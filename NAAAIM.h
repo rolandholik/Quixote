@@ -15,3 +15,4 @@
 /* Object identifiers. */
 #define NAAAIM_SHA256_OBJID		1
 #define NAAAIM_SHA256_hmac_OBJID	2
+#define NAAAIM_IDsignature_OBJID	3

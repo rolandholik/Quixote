@@ -6,7 +6,7 @@
 
 
 # Variable declarations.
-CSRC = 	SHA256.c SHA256_hmac.c
+CSRC = 	SHA256.c SHA256_hmac.c IDsignature.c
 
 CC = gcc
 
@@ -75,5 +75,6 @@ dotest: dotest.o ${COBJS}
 # Source dependencies.
 SHA256.o: ./HurdLib/Origin.h ./HurdLib/Buffer.h SHA256.c SHA256.h
 SHA256_hmac.o: ./HurdLib/Origin.h ./HurdLib/Buffer.h SHA256_hmac.h
+IDsignature.h: ./HurdLib/Origin.h ./HurdLib/Buffer.h SHA256.h
 
 genid.o: ./HurdLib/Config.h ./HurdLib/Buffer.h SHA256.h
