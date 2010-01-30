@@ -66,7 +66,7 @@ tags:
 
 clean:
 	rm -f *.o *~ TAGS;
-	rm -f genrandom genid RSAkey_test ID_test;
+	rm -f genrandom genid RSAkey_test ID_test sha256key;
 
 dotest: dotest.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
@@ -75,6 +75,9 @@ RSAkey_test: RSAkey_test.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
 ID_test: ID_test.o ${COBJS}
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
+
+sha256key: sha256key.o SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
 
@@ -86,3 +89,4 @@ OrgID.o: OrgID.h SHA256.h
 PatientID.o: PatientID.h OrgID.h SHA256.h
 
 genid.o: ./HurdLib/Config.h ./HurdLib/Buffer.h SHA256.h
+sha256key.o: SHA256.h
