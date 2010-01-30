@@ -6,7 +6,7 @@
 
 
 # Variable declarations.
-CSRC = 	SHA256.c SHA256_hmac.c IDsignature.c
+CSRC = 	SHA256.c SHA256_hmac.c RSAkey.c
 
 CC = gcc
 
@@ -66,15 +66,18 @@ tags:
 
 clean:
 	rm -f *.o *~ TAGS;
-	rm genrandom genid;
+	rm genrandom genid RSAkey_test;
 
 dotest: dotest.o ${COBJS}
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
+
+RSAkey_test: RSAkey_test.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
 
 # Source dependencies.
 SHA256.o: ./HurdLib/Origin.h ./HurdLib/Buffer.h SHA256.c SHA256.h
 SHA256_hmac.o: ./HurdLib/Origin.h ./HurdLib/Buffer.h SHA256_hmac.h
-IDsignature.h: ./HurdLib/Origin.h ./HurdLib/Buffer.h SHA256.h
+RSAkey.o: ./HurdLib/Origin.h RSAkey.h
 
 genid.o: ./HurdLib/Config.h ./HurdLib/Buffer.h SHA256.h
