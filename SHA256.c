@@ -45,6 +45,9 @@ struct NAAAIM_SHA256_State
 	/* Object identifier. */
 	uint32_t objid;
 
+	/* Object status. */
+	_Bool poisoned;
+
 	/* Flag to indicate if digest has been computed. */
 	_Bool computed;
 
@@ -74,7 +77,8 @@ static void _init_state(const SHA256_State const S) {
 	S->libid = NAAAIM_LIBID;
 	S->objid = NAAAIM_SHA256_OBJID;
 
-	S->computed    = false;
+	S->poisoned = false;
+	S->computed = false;
 
 	return;
 }
@@ -107,16 +111,10 @@ static _Bool _init_crypto(const SHA256_State const S )
 	 }
 
 	 /* Describe the hash we are using. */
-#if 1
 	 if ( (S->digest = EVP_get_digestbyname("SHA256")) == NULL ) {
-		 fputs("\n\nDefaulting to shorter hash.\n\n", stderr);
-		 if ( (S->digest = EVP_get_digestbyname("SHA1")) == NULL )
-			 return false;
-	 }
-#else
-	 if ( (S->digest = EVP_get_digestbyname("SHA1")) == NULL )
+		 S->poisoned = true;
 		 return false;
-#endif
+	 }
 
 	 /* Initialize a structure for digest manipulations. */
 	 EVP_MD_CTX_init(&S->context);
@@ -148,22 +146,35 @@ static _Bool _init_crypto(const SHA256_State const S )
 static _Bool _compute_digest(const SHA256_State const S)
 
 {
+	auto _Bool retn = false;
+
 	auto unsigned char buffer[EVP_MD_size(S->digest)];
 
-	auto int size;
+	auto unsigned int size;
 
 
-	if ( S->computed )
-		return true;
+	if ( S->poisoned )
+		return false;
+
+	if ( S->computed ) {
+		S->poisoned = true;
+		goto done;
+	}
 	S->computed = true;
 
-	if ( !EVP_DigestFinal_ex(&S->context, buffer, &size) )
-		return false;
+	if ( !EVP_DigestFinal_ex(&S->context, buffer, &size) ) {
+		S->poisoned = true;
+		goto done;
+	}
 
-	if ( !S->buffer->add(S->buffer, buffer, size) )
-		return false;
+	if ( !S->buffer->add(S->buffer, buffer, size) ){
+		S->poisoned = true;
+		goto done;
+	}
+	retn = true;
 
-	return true;
+ done:
+	return retn;
 }
 	
 	
@@ -185,25 +196,38 @@ static _Bool _compute_digest(const SHA256_State const S)
 static _Bool add(const SHA256 const this, const Buffer const bf)
 
 {
+	auto _Bool retn = false;
+
 	auto const SHA256_State const S = this->state;
 
 
+	if ( S->poisoned || bf->poisoned(bf) )
+		goto done;
+
 	/* Refuse to add to the hash if it has been computed. */
-	if ( S->computed )
-		return false;
+	if ( S->computed ) {
+		S->poisoned = true;
+		goto done;
+	}
 
 	/* Initialize the digest if necessary. */
 	if ( !S->computed ) {
-		if ( !EVP_DigestInit_ex(&S->context, S->digest, NULL) )
-			return false;
+		if ( !EVP_DigestInit_ex(&S->context, S->digest, NULL) ) {
+			S->poisoned = true;
+			goto done;
+		}
 		S->buffer->reset(S->buffer);
 	}
 
 	/* Add the buffer contents. */
-	if ( !EVP_DigestUpdate(&S->context, bf->get(bf), bf->size(bf)) )
-		return false;
+	if ( !EVP_DigestUpdate(&S->context, bf->get(bf), bf->size(bf)) ) {
+		S->poisoned = true;
+		goto done;
+	}
+	retn = true;
 
-	return true;
+ done:
+	return retn;
 }
 
 
@@ -223,10 +247,7 @@ static _Bool add(const SHA256 const this, const Buffer const bf)
 static _Bool compute(const SHA256 const this)
 
 {
-	if ( !_compute_digest(this->state) )
-		return NULL;
-
-	return true;
+	return _compute_digest(this->state);
 }
 
 
@@ -274,8 +295,13 @@ static unsigned char *get(const SHA256 const this)
 	auto const SHA256_State const S = this->state;
 
 
-	if ( !S->computed )
+	if ( S->poisoned )
 		return NULL;
+
+	if ( !S->computed ) {
+		S->poisoned = true;
+		return NULL;
+	}
 
 	return S->buffer->get(S->buffer);
 }
@@ -303,8 +329,10 @@ static Buffer get_Buffer(const SHA256 const this)
 	auto const SHA256_State const S = this->state;
 
 
-	if ( !S->computed )
+	if ( !S->computed ) {
+		S->poisoned = true;
 		return NULL;
+	}
 
 	return S->buffer;
 }
@@ -322,6 +350,10 @@ static Buffer get_Buffer(const SHA256 const this)
 static void print(const SHA256 const this)
 
 {
+	if ( this->state->poisoned ) {
+		fputs("* POISONED *\n", stderr);
+		return;
+	}
 	this->state->buffer->print(this->state->buffer);
 }
 
