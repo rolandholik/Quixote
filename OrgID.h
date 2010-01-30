@@ -27,6 +27,7 @@ struct NAAAIM_OrgID
 	_Bool (*create)(const OrgID, const char *, const char *);
 	Buffer (*get_Buffer)(const OrgID);
 	void (*print)(const OrgID);
+	_Bool (*poisoned)(const OrgID);
 	void (*whack)(const OrgID);
 
 	/* Private state. */

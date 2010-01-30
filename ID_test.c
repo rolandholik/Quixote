@@ -5,6 +5,7 @@
 #include <stdbool.h>
 
 #include "NAAAIM.h"
+#include "Buffer.h"
 #include "OrgID.h"
 
 

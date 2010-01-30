@@ -149,6 +149,26 @@ static _Bool create(const OrgID const this, const char * const anonymizer, \
 /**
  * External public method.
  *
+ * This method returns the functional status of the organizational
+ * identity.
+ *
+ * \param this	The object whose status is to be returned.
+ *
+ * \return	A boolean value is returned to indicate whether or not
+ *		the object has been contaminated by a dysfunctional
+ *		event during its creatioin or operation.
+ */
+
+static _Bool poisoned(const OrgID const this)
+
+{
+	return this->state->poisoned;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements returning the Buffer object which contains
  * the organizational identity.
  *
@@ -250,6 +270,7 @@ extern OrgID NAAAIM_OrgID_Init(void)
 	this->create	 = create;
 	this->get_Buffer = get_Buffer;
 	this->print	 = print;
+	this->poisoned	 = poisoned;
 	this->whack	 = whack;
 
 	return this;
