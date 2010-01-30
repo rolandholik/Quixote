@@ -32,13 +32,14 @@ extern int main(int argc, char *argv[])
 
 	while ( fgets(input, sizeof(input), stdin) ) {
 		if ( (p = strchr(input, '\n')) != NULL )
-			*p = NULL;
+			*p = '\0';
 		bufr->add_hexstring(bufr, input);
 		sha256->add(sha256, bufr);
 		bufr->reset(bufr);
 	}
 
 	sha256->compute(sha256);
+	fputc('\n', stdout);
 	sha256->print(sha256);
 
 

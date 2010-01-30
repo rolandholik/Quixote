@@ -201,8 +201,17 @@ static _Bool add(const SHA256 const this, const Buffer const bf)
 	auto const SHA256_State const S = this->state;
 
 
-	if ( S->poisoned || bf->poisoned(bf) )
+	/*
+	 * Sanity checks for the integrity of the object and the
+	 * input object.
+	 */
+	if ( S->poisoned )
 		goto done;
+	if ( bf->poisoned(bf) ) {
+		S->poisoned = true;
+		goto done;
+	}
+
 
 	/* Refuse to add to the hash if it has been computed. */
 	if ( S->computed ) {
