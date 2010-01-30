@@ -82,6 +82,7 @@ ID_test: ID_test.o ${COBJS}
 SHA256.o: ./HurdLib/Origin.h ./HurdLib/Buffer.h SHA256.c SHA256.h
 SHA256_hmac.o: ./HurdLib/Origin.h ./HurdLib/Buffer.h SHA256_hmac.h
 RSAkey.o: ./HurdLib/Origin.h RSAkey.h
-OrgID.o: OrgID.h
+OrgID.o: OrgID.h SHA256.h
+PatientID.o: PatientID.h OrgID.h SHA256.h
 
 genid.o: ./HurdLib/Config.h ./HurdLib/Buffer.h SHA256.h
