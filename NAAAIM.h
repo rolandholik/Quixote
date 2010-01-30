@@ -16,3 +16,4 @@
 #define NAAAIM_SHA256_OBJID		1
 #define NAAAIM_SHA256_hmac_OBJID	2
 #define NAAAIM_RSAkey_OBJID		3
+#define NAAAIM_OrgID_OBJID		3
