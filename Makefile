@@ -66,7 +66,7 @@ tags:
 
 clean:
 	rm -f *.o *~ TAGS;
-	rm -f genrandom genid RSAkey_test OrgID_test;
+	rm -f genrandom genid RSAkey_test ID_test;
 
 dotest: dotest.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
@@ -74,7 +74,7 @@ dotest: dotest.o ${COBJS}
 RSAkey_test: RSAkey_test.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
-OrgID_test: OrgID_test.o ${COBJS}
+ID_test: ID_test.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
 
