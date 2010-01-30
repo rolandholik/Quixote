@@ -6,7 +6,7 @@
 
 
 # Variable declarations.
-CSRC = 	SHA256.c SHA256_hmac.c RSAkey.c OrgID.c
+CSRC = 	SHA256.c SHA256_hmac.c RSAkey.c OrgID.c PatientID.c
 
 CC = gcc
 
