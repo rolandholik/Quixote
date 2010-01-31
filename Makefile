@@ -6,7 +6,7 @@
 
 
 # Variable declarations.
-CSRC = 	SHA256.c SHA256_hmac.c RSAkey.c OrgID.c PatientID.c
+CSRC = 	SHA256.c SHA256_hmac.c RSAkey.c OrgID.c PatientID.c RandomBuffer.c
 
 CC = gcc
 
@@ -54,8 +54,8 @@ CFLAGS := ${CFLAGS} -I./HurdLib -I${SSL_INCLUDE}
 # Targets
 all: ${COBJS} genrandom genid
 
-genrandom: genrandom.o
-	${CC} ${LDFLAGS} -o ${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
+genrandom: genrandom.o RandomBuffer.o SHA256.o
+	${CC} ${LDFLAGS} -o ${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
 genid: genid.o OrgID.o PatientID.o SHA256.o SHA256_hmac.o
 	${CC} ${LDFLAGS} -o ${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl \
@@ -87,6 +87,7 @@ SHA256_hmac.o: ./HurdLib/Origin.h ./HurdLib/Buffer.h SHA256_hmac.h
 RSAkey.o: ./HurdLib/Origin.h RSAkey.h
 OrgID.o: OrgID.h SHA256.h
 PatientID.o: PatientID.h OrgID.h SHA256.h
+RandomBuffer.o: RandomBuffer.h
 
 genid.o: ./HurdLib/Config.h ./HurdLib/Buffer.h SHA256.h
 sha256key.o: SHA256.h

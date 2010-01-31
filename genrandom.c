@@ -1,43 +1,42 @@
 #include <stdio.h>
 #include <stdbool.h>
 
+#include <openssl/rand.h>
+
 #include "NAAAIM.h"
 #include "Buffer.h"
+#include "RandomBuffer.h"
+#include "SHA256.h"
 
 
 
 extern int main(int argc, char *argv[])
 
 {
-	auto char bufr[32];
+	auto RandomBuffer random;
 
-	auto Buffer rand;
-
-	auto FILE *rndfile;
+	auto SHA256 sha256;
 
 
-	if ( (rndfile = fopen("/dev/urandom", "r")) == NULL ) {
-		fputs("Cannot open random file.\n", stderr);
+	if ( (random = NAAAIM_RandomBuffer_Init()) == NULL ) {
+		fputs("Failed random buffer initialization.\n", stderr);
 		return 1;
 	}
 
-	if ( fread(bufr, sizeof(bufr), 1, rndfile) != 1 ) {
-		fclose(rndfile);
-		fputs("Error reading random file.\n", stderr);
+	random->generate(random, 8);
+	random->print(random);
+
+	if ( (sha256 = NAAAIM_SHA256_Init()) == NULL ) {
+		fputs("Failed SHA256 initialization.\n", stderr);
+		random->whack(random);
 		return 1;
 	}
-	fclose(rndfile);
 
+	sha256->add(sha256, random->get_Buffer(random));
+	sha256->compute(sha256);
+	sha256->print(sha256);
 
-	if ( (rand = HurdLib_Buffer_Init()) == NULL ) {
-		fputs("Failed buffer init.\n", stderr);
-		return 0;
-	}
-		
-	rand->add(rand, bufr, sizeof(bufr));
-	rand->print(rand);
-	rand->whack(rand);
-
-
+	random->whack(random);
+	sha256->whack(sha256);
 	return 0;
 }
