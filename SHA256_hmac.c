@@ -46,6 +46,12 @@ struct NAAAIM_SHA256_hmac_State
 	/* Object identifier. */
 	uint32_t objid;
 
+	/* Object status. */
+	_Bool poisoned;
+
+	/* Flag to indicate whether or not object has been initialized. */
+	_Bool initialized;
+
 	/* Flag to indicate if digest has been computed. */
 	_Bool computed;
 
@@ -78,7 +84,9 @@ static void _init_state(const SHA256_hmac_State const S) {
 	S->libid = NAAAIM_LIBID;
 	S->objid = NAAAIM_SHA256_hmac_OBJID;
 
-	S->computed = false;
+	S->poisoned    = false;
+	S->initialized = false;
+	S->computed    = false;
 
 	return;
 }
@@ -111,16 +119,10 @@ static _Bool _init_crypto(const SHA256_hmac_State const S )
 	 }
 
 	 /* Describe the hash we are using. */
-#if 1
 	 if ( (S->digest = EVP_get_digestbyname("SHA256")) == NULL ) {
-		 fputs("HMAC defaulting to shorter hash.\n", stderr);
-		 if ( (S->digest = EVP_get_digestbyname("SHA1")) == NULL )
-			 return false;
-	 }
-#else
-	 if ( (S->digest = EVP_get_digestbyname("SHA1")) == NULL )
+		 S->poisoned = true;
 		 return false;
-#endif
+	 }
 
 
 	 /* Initialize structures for the hash and digest algorithms. */
@@ -153,21 +155,33 @@ static _Bool _init_crypto(const SHA256_hmac_State const S )
 static _Bool _compute_digest(const SHA256_hmac_State const S)
 
 {
+	auto _Bool retn = false;
+
 	auto unsigned char buffer[EVP_MD_size(S->digest)];
 
-	auto int size;
+	auto unsigned int size;
 
 
-	if ( S->computed )
-		return true;
+	if ( S->poisoned )
+		return false;
+
+	if ( S->computed ) {
+		S->poisoned = true;
+		goto done;
+	}
 	S->computed = true;
 
 	HMAC_Final(&S->context, buffer, &size);
 
-	if ( !S->buffer->add(S->buffer, buffer, size) )
-		return false;
+	if ( !S->buffer->add(S->buffer, buffer, size) ) {
+		S->poisoned = true;
+		goto done;
+	}
+	retn = true;
 
-	return true;
+
+ done:
+	return retn;
 }
 
 
@@ -187,24 +201,36 @@ static _Bool add(const SHA256_hmac const this, \
 		 unsigned const char * const bf, size_t const size)
 
 {
+	auto _Bool retn = false;
+
 	auto const SHA256_hmac_State const S = this->state;
 
 
-	/* Refuse to add to the hash if it has been computed. */
-	if ( S->computed )
-		return false;
+	/*
+	 * Sanity checks for the integrity of the object and improper use
+	 * of the object.
+	 */
+	if ( S->poisoned )
+		goto done;
+	if ( S->computed ) {
+		S->poisoned = true;
+		goto done;
+	}
+
 
 	/* Initialize the digest if necessary. */
-	if ( !S->computed ) {
+	if ( !S->initialized ) {
 		HMAC_Init_ex(&S->context, S->key->get(S->key), \
 			     S->key->size(S->key), S->digest, NULL);
-		S->buffer->reset(S->buffer);
+		S->initialized = true;
 	}
 
 	/* Add the buffer contents. */
 	HMAC_Update(&S->context, bf, size);
+	retn = true;
 
-	return true;
+ done:
+	return retn;
 }
 
 	
@@ -222,24 +248,38 @@ static _Bool add(const SHA256_hmac const this, \
 static _Bool add_Buffer(const SHA256_hmac const this, const Buffer const bf)
 
 {
+	auto _Bool retn = false;
+
 	auto const SHA256_hmac_State const S = this->state;
 
 
-	/* Refuse to add to the hash if it has been computed. */
-	if ( S->computed )
-		return false;
+	/*
+	 * Refuse to add to the hash and poison the object to indicate a
+	 * programming issue.  Also verify the incoming object does not
+	 * have a problem.
+	 */
+	if ( S->computed ) {
+		S->poisoned = true;
+		goto done;
+	}
+	if ( bf->poisoned(bf) ) {
+		S->poisoned = true;
+		goto done;
+	}
 
 	/* Initialize the digest if necessary. */
-	if ( !S->computed ) {
+	if ( !S->initialized ) {
 		HMAC_Init_ex(&S->context, S->key->get(S->key), \
 			     S->key->size(S->key), S->digest, NULL);
-		S->buffer->reset(S->buffer);
+		S->initialized = true;
 	}
 
 	/* Add the buffer contents. */
 	HMAC_Update(&S->context, bf->get(bf), bf->size(bf));
+	retn = true;
 
-	return true;
+ done:
+	return retn;
 }
 
 
@@ -257,10 +297,7 @@ static _Bool add_Buffer(const SHA256_hmac const this, const Buffer const bf)
 static _Bool compute(const SHA256_hmac const this)
 
 {
-	if ( !_compute_digest(this->state) )
-		return NULL;
-
-	return true;
+	return _compute_digest(this->state);
 }
 
 
@@ -281,7 +318,8 @@ static void reset(const SHA256_hmac const this)
 {
 	auto const SHA256_hmac_State const S = this->state;
 
-	S->computed = false;
+	S->computed    = false;
+	S->initialized = false;
 	S->buffer->reset(S->buffer);
 
 	return;
@@ -310,6 +348,8 @@ static unsigned char *get(const SHA256_hmac const this)
 
 
 	if ( !S->computed )
+		S->poisoned = true;
+	if ( S->poisoned )
 		return NULL;
 
 	return S->buffer->get(S->buffer);
@@ -339,6 +379,8 @@ static Buffer get_Buffer(const SHA256_hmac const this)
 
 
 	if ( !S->computed )
+		S->poisoned = true;
+	if ( S->poisoned )
 		return NULL;
 
 	return S->buffer;
@@ -357,6 +399,10 @@ static Buffer get_Buffer(const SHA256_hmac const this)
 static void print(const SHA256_hmac const this)
 
 {
+	if ( this->state->poisoned ) {
+		fputs("* POISONED *\n", stderr);
+		return;
+	}
 	this->state->buffer->print(this->state->buffer);
 }
 
@@ -374,6 +420,8 @@ static void whack(const SHA256_hmac const this)
 {
 	auto const SHA256_hmac_State const S = this->state;
 
+
+	HMAC_CTX_cleanup(&S->context);
 
 	if ( S->buffer != NULL )
 		S->buffer->whack(S->buffer);
