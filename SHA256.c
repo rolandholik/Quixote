@@ -48,6 +48,9 @@ struct NAAAIM_SHA256_State
 	/* Object status. */
 	_Bool poisoned;
 
+	/* Flag to indicate whether or not object has been initialized. */
+	_Bool initialized;
+
 	/* Flag to indicate if digest has been computed. */
 	_Bool computed;
 
@@ -77,8 +80,9 @@ static void _init_state(const SHA256_State const S) {
 	S->libid = NAAAIM_LIBID;
 	S->objid = NAAAIM_SHA256_OBJID;
 
-	S->poisoned = false;
-	S->computed = false;
+	S->poisoned    = false;
+	S->initialized = false;
+	S->computed    = false;
 
 	return;
 }
@@ -173,6 +177,7 @@ static _Bool _compute_digest(const SHA256_State const S)
 	}
 	retn = true;
 
+
  done:
 	return retn;
 }
@@ -220,12 +225,12 @@ static _Bool add(const SHA256 const this, const Buffer const bf)
 	}
 
 	/* Initialize the digest if necessary. */
-	if ( !S->computed ) {
+	if ( !S->initialized ) {
 		if ( !EVP_DigestInit_ex(&S->context, S->digest, NULL) ) {
 			S->poisoned = true;
 			goto done;
 		}
-		S->buffer->reset(S->buffer);
+		S->initialized = true;
 	}
 
 	/* Add the buffer contents. */
@@ -276,7 +281,8 @@ static void reset(const SHA256 const this)
 {
 	auto const SHA256_State const S = this->state;
 
-	S->computed = false;
+	S->computed    = false;
+	S->initialized = false;
 	S->buffer->reset(S->buffer);
 
 	return;
