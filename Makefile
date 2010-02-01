@@ -57,7 +57,7 @@ all: ${COBJS} genrandom genid
 genrandom: genrandom.o RandomBuffer.o SHA256.o
 	${CC} ${LDFLAGS} -o ${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
-genid: genid.o OrgID.o PatientID.o SHA256.o SHA256_hmac.o
+genid: genid.o ${COBJS}
 	${CC} ${LDFLAGS} -o ${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl \
 		${SSL_LIBRARY};
 

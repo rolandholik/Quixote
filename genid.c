@@ -10,6 +10,8 @@
 #include "SHA256_hmac.h"
 #include "OrgID.h"
 #include "PatientID.h"
+#include "RandomBuffer.h"
+#include "RSAkey.h"
 
 
 static _Bool permute_identity(const Config const parser,	   \
@@ -101,22 +103,175 @@ static _Bool permute_identity(const Config const parser,	   \
 }
 
 
+static _Bool output_ptid(const PatientID const ptid,	  \
+			 const RandomBuffer const random, \
+			 const char * const keyfile)
+
+{
+	auto _Bool retn = false;
+
+	auto unsigned char *encrypted;
+
+	auto unsigned int lp;
+
+	auto Buffer payload = NULL;
+
+	auto RSAkey key = NULL;
+
+
+	/* Setup the payload. */
+	if ( (payload = HurdLib_Buffer_Init()) == NULL )
+		goto done;
+	payload->add_Buffer(payload, ptid->get_Buffer(ptid));
+	payload->add_Buffer(payload, random->get_Buffer(random));
+
+
+	/* Setup and encrypt payload with the private key. */
+	if ( (key = NAAAIM_RSAkey_Init()) == NULL )
+		goto done;
+	if ( !key->load_private_key(key, keyfile) )
+		goto done;
+	if ( !key->encrypt(key, payload) )
+		goto done;
+
+	/* Output the private key in block format. */
+	encrypted = payload->get(payload);
+	fputs("-----BEGIN PATIENT IDENTITY-----\n", stdout);
+	for (lp= 1; lp <= key->size(key); ++lp) {
+		fprintf(stdout, "%02x", *(encrypted + lp - 1));
+		if ( ((lp % 32) == 0) )
+			fputc('\n', stdout);
+	}
+	fputs("-----END PATIENT IDENTITY-----\n", stdout);
+	retn = true;
+
+
+ done:
+	if ( payload != NULL )
+		payload->whack(payload);
+	if ( key != NULL )
+		key->whack(key);
+
+	return retn;
+}
+
+static _Bool generate_token(const Config const parser,	\
+			    const OrgID const orgid,	\
+			    const PatientID const ptid)
+
+{
+	auto _Bool retn = false;
+
+	auto char *rsakey;
+
+	auto Buffer rb,
+		    bf = NULL;
+
+	auto RandomBuffer random = NULL;
+
+	auto SHA256 sha256 = NULL;
+
+	auto SHA256_hmac hmac = NULL;
+
+
+	if ( (rsakey = parser->get(parser, "rsakey")) == NULL ) {
+		fputs("Failed RSA key lookup.\n", stderr);
+		goto done;
+	}
+
+	/* Generate the random nonce for an identity. */
+	if ( (random = NAAAIM_RandomBuffer_Init()) == NULL ) {
+		fputs("Cannot create random number generator.", stderr);
+		goto done;
+	}
+	if ( !random->generate(random, 512 / 8) ) {
+		fputs("Cannot generate id nonce.\n", stderr);
+		goto done;
+	}
+
+	if ( (sha256 = NAAAIM_SHA256_Init()) == NULL ) {
+		fputs("Cannot create hashing object.\n", stderr);
+		goto done;
+	}
+
+
+	/*
+	 * Generate the user specific organizational hash key from the
+	 * first 256 bits of the random nonce.
+	 */
+	if ( (bf = HurdLib_Buffer_Init()) == NULL ) {
+		fputs("Cannot create buffer object.\n", stderr);
+		goto done;
+	}
+	rb = random->get_Buffer(random);
+	bf->add(bf, rb->get(rb), 256 / 8);
+	sha256->add(sha256, bf);
+	sha256->compute(sha256);
+
+
+	/*
+	 * Hash the organizational identity with the user key generated
+	 * in the previous section.
+	 */
+	if ( (hmac = NAAAIM_SHA256_hmac_Init(sha256->get_Buffer(sha256))) \
+	     == NULL ) {
+		fputs("Cannot create HMAC object.\n", stderr);
+		goto done;
+	}
+	hmac->add_Buffer(hmac, orgid->get_Buffer(orgid));
+	hmac->compute(hmac);
+
+
+	/* Output the identity token. */
+	fputs("-----BEGIN IDENTITY TOKEN-----\n", stdout);
+
+	fputs("-----BEGIN ORGANIZATION IDENTITY-----\n", stdout);
+	sha256->print(sha256);
+	hmac->print(hmac);
+	fputs("-----END ORGANIZATION IDENTITY-----\n", stdout);
+
+	if ( !output_ptid(ptid, random, rsakey) )
+	      fputs("Error outputing id token.\n", stderr);
+	fputs("-----END IDENTITY TOKEN-----\n", stdout);
+
+	sha256->reset(sha256);
+	sha256->add(sha256, random->get_Buffer(random));
+	sha256->compute(sha256);
+	fputs("\nOrg token id: ", stdout);
+	sha256->print(sha256);
+	retn = true;
+
+
+ done:
+	if ( bf != NULL )
+		bf->whack(bf);
+	if ( random != NULL )
+		random->whack(random);
+	if ( sha256 != NULL )
+		sha256->whack(sha256);
+	if ( hmac != NULL )
+		hmac->whack(hmac);
+
+	return retn;
+}
+
+
 extern int main(int argc, char *argv[])
 
 {
+	auto _Bool token = false;
+
 	auto char *ssnid,
 		  *anonymizer,
 		  *credential,
 		  *organization = NULL,
 		  *ssn = NULL;
 
-
 	auto int retn;
 
 	auto _Bool permute = false;
 
-	auto Buffer bufr   = NULL,
-		    hashin = NULL;
+	auto Buffer bufr = NULL;
 
 	auto Config parser = NULL;
 
@@ -125,9 +280,12 @@ extern int main(int argc, char *argv[])
 	auto PatientID ptid = NULL;
 
 
-	/* Get the organizational name and SSN. */
-	while ( (retn = getopt(argc, argv, "pi:o:")) != EOF )
+	/* Get the organizational identifier and SSN. */
+	while ( (retn = getopt(argc, argv, "Tpi:o:")) != EOF )
 		switch ( retn ) {
+			case 'T':
+				token = true;
+				break;
 			case 'i':
 				ssn = optarg;
 				break;
@@ -180,14 +338,6 @@ extern int main(int argc, char *argv[])
 	}
 
 	orgid->create(orgid, anonymizer, credential);
-	fputs("Domain:  ", stdout);
-	if ( permute ) {
-		bufr->reset(bufr);
-		permute_identity(parser, orgid->get_Buffer(orgid), bufr);
-		bufr->print(bufr);
-	}
-	else
-		orgid->print(orgid);
 
 
 	/* Create the user identity. */
@@ -202,21 +352,37 @@ extern int main(int argc, char *argv[])
 	}
 
 	ptid->create(ptid, orgid, ssnid, ssn);
-	fputs("Element: ", stdout);
-	if ( permute ) {
-		bufr->reset(bufr);
-		permute_identity(parser, orgid->get_Buffer(orgid), bufr);
-		bufr->print(bufr);
+
+
+	/* Output user identities if token generation is not requested. */
+	if ( !token ) {
+		fputs("Domain:  ", stdout);
+		if ( permute ) {
+			bufr->reset(bufr);
+			permute_identity(parser, orgid->get_Buffer(orgid), \
+					 bufr);
+			bufr->print(bufr);
+		}
+		else
+			orgid->print(orgid);
+
+		fputs("Element: ", stdout);
+		if ( permute ) {
+			bufr->reset(bufr);
+			permute_identity(parser, orgid->get_Buffer(orgid), \
+					 bufr);
+			bufr->print(bufr);
+		}
+		else
+			ptid->print(ptid);
 	}
 	else
-		ptid->print(ptid);
+		generate_token(parser, orgid, ptid);
 
-	
+
  done:
 	if ( bufr != NULL )
 		bufr->whack(bufr);
-	if ( hashin != NULL )
-		hashin->whack(hashin);
 	if ( parser != NULL )
 		parser->whack(parser);
 	if ( orgid != NULL )
