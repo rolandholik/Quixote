@@ -1,51 +1,11 @@
-# Organizational identities.
+# Organizational identity configuration file.
 
 [org1]
-credential = 1245233279
-anonymizer = b5da47c67077b6104c0c2d01397e70c764449970a1518c660b511d86b7410ac2
-ssnid = 8310342c6fe343d9b54cf8363a78850aa58edc9b982899c946b081faad52aa5d
+credential = 0000000001
+anonymizer = 62a914ed511f23b84d68f860bd39cbffb75ab545aed14183f73582e6cf5133d8
+ssnid = 8124d14f9908e59854bbb79ada1b2d342cbc68f26885da57fffc6df4f4182be3
 
-base = 8ef4c1e06742f3f8f29ca1e6cda4c7002de41cf1d557b7b01996c832aefbf639
-key = b55146b7a49140a262dbf138729b1dd69d957af317b745eb0193641d24b94877
+base = 06283ffef9f148c4c32ee6bf0d99d519cb80d4e3bfb0f880b223777504053f82
+key = 0bbe86e54158de2a225745593d3fb86c8abaf2dc5810afd55df87c6d76ef520f
 
-rsakey = "/u/usr/sources/NAAAIM/org1-private.pem"
-
-[org2]
-credential = 1881697704
-anonymizer = 6ead52c78a0d3e1fecbfaf36031337f6193b5ea58595163da2d0ca51cb1ab73a
-ssnid = b2f1f58ca77625734e93b893cd2ec4dd3a9bbc98c89dc8d73c82bdb159a25073
-
-base = 8ef4c1e06742f3f8f29ca1e6cda4c7002de41cf1d557b7b01996c832aefbf639
-key = b55146b7a49140a262dbf138729b1dd69d957af317b745eb0193641d24b94877
-
-rsakey = "/u/usr/sources/NAAAIM/org2-private.pem"
-
-[org3]
-credential = 1124025713
-anonymizer = 566e2183cc677da77bd168fc6a0a33ed12a6a2081e263d3089368beb42c16a43
-ssnid = bbb7e30bb51cc2410435707ac2c09384865f5e353dc7d81af5763105ad499619
-
-base = bc9aad96a581f178753969ba644152f61ebe1d8dab6518eca8b4d10f4822d173
-key = 4141d15e5220bc2f4c62590c56554383408abd123cd085695568c2882842647d
-
-rsakey = "/u/usr/sources/NAAAIM/org3-private.pem"
-
-[org4]
-credential = 1528037330
-anonymizer = 45e5aaf84fd954569a95acbec669ebdbc5d396f1f65ca1d07310cac84375dbee
-ssnid = 1abcac2f6c8f182f548fc90a19f23ce75e5b9a21c3b71a2882fa404cafbb8db6
-
-base = 2f2aded21a2a6bacf4843df14da9cc5974ef9ca6d265d77e774e4c80cd7abc7a
-key = 8cf361a63a405abb8a4354e127a88d0e2f88cca1644634d3ce6532124e784a56
-
-rsakey = "/u/usr/sources/NAAAIM/org4-private.pem"
-
-[org5]
-credential = 1093817181
-anonymizer = 30e1a56868862e86ca1316c8dc9d71488c164615734b40b0d95281e99d22d0a3
-ssnid = 405275451bbd0f2b5a018e1e87f5a4a2303f577e7e3829ae6d94af474d7fab7f
-
-base = 311214dfc0fee10b77b0c4f03be531328071bb9f7a28fc31a9d9a1f409f4d916
-key = fe8f3a329de47c9bf090fad6f6f55abb5ad807290a6f32175c61ad79f40e572d
-
-rsakey = "/u/usr/sources/NAAAIM/org5-private.pem"
+rsakey = "./org-private.pem"

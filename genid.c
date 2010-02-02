@@ -264,6 +264,7 @@ extern int main(int argc, char *argv[])
 	auto char *ssnid,
 		  *anonymizer,
 		  *credential,
+		  *config = NULL,
 		  *organization = NULL,
 		  *ssn = NULL;
 
@@ -281,10 +282,13 @@ extern int main(int argc, char *argv[])
 
 
 	/* Get the organizational identifier and SSN. */
-	while ( (retn = getopt(argc, argv, "Tpi:o:")) != EOF )
+	while ( (retn = getopt(argc, argv, "Tpc:i:o:")) != EOF )
 		switch ( retn ) {
 			case 'T':
 				token = true;
+				break;
+			case 'c':
+				config = optarg;
 				break;
 			case 'i':
 				ssn = optarg;
@@ -301,6 +305,10 @@ extern int main(int argc, char *argv[])
 		fputs("Inputs not specified.\n", stderr);
 		return 1;
 	}
+
+	if ( config == NULL )
+		config = "./orgid.txt";
+
 	retn = 1;
 
 
@@ -310,7 +318,7 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
-	if ( !parser->parse(parser, "./orgid.txt") ) {
+	if ( !parser->parse(parser, config) ) {
 		fputs("Failed parsing of identity keys\n", stderr);
 		goto done;
 	}

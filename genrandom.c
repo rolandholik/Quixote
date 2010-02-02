@@ -23,7 +23,8 @@ extern int main(int argc, char *argv[])
 		return 1;
 	}
 
-	random->generate(random, 8);
+	random->generate(random, 256 / 8);
+	fputs("key:  ", stdout);
 	random->print(random);
 
 	if ( (sha256 = NAAAIM_SHA256_Init()) == NULL ) {
@@ -34,6 +35,7 @@ extern int main(int argc, char *argv[])
 
 	sha256->add(sha256, random->get_Buffer(random));
 	sha256->compute(sha256);
+	fputs("hash: ", stdout);
 	sha256->print(sha256);
 
 	random->whack(random);
