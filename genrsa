@@ -1,0 +1,60 @@
+#! /bin/bash
+
+
+# Variable for getopt processing.
+declare Arg;
+
+# Basename of RSA files and public/private filenames.
+declare Filename="" Private="" Public="";
+
+
+# Update path to include the openssl utility.
+PATH=$PATH:/usr/local/ssl/bin;
+
+
+#
+# This script is used to generate an RSA public/private keypair.  It
+# first generates a 2048 bit key and then extracts the public
+# component of that key into a separate file.  The following output
+# files are used:
+#
+#	Private:	NAME-private.pem
+#	Public:		NAME-public.pem
+#
+# Where NAME is set by the -o switch to this utility.
+#
+
+while getopts "o:" Arg;
+do
+	case $Arg in
+		o)	Filename=$OPTARG;;
+	esac;
+done;
+
+if [ -z "$Filename" ]; then
+	echo "No output file specified.";
+	exit 1;
+fi;
+
+Private="$Filename-private.pem";
+Public="$Filename-public.pem";
+
+
+# Generate the RSA keypair.
+openssl genrsa -out $Private 2048;
+if [ $? -ne 0 ]; then
+	echo "RSA key generation failed.";
+	exit 1;
+fi;
+
+
+# Extract the public component of the keypair.
+openssl rsa -pubout -in $Private -out $Public;
+if [ $? -ne 0 ]; then
+	echo "RSA key extraction failed.";
+	exit 1;
+fi;
+
+
+# All done.
+exit 0;

@@ -30,7 +30,7 @@ extern int main(int argc, char *argv[])
 		return 1;
 	}
 
-	if ( !enckey->load_public_key(enckey, "org-public.key") ) {
+	if ( !enckey->load_public_key(enckey, "org-public.pem") ) {
 		fputs("Failed load of private key.\n", stderr);
 		payload->whack(payload);
 		enckey->whack(enckey);
@@ -71,7 +71,7 @@ extern int main(int argc, char *argv[])
 		return 1;
 	}
 
-	if ( !deckey->load_private_key(enckey, "org-private.key") ) {
+	if ( !deckey->load_private_key(enckey, "org-private.pem") ) {
 		fputs("Failed load of public key.\n", stderr);
 		payload->whack(payload);
 		deckey->whack(deckey);
