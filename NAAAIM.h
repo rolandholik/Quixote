@@ -19,4 +19,4 @@
 #define NAAAIM_OrgID_OBJID		3
 #define NAAAIM_PatientID_OBJID		4
 #define NAAAIM_RandomBuffer_OBJID	5
-
+#define NAAAIM_IDtoken_OBJID		6

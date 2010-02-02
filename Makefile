@@ -6,7 +6,8 @@
 
 
 # Variable declarations.
-CSRC = 	SHA256.c SHA256_hmac.c RSAkey.c OrgID.c PatientID.c RandomBuffer.c
+CSRC = 	SHA256.c SHA256_hmac.c RSAkey.c OrgID.c PatientID.c RandomBuffer.c \
+	IDtoken.c
 
 CC = gcc
 
@@ -61,6 +62,10 @@ genid: genid.o ${COBJS}
 	${CC} ${LDFLAGS} -o ${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl \
 		${SSL_LIBRARY};
 
+token: token.o ${COBJS}
+	${CC} ${LDFLAGS} -o ${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl \
+		${SSL_LIBRARY};
+
 tags:
 	/opt/emacs/bin/etags *.{h,c};
 
@@ -88,6 +93,7 @@ RSAkey.o: ./HurdLib/Origin.h RSAkey.h
 OrgID.o: OrgID.h SHA256.h
 PatientID.o: PatientID.h OrgID.h SHA256.h
 RandomBuffer.o: RandomBuffer.h
+IDtoken.o: IDtoken.h
 
 genid.o: ./HurdLib/Config.h ./HurdLib/Buffer.h SHA256.h
 sha256key.o: SHA256.h
