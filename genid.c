@@ -174,10 +174,12 @@ static _Bool generate_token(const Config const parser,	\
 	auto SHA256_hmac hmac = NULL;
 
 
+	/* Get the RSA keyfile. */
 	if ( (rsakey = parser->get(parser, "rsakey")) == NULL ) {
-		fputs("Failed RSA key lookup.\n", stderr);
+		fputs("No RSA key specified.\n", stderr);
 		goto done;
 	}
+
 
 	/* Generate the random nonce for an identity. */
 	if ( (random = NAAAIM_RandomBuffer_Init()) == NULL ) {
@@ -232,13 +234,16 @@ static _Bool generate_token(const Config const parser,	\
 
 	if ( !output_ptid(ptid, random, rsakey) )
 	      fputs("Error outputing id token.\n", stderr);
-	fputs("-----END IDENTITY TOKEN-----\n", stdout);
 
 	sha256->reset(sha256);
 	sha256->add(sha256, random->get_Buffer(random));
 	sha256->compute(sha256);
-	fputs("\nOrg token id: ", stdout);
+	fputs("-----BEGIN TOKEN KEY-----\n", stdout);
 	sha256->print(sha256);
+	fputs("-----END TOKEN KEY-----\n", stdout);
+
+	fputs("-----END IDENTITY TOKEN-----\n", stdout);
+
 	retn = true;
 
 
