@@ -149,6 +149,23 @@ static _Bool create(const OrgID const this, const char * const anonymizer, \
 /**
  * External public method.
  *
+ * This method resets the organizational identity.  This method needs
+ * to be called after the create method has been in order to allow
+ * additional organizational identities to be created.
+ *
+ * \param this	The organizational identity which is to be reset.
+ */
+
+static void reset(const OrgID const this)
+
+{
+	this->state->identity->reset(this->state->identity);
+}
+
+
+/**
+ * External public method.
+ *
  * This method returns the functional status of the organizational
  * identity.
  *
@@ -268,6 +285,7 @@ extern OrgID NAAAIM_OrgID_Init(void)
 
 	/* Method initialization. */
 	this->create	 = create;
+	this->reset	 = reset;
 	this->get_Buffer = get_Buffer;
 	this->print	 = print;
 	this->poisoned	 = poisoned;

@@ -25,6 +25,7 @@ struct NAAAIM_OrgID
 {
 	/* External methods. */
 	_Bool (*create)(const OrgID, const char *, const char *);
+	void (*reset)(const OrgID);
 	Buffer (*get_Buffer)(const OrgID);
 	void (*print)(const OrgID);
 	_Bool (*poisoned)(const OrgID);
