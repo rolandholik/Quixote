@@ -71,7 +71,7 @@ tags:
 
 clean:
 	rm -f *.o *~ TAGS;
-	rm -f genrandom genid RSAkey_test ID_test sha256key;
+	rm -f genrandom genid token RSAkey_test ID_test sha256key;
 
 dotest: dotest.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
