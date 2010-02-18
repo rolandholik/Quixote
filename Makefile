@@ -7,7 +7,7 @@
 
 # Variable declarations.
 CSRC = 	SHA256.c SHA256_hmac.c RSAkey.c OrgID.c PatientID.c RandomBuffer.c \
-	IDtoken.c
+	IDtoken.c Duct.c
 
 CC = gcc
 
@@ -71,7 +71,7 @@ tags:
 
 clean:
 	rm -f *.o *~ TAGS;
-	rm -f genrandom genid token RSAkey_test ID_test sha256key;
+	rm -f genrandom genid token RSAkey_test ID_test Duct_test sha256key;
 
 dotest: dotest.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
@@ -80,6 +80,9 @@ RSAkey_test: RSAkey_test.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
 ID_test: ID_test.o ${COBJS}
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
+
+Duct_test: Duct_test.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
 sha256key: sha256key.o SHA256.o
@@ -94,6 +97,7 @@ OrgID.o: OrgID.h SHA256.h
 PatientID.o: PatientID.h OrgID.h SHA256.h
 RandomBuffer.o: RandomBuffer.h
 IDtoken.o: IDtoken.h
+Duct.o: Duct.h
 
 genid.o: ./HurdLib/Config.h ./HurdLib/Buffer.h SHA256.h
 sha256key.o: SHA256.h

@@ -20,3 +20,4 @@
 #define NAAAIM_PatientID_OBJID		4
 #define NAAAIM_RandomBuffer_OBJID	5
 #define NAAAIM_IDtoken_OBJID		6
+#define NAAAIM_Duct_OBJID		7
