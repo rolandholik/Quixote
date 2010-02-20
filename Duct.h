@@ -25,9 +25,15 @@ struct NAAAIM_Duct
 {
 	/* External methods. */
 	_Bool (*init_server)(const Duct);
+	_Bool (*init_client)(const Duct);
 	_Bool (*load_credentials)(const Duct, const char *, const char *);
-	_Bool (*init_port)(const Duct, int);
-	int (*accept_connection)(const Duct);
+	_Bool (*load_certificates)(const Duct, const char *);
+	_Bool (*init_port)(const Duct, const char *, int);
+	_Bool (*accept_connection)(const Duct);
+	_Bool (*init_connection)(const Duct);
+	_Bool (*send_Buffer)(const Duct, const Buffer);
+	_Bool (*receive_Buffer)(const Duct, const Buffer);
+	_Bool (*whack_connection)(const Duct);
 	void (*whack)(const Duct);
 
 	/* Private state. */

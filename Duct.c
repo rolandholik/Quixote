@@ -23,6 +23,7 @@
 #include <openssl/bn.h>
 
 #include <Origin.h>
+#include <Buffer.h>
 
 #include "NAAAIM.h"
 #include "Duct.h"
@@ -85,6 +86,9 @@ struct NAAAIM_Duct_State
 
 	/* Socket file descriptor. */
 	int sockt;
+
+	/* Server file descriptor. */
+	int fd;
 };
 
 
@@ -113,6 +117,7 @@ static void _init_state(const Duct_State const S) {
 	S->context_id	= 0;
 	S->connection 	= NULL;
 	S->sockt	= -1;
+	S->fd		= -1;
 
 	return;
 }
@@ -153,7 +158,7 @@ static _Bool _init_crypto(const Duct_State const S)
  * Internal private method.
  *
  * This method implements initialization of a port on which a server
- * Duct object listens for SSL connecxtions.
+ * Duct object listens for SSL connections.
  *
  * \param	A pointer to the state information for a server Duct
  *		object.
@@ -177,17 +182,14 @@ static _Bool _init_server_port(const Duct_State const S, const int port)
 	sdef.sin_addr.s_addr	= INADDR_ANY;
 	
 	if ( (S->sockt = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1 ) {
-		fputs("Failed socket call\n", stderr);
 		S->poisoned = true;
 		goto done;
 	}
 	if ( bind(S->sockt, (struct sockaddr *) &sdef, sizeof(sdef)) == -1 ) {
-		fputs("Failed bind.\n", stderr);
 		S->poisoned = true;
 		goto done;
 	}
 	if ( listen(S->sockt, 128) == -1 ) {
-		fputs("Failed listen.\n", stderr);
 		S->poisoned = true;
 		goto done;
 	}
@@ -196,9 +198,61 @@ static _Bool _init_server_port(const Duct_State const S, const int port)
 
 
  done:
-	if ( retn == false )
-		close(S->sockt);
+	return retn;
+}
 
+
+/**
+ * Internal private method.
+ *
+ * This method implements initialization of a port on which a client
+ * will attempt an SSL based connection.
+ *
+ * \param	A pointer to the state information for a client Duct
+ *		object.
+ *
+ * \return	A boolean return value is used to indicate success or
+ *		failure of port initialization.  A true value is used
+ *		to indicate success.
+ */
+
+static _Bool _init_client_port(const Duct_State const S, \
+			       const char * const host, const int port)
+
+{
+	auto _Bool retn = false;
+
+	auto struct sockaddr_in sdef;
+
+	auto struct hostent *hdef;
+
+
+	/* Socket initialization. */
+	memset(&sdef, '\0', sizeof(sdef));
+	sdef.sin_family		= AF_INET;
+	sdef.sin_port		= htons(port);
+
+	if ( (hdef = gethostbyname2(host, AF_INET)) == NULL ) {
+		S->poisoned = true;
+		goto done;
+	}
+	sdef.sin_addr.s_addr = *((unsigned long *) hdef->h_addr_list[0]);
+	
+	if ( (S->sockt = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1 ) {
+		S->poisoned = true;
+		goto done;
+	}
+
+	if ( connect(S->sockt, (struct sockaddr *) &sdef, sizeof(sdef)) \
+	     == -1 ) {
+		S->poisoned = true;
+		goto done;
+	}
+
+	retn = true;
+
+
+ done:
 	return retn;
 }
 
@@ -210,6 +264,10 @@ static _Bool _init_server_port(const Duct_State const S, const int port)
  *
  * \param this	The Duct object which is to be initialized to be an
  *		SSL server.
+ *
+ * \return	A boolean value is returned to indicate whether or
+ *		not the server initialization was successful.  A true
+ *		value indicates the server was successfully initialized.
  */
 
 static _Bool init_server(const Duct const this)
@@ -270,6 +328,44 @@ static _Bool init_server(const Duct const this)
 /**
  * External public method.
  *
+ * This method initializes the object to be a client object.
+ *
+ * \param this	The Duct object which is to be initialized to be an
+ *		SSL client.
+ *
+ * \return	A boolean value is returned to indicate whether or
+ *		not client initialization was successful.  A true
+ *		value indicates the client was successfully initialized.
+ */
+
+static _Bool init_client(const Duct const this)
+
+{
+	auto const Duct_State const S = this->state;
+
+	auto _Bool retn = false;
+
+
+	/* Initialize the SSL context. */
+	S->method = SSLv3_client_method();
+	if ( (S->context = SSL_CTX_new(S->method)) == NULL ) {
+		S->poisoned = true;
+		goto done;
+	}
+
+	retn	    = true;
+	S->type	    = client;
+	S->poisoned = false;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements loading credentials in the form of an RSA
  * private key and a certificate into the SSL communications object.
  *
@@ -321,6 +417,45 @@ static _Bool load_credentials(const Duct const this, const char * const key, \
 /**
  * External public method.
  *
+ * This method implements the loading of certificates which will be used
+ * to verify the SSL peer.
+ *
+ * \param this	The Duct object into which the certificates will be
+ *		loaded.
+ *
+ * \param certfile	A null-terminated character buffer containing the
+ *			name of the file containing the PEM encoded
+ *			certificates.
+ *
+ * \return	If the load of the certificates succeeds a boolean true
+ *		value is returned to the caller.  If either load fails the
+ *		object is poisoned and a boolean false value is
+ *		returned.
+ */
+
+static _Bool load_certificates(const Duct const this, \
+			       const char * const certfile)
+
+{
+	auto const Duct_State const S = this->state;
+
+
+	if ( S->poisoned )
+		return false;
+
+	if ( SSL_CTX_load_verify_locations(S->context, certfile, NULL) == 0 ) {
+		S->poisoned = true;
+		return false;
+	}
+	SSL_CTX_set_verify(S->context, SSL_VERIFY_PEER, NULL);
+
+	return true;
+}
+
+
+/**
+ * External public method.
+ *
  * This method initializes a network port for communications.
  *
  * \param this	The communications object for which a port is to be
@@ -334,17 +469,20 @@ static _Bool load_credentials(const Duct const this, const char * const key, \
  *		is poisoned.
  */
 
-static _Bool init_port(const Duct const this, int const port)
+static _Bool init_port(const Duct const this, const char * const host, \
+		       int const port)
 
 {
 	auto _Bool retn = false;
 
 
-	if ( this->state->poisoned )
+	if ( this->state->poisoned ) 
 		return retn;
 		
 	if ( this->state->type == server )
 		retn = _init_server_port(this->state, port);
+	else
+		retn = _init_client_port(this->state, host, port);
 
 	return retn;
 }
@@ -362,13 +500,12 @@ static _Bool init_port(const Duct const this, int const port)
  *		descriptor of the connected socket is returned.
  */
 
-static int accept_connection(const Duct const this)
+static _Bool accept_connection(const Duct const this)
 
 {
 	auto const Duct_State const S = this->state;
 
 	auto int retn,
-		 client_fd,
 		 client_size;
 
 	struct hostent *client_hostname;
@@ -382,16 +519,14 @@ static int accept_connection(const Duct const this)
 	client_size = sizeof(client);
 	memset(&client, '\0', client_size);
 
-	if ( (client_fd = accept(S->sockt, (struct sockaddr *) &client, \
-				 (void *) &client_size)) == -1 ) {
+	if ( (S->fd = accept(S->sockt, (struct sockaddr *) &client, \
+			     (void *) &client_size)) == -1 ) {
 		S->poisoned = true;
 		goto done;
 	}
 
 	client_hostname = gethostbyaddr(&client.sin_addr, \
 					sizeof(struct in_addr), AF_INET);
-	fprintf(stdout, "Connection from: %s\n", client_hostname->h_name);
-	fprintf(stdout, "\tsocket: %d\n", client_fd);
 
 
 	/* Initiate an SSL connection and listen for a client handshake. */
@@ -407,7 +542,7 @@ static int accept_connection(const Duct const this)
 
 	SSL_set_accept_state(S->connection);
 
-	if ( SSL_set_fd(S->connection, client_fd) != 1 ) {
+	if ( SSL_set_fd(S->connection, S->fd) != 1 ) {
 		S->poisoned = true;
 		goto done;
 	}
@@ -416,13 +551,216 @@ static int accept_connection(const Duct const this)
 		S->poisoned = true;
 		goto done;
 	}
-	fprintf(stdout, "SSL accept state = %d\n", retn);
+
+	retn = true;
 
 
  done:
-	if ( S->poisoned == true )
-		client_fd = -1;
-	return client_fd;
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements initiation of an SSL client connection to
+ * a previously instituted socket connection.
+ *
+ * \param this	The client Duct object which is to initiate a connection.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		initiation of an SSL connection was successful.  A true
+ *		value indicates the connection was successful.
+ */
+
+static _Bool init_connection(const Duct const this)
+
+{
+	auto const Duct_State const S = this->state;
+
+	auto _Bool retn = false;
+
+	auto int state;
+
+	auto long verify;
+
+
+	if ( S->poisoned )
+		goto done;
+
+
+	/* Initiate an SSL connection and listen for a client handshake. */
+	if ( (S->connection = SSL_new(S->context)) == NULL ) {
+		S->poisoned = true;
+		goto done;
+	}
+
+	SSL_set_connect_state(S->connection);
+
+	if ( SSL_set_fd(S->connection, S->sockt) != 1 ) {
+		S->poisoned = true;
+		goto done;
+	}
+
+	if ( (state = SSL_connect(S->connection)) < 0 ) {
+		S->poisoned = true;
+		goto done;
+	}
+	if ( state == 1 )
+		S->fd = S->sockt;
+
+
+	/* Check peer verification. */
+	verify = SSL_get_verify_result(S->connection);
+	if ( (verify == X509_V_OK) || (verify == 18) )
+		retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements sending the contents of a specified Buffer object
+ * over a previously established connection.
+ *
+ * \param this	The Duct object over which the Buffer is to be sent.
+ *
+ * \return	A boolean value is used to indicate whether or the
+ *		write was successful.  A true value indicates the
+ *		transmission was successful.
+ */
+
+static _Bool send_Buffer(const Duct const this, const Buffer bf)
+
+{
+	auto const Duct_State const S = this->state;
+
+	auto _Bool retn = false;
+
+	auto int state;
+
+	auto uint32_t send_size = htonl(bf->size(bf));
+
+
+	if ( S->poisoned || bf->poisoned(bf) )
+		goto done;
+
+
+	/* Send size of transmission. */
+	state = SSL_write(S->connection, &send_size, sizeof(send_size));
+	if ( state != sizeof(send_size) ) {
+		S->poisoned = true;
+		goto done;
+	}
+
+	state = SSL_write(S->connection, bf->get(bf), bf->size(bf));
+	if ( state == bf->size(bf) ) {
+		retn = true;
+		goto done;
+	}
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements loading the specified number of bytes into
+ * the provided Buffer object.
+ *
+ * \param this	The Duct object from which data is to be read.
+ *
+ * \return	A boolean value is used to indicate whether or the
+ *		read was successful.  A true value indicates the receive
+ *		was successful.
+ */
+
+static _Bool receive_Buffer(const Duct const this, const Buffer bf)
+
+{
+	auto const Duct_State const S = this->state;
+
+	auto _Bool retn = false;
+
+	auto unsigned char rbufr[1];
+
+	auto int state;
+
+	auto uint32_t receive_size;
+
+
+	if ( S->poisoned || bf->poisoned(bf) || (S->fd == -1 ) )
+		goto done;
+
+
+	/* Get the size of the buffer to be received. */
+	state = SSL_read(S->connection, &receive_size, sizeof(receive_size));
+	if ( state != sizeof(receive_size) ) {
+		S->poisoned = true;
+		goto done;
+	}
+	receive_size = ntohl(receive_size);
+
+	while ( receive_size-- > 0 ) {
+		state = SSL_read(S->connection, rbufr, sizeof(rbufr));
+		if ( state == 1 )
+			bf->add(bf, rbufr, sizeof(rbufr));
+		if ( state <= 0 )
+			goto done;
+	}
+
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method shuts down the SSL transport connection between two
+ * connected peers.
+ *
+ * \param this	The Duct object whose transport layer is to be
+ *		shutdown.
+ */
+
+static _Bool whack_connection(const Duct const this)
+
+{
+	auto const Duct_State const S = this->state;
+
+	auto _Bool retn = false;
+
+	auto int state;
+
+
+	if ( S->poisoned )
+		goto done;
+
+	if ( (state = SSL_shutdown(S->connection)) == -1 ) {
+		S->poisoned = true;
+		goto done;
+	}
+
+	if ( (state == 0 ) && SSL_shutdown(S->connection) != 1 ) {
+		S->poisoned = true;
+		goto done;
+	}
+
+	retn = true;
+
+ done:
+	return retn;
 }
 
 
@@ -443,18 +781,19 @@ static void whack(const Duct const this)
 	/* Free loaded error strings. */
 	ERR_free_strings();
 
+	/* Free SSL connection if one has been established. */
+	if ( S->connection != NULL )
+		SSL_free(S->connection);
+
 	/* Free SSL context. */
 	if ( S->context != NULL )
 		SSL_CTX_free(S->context);
 
 	/* Close listening socket. */
+	if ( (S->type == server) && (S->fd != -1) )
+		close(S->fd);
 	if ( S->sockt != -1 )
 		close(S->sockt);
-
-	/* Free SSL connection if one has been established. */
-	if ( S->connection != NULL )
-		SSL_free(S->connection);
-
 
 	S->root->whack(S->root, this, S);
 	return;
@@ -506,8 +845,18 @@ extern Duct NAAAIM_Duct_Init(void)
 	/* Method initialization. */
 	this->init_server 	= init_server;
 	this->load_credentials  = load_credentials;
+	this->load_certificates	= load_certificates;
 	this->init_port		= init_port;
+	this->init_client      	= init_client;
+
 	this->accept_connection	= accept_connection;
+	this->init_connection	= init_connection;
+
+	this->send_Buffer	= send_Buffer;
+	this->receive_Buffer	= receive_Buffer;
+
+	this->whack_connection	= whack_connection;
+
 	this->whack		= whack;
 
 	return this;
