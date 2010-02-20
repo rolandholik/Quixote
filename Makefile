@@ -56,22 +56,13 @@ CFLAGS := ${CFLAGS} -I./HurdLib -I${SSL_INCLUDE}
 all: ${COBJS} genrandom genid
 
 genrandom: genrandom.o RandomBuffer.o SHA256.o
-	${CC} ${LDFLAGS} -o ${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
 genid: genid.o ${COBJS}
-	${CC} ${LDFLAGS} -o ${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl \
-		${SSL_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl ${SSL_LIBRARY};
 
 token: token.o ${COBJS}
-	${CC} ${LDFLAGS} -o ${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl \
-		${SSL_LIBRARY};
-
-tags:
-	/opt/emacs/bin/etags *.{h,c};
-
-clean:
-	rm -f *.o *~ TAGS;
-	rm -f genrandom genid token RSAkey_test ID_test Duct_test sha256key;
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl ${SSL_LIBRARY};
 
 dotest: dotest.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
@@ -87,6 +78,13 @@ Duct_test: Duct_test.o ${COBJS}
 
 sha256key: sha256key.o SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
+
+tags:
+	/opt/emacs/bin/etags *.{h,c};
+
+clean:
+	rm -f *.o *~ TAGS;
+	rm -f genrandom genid token RSAkey_test ID_test Duct_test sha256key;
 
 
 # Source dependencies.
