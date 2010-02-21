@@ -727,6 +727,41 @@ static _Bool receive_Buffer(const Duct const this, const Buffer bf)
 /**
  * External public method.
  *
+ * This method implements resetting of a duct object.  In the case of
+ * a server object the reset method is used to close the file descriptor
+ * associated with a connection which has been accepted.
+ *
+ * \param this	The Duct object which is to be reset.
+ *
+ * \return	A boolean value is returned to indicate whether or not
+ *		the reset was successful.  A true value indicates the
+ *		reset was successful.
+ */
+
+static _Bool reset(const Duct const this)
+
+{
+	auto const Duct_State const S = this->state;
+
+	auto _Bool retn = false;
+
+
+	if ( S->poisoned )
+		return false;
+
+	if ( S->type == server )
+		if ( (S->fd != -1) && (close(this->state->fd) == -1) )
+			goto done;
+	retn = true;
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method shuts down the SSL transport connection between two
  * connected peers.
  *
@@ -752,7 +787,7 @@ static _Bool whack_connection(const Duct const this)
 		goto done;
 	}
 
-	if ( (state == 0 ) && SSL_shutdown(S->connection) != 1 ) {
+	if ( (state == 0 ) && (state = SSL_shutdown(S->connection)) != 1 ) {
 		S->poisoned = true;
 		goto done;
 	}
@@ -762,8 +797,8 @@ static _Bool whack_connection(const Duct const this)
  done:
 	return retn;
 }
-
-
+			
+			
 /**
  * External public method.
  *
@@ -855,8 +890,9 @@ extern Duct NAAAIM_Duct_Init(void)
 	this->send_Buffer	= send_Buffer;
 	this->receive_Buffer	= receive_Buffer;
 
-	this->whack_connection	= whack_connection;
+	this->reset		= reset;
 
+	this->whack_connection	= whack_connection;
 	this->whack		= whack;
 
 	return this;
