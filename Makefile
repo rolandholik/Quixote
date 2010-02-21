@@ -7,7 +7,7 @@
 
 # Variable declarations.
 CSRC = 	SHA256.c SHA256_hmac.c RSAkey.c OrgID.c PatientID.c RandomBuffer.c \
-	IDtoken.c Duct.c
+	IDtoken.c Duct.c Authenticator.c AES256_cbc.c
 
 CC = gcc
 
@@ -53,7 +53,15 @@ CFLAGS := ${CFLAGS} -I./HurdLib -I${SSL_INCLUDE}
 
 
 # Targets
-all: ${COBJS} genrandom genid
+all: ${COBJS} genrandom genid query-client servers
+
+servers: root-referral
+
+root-referral: root-referral.o ${COBJS}
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
+
+query-client: query-client.o ${COBJS}
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
 genrandom: genrandom.o RandomBuffer.o SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
@@ -84,6 +92,7 @@ tags:
 
 clean:
 	rm -f *.o *~ TAGS;
+	rm -f root-referral query-client;
 	rm -f genrandom genid token RSAkey_test ID_test Duct_test sha256key;
 
 
@@ -96,6 +105,8 @@ PatientID.o: PatientID.h OrgID.h SHA256.h
 RandomBuffer.o: RandomBuffer.h
 IDtoken.o: IDtoken.h
 Duct.o: Duct.h
+Authenticator.o: Authenticator.h RandomBuffer.h RSAkey.h IDtoken.h AES256_cbc.h
+AES256_cbc.o: AES256_cbc.h 
 
 genid.o: ./HurdLib/Config.h ./HurdLib/Buffer.h SHA256.h
 sha256key.o: SHA256.h
