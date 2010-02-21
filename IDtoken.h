@@ -18,15 +18,19 @@ typedef struct NAAAIM_IDtoken * IDtoken;
 
 typedef struct NAAAIM_IDtoken_State * IDtoken_State;
 
+typedef enum {IDtoken_orgkey, IDtoken_orgid, IDtoken_id} IDtoken_element;
+
 /**
  * External IDtoken object representation.
  */
 struct NAAAIM_IDtoken
 {
 	/* External methods. */
+	Buffer (*get_element)(const IDtoken, IDtoken_element);
 	_Bool (*parse)(const IDtoken, FILE *);
 	_Bool (*matches)(const IDtoken, const Buffer);
 	void (*print)(const IDtoken);
+	void (*reset)(const IDtoken);
 	void (*whack)(const IDtoken);
 
 	/* Private state. */

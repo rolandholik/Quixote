@@ -168,6 +168,50 @@ static void _init_state(const IDtoken_State const S) {
 /**
  * External public method.
  *
+ * This method implements an accessor for obtaining the various identity
+ * elements from this token.  A multiplexed accessor is used in order
+ * diminish the number of separate methods needed.
+ *
+ * \param this		The token whose elements are to be accessed.
+ *
+ * \param element	The element which is to be returned.
+ *
+ * \return		The Buffer object containing the desired element
+ *			is returned.
+ */
+
+static Buffer get_element(const IDtoken const this, \
+			  const IDtoken_element element)
+
+{
+	auto const IDtoken_State const S = this->state;
+
+
+	if ( S->poisoned )
+		return NULL;
+
+	switch ( element ) {
+		case IDtoken_orgkey:
+			return S->orgkey;
+			break;
+		case IDtoken_orgid:
+			return S->orgid;
+			break;
+		case IDtoken_id:
+			return S->ptid;
+			break;
+		default:
+			return NULL;
+			break;
+	}
+
+	return NULL;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements parsing of an ASCII encoded identity token.  The
  * token consists of a guard pair of delimiters of the following form:
  *
@@ -417,6 +461,33 @@ static void print(const IDtoken const this)
 /**
  * External public method.
  *
+ * This method implements resetting of an identity token object.  It
+ * is typically used to allow parsing of multiple identity files.
+ *
+ * \param this	The object to be reset.
+ */
+
+static void reset(const IDtoken const this)
+
+{
+	auto const IDtoken_State const S = this->state;
+
+
+	if ( S->poisoned )
+		return;
+
+	S->orgkey->reset(S->orgkey);
+	S->orgid->reset(S->orgid);
+	S->ptid->reset(S->ptid);
+	S->idkey->reset(S->idkey);
+
+	return;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a destructor for a IDtoken object.
  *
  * \param this	A pointer to the object which is to be destroyed.
@@ -492,10 +563,12 @@ extern IDtoken NAAAIM_IDtoken_Init(void)
 	_init_state(this->state);
 
 	/* Method initialization. */
-	this->parse   = parse;
-	this->matches = matches;
-	this->print   = print;
-	this->whack   = whack;
+	this->get_element = get_element;
+	this->parse	  = parse;
+	this->matches	  = matches;
+	this->print	  = print;
+	this->reset	  = reset;
+	this->whack	  = whack;
 
 	return this;
 }
