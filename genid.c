@@ -264,7 +264,9 @@ static _Bool generate_token(const Config const parser,	\
 extern int main(int argc, char *argv[])
 
 {
-	auto _Bool token = false;
+	auto _Bool domain   = false,
+		   identity = false,
+		   token    = false;
 
 	auto char *ssnid,
 		  *anonymizer,
@@ -287,8 +289,14 @@ extern int main(int argc, char *argv[])
 
 
 	/* Get the organizational identifier and SSN. */
-	while ( (retn = getopt(argc, argv, "Tpc:i:o:")) != EOF )
+	while ( (retn = getopt(argc, argv, "DITpc:i:o:")) != EOF )
 		switch ( retn ) {
+			case 'D':
+				domain = true;
+				break;
+			case 'I':
+				identity = true;
+				break;
 			case 'T':
 				token = true;
 				break;
@@ -368,7 +376,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Output user identities if token generation is not requested. */
-	if ( !token ) {
+	if ( !domain && !identity && !token ) {
 		fputs("Domain:  ", stdout);
 		if ( permute ) {
 			bufr->reset(bufr);
@@ -389,8 +397,17 @@ extern int main(int argc, char *argv[])
 		else
 			ptid->print(ptid);
 	}
-	else
+
+	if ( identity )
+		ptid->print(ptid);
+
+	if ( domain )
+		orgid->print(orgid);
+
+	if ( token ) {
 		generate_token(parser, orgid, ptid);
+	}
+
 
 
  done:
