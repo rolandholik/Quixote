@@ -9,6 +9,8 @@
 CSRC = 	SHA256.c SHA256_hmac.c RSAkey.c OrgID.c PatientID.c RandomBuffer.c \
 	IDtoken.c Duct.c Authenticator.c AES256_cbc.c
 
+SERVERS = root-referral device-broker user-broker
+
 CC = gcc
 
 # Uncomment the following two lines to enable compilation with memory debug
@@ -55,9 +57,15 @@ CFLAGS := ${CFLAGS} -I./HurdLib -I${SSL_INCLUDE}
 # Targets
 all: ${COBJS} genrandom genid query-client servers
 
-servers: root-referral
+servers: ${SERVERS}
 
 root-referral: root-referral.o ${COBJS}
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
+
+device-broker: device-broker.o ${COBJS}
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
+
+user-broker: user-broker.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
 query-client: query-client.o ${COBJS}
@@ -92,21 +100,30 @@ tags:
 
 clean:
 	rm -f *.o *~ TAGS;
-	rm -f root-referral query-client;
+	rm -f query-client
+	rm -f ${SERVERS}
 	rm -f genrandom genid token RSAkey_test ID_test Duct_test sha256key;
 
 
 # Source dependencies.
-SHA256.o: ./HurdLib/Origin.h ./HurdLib/Buffer.h SHA256.c SHA256.h
-SHA256_hmac.o: ./HurdLib/Origin.h ./HurdLib/Buffer.h SHA256_hmac.h
-RSAkey.o: ./HurdLib/Origin.h RSAkey.h
-OrgID.o: OrgID.h SHA256.h
-PatientID.o: PatientID.h OrgID.h SHA256.h
-RandomBuffer.o: RandomBuffer.h
-IDtoken.o: IDtoken.h
-Duct.o: Duct.h
-Authenticator.o: Authenticator.h RandomBuffer.h RSAkey.h IDtoken.h AES256_cbc.h
-AES256_cbc.o: AES256_cbc.h 
+SHA256.o: NAAAIM.h SHA256.h
+SHA256_hmac.o: NAAAIM.h SHA256_hmac.h
+RSAkey.o: NAAAIM.h RSAkey.h
+OrgID.o: NAAAIM.h OrgID.h SHA256.h
+PatientID.o: NAAAIM.h OrgID.h PatientID.h SHA256.h
+RandomBuffer.o: NAAAIM.h RandomBuffer.h
+IDtoken.o: NAAAIM.h IDtoken.h SHA256_hmac.h
+Duct.o: NAAAIM.h Duct.h
+Authenticator.o: NAAAIM.h Authenticator.h RandomBuffer.h RSAkey.h IDtoken.h \
+	AES256_cbc.h
+AES256_cbc.o: AES256_cbc.h
 
-genid.o: ./HurdLib/Config.h ./HurdLib/Buffer.h SHA256.h
-sha256key.o: SHA256.h
+query-client.o: NAAAIM.h Duct.h IDtoken.h Authenticator.h
+
+root-referral.o: NAAAIM.h Duct.h IDtoken.h Authenticator.h
+device-broker.o: NAAAIM.h Duct.h IDtoken.h Authenticator.h
+user-broker.o: NAAAIM.h Duct.h IDtoken.h Authenticator.h
+
+genid.o: NAAAIM.h SHA256.h SHA256_hmac.h OrgID.h PatientID.h \
+	RandomBuffer.h RSAkey.h
+sha256key.o: NAAAIM.h SHA256.h

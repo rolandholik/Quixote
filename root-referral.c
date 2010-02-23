@@ -29,8 +29,11 @@
 
 
 /* Local defines. */
+#define SERVER "Root Referral Server"
 #define SITE "Gardonville Cooperative Telephone"
 #define LOCATION "Brandon, MN"
+
+#define FAILED "Authentication failed."
 
 /* Include files. */
 #include <stdio.h>
@@ -127,6 +130,232 @@ static void update_process_table(void)
 	return;
 }
 
+/**
+ * Private function.
+ *
+ * This is a utility function which prints the contents of a text
+ * buffer received from a server.
+ *
+ * \param bufr	The buffer object containing the text to be printed.
+ */
+
+static void print_buffer(const Buffer const bufr)
+
+{
+	auto char *p,
+		  *begin,
+		  pbufr[160];
+
+
+	/* Sanity check. */
+	if ( bufr->size(bufr) > 160 ){
+		fputs(".reply too long to print", stdout);
+		return;
+	} 
+
+
+	/*
+	 * Copy the buffer and loop through it prepending a token to
+	 * indicate this is an incoming response.
+	 */
+	memcpy(pbufr, bufr->get(bufr), bufr->size(bufr));
+
+	begin = pbufr;
+	do {
+		if ( (p = strchr(begin, '\n')) != NULL ) {
+			*p = '\0';
+			fprintf(stdout, "<%s\n", begin);
+			begin = p;
+			++begin;
+		}
+	} while ( p != NULL );
+
+	return;
+}
+			
+		
+/**
+ * Private function.
+ *
+ * This function implements a connection to a user identity brokerage
+ * server.  The binary authenticator object is transmitted to the
+ * identity brokerage server for processing.
+ *
+ * \param client	The SSL connection object managing the connection
+ *			from the client.
+ *
+ * \param bufr		The Buffer object to be used for communicating
+ *			with the user identity brokerage.  The reply
+ *			from the identity brokerage will be returned in
+ *			this object.
+ *
+ * \return		A boolean value is used to indicate the success or
+ *			failure of the device authentication.   A true
+ *			value indicates the authentication has been
+ *			successful.
+ */
+
+static int authenticate_user(const Duct const client, const Buffer const bufr)
+
+{
+	auto _Bool retn = false;
+
+	auto Duct broker = NULL;
+
+
+	fputs(".Connecting to user authentication brokerage.\n", stdout);
+
+
+	/*
+	 * Initialize SSL connection and connect to the user identity
+	 * brokerage server.
+	 */
+	if ( (broker = NAAAIM_Duct_Init()) == NULL ) {
+		fputs("Error on SSL object creation.\n", stderr);
+		goto done;
+	}
+
+	if ( !broker->init_client(broker) ) {
+		fputs("Cannot initialize server mode.\n", stderr);
+		goto done;
+	}
+
+	if ( !broker->load_certificates(broker, "./org-cert.pem") ) {
+		fputs("Cannot load certificates.\n", stderr);
+		goto done;
+	}
+
+	if ( !broker->init_port(broker, "localhost", 11992) ) {
+		fputs("Cannot initialize port.\n", stderr);
+		goto done;
+	}
+
+	if ( !broker->init_connection(broker) ) {
+		fputs("Cannot initialize connection.\n", stderr);
+		goto done;
+	}
+
+
+	/* Obtain and print connection banner. */
+	bufr->reset(bufr);
+	if ( !broker->receive_Buffer(broker, bufr) ) {
+		fputs("Error on receive.\n", stderr);
+		goto done;
+	}
+	print_buffer(bufr);
+
+
+	/* Receive and re-transmit device authenticator. */
+	fputs(">Sending device authentication.\n", stdout);
+	bufr->reset(bufr);
+	if ( !client->receive_Buffer(client, bufr) )
+		goto done;
+
+	if ( !broker->send_Buffer(broker, bufr) )
+		goto done;
+
+	retn = true;
+
+
+ done:
+	if ( broker != NULL )
+		broker->whack(broker);
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function implements a connection to a device identity brokerage
+ * server.  The binary authenticator object is transmitted to the
+ * identity brokerage server for processing.
+ *
+ * \param client	The SSL connection object managing the connection
+ *			from the client.
+ *
+ * \param bufr		The Buffer object to be used for communicating
+ *			with the device identity brokerage.  The reply
+ *			from the identity brokerage will be returned in
+ *			this object.
+ *
+ * \return		A boolean value is used to indicate the success or
+ *			failure of the device authentication.   A true
+ *			value indicates the authentication has been
+ *			successful.
+ */
+
+static int authenticate_device(const Duct const client, \
+			       const Buffer const bufr)
+
+{
+	auto _Bool retn = false;
+
+	auto Duct broker = NULL;
+
+
+	fputs(".Connecting to device authentication brokerage.\n", stdout);
+
+
+	/*
+	 * Initialize SSL connection and connect to the device identity
+	 * brokerage server.
+	 */
+	if ( (broker = NAAAIM_Duct_Init()) == NULL ) {
+		fputs("Error on SSL object creation.\n", stderr);
+		goto done;
+	}
+
+	if ( !broker->init_client(broker) ) {
+		fputs("Cannot initialize server mode.\n", stderr);
+		goto done;
+	}
+
+	if ( !broker->load_certificates(broker, "./org-cert.pem") ) {
+		fputs("Cannot load certificates.\n", stderr);
+		goto done;
+	}
+
+	if ( !broker->init_port(broker, "localhost", 11991) ) {
+		fputs("Cannot initialize port.\n", stderr);
+		goto done;
+	}
+
+	if ( !broker->init_connection(broker) ) {
+		fputs("Cannot initialize connection.\n", stderr);
+		goto done;
+	}
+
+
+	/* Obtain and print connection banner. */
+	bufr->reset(bufr);
+	if ( !broker->receive_Buffer(broker, bufr) ) {
+		fputs("Error on receive.\n", stderr);
+		goto done;
+	}
+	print_buffer(bufr);
+
+
+	/* Receive and re-transmit device authenticator. */
+	fputs(">Sending device authentication.\n", stdout);
+	bufr->reset(bufr);
+	if ( !client->receive_Buffer(client, bufr) )
+		goto done;
+
+	if ( !broker->send_Buffer(broker, bufr) )
+		goto done;
+
+	retn = true;
+
+
+ done:
+	if ( broker != NULL )
+		broker->whack(broker);
+
+	return retn;
+}
+
 
 /**
  * Private function.
@@ -135,17 +364,17 @@ static void update_process_table(void)
  *
  * \param duct	The SSL connection object describing the accepted connection.
  *
- * \return	A value of zero is used to indicate the connection has
- *		been handled successfully.  A value of 1 indicates
- *		connection handling has failed.
+ * \return	A boolean value is used to indicate the success or
+ *		failure of the connection.  A true value indicates the
+ *		connection has been successfully processed.
  */
 
-static int handle_connection(const Duct const duct)
+static _Bool handle_connection(const Duct const duct)
 
 {
 	auto char banner[256];
 
-	auto int retn = 1;
+	auto int retn = false;
 
 	auto Buffer bufr = NULL;
 
@@ -163,50 +392,36 @@ static int handle_connection(const Duct const duct)
 		
 
 	/* Send the connection banner. */
-	snprintf(banner, sizeof(banner), \
-		 "Hello\nRoot Referral Server / %s / %s\n", SITE, LOCATION);
+	fprintf(stdout, "\n.Accepted client connection from: %s\n", \
+		"localhost");
+
+	snprintf(banner, sizeof(banner), "%s / %s / %s\nHello\n", SERVER, \
+		 SITE, LOCATION);
 	bufr->add(bufr, (unsigned char *) banner, strlen(banner));
 	if ( !duct->send_Buffer(duct, bufr) )
 		goto done;
 
 
 	/* Read and process device authenticator. */
-	bufr->reset(bufr);
-	if ( !duct->receive_Buffer(duct, bufr) )
+	if ( !authenticate_device(duct, bufr) )
 		goto done;
-
-	if ( !authn->decode(authn, bufr) ) {
-		fputs("Failed decode.\n", stderr);
-		goto done;
-	}
-
-	authn->decrypt(authn, "./org-public.pem");
-
-	fputs("Device identity:\n", stdout);
-	authn->get_identity(authn, token);
-	token->print(token);
-
 
 	/* Read and process user authenticator. */
-	bufr->reset(bufr);
-	if ( !duct->receive_Buffer(duct, bufr) )
+	if ( !authenticate_user(duct, bufr) )
 		goto done;
 
-	authn->reset(authn);
-	if ( !authn->decode(authn, bufr) ) {
-		fputs("Failed decode.\n", stderr);
-		goto done;
-	}
-
-	authn->decrypt(authn, "./org-public.pem");
-
-	fputs("\nUser identity:\n", stdout);
-	token->reset(token);
-	authn->get_identity(authn, token);
-	token->print(token);
+	fflush(stdout);
+	retn = true;
 
 
  done:
+	if ( retn == false ) {
+		bufr->reset(bufr);
+		bufr->add(bufr, (unsigned char *) FAILED, strlen(FAILED));
+		if ( !duct->send_Buffer(duct, bufr) )
+			goto done;
+	}
+
 	if ( bufr != NULL )
 		bufr->whack(bufr);
 	if ( authn != NULL )
@@ -235,6 +450,9 @@ extern int main(int argc, char *argv[])
 
 	auto Duct duct = NULL;
 
+ 
+	fprintf(stdout, "%s started.\n", SERVER);
+	fflush(stdout);
 
 	/* Get the organizational identifier and SSN. */
 	while ( (retn = getopt(argc, argv, "c:")) != EOF )
@@ -288,12 +506,12 @@ extern int main(int argc, char *argv[])
 			goto done;
 		}
 		if ( pid == 0 ) {
-			retn = handle_connection(duct);
-			goto done;
+			if ( handle_connection(duct) ) {
+				retn = 0;
+				goto done;
+			}
 		}
 
-		fprintf(stdout, "Client connection dispatched to: %d\n", \
-			pid);
 		add_process(pid);
 		update_process_table();
 		duct->reset(duct);

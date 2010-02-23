@@ -90,6 +90,8 @@ extern int main(int argc, char *argv[])
 	auto Authenticator authn = NULL;
 
 
+	fputs("NAAAIM query client.\n\n", stdout);
+
 	/* Get the organizational identifier and SSN. */
 	while ( (retn = getopt(argc, argv, "c:")) != EOF )
 		switch ( retn ) {
@@ -103,13 +105,13 @@ extern int main(int argc, char *argv[])
 	if ( config == NULL )
 		config = "./query-client.conf";
 
-
 	if ( (bufr = HurdLib_Buffer_Init()) == NULL ) {
 		fputs("Cannot initialize receive buffer.\n", stderr);
 		goto done;
 	}
 
-	/* Initialize SSL connection and wait for connections. */
+
+	/* Initialize SSL connection and attach to root referral server. */
 	if ( (duct = NAAAIM_Duct_Init()) == NULL ) {
 		fputs("Error on SSL object creation.\n", stderr);
 		goto done;
@@ -199,6 +201,8 @@ extern int main(int argc, char *argv[])
 	}
 	if ( !duct->send_Buffer(duct, bufr) )
 		fputs("Error transmitting device authenticator.\n", stderr);
+
+	retn = 0;
 
 
  done:
