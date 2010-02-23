@@ -167,7 +167,6 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
-
 	token->reset(token);
 	if ( !load_identity(token, "./user1.txt") ) {
 		fputs("Cannot load user identity.\n", stderr);
@@ -177,15 +176,29 @@ extern int main(int argc, char *argv[])
 	authn->add_element(authn, token->get_element(token, IDtoken_orgkey));
 	authn->encrypt(authn, "./org-private.pem");
 
+	fputs("\nSending device authenticator.\n", stdout);
 	bufr->reset(bufr);
 	if ( !authn->encode(authn, bufr) ) {
 		fputs("Error encoding device authenticator.\n", stderr);
 		goto done;
 	}
-
 	if ( !duct->send_Buffer(duct, bufr) )
 		fputs("Error transmitting device authenticator.\n", stderr);
-	authn->print(authn);
+
+
+	/* Send the user authenticator. */
+	fputs("Sending user authenticator\n", stdout);
+	authn->reset(authn);
+	authn->add_identity(authn, token);
+	authn->add_element(authn, token->get_element(token, IDtoken_orgkey));
+	authn->encrypt(authn, "./org-private.pem");
+	bufr->reset(bufr);
+	if ( !authn->encode(authn, bufr) ) {
+		fputs("Error encoding user authenticator.\n", stderr);
+		goto done;
+	}
+	if ( !duct->send_Buffer(duct, bufr) )
+		fputs("Error transmitting device authenticator.\n", stderr);
 
 
  done:

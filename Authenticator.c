@@ -146,6 +146,10 @@ static _Bool add_identity(const Authenticator const this, \
 	auto _Bool retn = false;
 
 
+	if ( S->poisoned )
+		goto done;
+
+
 	/* Set the identity elements. */
 	S->orgkey->add_Buffer(S->orgkey, \
 			      token->get_element(token, IDtoken_orgkey));
@@ -155,6 +159,56 @@ static _Bool add_identity(const Authenticator const this, \
 
 	if ( S->orgkey->poisoned(S->orgkey) || S->orgid->poisoned(S->orgid) \
 	     || S->id->poisoned(S->id) )
+		goto done;
+
+	retn = true;
+
+
+ done:
+	if ( retn == false )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements obtaiining the identity elements in the
+ * authenticator in the form of an IDtoken object.  It is essentially
+ * the reciprocal function of the add_identity method.
+ *
+ * \param this	The authenticator whose identity elements are to be
+ *		retrieved.
+ *
+ * \param token	The identity token which will be loaded with the
+ *		identity elements.
+ *
+ * \return	A boolean value is used to indicate the sucess or
+ *		failure of loading the elements.  On failure the object
+ *		is poisoned for future activity.
+ */
+
+static _Bool get_identity(const Authenticator const this, \
+			  const IDtoken const token)
+
+{
+	auto const Authenticator_State const S = this->state;
+
+	auto _Bool retn = false;
+
+
+	if ( S->poisoned )
+		goto done;
+
+
+	/* Set the identity components in the token. */
+	if ( !token->set_element(token, IDtoken_orgkey, S->orgkey) )
+		goto done;
+	if ( !token->set_element(token, IDtoken_orgid, S->orgid) )
+		goto done;
+	if ( !token->set_element(token, IDtoken_id, S->id) )
 		goto done;
 
 	retn = true;
@@ -274,12 +328,11 @@ static _Bool encrypt(const Authenticator const this, const char * const rsa)
 	if ( !S->elements->add_Buffer(S->elements, encrypted) )
 		goto done;
 
+
 	/* Encrypt the random key. */
 	if ( (rsakey = NAAAIM_RSAkey_Init()) == NULL )
 		goto done;
 
-	iv->add_Buffer(iv, S->key);
-	S->key->reset(S->key);
 	S->key->add_Buffer(S->key, iv);
 		
 	rsakey->load_private_key(rsakey, rsa);
@@ -297,6 +350,88 @@ static _Bool encrypt(const Authenticator const this, const char * const rsa)
 		iv->whack(iv);
 	if ( randbufr != NULL )
 		randbufr->whack(randbufr);
+	if ( rsakey != NULL )
+		rsakey->whack(rsakey);
+	if ( aes256 != NULL )
+		aes256->whack(aes256);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method is responsible for decrypting a previously encrypted
+ * authenticator payload.  The symmetric key and initialization vector
+ * are obtained from the RSA encrypted key package and used to
+ * decrypt the target identity elements.
+ *
+ * \param this	The Authenticator object whose elements are to be
+ *		decrypted..
+ *
+ * \param rsa	A pointer to a null-terminated buffer containing the
+ *		RSA public key to be used for decrypting the symmetric
+ *		key and initialization vector.
+ *
+ * \return	A boolean value is used to return success or failure of
+ *		key generation.  A true value is used to indicate
+ *		success.
+ */
+
+static _Bool decrypt(const Authenticator const this, const char * const rsa)
+
+{
+	auto const Authenticator_State const S = this->state;
+
+	auto _Bool retn = false;
+
+	auto Buffer decrypted,
+		    iv = NULL;
+
+	auto RSAkey rsakey = NULL;
+
+	auto AES256_cbc aes256 = NULL;
+
+
+	/* Sanity checks. */
+	if ( S->poisoned )
+		goto done;
+
+
+	/* Decrypt the initialization vector and symmetric key. */
+	if ( (rsakey = NAAAIM_RSAkey_Init()) == NULL )
+		goto done;
+	rsakey->load_public_key(rsakey, rsa);
+	if ( !rsakey->decrypt(rsakey, S->key) )
+		goto done;
+
+	if ( (iv = HurdLib_Buffer_Init()) == NULL )
+		goto done;
+
+	iv->add(iv, S->key->get(S->key) + (256 / 8), 128 / 8);
+	S->key->shrink(S->key, 128 / 8);
+
+
+	/* Encrypt the elements. */
+	if ( (aes256 = NAAAIM_AES256_cbc_Init_decrypt(S->key, iv)) == NULL )
+		goto done;
+	if ( (decrypted = aes256->decrypt(aes256, S->elements)) == NULL )
+		goto done;
+
+	S->elements->reset(S->elements);
+	if ( !S->elements->add_Buffer(S->elements, decrypted) )
+		goto done;
+
+	retn = true;
+
+
+ done:
+	if ( retn == false )
+		S->poisoned = true;
+
+	if ( iv != NULL )
+		iv->whack(iv);
 	if ( rsakey != NULL )
 		rsakey->whack(rsakey);
 	if ( aes256 != NULL )
@@ -451,10 +586,13 @@ static _Bool decode(const Authenticator const this, const Buffer const bufr)
 	return retn;
 }
 
+
 /**
  * External public method.
  *
- * This method prints the contents of an Authenticator object.
+ * This method prints the contents of an Authenticator object.  The
+ * status, ie, whether or not the object has been poisoned is also
+ * indicated.
  *
  * \param this	A pointer to the object which is to be printed..
  */
@@ -464,6 +602,9 @@ static void print(const Authenticator const this)
 {
 	auto const Authenticator_State const S = this->state;
 
+
+	if ( S->poisoned )
+		fputs("* POISONED *\n", stdout);
 
 	fputs("orgkey:\n", stdout);
 	S->orgkey->print(S->orgkey);
@@ -478,6 +619,34 @@ static void print(const Authenticator const this)
 
 	fputs("elements\n", stdout);
 	S->elements->print(S->elements);
+
+	return;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements resetting of an authenticator object.  It
+ * allows an authenicator to be used multiple times.
+ *
+ * \param this	The object to be reset.
+ */
+
+static void reset(const Authenticator const this)
+
+{
+	auto const Authenticator_State const S = this->state;
+
+
+	if ( S->poisoned )
+		return;
+
+	S->orgkey->reset(S->orgkey);
+	S->orgid->reset(S->orgid);
+	S->id->reset(S->id);
+	S->key->reset(S->key);
+	S->elements->reset(S->elements);
 
 	return;
 }
@@ -564,11 +733,14 @@ extern Authenticator NAAAIM_Authenticator_Init(void)
 
 	/* Method initialization. */
 	this->add_identity = add_identity;
+	this->get_identity = get_identity;
 	this->add_element  = add_element;
 	this->encrypt	   = encrypt;
+	this->decrypt	   = decrypt;
 	this->encode	   = encode;
 	this->decode	   = decode;
 	this->print	   = print;
+	this->reset	   = reset;
 	this->whack	   = whack;
 
 	return this;

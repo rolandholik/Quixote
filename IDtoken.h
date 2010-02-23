@@ -27,6 +27,7 @@ struct NAAAIM_IDtoken
 {
 	/* External methods. */
 	Buffer (*get_element)(const IDtoken, IDtoken_element);
+	_Bool (*set_element)(const IDtoken, IDtoken_element, const Buffer);
 	_Bool (*parse)(const IDtoken, FILE *);
 	_Bool (*matches)(const IDtoken, const Buffer);
 	void (*print)(const IDtoken);

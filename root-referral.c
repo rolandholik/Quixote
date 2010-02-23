@@ -151,10 +151,14 @@ static int handle_connection(const Duct const duct)
 
 	auto Authenticator authn = NULL;
 
+	auto IDtoken token = NULL;
+
 
 	if ( (bufr = HurdLib_Buffer_Init()) == NULL )
 		goto done;
 	if ( (authn = NAAAIM_Authenticator_Init()) == NULL )
+		goto done;
+	if ( (token = NAAAIM_IDtoken_Init()) == NULL )
 		goto done;
 		
 
@@ -170,19 +174,36 @@ static int handle_connection(const Duct const duct)
 	bufr->reset(bufr);
 	if ( !duct->receive_Buffer(duct, bufr) )
 		goto done;
-	fputs("Received:\n", stdout);
-	bufr->print(bufr);
 
-	fputs("Doing decode.\n", stdout);
 	if ( !authn->decode(authn, bufr) ) {
 		fputs("Failed decode.\n", stderr);
 		goto done;
 	}
 
-	fputs("Device authenticator.\n", stdout);
-	authn->print(authn);
-	
-	retn = 0;
+	authn->decrypt(authn, "./org-public.pem");
+
+	fputs("Device identity:\n", stdout);
+	authn->get_identity(authn, token);
+	token->print(token);
+
+
+	/* Read and process user authenticator. */
+	bufr->reset(bufr);
+	if ( !duct->receive_Buffer(duct, bufr) )
+		goto done;
+
+	authn->reset(authn);
+	if ( !authn->decode(authn, bufr) ) {
+		fputs("Failed decode.\n", stderr);
+		goto done;
+	}
+
+	authn->decrypt(authn, "./org-public.pem");
+
+	fputs("\nUser identity:\n", stdout);
+	token->reset(token);
+	authn->get_identity(authn, token);
+	token->print(token);
 
 
  done:
@@ -190,6 +211,9 @@ static int handle_connection(const Duct const duct)
 		bufr->whack(bufr);
 	if ( authn != NULL )
 		authn->whack(authn);
+	if ( token != NULL )
+		token->whack(token);
+
 	return retn;
 }
 

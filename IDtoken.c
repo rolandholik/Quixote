@@ -212,6 +212,69 @@ static Buffer get_element(const IDtoken const this, \
 /**
  * External public method.
  *
+ * This method implements an accessor for setting the various identity
+ * elements in this token.  A multiplexed accessor is used in order
+ * diminish the number of separate methods needed to acces the
+ * multiple elements in the object.
+ *
+ * \param this		The token whose elements are to be accessed.
+ *
+ * \param element	The identity component to be set.
+ * 
+ * \param bufr		The data to be used for setting the element.
+ *
+ * \return		A boolean value is used to indicate the success or
+ *			failure of setting the identity component.  A true
+ *			value is used to indicate success of the
+ *			operation.  If a failure is detected in setting
+ *			any component the object is poisoned.
+ */
+
+static _Bool set_element(const IDtoken const this,	\
+			 const IDtoken_element const element, \
+			 const Buffer const bufr)
+
+{
+	auto const IDtoken_State const S = this->state;
+
+	auto _Bool retn = false;
+
+
+	if ( S->poisoned )
+		goto done;
+
+	switch ( element ) {
+		case IDtoken_orgkey:
+			if ( !S->orgkey->add_Buffer(S->orgkey, bufr) )
+				goto done;
+			break;
+		case IDtoken_orgid:
+			if ( !S->orgid->add_Buffer(S->orgid, bufr) )
+				goto done;
+			break;
+		case IDtoken_id:
+			if ( !S->ptid->add_Buffer(S->ptid, bufr) )
+				goto done;
+			break;
+		default:
+			goto done;
+			break;
+	}
+
+	retn = true;
+
+
+ done:
+	if ( retn == false )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements parsing of an ASCII encoded identity token.  The
  * token consists of a guard pair of delimiters of the following form:
  *
@@ -564,6 +627,7 @@ extern IDtoken NAAAIM_IDtoken_Init(void)
 
 	/* Method initialization. */
 	this->get_element = get_element;
+	this->set_element = set_element;
 	this->parse	  = parse;
 	this->matches	  = matches;
 	this->print	  = print;
