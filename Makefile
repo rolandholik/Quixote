@@ -121,7 +121,8 @@ AES256_cbc.o: AES256_cbc.h
 query-client.o: NAAAIM.h Duct.h IDtoken.h Authenticator.h
 
 root-referral.o: NAAAIM.h Duct.h IDtoken.h Authenticator.h
-device-broker.o: NAAAIM.h Duct.h IDtoken.h Authenticator.h
+device-broker.o: NAAAIM.h Duct.h IDtoken.h Authenticator.h SHA256.h \
+	SHA256_hmac.h RSAkey.h
 user-broker.o: NAAAIM.h Duct.h IDtoken.h Authenticator.h
 
 genid.o: NAAAIM.h SHA256.h SHA256_hmac.h OrgID.h PatientID.h \
