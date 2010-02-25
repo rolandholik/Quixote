@@ -50,6 +50,7 @@
 #include "Duct.h"
 #include "IDtoken.h"
 #include "Authenticator.h"
+#include "AuthenReply.h"
 
 
 /* Variables static to this module. */
@@ -203,7 +204,7 @@ static int authenticate_user(const Duct const client, const Buffer const bufr)
 	auto Duct broker = NULL;
 
 
-	fputs(".Connecting to user authentication brokerage.\n", stdout);
+	fputs("\n.Connecting to user authentication brokerage.\n", stdout);
 
 
 	/*
@@ -246,13 +247,20 @@ static int authenticate_user(const Duct const client, const Buffer const bufr)
 
 
 	/* Receive and re-transmit device authenticator. */
-	fputs(">Sending device authentication.\n", stdout);
+	fputs(">Sending user authentication.\n", stdout);
 	bufr->reset(bufr);
 	if ( !client->receive_Buffer(client, bufr) )
 		goto done;
 
 	if ( !broker->send_Buffer(broker, bufr) )
 		goto done;
+
+	fputs("<Receiving user authentication reply.\n", stdout);
+	bufr->reset(bufr);
+	if ( !broker->receive_Buffer(broker, bufr) ) {
+		fputs("Error receiving authentication reply.\n", stdout);
+		goto done;
+	}
 
 	retn = true;
 
@@ -295,7 +303,7 @@ static int authenticate_device(const Duct const client, \
 	auto Duct broker = NULL;
 
 
-	fputs(".Connecting to device authentication brokerage.\n", stdout);
+	fputs("\n.Connecting to device authentication brokerage.\n", stdout);
 
 
 	/*
@@ -345,6 +353,27 @@ static int authenticate_device(const Duct const client, \
 
 	if ( !broker->send_Buffer(broker, bufr) )
 		goto done;
+
+
+	/* Retrieve the decrypted identity elements. */
+	bufr->reset(bufr);
+	fputs("<Receiving device authentication reply.\n", stdout);
+	if ( !broker->receive_Buffer(broker, bufr) ) {
+		fputs("Error reading device identity elements.\n", stdout);
+		goto done;
+	}
+
+	auto AuthenReply reply;
+	if ( (reply = NAAAIM_AuthenReply_Init()) == NULL ) {
+		fputs("ERROR.\n", stderr);
+		goto done;
+	}
+	if ( !reply->decode(reply, bufr) ) {
+		fputs("!Cannot decode authentication reply.\n", stdout);
+		goto done;
+	}
+	fputs(".el: ", stdout);
+	reply->print(reply);
 
 	retn = true;
 

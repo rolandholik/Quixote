@@ -47,6 +47,7 @@
 #include "SHA256.h"
 #include "SHA256_hmac.h"
 #include "RSAkey.h"
+#include "AuthenReply.h"
 
 
 /* Variables static to this module. */
@@ -398,6 +399,8 @@ static int handle_connection(const Duct const duct)
 
 	auto IDtoken token = NULL;
 
+	auto AuthenReply reply = NULL;
+
 
 	if ( (bufr = HurdLib_Buffer_Init()) == NULL )
 		goto done;
@@ -405,9 +408,14 @@ static int handle_connection(const Duct const duct)
 		goto done;
 	if ( (token = NAAAIM_IDtoken_Init()) == NULL )
 		goto done;
+	if ( (reply = NAAAIM_AuthenReply_Init()) == NULL )
+		goto done;
 		
 
 	/* Send the connection banner. */
+	fprintf(stdout, "\n.Accepted client connection from: %s\n", \
+		"localhost");
+
 	snprintf(banner, sizeof(banner), "%s / %s / %s\nHello\n", SERVER, \
 		 SITE, LOCATION);
 	bufr->add(bufr, (unsigned char *) banner, strlen(banner));
@@ -416,6 +424,7 @@ static int handle_connection(const Duct const duct)
 
 
 	/* Read and process device authenticator. */
+	fputs("<Receiving device authenticator.\n", stdout);
 	bufr->reset(bufr);
 	if ( !duct->receive_Buffer(duct, bufr) )
 		goto done;
@@ -447,6 +456,27 @@ static int handle_connection(const Duct const duct)
 		goto done;
 	}
 
+
+	/* Return the identity elements. */
+	fputs(">Returning identity elements.\n", stdout);
+	bufr->reset(bufr);
+	if ( !authn->get_element(authn, bufr) ) {
+		fputs("Cannot retrieve identity element.\n", stderr);
+		goto done;
+	}
+
+	reply->add_elements(reply, bufr);
+	bufr->reset(bufr);
+	if ( !reply->encode(reply, bufr) ) {
+		fputs("Error encoding authentication response.\n", stderr);
+		goto done;
+	}
+
+	if ( !duct->send_Buffer(duct, bufr) ) {
+		fputs("Error returning device identity element.\n", stderr);
+		goto done;
+	}
+
 	retn = true;
 
 
@@ -457,6 +487,8 @@ static int handle_connection(const Duct const duct)
 		authn->whack(authn);
 	if ( token != NULL )
 		token->whack(token);
+	if ( reply != NULL )
+		reply->whack(reply);
 
 	return retn;
 }
@@ -539,8 +571,6 @@ extern int main(int argc, char *argv[])
 			goto done;
 		}
 
-		fprintf(stdout, "\nClient connection dispatched to: %d\n", \
-			pid);
 		add_process(pid);
 		update_process_table();
 		duct->reset(duct);

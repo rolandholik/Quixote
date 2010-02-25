@@ -74,19 +74,19 @@ struct NAAAIM_Authenticator_State
  * the wire.
  */
 typedef struct {
-        ASN1_OCTET_STRING *orgkey;
-        ASN1_OCTET_STRING *orgid;
-        ASN1_OCTET_STRING *id;
+	ASN1_OCTET_STRING *orgkey;
+	ASN1_OCTET_STRING *orgid;
+	ASN1_OCTET_STRING *id;
 	ASN1_OCTET_STRING *key;
 	ASN1_OCTET_STRING *elements;
 } authenticator_payload;
 
 ASN1_SEQUENCE(authenticator_payload) = {
-        ASN1_SIMPLE(authenticator_payload, orgkey,   ASN1_OCTET_STRING),
-        ASN1_SIMPLE(authenticator_payload, orgid,    ASN1_OCTET_STRING),
-        ASN1_SIMPLE(authenticator_payload, id,	     ASN1_OCTET_STRING),
-        ASN1_SIMPLE(authenticator_payload, key,	     ASN1_OCTET_STRING),
-        ASN1_SIMPLE(authenticator_payload, elements, ASN1_OCTET_STRING)
+	ASN1_SIMPLE(authenticator_payload, orgkey,   ASN1_OCTET_STRING),
+	ASN1_SIMPLE(authenticator_payload, orgid,    ASN1_OCTET_STRING),
+	ASN1_SIMPLE(authenticator_payload, id,       ASN1_OCTET_STRING),
+	ASN1_SIMPLE(authenticator_payload, key,      ASN1_OCTET_STRING),
+	ASN1_SIMPLE(authenticator_payload, elements, ASN1_OCTET_STRING)
 } ASN1_SEQUENCE_END(authenticator_payload)
 
 IMPLEMENT_ASN1_FUNCTIONS(authenticator_payload)
@@ -250,6 +250,49 @@ static _Bool add_element(const Authenticator const this, \
 		goto done;
 
 	if ( !S->elements->add_Buffer(S->elements, element) )
+		goto done;
+
+	retn = true;
+
+
+ done:
+	if ( retn == false )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements retrieving the identity elements have been
+ * authenticated.
+ *
+ * \param this	The authenticator to from which the elements are to
+ *		be retroeved. an element is to be added.
+ *
+ * \param bufr	The Buffer object which is to be loaded with the
+ *		authenicated identity elements.
+ *
+ * \return	A boolean value is used to indicate the sucess or
+ *		failure of loading the elements.  On failure the object
+ *		is poisoned for future use.
+ */
+
+static _Bool get_element(const Authenticator const this, \
+			 const Buffer const bufr)
+
+{
+	auto const Authenticator_State const S = this->state;
+
+	auto _Bool retn = false;
+
+
+	if ( S->poisoned )
+		goto done;
+
+	if ( !bufr->add_Buffer(bufr, S->elements) )
 		goto done;
 
 	retn = true;
@@ -735,6 +778,7 @@ extern Authenticator NAAAIM_Authenticator_Init(void)
 	this->add_identity = add_identity;
 	this->get_identity = get_identity;
 	this->add_element  = add_element;
+	this->get_element  = get_element;
 	this->encrypt	   = encrypt;
 	this->decrypt	   = decrypt;
 	this->encode	   = encode;

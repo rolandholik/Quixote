@@ -23,3 +23,4 @@
 #define NAAAIM_Duct_OBJID		7
 #define NAAAIM_Authenticator_OBJID	8
 #define NAAAIM_AES256_cbc_OBJID		9
+#define NAAAIM_AuthenReply_OBJID	10

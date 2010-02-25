@@ -27,6 +27,7 @@ struct NAAAIM_Authenticator
 	_Bool (*add_identity)(const Authenticator, const IDtoken);
 	_Bool (*get_identity)(const Authenticator, const IDtoken);
 	_Bool (*add_element)(const Authenticator, const Buffer);
+	_Bool (*get_element)(const Authenticator, const Buffer);
 	_Bool (*encrypt)(const Authenticator, const char *);
 	_Bool (*decrypt)(const Authenticator, const char *);
 	_Bool (*encode)(const Authenticator, const Buffer);
