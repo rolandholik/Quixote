@@ -27,6 +27,8 @@
 #define SITE "Level 3"
 #define LOCATION "Missoula, MT"
 
+#define USER_FILE "/u/usr/sources/NAAAIM/user/user-search.txt"
+
 /* Include files. */
 #include <stdio.h>
 #include <unistd.h>
@@ -42,6 +44,10 @@
 #include "Duct.h"
 #include "IDtoken.h"
 #include "Authenticator.h"
+#include "SHA256.h"
+#include "SHA256_hmac.h"
+#include "RSAkey.h"
+#include "AuthenReply.h"
 
 
 /* Variables static to this module. */
@@ -123,6 +129,253 @@ static void update_process_table(void)
 }
 
 
+
+
+/**
+ * Private function.
+ *
+ * This function is responsible for determining whether or not the
+ * user is authorized to request queries.  The contents of the
+ * intrinsic identity is extracted and the hash of the ephemeralizer
+ * is computed.  The intrinsic identity and the ephemeralizer hash are
+ * used to determine the status of the user.
+ *
+ * \param token		The identity token to be encrypted.
+ *
+ * \param rsakey	A null-terminated character buffer containing the
+ *			name of the RSA public key to be used for
+ *			decrypting the intrinsic identity.
+ *
+ * \return		A boolean return value is used to indicate whether
+ *			or not authorization was successful.  A true
+ *			value is used to indicate the user is
+ *			authorized to conduct queries.
+ */
+
+static _Bool authorize_identity(const IDtoken const token, \
+				const Buffer const bufr)
+
+{
+	auto _Bool retn = false;
+
+	auto Buffer bf;
+
+	auto SHA256 sha256;
+
+
+	if ( (bf = token->get_element(token, IDtoken_id)) == NULL ) {
+		fputs("Cannot access intrinsic identity.\n", stderr);
+		goto done;
+	}
+
+	if ( (sha256 = NAAAIM_SHA256_Init()) == NULL ) {
+		fputs("Cannot initialize hash object.\n", stderr);
+		goto done;
+	}
+	bufr->reset(bufr);
+	bufr->add(bufr, bf->get(bf) + (256 / 8), 512 / 8);
+	sha256->add(sha256, bufr);
+	if ( !sha256->compute(sha256) ) {
+		fputs("Error computing ephemeralizer hash.\n", stderr);
+		goto done;
+	}
+
+	bufr->reset(bufr);
+	bufr->add(bufr, bf->get(bf), 256 / 8);
+
+	fputs(".User is authorized.\n", stdout);
+	fputs(".ii: ", stdout);
+	bufr->print(bufr);
+	fputs(".ei: ", stdout);
+	sha256->print(sha256);
+
+	retn = true;
+
+ done:
+	if ( sha256 != NULL )
+		sha256->whack(sha256);
+
+	return retn;
+}
+	
+
+/**
+ * Private function.
+ *
+ * This function is responsible for extracting and authenticating the
+ * intrinsic identity from the identity token.
+ *
+ * In order to be authentic the RSA decryption of the intrinsic identity
+ * and ephemeralizer must be successful.  The first component hash
+ * of the ephemeralizer is computed and compared to the orgkey element
+ * of the identity token which it must match.
+ *
+ * \param token		The identity token to be encrypted.
+ *
+ * \param rsakey	A null-terminated character buffer containing the
+ *			name of the RSA public key to be used for
+ *			decrypting the intrinsic identity.
+ *
+ * \param bufr		A Buffer object which is passed to the function
+ *			for working purposes in order to avoid an
+ *			allocation in this function.
+ *
+ * \return		A boolean return value is used to indicate whether
+ *			or not the decryption was successful.  A true
+ *			value indicates the buffer contains a valid
+ *			identity.
+ */
+
+static _Bool authenticate_identity(const IDtoken const token,  \
+				   const char * const rsafile, \
+				   const Buffer const bufr)
+
+{
+	auto _Bool retn = false;
+
+	auto Buffer bf;
+
+	auto RSAkey rsa = NULL;
+
+	auto SHA256 sha256 = NULL;
+
+
+	if ( (rsa = NAAAIM_RSAkey_Init()) == NULL )
+		goto done;
+	if ( !rsa->load_public_key(rsa, rsafile) ) { 
+		fputs("Cannot load public key.\n", stderr);
+		goto done;
+	}
+
+	if ( (bf = token->get_element(token, IDtoken_id)) == NULL ) {
+		fputs("Failed extract intrinsic identity.\n", stdout);
+		goto done;
+	}
+	if ( !rsa->decrypt(rsa, bf) ) {
+		fputs("Failed phase 1 authentication.\n", stderr);
+		goto done;
+	}
+
+	if ( (sha256 = NAAAIM_SHA256_Init()) == NULL ) {
+		fputs("SHA256 object creation failed.\n", stderr);
+		goto done;
+	}
+	bufr->reset(bufr);
+	bufr->add(bufr, bf->get(bf) + (256 / 8), 256 / 8);
+	sha256->add(sha256, bufr);
+	if ( !sha256->compute(sha256) ) {
+		fputs("Failed hash generation.\n", stderr);
+		goto done;
+	}
+
+	if ( (bf = token->get_element(token, IDtoken_orgkey)) == NULL ) {
+		fputs("Failed to load orgkey\n", stderr);
+		goto done;
+	}
+
+	if ( memcmp(sha256->get(sha256), bf->get(bf), bf->size(bf)) != 0 ) {
+		fputs("Phase two authentication failed.\n", stderr);
+		goto done;
+	}
+
+	retn = true;
+
+
+ done:
+	if ( rsa != NULL )
+		rsa->whack(rsa);
+	if ( sha256 != NULL )
+		sha256->whack(sha256);
+
+	return retn;
+}
+	
+
+/**
+ * Private function.
+ *
+ * This function searches for the organizational identity which generated
+ * the identity contained in the authenticator.
+ *
+ * \param token		The identity token whose originating organization
+ *			is to be found.
+ *
+ * \param bufr		A Buffer object which will be loaded with the
+ *			intrinsic identity contained in the RSA
+ *			encrypted portion of the authenticator.
+ *
+ * \return		A boolean value is used to indicate whether or not
+ *			an orginating organizational identity was
+ *			found.  A true value indicates success.
+ */
+
+static _Bool search_for_organization(const IDtoken const token, \
+				     const Buffer const bufr)
+
+{
+	auto _Bool retn = false;
+
+	auto char *rsafile,
+		  orgid[256];
+
+	auto FILE *infile = NULL;
+
+	auto Buffer bf = NULL;
+
+	auto SHA256_hmac hmac = NULL;
+
+
+	bf = token->get_element(token, IDtoken_orgkey);
+	if ( (hmac = NAAAIM_SHA256_hmac_Init(bf)) == NULL ) {
+		fputs("Cannot initialize hash object.\n", stderr);
+		goto done;
+	}
+
+	if ( (infile = fopen(USER_FILE, "r")) == NULL ) {
+		fputs("Error opening search file.\n", stderr);
+		goto done;
+	}
+
+	bf = token->get_element(token, IDtoken_orgid);
+	while ( fgets(orgid, sizeof(orgid), infile) != NULL ) {
+		if ( (rsafile = strchr(orgid, '\n')) != NULL )
+			*rsafile = '\0';
+		if ( (rsafile = strchr(orgid, ' ')) == NULL ) {
+			fputs("No NPI delimiter found\n", stderr);
+			goto done;
+		}
+		*rsafile++ = '\0';
+
+		bufr->add_hexstring(bufr, orgid);
+		hmac->add_Buffer(hmac, bufr);
+		if ( !hmac->compute(hmac) ) {
+			fputs("Error computing organizational identity.\n", \
+			      stderr);
+			goto done;
+		}
+		if ( memcmp(bf->get(bf), hmac->get(hmac), bf->size(bf)) \
+		     == 0 ) {
+			bufr->reset(bufr);
+			bufr->add(bufr, (unsigned char *) rsafile, \
+				  strlen(rsafile) + 1);
+			retn = true;
+			goto done;
+		}
+		bufr->reset(bufr);
+		hmac->reset(hmac);
+	}
+
+
+ done:
+	if ( infile != NULL )
+		fclose(infile);
+	if ( hmac != NULL )
+		hmac->whack(hmac);
+
+	return retn;
+}
+
+
 /**
  * Private function.
  *
@@ -148,6 +401,8 @@ static int handle_connection(const Duct const duct)
 
 	auto IDtoken token = NULL;
 
+	auto AuthenReply reply = NULL;
+
 
 	if ( (bufr = HurdLib_Buffer_Init()) == NULL )
 		goto done;
@@ -155,9 +410,14 @@ static int handle_connection(const Duct const duct)
 		goto done;
 	if ( (token = NAAAIM_IDtoken_Init()) == NULL )
 		goto done;
+	if ( (reply = NAAAIM_AuthenReply_Init()) == NULL )
+		goto done;
 		
 
 	/* Send the connection banner. */
+	fprintf(stdout, "\n.Accepted client connection from: %s\n", \
+		"localhost");
+
 	snprintf(banner, sizeof(banner), "%s / %s / %s\nHello\n", SERVER, \
 		 SITE, LOCATION);
 	bufr->add(bufr, (unsigned char *) banner, strlen(banner));
@@ -165,7 +425,8 @@ static int handle_connection(const Duct const duct)
 		goto done;
 
 
-	/* Read and process device authenticator. */
+	/* Read and process user authenticator. */
+	fputs("<Receiving user authenticator.\n", stdout);
 	bufr->reset(bufr);
 	if ( !duct->receive_Buffer(duct, bufr) )
 		goto done;
@@ -175,11 +436,50 @@ static int handle_connection(const Duct const duct)
 		goto done;
 	}
 
-	authn->decrypt(authn, "./org-public.pem");
+	if ( !authn->decrypt(authn, "./org-public.pem") ) {
+		fputs("Failed decryption of authenticator.\n", stderr);
+		goto done;
+	}
 
-	fputs("Device identity:\n", stdout);
 	authn->get_identity(authn, token);
-	token->print(token);
+	if ( !search_for_organization(token, bufr) ) {
+		fputs("User organization not found.\n", stderr);
+		goto done;
+	}
+	fputs(".User organization found.\n", stdout);
+
+	memcpy(banner, bufr->get(bufr), bufr->size(bufr));
+	if ( !authenticate_identity(token, banner, bufr) )
+		goto done;
+	fputs(".User is authenticated.\n", stdout);
+
+	if ( !authorize_identity(token, bufr) ) {
+		fputs("User is not authorized.\n", stderr);
+		goto done;
+	}
+
+
+	/* Return the identity elements. */
+	fputs(">Returning identity elements.\n", stdout);
+	bufr->reset(bufr);
+	if ( !authn->get_element(authn, bufr) ) {
+		fputs("Cannot retrieve identity element.\n", stderr);
+		goto done;
+	}
+
+	reply->add_elements(reply, bufr);
+	bufr->reset(bufr);
+	if ( !reply->encode(reply, bufr) ) {
+		fputs("Error encoding authentication response.\n", stderr);
+		goto done;
+	}
+
+	if ( !duct->send_Buffer(duct, bufr) ) {
+		fputs("Error returning user identity element.\n", stderr);
+		goto done;
+	}
+
+	retn = true;
 
 
  done:
@@ -189,6 +489,8 @@ static int handle_connection(const Duct const duct)
 		authn->whack(authn);
 	if ( token != NULL )
 		token->whack(token);
+	if ( reply != NULL )
+		reply->whack(reply);
 
 	return retn;
 }
@@ -271,8 +573,6 @@ extern int main(int argc, char *argv[])
 			goto done;
 		}
 
-		fprintf(stdout, "Client connection dispatched to: %d\n", \
-			pid);
 		add_process(pid);
 		update_process_table();
 		duct->reset(duct);

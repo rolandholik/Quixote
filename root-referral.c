@@ -255,12 +255,26 @@ static int authenticate_user(const Duct const client, const Buffer const bufr)
 	if ( !broker->send_Buffer(broker, bufr) )
 		goto done;
 
-	fputs("<Receiving user authentication reply.\n", stdout);
+
+	/* Retrieve the decrypted identity elements. */
 	bufr->reset(bufr);
+	fputs("<Receiving user authentication reply.\n", stdout);
 	if ( !broker->receive_Buffer(broker, bufr) ) {
 		fputs("Error receiving authentication reply.\n", stdout);
 		goto done;
 	}
+	auto AuthenReply reply;
+	if ( (reply = NAAAIM_AuthenReply_Init()) == NULL ) {
+		fputs("ERROR.\n", stderr);
+		goto done;
+	}
+	if ( !reply->decode(reply, bufr) ) {
+		fputs("!Cannot decode authentication reply.\n", stdout);
+		goto done;
+	}
+	fputs(".el: ", stdout);
+	reply->print(reply);
+	reply->whack(reply);
 
 	retn = true;
 
@@ -359,7 +373,7 @@ static int authenticate_device(const Duct const client, \
 	bufr->reset(bufr);
 	fputs("<Receiving device authentication reply.\n", stdout);
 	if ( !broker->receive_Buffer(broker, bufr) ) {
-		fputs("Error reading device identity elements.\n", stdout);
+		fputs("Error receiving authentication reply.\n", stdout);
 		goto done;
 	}
 
@@ -374,6 +388,7 @@ static int authenticate_device(const Duct const client, \
 	}
 	fputs(".el: ", stdout);
 	reply->print(reply);
+	reply->whack(reply);
 
 	retn = true;
 

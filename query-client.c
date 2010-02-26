@@ -30,21 +30,22 @@
 /**
  * Private function.
  *
- * This function parses an identity from the specified file.
+ * This function encapsulates opening the file containing the identity
+ * token and parsin of the file.
  *
- * \param token		A token parsing object into which the identity
- *			is to be loaded.
+ * \param token		The identity token which the file contents is
+ *			to be parsed into.
  *
- * \param idfile	A pointer to a null terminated buffer containing
- *			the name of the identity token file to be
- *			parsed.
+ * \param file		A pointer to a null terminated behavior
+ *			containing the name of the file to be parsed.
  *
- * \return		A boolean value is used to return the success or
- *			failure of the token loading.  A true value is
- *			used to indicate success.
+ * \return		A boolean value is used to indicate whether or
+ *			not loading of the file was successful.  A
+ *			true value indicates the load was successful.
  */
 
-static _Bool load_identity(const IDtoken token, const char * const idfile)
+static _Bool load_identity(const IDtoken const token, \
+			   const char * const filename)
 
 {
 	auto _Bool retn = false;
@@ -52,7 +53,7 @@ static _Bool load_identity(const IDtoken token, const char * const idfile)
 	auto FILE *infile = NULL;
 
 
-	if ( (infile = fopen(idfile, "r")) == NULL )
+	if ( (infile = fopen(filename, "r")) == NULL )
 		goto done;
 
 	if ( !token->parse(token, infile) )
@@ -64,7 +65,59 @@ static _Bool load_identity(const IDtoken token, const char * const idfile)
  done:
 	if ( infile != NULL )
 		fclose(infile);
+
 	return retn;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function parses the three identities which are needed to
+ * initiate an identity query.
+ *
+ * \param devname	A pointer to a null terminated buffer containing
+ *			the name of the file holding the device identity
+ *			token.
+ *
+ * \param username	A pointer to a null terminated buffer containing
+ *			the name of the file holding the user identity
+ *			token.
+ *
+ * \param patientname	A pointer to a null terminated buffer containing
+ *			the name of the file holding the patient identity
+ *			token.
+ *
+ * \param device	The identity token to be loaded with the device
+ *			identity.
+ *
+ * \param user		The identity token to be loaded with the user
+ *			identity.
+ *
+ * \param patient	The identity token to be loaded with the
+ *			patient identity.
+ *
+ * \return		A boolean value is used to return the success or
+ *			failure of the token loading.  A true value is
+ *			used to indicate success.
+ */
+
+static _Bool load_identities(const char * const devname,     \
+			     const char * const username,    \
+			     const char * const patientname, \
+			     const IDtoken const device,     \
+			     const IDtoken const user,	     \
+			     const IDtoken const patient)
+
+{
+	if ( !load_identity(device, devname) )
+		return false;
+	if ( !load_identity(user, username) )
+		return false;
+	if ( !load_identity(patient, patientname) )
+		return false;
+
+	return true;
 }
 
 
@@ -85,7 +138,9 @@ extern int main(int argc, char *argv[])
 
 	auto Duct duct = NULL;
 
-	auto IDtoken token = NULL;
+	auto IDtoken device  = NULL,
+		     user    = NULL,
+		     patient = NULL;
 
 	auto Authenticator authn = NULL;
 
@@ -107,6 +162,21 @@ extern int main(int argc, char *argv[])
 
 	if ( (bufr = HurdLib_Buffer_Init()) == NULL ) {
 		fputs("Cannot initialize receive buffer.\n", stderr);
+		goto done;
+	}
+
+
+	/* Load identities. */
+	device	= NAAAIM_IDtoken_Init();
+	user	= NAAAIM_IDtoken_Init();
+	patient = NAAAIM_IDtoken_Init();
+	if ( (device == NULL) || (user == NULL ) || (patient == NULL) ) {
+		fputs("Cannot initialize identity tokens\n", stderr);
+		goto done;
+	}
+	if ( !load_identities("./device1.txt", "./user1.txt", \
+			      "./patient1.txt", device, user, patient) ) {
+		fputs("Error loading identities.\n", stderr);
 		goto done;
 	}
 
@@ -155,27 +225,13 @@ extern int main(int argc, char *argv[])
 
 
 	/* Initialize and load device identity. */
-	if ( (token = NAAAIM_IDtoken_Init()) == NULL ) {
-		fputs("Cannot initialize identity token.\n", stderr);
-		goto done;
-	}
-	if ( !load_identity(token, "./device1.txt") ) {
-		fputs("Cannot load device identity.\n", stderr);
-		goto done;
-	}
-
-	if ( !authn->add_identity(authn, token) ) {
+	if ( !authn->add_identity(authn, device) ) {
 		fputs("Cannot add device identity.\n", stderr);
 		goto done;
 	}
 
-	token->reset(token);
-	if ( !load_identity(token, "./user1.txt") ) {
-		fputs("Cannot load user identity.\n", stderr);
-		goto done;
-	}
-
-	authn->add_element(authn, token->get_element(token, IDtoken_orgkey));
+	authn->add_element(authn, patient->get_element(patient, \
+						       IDtoken_orgkey));
 	authn->encrypt(authn, "./org-private.pem");
 
 	fputs("\nSending device authenticator.\n", stdout);
@@ -189,10 +245,11 @@ extern int main(int argc, char *argv[])
 
 
 	/* Send the user authenticator. */
-	fputs("Sending user authenticator\n", stdout);
+	fputs("Sending user authenticator.\n", stdout);
 	authn->reset(authn);
-	authn->add_identity(authn, token);
-	authn->add_element(authn, token->get_element(token, IDtoken_orgkey));
+	authn->add_identity(authn, user);
+	authn->add_element(authn, patient->get_element(patient, \
+						       IDtoken_orgid));
 	authn->encrypt(authn, "./org-private.pem");
 	bufr->reset(bufr);
 	if ( !authn->encode(authn, bufr) ) {
@@ -209,14 +266,19 @@ extern int main(int argc, char *argv[])
 	if ( !duct->whack_connection(duct) )
 		fputs("Error closing connection.\n", stderr);
 
+	if ( device != NULL )
+		device->whack(device);
+	if ( user != NULL )
+		user->whack(user);
+	if ( patient != NULL )
+		patient->whack(patient);
+
 	if ( parser != NULL )
 		parser->whack(parser);
 	if ( duct != NULL )
 		duct->whack(duct);
 	if ( bufr != NULL )
 		bufr->whack(bufr);
-	if ( token != NULL )
-		token->whack(token);
 	if ( authn != NULL )
 		authn->whack(authn);
 

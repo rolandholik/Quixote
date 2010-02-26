@@ -27,7 +27,7 @@
 #define SITE "702 Communications"
 #define LOCATION "Moorhead, MN"
 
-#define DEVICE_FILE "/u/usr/sources/NAAAIM/device-search.txt"
+#define DEVICE_FILE "/u/usr/sources/NAAAIM/device/device-search.txt"
 
 /* Include files. */
 #include <stdio.h>
@@ -330,7 +330,7 @@ static _Bool search_for_organization(const IDtoken const token, \
 	}
 
 	if ( (infile = fopen(DEVICE_FILE, "r")) == NULL ) {
-		fputs("Error opening search file file.\n", stderr);
+		fputs("Error opening search file.\n", stderr);
 		goto done;
 	}
 
@@ -526,7 +526,7 @@ extern int main(int argc, char *argv[])
 	retn = 1;
 
 	if ( config == NULL )
-		config = "./root-referral.conf";
+		config = "./device-broker.conf";
 
 
 	/* Initialize process table. */
