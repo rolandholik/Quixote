@@ -24,6 +24,7 @@
 
 #include <Origin.h>
 #include <Buffer.h>
+#include <String.h>
 
 #include "NAAAIM.h"
 #include "Duct.h"
@@ -89,6 +90,9 @@ struct NAAAIM_Duct_State
 
 	/* Server file descriptor. */
 	int fd;
+
+	/* Client hostname .*/
+	Buffer client;
 };
 
 
@@ -118,6 +122,7 @@ static void _init_state(const Duct_State const S) {
 	S->connection 	= NULL;
 	S->sockt	= -1;
 	S->fd		= -1;
+	S->client       = NULL;
 
 	return;
 }
@@ -505,6 +510,8 @@ static _Bool accept_connection(const Duct const this)
 {
 	auto const Duct_State const S = this->state;
 
+	auto char *hp;
+
 	auto int retn,
 		 client_size;
 
@@ -527,6 +534,20 @@ static _Bool accept_connection(const Duct const this)
 
 	client_hostname = gethostbyaddr(&client.sin_addr, \
 					sizeof(struct in_addr), AF_INET);
+	hp = client_hostname->h_name;
+	if ( S->client == NULL ) {
+		S->client = HurdLib_Buffer_Init();
+		if ( S->client == NULL )
+			goto done;
+	}
+	else
+		S->client->reset(S->client);
+
+	S->client->add(S->client, (unsigned char *) hp, strlen(hp));
+	if ( !S->client->add(S->client, (unsigned char *) "\0", 1) ) {
+		S->poisoned = true;
+		goto done;
+	}
 
 
 	/* Initiate an SSL connection and listen for a client handshake. */
@@ -727,6 +748,33 @@ static _Bool receive_Buffer(const Duct const this, const Buffer bf)
 /**
  * External public method.
  *
+ * This method implements returning the hostname of the client which
+ * initiated a connection to a Server object.
+ *
+ * \param this	The Duct object whose hostname is to be printed.
+ *
+ * \return	A pointer to a null-terminated character buffer containing
+ *		the hostname.
+ */
+
+static char * get_client(const Duct const this)
+
+{
+	/* Sanity checks. */
+	if ( this->state->poisoned )
+		return NULL;
+	if ( this->state->client == NULL ) {
+		this->state->poisoned = true;
+		return NULL;
+	}
+
+	return (char *) this->state->client->get(this->state->client);
+}
+	
+
+/**
+ * External public method.
+ *
  * This method implements resetting of a duct object.  In the case of
  * a server object the reset method is used to close the file descriptor
  * associated with a connection which has been accepted.
@@ -816,6 +864,10 @@ static void whack(const Duct const this)
 	/* Free loaded error strings. */
 	ERR_free_strings();
 
+	/* Free client hostname if it has been defined. */
+	if ( S->client != NULL )
+		S->client->whack(S->client);
+
 	/* Free SSL connection if one has been established. */
 	if ( S->connection != NULL )
 		SSL_free(S->connection);
@@ -889,6 +941,8 @@ extern Duct NAAAIM_Duct_Init(void)
 
 	this->send_Buffer	= send_Buffer;
 	this->receive_Buffer	= receive_Buffer;
+
+	this->get_client	= get_client;
 
 	this->reset		= reset;
 

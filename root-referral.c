@@ -534,8 +534,8 @@ static _Bool handle_connection(const Duct const duct)
 
 		
 	/* Send the connection banner. */
-	fprintf(stdout, "\n.Accepted client connection from: %s\n", \
-		"localhost");
+	fprintf(stdout, "\n.Accepted client connection from %s.\n", \
+		duct->get_client(duct));
 
 	snprintf(banner, sizeof(banner), "%s / %s / %s\nHello\n", SERVER, \
 		 SITE, LOCATION);
