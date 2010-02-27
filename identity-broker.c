@@ -27,7 +27,8 @@
 #define SITE "Clear Lake Cooperative Telephone"
 #define LOCATION "Clear Lake, SD"
 
-#define FAILED "Authentication failed."
+#define FAILED "Failed.\n"
+#define SUCCESS "OK.\n"
 
 /* Include files. */
 #include <stdio.h>
@@ -276,6 +277,12 @@ static _Bool handle_connection(const Duct const duct)
 		bufr->print(bufr);
 	}
 
+	fputs(">Sending identity referral.\n", stdout);
+	if ( !duct->send_Buffer(duct, bufr) ) {
+		fputs("!Error sending referral.\n", stderr);
+		goto done;
+	}
+	
 	retn = true;
 
 
@@ -343,7 +350,8 @@ extern int main(int argc, char *argv[])
 		fputs("Error allocating search object.\n", stderr);
 		goto done;
 	}
-	if ( !IDfinder->load(IDfinder, "/u/usr/src/npi/npi-search.txt") ) {
+	fputs("\nLoading originating identity database.\n", stdout);
+	if ( !IDfinder->load(IDfinder, "/u/usr/src/npi/npi-full-search.txt") ) {
 		fputs("Error loading search object.\n", stderr);
 		goto done;
 	}

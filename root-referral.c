@@ -488,6 +488,13 @@ static _Bool dispatch_brokers(const Buffer const devauth,  \
 		goto done;
 	}
 
+	fputs("<Receiving identity referrals.\n", stdout);
+	bufr->reset(bufr);
+	if ( !broker->receive_Buffer(broker, bufr) ) {
+		fputs("Error receiving referrals.\n", stdout);
+		goto done;
+	}
+
 	retn = true;
 
 
@@ -556,6 +563,13 @@ static _Bool handle_connection(const Duct const duct)
 
 	if ( !dispatch_brokers(devauth, userauth, bufr) )
 		goto done;
+
+	fputs(">Returning identity referrals.\n", stdout);
+	if ( !duct->send_Buffer(duct, bufr) ) {
+		fputs("!Error send referrals.\n", stderr);
+		goto done;
+	}
+
 	retn = true;
 
 

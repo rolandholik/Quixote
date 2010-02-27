@@ -309,6 +309,17 @@ extern int main(int argc, char *argv[])
 	if ( !duct->send_Buffer(duct, bufr) )
 		fputs("!Error transmitting device authenticator.\n", stderr);
 
+
+	/* Receive the referrals. */
+	fputs("<Receiving referrals.\n", stdout);
+	bufr->reset(bufr);
+	if ( !duct->receive_Buffer(duct, bufr) ) {
+		fputs("!Error receiving referrals.\n", stderr);
+		goto done;
+	}
+	fputs(".referral: ", stdout);
+	bufr->print(bufr);
+
 	retn = 0;
 
 
