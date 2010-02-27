@@ -45,10 +45,13 @@
 #include "IDtoken.h"
 #include "Authenticator.h"
 #include "AuthenReply.h"
+#include "OrgSearch.h"
 
 
 /* Variables static to this module. */
 static pid_t process_table[100];
+
+static OrgSearch IDfinder = NULL;
 
 
 /**
@@ -193,6 +196,8 @@ static _Bool handle_connection(const Duct const duct)
 	auto AuthenReply orgkey = NULL,
 		         orgid  = NULL;
 
+	auto IDtoken token = NULL;
+
 
 	if ( (bufr = HurdLib_Buffer_Init()) == NULL )
 		goto done;
@@ -200,6 +205,9 @@ static _Bool handle_connection(const Duct const duct)
 	orgkey = NAAAIM_AuthenReply_Init();
 	orgid  = NAAAIM_AuthenReply_Init();
 	if ( (orgkey == NULL) || (orgid == NULL) )
+		goto done;
+
+	if ( (token = NAAAIM_IDtoken_Init()) == NULL )
 		goto done;
 		
 
@@ -243,6 +251,31 @@ static _Bool handle_connection(const Duct const duct)
 	fputs(".elid:  ", stdout);
 	orgid->print(orgid);
 
+	fputs(".Searching for originating organization.\n", stdout);
+	bufr->reset(bufr);
+	orgkey->get_elements(orgkey, bufr);
+	if ( !token->set_element(token, IDtoken_orgkey, bufr) ) {
+		fputs("!Error setting organizational key.\n", stderr);
+		goto done;
+	}
+	bufr->reset(bufr);
+	orgid->get_elements(orgid, bufr);
+	if ( !token->set_element(token, IDtoken_orgid, bufr) ) {
+		fputs("!Error setting organizational identity.\n", stderr);
+		goto done;
+	}
+
+	if ( !IDfinder->search(IDfinder, token) ) {
+		fputs(".Not found.\n", stdout);
+		goto done;
+	}
+	else {
+		bufr->reset(bufr);
+		IDfinder->get_match(IDfinder, bufr);
+		fputs(".Matched: ", stdout);
+		bufr->print(bufr);
+	}
+
 	retn = true;
 
 
@@ -260,6 +293,8 @@ static _Bool handle_connection(const Duct const duct)
 		orgkey->whack(orgkey);
 	if ( orgid != NULL )
 		orgid->whack(orgid);
+	if ( token != NULL )
+		token->whack(token);
 
 	return retn;
 }
@@ -303,6 +338,15 @@ extern int main(int argc, char *argv[])
 	/* Initialize process table. */
 	init_process_table();
 
+	/* Initialize and organizational identity search object. */
+	if ( (IDfinder = NAAAIM_OrgSearch_Init()) == NULL ) {
+		fputs("Error allocating search object.\n", stderr);
+		goto done;
+	}
+	if ( !IDfinder->load(IDfinder, "/u/usr/src/npi/npi-search.txt") ) {
+		fputs("Error loading search object.\n", stderr);
+		goto done;
+	}
 
 	/* Initialize SSL connection and wait for connections. */
 	if ( (duct = NAAAIM_Duct_Init()) == NULL ) {
@@ -358,6 +402,8 @@ extern int main(int argc, char *argv[])
 		parser->whack(parser);
 	if ( duct != NULL )
 		duct->whack(duct);
+	if ( IDfinder != NULL )
+		IDfinder->whack(IDfinder);
 
 	return retn;
 }
