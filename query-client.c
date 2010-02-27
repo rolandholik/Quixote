@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <string.h>
+#include <time.h>
 
 #include <Config.h>
 #include <Buffer.h>
@@ -25,6 +26,50 @@
 #include "Duct.h"
 #include "IDtoken.h"
 #include "Authenticator.h"
+
+
+/**
+ * Private function.
+ *
+ * This is a utility function which prints the contents of a text
+ * buffer received from a server.
+ *
+ * \param bufr	The buffer object containing the text to be printed.
+ */
+
+static void print_buffer(const Buffer const bufr)
+
+{
+	auto char *p,
+		  *begin,
+		  pbufr[160];
+
+
+	/* Sanity check. */
+	if ( bufr->size(bufr) > 160 ){
+		fputs(".reply too long to print", stdout);
+		return;
+	} 
+
+
+	/*
+	 * Copy the buffer and loop through it prepending a token to
+	 * indicate this is an incoming response.
+	 */
+	memcpy(pbufr, bufr->get(bufr), bufr->size(bufr));
+
+	begin = pbufr;
+	do {
+		if ( (p = strchr(begin, '\n')) != NULL ) {
+			*p = '\0';
+			fprintf(stdout, "<%s\n", begin);
+			begin = p;
+			++begin;
+		}
+	} while ( p != NULL );
+
+	return;
+}
 
 
 /**
@@ -132,6 +177,8 @@ extern int main(int argc, char *argv[])
 
 	auto int retn = 1;
 
+	auto time_t start_time;
+
 	auto Buffer bufr = NULL;
 
 	auto Config parser = NULL;
@@ -180,6 +227,8 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
+	start_time = time(NULL);
+
 
 	/* Initialize SSL connection and attach to root referral server. */
 	if ( (duct = NAAAIM_Duct_Init()) == NULL ) {
@@ -202,6 +251,7 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
+	fputs(".Connecting to root referral server.\n", stdout);
 	if ( !duct->init_connection(duct) ) {
 		fputs("Cannot initialize connection.\n", stderr);
 		goto done;
@@ -210,23 +260,23 @@ extern int main(int argc, char *argv[])
 
 	/* Obtain connection banner. */
 	if ( !duct->receive_Buffer(duct, bufr) ) {
-		fputs("Error on receive.\n", stderr);
+		fputs("!Error receiving connection banner.\n", stderr);
 		goto done;
 	}
 	bufr->add(bufr, (unsigned char *) "\0", sizeof(1));
-	fprintf(stdout, "%s", bufr->get(bufr));
+	print_buffer(bufr);
 
 
 	/* Initialize an authenticator object. */
 	if ( (authn = NAAAIM_Authenticator_Init()) == NULL ) {
-		fputs("Cannot initialize authenticator.\n", stderr);
+		fputs("!Cannot initialize authenticator.\n", stderr);
 		goto done;
 	}
 
 
 	/* Initialize and load device identity. */
 	if ( !authn->add_identity(authn, device) ) {
-		fputs("Cannot add device identity.\n", stderr);
+		fputs("!Cannot add device identity.\n", stderr);
 		goto done;
 	}
 
@@ -234,18 +284,18 @@ extern int main(int argc, char *argv[])
 						       IDtoken_orgkey));
 	authn->encrypt(authn, "./org-private.pem");
 
-	fputs("\nSending device authenticator.\n", stdout);
+	fputs(">Sending device authenticator.\n", stdout);
 	bufr->reset(bufr);
 	if ( !authn->encode(authn, bufr) ) {
-		fputs("Error encoding device authenticator.\n", stderr);
+		fputs("!Error encoding device authenticator.\n", stderr);
 		goto done;
 	}
 	if ( !duct->send_Buffer(duct, bufr) )
-		fputs("Error transmitting device authenticator.\n", stderr);
+		fputs("!Error transmitting device authenticator.\n", stderr);
 
 
 	/* Send the user authenticator. */
-	fputs("Sending user authenticator.\n", stdout);
+	fputs(">Sending user authenticator.\n", stdout);
 	authn->reset(authn);
 	authn->add_identity(authn, user);
 	authn->add_element(authn, patient->get_element(patient, \
@@ -253,18 +303,21 @@ extern int main(int argc, char *argv[])
 	authn->encrypt(authn, "./org-private.pem");
 	bufr->reset(bufr);
 	if ( !authn->encode(authn, bufr) ) {
-		fputs("Error encoding user authenticator.\n", stderr);
+		fputs("!Error encoding user authenticator.\n", stderr);
 		goto done;
 	}
 	if ( !duct->send_Buffer(duct, bufr) )
-		fputs("Error transmitting device authenticator.\n", stderr);
+		fputs("!Error transmitting device authenticator.\n", stderr);
 
 	retn = 0;
 
 
  done:
+	fprintf(stdout, ".Query complete, time = %ld seconds.\n", \
+		time(NULL) - start_time);
+
 	if ( !duct->whack_connection(duct) )
-		fputs("Error closing connection.\n", stderr);
+		fputs("!Error closing connection.\n", stderr);
 
 	if ( device != NULL )
 		device->whack(device);
