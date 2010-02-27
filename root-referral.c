@@ -404,6 +404,107 @@ static int authenticate_device(const Duct const client, \
 /**
  * Private function.
  *
+ * This function dispatches the identity element authenticators to each
+ * of the defined identity brokerages.
+ *
+ * \param devauth	The identity elements authenticated by the
+ *			device authentication brokerage.
+ *
+ * \param userauth	The identity elements authenticated by the user
+ *			authentication brokerage.
+ *
+ * \param bufr		A utility buffer passed from the caller to avoid
+ *			the need to allocate a buffer within the
+ *			function.
+ *
+ * \return		A boolean value is used to indicate the success or
+ *			failure of processing by the identity brokerages.
+ *			A true value indicates the authentication has been
+ *			successful.
+ */
+
+static _Bool dispatch_brokers(const Buffer const devauth,  \
+			      const Buffer const userauth, \
+			      const Buffer const bufr)
+
+{
+	auto _Bool retn = false;
+
+	auto Duct broker = NULL;
+
+
+	fputs("\n.Connecting to identity brokerage.\n", stdout);
+
+	/*
+	 * Initialize SSL connection and connect to the device identity
+	 * brokerage server.
+	 */
+	if ( (broker = NAAAIM_Duct_Init()) == NULL ) {
+		fputs("Error on SSL object creation.\n", stderr);
+		goto done;
+	}
+
+	if ( !broker->init_client(broker) ) {
+		fputs("Cannot initialize server mode.\n", stderr);
+		goto done;
+	}
+
+	if ( !broker->load_certificates(broker, "./org-cert.pem") ) {
+		fputs("Cannot load certificates.\n", stderr);
+		goto done;
+	}
+
+	if ( !broker->init_port(broker, "localhost", 11993) ) {
+		fputs("Cannot initialize port.\n", stderr);
+		goto done;
+	}
+
+	if ( !broker->init_connection(broker) ) {
+		fputs("Cannot initialize connection.\n", stderr);
+		goto done;
+	}
+
+
+	/* Obtain and print connection banner. */
+	bufr->reset(bufr);
+	if ( !broker->receive_Buffer(broker, bufr) ) {
+		fputs("Error on receive.\n", stderr);
+		goto done;
+	}
+	print_buffer(bufr);
+
+
+	/* Transmit key elements. */
+	fputs(">Sending device key elements.\n", stdout);
+	if ( !broker->send_Buffer(broker, devauth) ) {
+		fputs("!Error sending elements.\n", stderr);
+		goto done;
+	}
+
+	/* Transmit identity elements. */
+	fputs(">Sending identity elements.\n", stdout);
+	if ( !broker->send_Buffer(broker, userauth) ) {
+		fputs("!Error sending elements.\n", stderr);
+		goto done;
+	}
+
+	retn = true;
+
+
+ done:
+	if ( (broker != NULL) ) {
+		if ( !broker->whack_connection(broker) )
+			fputs("Error closing connection.\n", stderr);
+		broker->whack(broker);
+	}
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
  * This function is called after a fork to handle an accepted connection.
  *
  * \param duct	The SSL connection object describing the accepted connection.
@@ -420,21 +521,18 @@ static _Bool handle_connection(const Duct const duct)
 
 	auto int retn = false;
 
-	auto Buffer bufr = NULL;
-
-	auto Authenticator authn = NULL;
-
-	auto IDtoken token = NULL;
+	auto Buffer bufr     = NULL,
+		    devauth  = NULL,
+		    userauth = NULL;
 
 
-	if ( (bufr = HurdLib_Buffer_Init()) == NULL )
-		goto done;
-	if ( (authn = NAAAIM_Authenticator_Init()) == NULL )
-		goto done;
-	if ( (token = NAAAIM_IDtoken_Init()) == NULL )
-		goto done;
+	bufr	 = HurdLib_Buffer_Init();
+	devauth  = HurdLib_Buffer_Init();
+	userauth = HurdLib_Buffer_Init();
+	if ( (bufr == NULL) || (devauth == NULL) || (userauth == NULL) )
+ 		goto done;
+
 		
-
 	/* Send the connection banner. */
 	fprintf(stdout, "\n.Accepted client connection from: %s\n", \
 		"localhost");
@@ -449,12 +547,15 @@ static _Bool handle_connection(const Duct const duct)
 	/* Read and process device authenticator. */
 	if ( !authenticate_device(duct, bufr) )
 		goto done;
-
+	devauth->add_Buffer(devauth, bufr);
+	
 	/* Read and process user authenticator. */
 	if ( !authenticate_user(duct, bufr) )
 		goto done;
+	userauth->add_Buffer(userauth, bufr);
 
-	fflush(stdout);
+	if ( !dispatch_brokers(devauth, userauth, bufr) )
+		goto done;
 	retn = true;
 
 
@@ -468,10 +569,10 @@ static _Bool handle_connection(const Duct const duct)
 
 	if ( bufr != NULL )
 		bufr->whack(bufr);
-	if ( authn != NULL )
-		authn->whack(authn);
-	if ( token != NULL )
-		token->whack(token);
+	if ( devauth != NULL )
+		devauth->whack(devauth);
+	if ( userauth != NULL )
+		userauth->whack(userauth);
 
 	return retn;
 }

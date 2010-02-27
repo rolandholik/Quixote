@@ -9,7 +9,7 @@
 CSRC = 	SHA256.c SHA256_hmac.c RSAkey.c OrgID.c PatientID.c RandomBuffer.c \
 	IDtoken.c Duct.c Authenticator.c AES256_cbc.c AuthenReply.c
 
-SERVERS = root-referral device-broker user-broker
+SERVERS = root-referral device-broker user-broker identity-broker
 
 CC = gcc
 
@@ -66,6 +66,9 @@ device-broker: device-broker.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
 user-broker: user-broker.o ${COBJS}
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
+
+identity-broker: identity-broker.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
 query-client: query-client.o ${COBJS}
