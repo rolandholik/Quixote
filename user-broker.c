@@ -24,8 +24,8 @@
 
 /* Local defines. */
 #define SERVER "User Authentication Broker"
-#define SITE "Level 3"
-#define LOCATION "Missoula, MT"
+#define SITE "Parsec Data Management"
+#define LOCATION "Billings, MT"
 
 #define USER_FILE "/u/usr/sources/NAAAIM/user/user-search.txt"
 
