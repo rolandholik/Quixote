@@ -282,8 +282,12 @@ static int authenticate_user(const Duct const client, const Buffer const bufr)
 
 
  done:
-	if ( broker != NULL )
+	if ( broker != NULL ) {
+		if ( !broker->whack_connection(broker) )
+			fputs("Error closing connection.\n", stderr);
 		broker->whack(broker);
+	}
+
 	if ( reply != NULL )
 		reply->whack(reply);
 
@@ -400,8 +404,12 @@ static int authenticate_device(const Duct const client, \
 
 
  done:
-	if ( broker != NULL )
+	if ( broker != NULL ) {
+		if ( !broker->whack_connection(broker) )
+			fputs("Error closing connection.\n", stderr);
 		broker->whack(broker);
+	}
+
 	if ( reply != NULL )
 		reply->whack(reply);
 
@@ -686,13 +694,14 @@ extern int main(int argc, char *argv[])
 
 
  done:
-	if ( !duct->whack_connection(duct) )
-		fputs("Error closing connection.\n", stderr);
+	if ( duct != NULL ) {
+	     if ( !duct->whack_connection(duct) )
+		     fputs("Error closing connection.\n", stderr);
+	     duct->whack(duct);
+	}
 
 	if ( parser != NULL )
 		parser->whack(parser);
-	if ( duct != NULL )
-		duct->whack(duct);
 
 	return retn;
 }

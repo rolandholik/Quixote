@@ -387,8 +387,6 @@ static _Bool handle_connection(const Duct const duct)
 		orgkey->whack(orgkey);
 	if ( orgid != NULL )
 		orgid->whack(orgid);
-	if ( token != NULL )
-		token->whack(token);
 
 	return retn;
 }
@@ -477,10 +475,9 @@ extern int main(int argc, char *argv[])
 			goto done;
 		}
 		if ( pid == 0 ) {
-			if ( handle_connection(duct) ) {
+			if ( handle_connection(duct) )
 				retn = 0;
-				goto done;
-			}
+			goto done;
 		}
 
 		add_process(pid);
@@ -490,13 +487,14 @@ extern int main(int argc, char *argv[])
 
 
  done:
-	if ( !duct->whack_connection(duct) )
-		fputs("Error closing connection.\n", stderr);
+	if ( duct != NULL ) {
+		if ( !duct->whack_connection(duct) )
+			fputs("Error closing connection.\n", stderr);
+		duct->whack(duct);
+	}
 
 	if ( parser != NULL )
 		parser->whack(parser);
-	if ( duct != NULL )
-		duct->whack(duct);
 	if ( IDfinder != NULL )
 		IDfinder->whack(IDfinder);
 

@@ -578,13 +578,14 @@ extern int main(int argc, char *argv[])
 
 
  done:
-	if ( !duct->whack_connection(duct) )
-		fputs("Error closing connection.\n", stderr);
+	if ( duct != NULL ) {
+		if ( !duct->whack_connection(duct) )
+			fputs("Error closing connection.\n", stderr);
+		duct->whack(duct);
+	}
 
 	if ( parser != NULL )
 		parser->whack(parser);
-	if ( duct != NULL )
-		duct->whack(duct);
 
 	return retn;
 }

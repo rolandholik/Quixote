@@ -401,8 +401,11 @@ extern int main(int argc, char *argv[])
 	fprintf(stdout, ".Query complete, time = %ld seconds.\n", \
 		time(NULL) - start_time);
 
-	if ( (duct != NULL) && !duct->whack_connection(duct) )
-		fputs("!Error closing connection.\n", stderr);
+	if ( duct != NULL ) {
+		if ( !duct->whack_connection(duct) )
+			fputs("!Error closing connection.\n", stderr);
+		duct->whack(duct);
+	}
 
 	if ( device != NULL )
 		device->whack(device);
@@ -414,8 +417,6 @@ extern int main(int argc, char *argv[])
 
 	if ( parser != NULL )
 		parser->whack(parser);
-	if ( duct != NULL )
-		duct->whack(duct);
 	if ( bufr != NULL )
 		bufr->whack(bufr);
 	if ( authn != NULL )
