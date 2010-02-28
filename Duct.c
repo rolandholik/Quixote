@@ -797,10 +797,16 @@ static _Bool reset(const Duct const this)
 	if ( S->poisoned )
 		return false;
 
-	if ( S->type == server )
+	if ( S->type == server ) {
+		SSL_free(S->connection);
+		S->connection = NULL;
+
 		if ( (S->fd != -1) && (close(this->state->fd) == -1) )
 			goto done;
+	}
+
 	retn = true;
+
 
  done:
 	return retn;
