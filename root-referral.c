@@ -203,9 +203,10 @@ static int authenticate_user(const Duct const client, const Buffer const bufr)
 
 	auto Duct broker = NULL;
 
+	auto AuthenReply reply = NULL;
+
 
 	fputs("\n.Connecting to user authentication brokerage.\n", stdout);
-
 
 	/*
 	 * Initialize SSL connection and connect to the user identity
@@ -263,7 +264,7 @@ static int authenticate_user(const Duct const client, const Buffer const bufr)
 		fputs("Error receiving authentication reply.\n", stdout);
 		goto done;
 	}
-	auto AuthenReply reply;
+
 	if ( (reply = NAAAIM_AuthenReply_Init()) == NULL ) {
 		fputs("ERROR.\n", stderr);
 		goto done;
@@ -272,9 +273,10 @@ static int authenticate_user(const Duct const client, const Buffer const bufr)
 		fputs("!Cannot decode authentication reply.\n", stdout);
 		goto done;
 	}
+#if 0
 	fputs(".el: ", stdout);
 	reply->print(reply);
-	reply->whack(reply);
+#endif
 
 	retn = true;
 
@@ -282,6 +284,8 @@ static int authenticate_user(const Duct const client, const Buffer const bufr)
  done:
 	if ( broker != NULL )
 		broker->whack(broker);
+	if ( reply != NULL )
+		reply->whack(reply);
 
 	return retn;
 }
@@ -316,9 +320,10 @@ static int authenticate_device(const Duct const client, \
 
 	auto Duct broker = NULL;
 
+	auto AuthenReply reply = NULL;
+
 
 	fputs("\n.Connecting to device authentication brokerage.\n", stdout);
-
 
 	/*
 	 * Initialize SSL connection and connect to the device identity
@@ -377,7 +382,6 @@ static int authenticate_device(const Duct const client, \
 		goto done;
 	}
 
-	auto AuthenReply reply;
 	if ( (reply = NAAAIM_AuthenReply_Init()) == NULL ) {
 		fputs("ERROR.\n", stderr);
 		goto done;
@@ -386,9 +390,11 @@ static int authenticate_device(const Duct const client, \
 		fputs("!Cannot decode authentication reply.\n", stdout);
 		goto done;
 	}
+
+#if 0
 	fputs(".el: ", stdout);
 	reply->print(reply);
-	reply->whack(reply);
+#endif
 
 	retn = true;
 
@@ -396,6 +402,8 @@ static int authenticate_device(const Duct const client, \
  done:
 	if ( broker != NULL )
 		broker->whack(broker);
+	if ( reply != NULL )
+		reply->whack(reply);
 
 	return retn;
 }

@@ -9,6 +9,10 @@
 #endif
 
 
+/* The size of an individual identity in bytes. */
+#define NAAAIM_IDSIZE 32
+
+
 /* Numeric library identifier. */
 #define NAAAIM_LIBID 3
 

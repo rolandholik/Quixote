@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
@@ -26,6 +27,10 @@
 #include "Duct.h"
 #include "IDtoken.h"
 #include "Authenticator.h"
+
+
+/* Variables static to this module. */
+static IDtoken *Ptid_list = NULL;
 
 
 /**
@@ -149,23 +154,81 @@ static _Bool load_identity(const IDtoken const token, \
 
 static _Bool load_identities(const char * const devname,     \
 			     const char * const username,    \
-			     const char * const patientname, \
 			     const IDtoken const device,     \
-			     const IDtoken const user,	     \
-			     const IDtoken const patient)
+			     const IDtoken const user)
 
 {
 	if ( !load_identity(device, devname) )
 		return false;
 	if ( !load_identity(user, username) )
 		return false;
-	if ( !load_identity(patient, patientname) )
-		return false;
 
 	return true;
 }
 
 
+/**
+ * Private function.
+ *
+ * This function loads one or more identities for a filename provided by
+ * the caller.  This function populates an array static to this file
+ * with the set of identity tokens parsed from the file.
+ *
+ * \param file		A pointer to a null terminated file containing
+ *			the name of the file to parse.
+ *
+ * \return		A boolean value is used to indicate whether or
+ *			not loading of the file was successful.  A
+ *			true value indicates the load was successful.
+ */
+
+static _Bool load_patient_identity(const char * const filename)
+
+{
+	auto _Bool retn = false;
+
+	auto unsigned int idcnt = 1;
+
+	auto FILE *infile = NULL;
+
+	auto IDtoken token;
+
+
+	if ( (infile = fopen(filename, "r")) == NULL )
+		goto done;
+
+	while ( !feof(infile) ) {
+		if ( (token = NAAAIM_IDtoken_Init()) == NULL )
+			goto done;
+		if ( !token->parse(token, infile) ) {
+			token->whack(token);
+			if ( feof(infile) )
+				break;
+			fputs("Error on parse.\n", stderr);
+			goto done;
+		}
+
+		Ptid_list = realloc(Ptid_list, (idcnt+1) * sizeof(IDtoken));
+		if ( Ptid_list == NULL )
+			goto done;
+		Ptid_list[idcnt - 1] = token;
+		Ptid_list[idcnt]     = NULL;
+		++idcnt;
+	}
+
+	fprintf(stdout, ".Loaded %d patient identity %s.\n", idcnt - 1, \
+		idcnt == 2 ? "token" : "tokens");
+	retn = true;
+
+
+ done:
+	if ( infile != NULL )
+		fclose(infile);
+
+	return retn;
+}
+			
+			
 /*
  * Program entry point begins here.
  */
@@ -177,6 +240,8 @@ extern int main(int argc, char *argv[])
 
 	auto int retn = 1;
 
+	auto unsigned int lp = 0;
+
 	auto time_t start_time;
 
 	auto Buffer bufr = NULL;
@@ -185,9 +250,9 @@ extern int main(int argc, char *argv[])
 
 	auto Duct duct = NULL;
 
-	auto IDtoken device  = NULL,
-		     user    = NULL,
-		     patient = NULL;
+	auto IDtoken patient,
+		     device  = NULL,
+		     user    = NULL;
 
 	auto Authenticator authn = NULL;
 
@@ -216,21 +281,24 @@ extern int main(int argc, char *argv[])
 	/* Load identities. */
 	device	= NAAAIM_IDtoken_Init();
 	user	= NAAAIM_IDtoken_Init();
-	patient = NAAAIM_IDtoken_Init();
-	if ( (device == NULL) || (user == NULL ) || (patient == NULL) ) {
+	if ( (device == NULL) || (user == NULL ) ) {
 		fputs("Cannot initialize identity tokens\n", stderr);
 		goto done;
 	}
-	if ( !load_identities("./device1.txt", "./user1.txt", \
-			      "./patient1.txt", device, user, patient) ) {
+	if ( !load_identities("./device1.txt", "./user1.txt", device, user) ) {
 		fputs("Error loading identities.\n", stderr);
 		goto done;
 	}
 
-	start_time = time(NULL);
+	if ( !load_patient_identity("./patient1.txt") ) {
+		fputs("Error loading patient identity.\n", stderr);
+		goto done;
+	}
 
 
 	/* Initialize SSL connection and attach to root referral server. */
+	start_time = time(NULL);
+
 	if ( (duct = NAAAIM_Duct_Init()) == NULL ) {
 		fputs("Error on SSL object creation.\n", stderr);
 		goto done;
@@ -280,8 +348,11 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
-	authn->add_element(authn, patient->get_element(patient, \
+	for (lp= 0; Ptid_list[lp] != NULL; ++lp) {
+		patient = Ptid_list[lp];
+		authn->add_element(authn, patient->get_element(patient, \
 						       IDtoken_orgkey));
+	}
 	authn->encrypt(authn, "./org-private.pem");
 
 	fputs(">Sending device authenticator.\n", stdout);
@@ -298,8 +369,11 @@ extern int main(int argc, char *argv[])
 	fputs(">Sending user authenticator.\n", stdout);
 	authn->reset(authn);
 	authn->add_identity(authn, user);
-	authn->add_element(authn, patient->get_element(patient, \
+	for (lp= 0; Ptid_list[lp] != NULL; ++lp) {
+		patient = Ptid_list[lp];
+		authn->add_element(authn, patient->get_element(patient, \
 						       IDtoken_orgid));
+	}
 	authn->encrypt(authn, "./org-private.pem");
 	bufr->reset(bufr);
 	if ( !authn->encode(authn, bufr) ) {
@@ -327,15 +401,16 @@ extern int main(int argc, char *argv[])
 	fprintf(stdout, ".Query complete, time = %ld seconds.\n", \
 		time(NULL) - start_time);
 
-	if ( !duct->whack_connection(duct) )
+	if ( (duct != NULL) && !duct->whack_connection(duct) )
 		fputs("!Error closing connection.\n", stderr);
 
 	if ( device != NULL )
 		device->whack(device);
 	if ( user != NULL )
 		user->whack(user);
-	if ( patient != NULL )
-		patient->whack(patient);
+
+	for (lp= 0; Ptid_list[lp] != NULL; ++lp)
+		Ptid_list[lp]->whack(Ptid_list[lp]);
 
 	if ( parser != NULL )
 		parser->whack(parser);

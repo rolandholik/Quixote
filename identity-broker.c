@@ -32,6 +32,7 @@
 
 /* Include files. */
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <stdbool.h>
 #include <string.h>
@@ -53,6 +54,14 @@
 static pid_t process_table[100];
 
 static OrgSearch IDfinder = NULL;
+
+struct search_entry {
+	Buffer orgid;
+	IDtoken token;
+};
+
+static unsigned int Search_cnt;
+static struct search_entry *Search_list;
 
 
 /**
@@ -129,47 +138,102 @@ static void update_process_table(void)
 	return;
 }
 
+
 /**
  * Private function.
  *
- * This is a utility function which prints the contents of a text
- * buffer received from a server.
+ * This function creates an array which will be iterated over for each
+ * originating identity managed by this server.  The array will contain
+ * a structure which defines each pair of identity elements which are
+ * to be searched for.  A boolean value is also contained which allows
+ * a given pair of elements to be skipped if they have already been
+ * resolved.
  *
- * \param bufr	The buffer object containing the text to be printed.
+ * \param orgkey	The list of organizational identity keys to
+ *			be searched for.
+ *
+ * \param orgid		The list of organization idenities to be
+ *			searched for.
+ *
+ * \param bufr		A Buffer object to be used in setting up the
+ *			list.
+ *
+ * \return		A boolean value is used to indicate whether or
+ *			not the search array has been successfully
+ *			created.
  */
 
-static void print_buffer(const Buffer const bufr)
+static _Bool setup_search_array(const AuthenReply const orgkey, \
+				const AuthenReply const orgid,  \
+				const Buffer const bufr)
 
 {
-	auto char *p,
-		  *begin,
-		  pbufr[160];
+	auto _Bool retn = false;
+
+	auto unsigned int lp,
+			  keysize = NAAAIM_IDSIZE;
+
+	auto Buffer wb	    = NULL,
+		    keybufr = NULL,
+		    idbufr  = NULL;
+
+	auto IDtoken token;
 
 
-	/* Sanity check. */
-	if ( bufr->size(bufr) > 160 ){
-		fputs(".reply too long to print", stdout);
-		return;
-	} 
+	/* Load buffers with identity keys and resultant identities. */
+	keybufr = HurdLib_Buffer_Init();
+	idbufr  = HurdLib_Buffer_Init();
+	if ( (keybufr == NULL) || (idbufr == NULL) )
+		goto done;
+
+	if ( !orgkey->get_elements(orgkey, keybufr) )
+		goto done;
+	if ( !orgid->get_elements(orgid, idbufr) )
+		goto done;
 
 
-	/*
-	 * Copy the buffer and loop through it prepending a token to
-	 * indicate this is an incoming response.
-	 */
-	memcpy(pbufr, bufr->get(bufr), bufr->size(bufr));
+	/* Allocate the search array. */
+	Search_cnt = keybufr->size(bufr) / keysize;
+	Search_list = malloc(Search_cnt * sizeof(struct search_entry));
+	if ( Search_list == NULL )
+		goto done;
+	memset(Search_list, '\0', Search_cnt * sizeof(struct search_entry));
 
-	begin = pbufr;
-	do {
-		if ( (p = strchr(begin, '\n')) != NULL ) {
-			*p = '\0';
-			fprintf(stdout, "<%s\n", begin);
-			begin = p;
-			++begin;
-		}
-	} while ( p != NULL );
 
-	return;
+	/* Populate the search array. */
+	if ( (wb = HurdLib_Buffer_Init()) == NULL )
+		goto done;
+
+	for (lp= 0; lp < Search_cnt; ++lp) {
+		Search_list[lp].orgid = NULL;
+
+		if ( (token = NAAAIM_IDtoken_Init()) == NULL )
+			goto done;
+		Search_list[lp].token = token;
+
+		wb->reset(wb);
+		wb->add(wb, keybufr->get(keybufr) + (lp*keysize), keysize);
+		if ( !token->set_element(token, IDtoken_orgkey, wb) )
+			goto done;
+
+		wb->reset(wb);
+		wb->add(wb, idbufr->get(idbufr) + (lp*keysize), keysize);
+		if ( !token->set_element(token, IDtoken_orgid, wb) )
+			goto done;
+	}
+
+	retn = true;
+
+
+ done:
+	if ( wb != NULL )
+		wb->whack(wb);
+	if ( keybufr != NULL )
+		keybufr->whack(keybufr);
+	if ( idbufr != NULL )
+		idbufr->whack(idbufr);
+		
+	return retn;
 }
 			
 		
@@ -192,7 +256,10 @@ static _Bool handle_connection(const Duct const duct)
 
 	auto int retn = false;
 
-	auto Buffer bufr = NULL;
+	auto unsigned int lp;
+
+	auto Buffer bfp,
+		    bufr = NULL;
 
 	auto AuthenReply orgkey = NULL,
 		         orgid  = NULL;
@@ -208,9 +275,6 @@ static _Bool handle_connection(const Duct const duct)
 	if ( (orgkey == NULL) || (orgid == NULL) )
 		goto done;
 
-	if ( (token = NAAAIM_IDtoken_Init()) == NULL )
-		goto done;
-		
 
 	/* Send the connection banner. */
 	fprintf(stdout, "\n.Accepted client connection from %s.\n", \
@@ -234,6 +298,10 @@ static _Bool handle_connection(const Duct const duct)
 		fputs("!Error decoding key elements.\n", stderr);
 		goto done;
 	}
+#if 0
+	fputs(".elkey: ", stdout);
+	orgkey->print(orgkey);
+#endif
 
 	/* Read the organizational identity elements. */
 	bufr->reset(bufr);
@@ -246,36 +314,49 @@ static _Bool handle_connection(const Duct const duct)
 		fputs("!Error decoding identity elements.\n", stderr);
 		goto done;
 	}
-
-	fputs(".elkey: ", stdout);
-	orgkey->print(orgkey);
+#if 0
 	fputs(".elid:  ", stdout);
 	orgid->print(orgid);
+#endif
 
-	fputs(".Searching for originating organization.\n", stdout);
-	bufr->reset(bufr);
-	orgkey->get_elements(orgkey, bufr);
-	if ( !token->set_element(token, IDtoken_orgkey, bufr) ) {
-		fputs("!Error setting organizational key.\n", stderr);
+
+	/*
+	 * Search for identities which originated the identity elements
+	 * in the identity query.
+	 */
+	if ( !setup_search_array(orgkey, orgid, bufr) ) {
+		fputs("!Error creating search array.\n", stdout);
 		goto done;
 	}
-	bufr->reset(bufr);
-	orgid->get_elements(orgid, bufr);
-	if ( !token->set_element(token, IDtoken_orgid, bufr) ) {
-		fputs("!Error setting organizational identity.\n", stderr);
-		goto done;
+	fprintf(stdout, ".Searching over %d %s.\n", Search_cnt, \
+		Search_cnt > 1 ? "identities" : "identity");
+
+	for (lp= 0; lp < Search_cnt; ++lp) {
+		token = Search_list[lp].token;
+
+		if ( IDfinder->search(IDfinder, token) ) {
+			if ( (bfp = HurdLib_Buffer_Init()) == NULL )
+				goto done;
+			Search_list[lp].orgid = bfp;
+			IDfinder->get_match(IDfinder, bfp);
+		}
 	}
 
-	if ( !IDfinder->search(IDfinder, token) ) {
-		fputs(".Not found.\n", stdout);
-		goto done;
+	for (lp= 0; lp < Search_cnt; ++lp) {
+		fprintf(stdout, ".slot %d: ", lp);
+		if ( (bfp = Search_list[lp].orgid) != NULL )
+			bfp->print(bfp);
+		else
+			fputs("not found\n", stdout);
 	}
-	else {
-		bufr->reset(bufr);
-		IDfinder->get_match(IDfinder, bufr);
-		fputs(".Matched: ", stdout);
-		bufr->print(bufr);
-	}
+
+
+	/* Return referral information. */
+	bufr->reset(bufr);
+	fputs(".Creating identity referrals.\n", stdout);
+	for (lp= 0; lp < Search_cnt; ++lp)
+		if ( (bfp = Search_list[lp].orgid) != NULL )
+			bufr->add_Buffer(bufr, bfp);
 
 	fputs(">Sending identity referral.\n", stdout);
 	if ( !duct->send_Buffer(duct, bufr) ) {
@@ -292,6 +373,12 @@ static _Bool handle_connection(const Duct const duct)
 		bufr->add(bufr, (unsigned char *) FAILED, strlen(FAILED));
 		if ( !duct->send_Buffer(duct, bufr) )
 			goto done;
+	}
+
+	for (lp= 0; lp < Search_cnt; ++lp) {
+		Search_list[lp].token->whack(Search_list[lp].token);
+		if ( Search_list[lp].orgid != NULL )
+			Search_list[lp].orgid->whack(Search_list[lp].orgid);
 	}
 
 	if ( bufr != NULL )
@@ -351,7 +438,7 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 	fputs("\nLoading originating identity database.\n", stdout);
-	if ( !IDfinder->load(IDfinder, "/u/usr/src/npi/npi-full-search.txt") ) {
+	if ( !IDfinder->load(IDfinder, "/u/usr/src/npi/npi-search.txt") ) {
 		fputs("Error loading search object.\n", stderr);
 		goto done;
 	}

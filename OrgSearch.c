@@ -11,9 +11,6 @@
  **************************************************************************/
 
 
-/* Local defines. */
-#define KEYSIZE 256 / 8
-
 /* Include files. */
 #include <stdint.h>
 #include <stdio.h>
@@ -132,7 +129,7 @@ static _Bool load(const OrgSearch const this, const char * const infile)
 	while ( fgets(bufr, sizeof(bufr), fp) != NULL )
 		++S->idcnt;
 
-	size = S->idcnt * sizeof(unsigned char) * KEYSIZE;
+	size = S->idcnt * sizeof(unsigned char) * NAAAIM_IDSIZE;
 	if ( (S->idblock = malloc(size)) == NULL )
 		goto done;
 	idbp = S->idblock;
@@ -151,7 +148,7 @@ static _Bool load(const OrgSearch const this, const char * const infile)
 		if ( !hex->add_hexstring(hex, bufr) )
 			goto done;
 		memcpy(idbp, hex->get(hex), hex->size(hex));
-		idbp += KEYSIZE;
+		idbp += NAAAIM_IDSIZE;
 		hex->reset(hex);
 	}
 
@@ -208,7 +205,7 @@ static _Bool search(const OrgSearch const this, const IDtoken const token)
 	/* Iterate through memory block looking for a match. */
 	S->matched->reset(S->matched);
 	for (lp= 0; lp < S->idcnt; ++lp) {
-		if ( !S->matched->add(S->matched, idbp, KEYSIZE) ) {
+		if ( !S->matched->add(S->matched, idbp, NAAAIM_IDSIZE) ) {
 			fputs("Failed addition of key.\n", stderr);
 			goto done;
 		}
@@ -216,15 +213,12 @@ static _Bool search(const OrgSearch const this, const IDtoken const token)
 			retn = true;
 			goto done;
 		}
-		idbp += KEYSIZE;
+		idbp += NAAAIM_IDSIZE;
 		S->matched->reset(S->matched);
 	}
 
 
  done:
-	if ( retn == false)
-		S->poisoned = true;
-
 	return retn;
 }
 
