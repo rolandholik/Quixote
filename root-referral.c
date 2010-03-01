@@ -29,6 +29,7 @@
 
 
 /* Local defines. */
+#define EQUIPMENT "DakTech 5530"
 #define SERVER "Root Referral Server"
 #define SITE "Gardonville Cooperative Telephone"
 #define LOCATION "Brandon, MN"
@@ -560,8 +561,8 @@ static _Bool handle_connection(const Duct const duct)
 	fprintf(stdout, "\n.Accepted client connection from %s.\n", \
 		duct->get_client(duct));
 
-	snprintf(banner, sizeof(banner), "%s / %s / %s\nHello\n", SERVER, \
-		 SITE, LOCATION);
+	snprintf(banner, sizeof(banner), "%s / %s / %s\n%s\nHello\n", \
+		 SERVER, SITE, LOCATION, EQUIPMENT);
 	bufr->add(bufr, (unsigned char *) banner, strlen(banner));
 	if ( !duct->send_Buffer(duct, bufr) )
 		goto done;
