@@ -252,7 +252,8 @@ static _Bool setup_search_array(const AuthenReply const orgkey, \
 static _Bool handle_connection(const Duct const duct)
 
 {
-	auto char banner[256];
+	auto char *err,
+		  banner[256];
 
 	auto int retn = false;
 
@@ -291,11 +292,11 @@ static _Bool handle_connection(const Duct const duct)
 	bufr->reset(bufr);
 	fputs("<Receiving organizational key elements.\n", stdout);
 	if ( !duct->receive_Buffer(duct, bufr) ) {
-		fputs("!Error receiving key elements.\n", stderr);
+		err = "Error receiving key elements.";
 		goto done;
 	}
 	if ( !orgkey->decode(orgkey, bufr) ) {
-		fputs("!Error decoding key elements.\n", stderr);
+		err = "Error decoding key elements.";
 		goto done;
 	}
 #if 0
@@ -307,11 +308,11 @@ static _Bool handle_connection(const Duct const duct)
 	bufr->reset(bufr);
 	fputs("<Receiving organizational identity elements.\n", stdout);
 	if ( !duct->receive_Buffer(duct, bufr) ) {
-		fputs("!Error receiving identity elements.\n", stderr);
+		err = "Error receiving identity elements.";
 		goto done;
 	}
 	if ( !orgid->decode(orgid, bufr) ) {
-		fputs("!Error decoding identity elements.\n", stderr);
+		err = "Error decoding identity elements.";
 		goto done;
 	}
 #if 0
@@ -325,7 +326,7 @@ static _Bool handle_connection(const Duct const duct)
 	 * in the identity query.
 	 */
 	if ( !setup_search_array(orgkey, orgid, bufr) ) {
-		fputs("!Error creating search array.\n", stdout);
+		err = "Error creating search array.";
 		goto done;
 	}
 	fprintf(stdout, ".Searching over %d %s.\n", Search_cnt, \
@@ -353,15 +354,14 @@ static _Bool handle_connection(const Duct const duct)
 
 	/* Return referral information. */
 	bufr->reset(bufr);
-	fputs(".Creating identity referrals.\n", stdout);
-	for (lp= 0; lp < Search_cnt; ++lp)
-		if ( (bfp = Search_list[lp].orgid) != NULL )
-			bufr->add_Buffer(bufr, bfp);
-
 	fputs(">Sending identity referral.\n", stdout);
-	if ( !duct->send_Buffer(duct, bufr) ) {
-		fputs("!Error sending referral.\n", stderr);
-		goto done;
+	for (lp= 0; lp < Search_cnt; ++lp) {
+		if ( (bfp = Search_list[lp].orgid) == NULL )
+			continue;
+		if ( !duct->send_Buffer(duct, bfp) ) {
+			err = "Failed referral send.";
+			goto done;
+		}
 	}
 	
 	retn = true;
@@ -369,6 +369,8 @@ static _Bool handle_connection(const Duct const duct)
 
  done:
 	if ( retn == false ) {
+		fprintf(stderr, "!%s\n", err);
+
 		bufr->reset(bufr);
 		bufr->add(bufr, (unsigned char *) FAILED, strlen(FAILED));
 		if ( !duct->send_Buffer(duct, bufr) )

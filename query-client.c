@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <arpa/inet.h>
 
 #include <Config.h>
 #include <Buffer.h>
@@ -30,7 +31,8 @@
 
 
 /* Variables static to this module. */
-static IDtoken *Ptid_list = NULL;
+static unsigned int Ptid_cnt = 1;
+static IDtoken *Ptid_list    = NULL;
 
 
 /**
@@ -187,8 +189,6 @@ static _Bool load_patient_identity(const char * const filename)
 {
 	auto _Bool retn = false;
 
-	auto unsigned int idcnt = 1;
-
 	auto FILE *infile = NULL;
 
 	auto IDtoken token;
@@ -208,16 +208,16 @@ static _Bool load_patient_identity(const char * const filename)
 			goto done;
 		}
 
-		Ptid_list = realloc(Ptid_list, (idcnt+1) * sizeof(IDtoken));
+		Ptid_list = realloc(Ptid_list, (Ptid_cnt+1) * sizeof(IDtoken));
 		if ( Ptid_list == NULL )
 			goto done;
-		Ptid_list[idcnt - 1] = token;
-		Ptid_list[idcnt]     = NULL;
-		++idcnt;
+		Ptid_list[Ptid_cnt - 1] = token;
+		Ptid_list[Ptid_cnt]     = NULL;
+		++Ptid_cnt;
 	}
 
-	fprintf(stdout, ".Loaded %d patient identity %s.\n", idcnt - 1, \
-		idcnt == 2 ? "token" : "tokens");
+	fprintf(stdout, ".Loaded %d patient identity %s.\n", Ptid_cnt - 1, \
+		Ptid_cnt == 2 ? "token" : "tokens");
 	retn = true;
 
 
@@ -335,6 +335,20 @@ extern int main(int argc, char *argv[])
 	print_buffer(bufr);
 
 
+	/*
+	 * Send the number of identity query slots which we will request
+	 * to be filled.
+	 */
+	fputs(">Sending query slots.\n", stderr);
+	bufr->reset(bufr);
+	lp = htonl(Ptid_cnt - 1);
+	bufr->add(bufr, (unsigned char *) &lp, sizeof(lp));
+	if ( !duct->send_Buffer(duct, bufr) ) {
+		fputs("!Cannot send query slots.\n", stderr);
+		goto done;
+	}
+
+
 	/* Initialize an authenticator object. */
 	if ( (authn = NAAAIM_Authenticator_Init()) == NULL ) {
 		fputs("!Cannot initialize authenticator.\n", stderr);
@@ -386,13 +400,16 @@ extern int main(int argc, char *argv[])
 
 	/* Receive the referrals. */
 	fputs("<Receiving referrals.\n", stdout);
-	bufr->reset(bufr);
-	if ( !duct->receive_Buffer(duct, bufr) ) {
-		fputs("!Error receiving referrals.\n", stderr);
-		goto done;
+	for (lp= 0; lp < (Ptid_cnt - 1); ++lp) {
+		bufr->reset(bufr);
+		if ( !duct->receive_Buffer(duct, bufr) ) {
+			fputs("!Error receiving referrals.\n", stderr);
+			goto done;
+		}
+
+		fprintf(stdout, ".referral %d: ", lp);
+		bufr->print(bufr);
 	}
-	fputs(".referral: ", stdout);
-	bufr->print(bufr);
 
 	retn = 0;
 
@@ -412,8 +429,11 @@ extern int main(int argc, char *argv[])
 	if ( user != NULL )
 		user->whack(user);
 
-	for (lp= 0; Ptid_list[lp] != NULL; ++lp)
-		Ptid_list[lp]->whack(Ptid_list[lp]);
+	if ( Ptid_list != NULL ) {
+		for (lp= 0; Ptid_list[lp] != NULL; ++lp)
+			Ptid_list[lp]->whack(Ptid_list[lp]);
+		free(Ptid_list);
+	}
 
 	if ( parser != NULL )
 		parser->whack(parser);

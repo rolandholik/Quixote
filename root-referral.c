@@ -38,11 +38,13 @@
 
 /* Include files. */
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <stdbool.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <arpa/inet.h>
 
 #include <Config.h>
 #include <Buffer.h>
@@ -56,6 +58,14 @@
 
 /* Variables static to this module. */
 static pid_t process_table[100];
+
+/** The list of query slots to be filled. */
+static unsigned int Query_count = 0;
+
+static struct query_slot {
+	_Bool filled;
+	Buffer bufr;
+} *Query_slots = NULL;
 
 
 /**
@@ -174,8 +184,59 @@ static void print_buffer(const Buffer const bufr)
 
 	return;
 }
+
+
+/**
+ * Private function.
+ *
+ * This function reads and initializes the number of identity queries
+ * the client is requesting.
+ *
+ * \param client	The SSL connection object which is requesting
+ *			the query.
+ *
+ * \param bufr		The Buffer object to be used in communicating
+ *			with the client.
+ *
+ * \return		A boolean value is used to indicate whether or
+ *			not the session was successfully initialized.  A
+ *			true value indicates success.
+ */
+
+static _Bool initialize_query(const Duct const duct, const Buffer const bufr)
+
+{
+	auto _Bool retn = false;
+
+
+	/* Read the number of slots from the client. */
+	bufr->reset(bufr);
+	if ( !duct->receive_Buffer(duct, bufr) )
+		goto done;
+
+	memcpy(&Query_count, bufr->get(bufr), sizeof(Query_count));
+	Query_count = htonl(Query_count);
+	fprintf(stdout, ".Client requesting %d query %s.\n", Query_count, \
+		Query_count == 1 ? "slot" : "slots");
+
+
+	/* Allocate an array of query structures to be filled. */
+	Query_slots = malloc(Query_count * sizeof(struct query_slot));
+	if ( Query_slots == NULL )
+		goto done;
+	memset(Query_slots, '\0', Query_count * sizeof(struct query_slot));
+
+	retn = true;
+
+
+ done:
+	if ( retn == false )
+		fputs("!Query initialized failed.\n", stderr);
+
+	return retn;
+}
+
 			
-		
 /**
  * Private function.
  *
@@ -447,6 +508,10 @@ static _Bool dispatch_brokers(const Buffer const devauth,  \
 {
 	auto _Bool retn = false;
 
+	auto unsigned int lp;
+
+	auto Buffer bfp;
+
 	auto Duct broker = NULL;
 
 
@@ -506,10 +571,17 @@ static _Bool dispatch_brokers(const Buffer const devauth,  \
 	}
 
 	fputs("<Receiving identity referrals.\n", stdout);
-	bufr->reset(bufr);
-	if ( !broker->receive_Buffer(broker, bufr) ) {
-		fputs("Error receiving referrals.\n", stdout);
-		goto done;
+	for (lp= 0; lp < Query_count; ++lp) {
+		if ( (bfp = HurdLib_Buffer_Init()) == NULL ) {
+			fputs("Error receiving referrals.\n", stdout);
+			goto done;
+		}
+		Query_slots[lp].bufr = bfp;
+		
+		if ( !broker->receive_Buffer(broker, bfp) ) {
+			fputs("!Error receiving referrals.\n", stdout);
+			goto done;
+		}
 	}
 
 	retn = true;
@@ -545,6 +617,8 @@ static _Bool handle_connection(const Duct const duct)
 
 	auto int retn = false;
 
+	auto unsigned int lp;
+
 	auto Buffer bufr     = NULL,
 		    devauth  = NULL,
 		    userauth = NULL;
@@ -568,6 +642,13 @@ static _Bool handle_connection(const Duct const duct)
 		goto done;
 
 
+	/* Receive the number of query slots from the client. */
+	if ( !initialize_query(duct, bufr) ) {
+		fputs("!Failed to initialize query.\n", stderr);
+		goto done;
+	}
+	
+
 	/* Read and process device authenticator. */
 	if ( !authenticate_device(duct, bufr) )
 		goto done;
@@ -578,13 +659,19 @@ static _Bool handle_connection(const Duct const duct)
 		goto done;
 	userauth->add_Buffer(userauth, bufr);
 
+
+	/* Dispatch authenticators to defined brokerage servers. */
 	if ( !dispatch_brokers(devauth, userauth, bufr) )
 		goto done;
 
+
+	/* Return referral information to the client. */
 	fputs(">Returning identity referrals.\n", stdout);
-	if ( !duct->send_Buffer(duct, bufr) ) {
-		fputs("!Error send referrals.\n", stderr);
-		goto done;
+	for (lp= 0; lp < Query_count; ++lp) {
+		if ( !duct->send_Buffer(duct, Query_slots[lp].bufr) ) {
+			fputs("!Error sending referrals.\n", stdout);
+			goto done;
+		}
 	}
 
 	retn = true;
@@ -619,6 +706,8 @@ extern int main(int argc, char *argv[])
 	auto char *config;
 
 	auto int retn = 1;
+
+	auto unsigned int lp;
 
 	auto pid_t pid;
 
@@ -682,10 +771,9 @@ extern int main(int argc, char *argv[])
 			goto done;
 		}
 		if ( pid == 0 ) {
-			if ( handle_connection(duct) ) {
+			if ( handle_connection(duct) )
 				retn = 0;
-				goto done;
-			}
+			goto done;
 		}
 
 		add_process(pid);
@@ -699,6 +787,13 @@ extern int main(int argc, char *argv[])
 	     if ( !duct->whack_connection(duct) )
 		     fputs("Error closing connection.\n", stderr);
 	     duct->whack(duct);
+	}
+
+	if ( Query_slots != NULL ) {
+		for (lp= 0; lp < Query_count; ++Query_count)
+			if ( Query_slots[lp].bufr != NULL )
+				Query_slots[lp].bufr->whack(Query_slots[lp].bufr);
+		free(Query_slots);
 	}
 
 	if ( parser != NULL )
