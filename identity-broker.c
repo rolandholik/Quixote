@@ -271,7 +271,7 @@ static _Bool handle_connection(const Duct const duct)
 
 	auto IDtoken token = NULL;
 
-	auto IDqueryReply reply = NULL;
+	auto IDqueryReply reply;
 
 
 	if ( (bufr = HurdLib_Buffer_Init()) == NULL )
@@ -342,7 +342,13 @@ static _Bool handle_connection(const Duct const duct)
 		token = Search_list[lp].token;
 
 		if ( IDfinder->search(IDfinder, token) ) {
-			continue;
+			reply = Search_list[lp].reply;
+			if ( !reply->set_ip_reply(reply,	\
+						  "127.0.0.1",	\
+						  10902) ) {
+				err = "Error encoding ip.";
+				goto done;
+			}
 			// IDfinder->get_match(IDfinder, bfp);
 		}
 	}
@@ -396,8 +402,6 @@ static _Bool handle_connection(const Duct const duct)
 		orgkey->whack(orgkey);
 	if ( orgid != NULL )
 		orgid->whack(orgid);
-	if ( reply != NULL )
-		reply->whack(reply);
 
 	return retn;
 }

@@ -360,7 +360,8 @@ static int authenticate_user(const Duct const client, const Buffer const bufr)
  done:
 	if ( broker != NULL ) {
 		if ( !broker->whack_connection(broker) )
-			fputs("Error closing connection.\n", stderr);
+			fputs("Error closing user broker connection.\n", \
+			      stderr);
 		broker->whack(broker);
 	}
 
@@ -482,7 +483,8 @@ static int authenticate_device(const Duct const client, \
  done:
 	if ( broker != NULL ) {
 		if ( !broker->whack_connection(broker) )
-			fputs("Error closing connection.\n", stderr);
+			fputs("Error closing device broker connection.\n", \
+			      stderr);
 		broker->whack(broker);
 	}
 
@@ -622,7 +624,8 @@ static _Bool dispatch_brokers(const Buffer const devauth,  \
  done:
 	if ( (broker != NULL) ) {
 		if ( !broker->whack_connection(broker) )
-			fputs("Error closing connection.\n", stderr);
+			fputs("Error closing identity broker connection.\n", \
+			      stderr);
 		broker->whack(broker);
 	}
 
@@ -715,12 +718,12 @@ static _Bool handle_connection(const Duct const duct)
 	}
 
 	fputs(">Returning identity referrals.\n", stdout);
-	for (lp= 0; lp < Query_count; ++lp) {
+	for (lp= 0; lp < Query_count; ++lp) { 
 		if ( Query_slots[lp].filled )
 			bfp = Query_slots[lp].reply;
 		else
 			bfp = bufr;
-		if ( !duct->send_Buffer(duct, bufr) ) {
+		if ( !duct->send_Buffer(duct, bfp) ) {
 			fputs("!Error sending referrals.\n", stdout);
 			goto done;
 		}
@@ -839,7 +842,7 @@ extern int main(int argc, char *argv[])
  done:
 	if ( duct != NULL ) {
 	     if ( !duct->whack_connection(duct) )
-		     fputs("Error closing connection.\n", stderr);
+		     fputs("Error closing duct connection.\n", stderr);
 	     duct->whack(duct);
 	}
 

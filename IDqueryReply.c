@@ -163,11 +163,12 @@ static _Bool set_ip_reply(const IDqueryReply const this, \
 	if ( (reply = ip_reply_new()) == NULL )
 		goto done;
 
-        if ( ASN1_STRING_set(reply->hostname, hostname, strlen(hostname)) )
+        if ( ASN1_STRING_set(reply->hostname, hostname, strlen(hostname)) \
+	     != 1 )
                 goto done;
 
 	if ( ASN1_INTEGER_set(reply->port, port) != 1 )
-                goto done;
+		got one;
 
 
         asn_size = i2d_ip_reply(reply, p);
@@ -177,7 +178,8 @@ static _Bool set_ip_reply(const IDqueryReply const this, \
 	if ( !S->payload->add(S->payload, asn, asn_size) )
 		goto done;
 
-	retn = true;
+	retn	= true;
+	S->type = IDQreply_ipredirect;
 	
 
  done:
@@ -368,6 +370,8 @@ static void whack(const IDqueryReply const this)
 {
 	auto const IDqueryReply_State const S = this->state;
 
+
+	S->payload->whack(S->payload);
 
 	S->root->whack(S->root, this, S);
 	return;

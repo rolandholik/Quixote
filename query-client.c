@@ -402,7 +402,6 @@ extern int main(int argc, char *argv[])
 
 
 	/* Receive the referrals. */
-
 	if ( (reply = NAAAIM_IDqueryReply_Init()) == NULL ) {
 		fputs("!Error initializing referral reply object.\n", stderr);
 		goto done;
