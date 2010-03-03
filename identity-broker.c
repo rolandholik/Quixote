@@ -48,6 +48,7 @@
 #include "Authenticator.h"
 #include "AuthenReply.h"
 #include "OrgSearch.h"
+#include "IDqueryReply.h"
 
 
 /* Variables static to this module. */
@@ -56,7 +57,7 @@ static pid_t process_table[100];
 static OrgSearch IDfinder = NULL;
 
 struct search_entry {
-	Buffer orgid;
+	IDqueryReply reply;
 	IDtoken token;
 };
 
@@ -179,6 +180,8 @@ static _Bool setup_search_array(const AuthenReply const orgkey, \
 
 	auto IDtoken token;
 
+	auto IDqueryReply reply = NULL;
+
 
 	/* Load buffers with identity keys and resultant identities. */
 	keybufr = HurdLib_Buffer_Init();
@@ -205,7 +208,9 @@ static _Bool setup_search_array(const AuthenReply const orgkey, \
 		goto done;
 
 	for (lp= 0; lp < Search_cnt; ++lp) {
-		Search_list[lp].orgid = NULL;
+		if ( (reply = NAAAIM_IDqueryReply_Init()) == NULL )
+			goto done;
+		Search_list[lp].reply = reply;
 
 		if ( (token = NAAAIM_IDtoken_Init()) == NULL )
 			goto done;
@@ -259,13 +264,14 @@ static _Bool handle_connection(const Duct const duct)
 
 	auto unsigned int lp;
 
-	auto Buffer bfp,
-		    bufr = NULL;
+	auto Buffer bufr = NULL;
 
 	auto AuthenReply orgkey = NULL,
 		         orgid  = NULL;
 
 	auto IDtoken token = NULL;
+
+	auto IDqueryReply reply = NULL;
 
 
 	if ( (bufr = HurdLib_Buffer_Init()) == NULL )
@@ -336,29 +342,31 @@ static _Bool handle_connection(const Duct const duct)
 		token = Search_list[lp].token;
 
 		if ( IDfinder->search(IDfinder, token) ) {
-			if ( (bfp = HurdLib_Buffer_Init()) == NULL )
-				goto done;
-			Search_list[lp].orgid = bfp;
-			IDfinder->get_match(IDfinder, bfp);
+			continue;
+			// IDfinder->get_match(IDfinder, bfp);
 		}
 	}
 
 	for (lp= 0; lp < Search_cnt; ++lp) {
 		fprintf(stdout, ".slot %d: ", lp);
-		if ( (bfp = Search_list[lp].orgid) != NULL )
-			bfp->print(bfp);
+		reply = Search_list[lp].reply;
+		if ( reply->is_type(reply, IDQreply_notfound) )
+			fputs("not found.\n", stdout);
 		else
-			fputs("not found\n", stdout);
+			fputs("found.\n", stdout);
 	}
 
 
 	/* Return referral information. */
-	bufr->reset(bufr);
 	fputs(">Sending identity referral.\n", stdout);
 	for (lp= 0; lp < Search_cnt; ++lp) {
-		if ( (bfp = Search_list[lp].orgid) == NULL )
-			continue;
-		if ( !duct->send_Buffer(duct, bfp) ) {
+		bufr->reset(bufr);
+		reply = Search_list[lp].reply;
+		if ( !reply->encode(reply, bufr) ) {
+			err = "Failed referral encoding.";
+			goto done;
+		}
+		if ( !duct->send_Buffer(duct, bufr) ) {
 			err = "Failed referral send.";
 			goto done;
 		}
@@ -379,8 +387,7 @@ static _Bool handle_connection(const Duct const duct)
 
 	for (lp= 0; lp < Search_cnt; ++lp) {
 		Search_list[lp].token->whack(Search_list[lp].token);
-		if ( Search_list[lp].orgid != NULL )
-			Search_list[lp].orgid->whack(Search_list[lp].orgid);
+		Search_list[lp].reply->whack(Search_list[lp].reply);
 	}
 
 	if ( bufr != NULL )
@@ -389,6 +396,8 @@ static _Bool handle_connection(const Duct const duct)
 		orgkey->whack(orgkey);
 	if ( orgid != NULL )
 		orgid->whack(orgid);
+	if ( reply != NULL )
+		reply->whack(reply);
 
 	return retn;
 }

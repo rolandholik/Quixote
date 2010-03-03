@@ -29,3 +29,4 @@
 #define NAAAIM_AES256_cbc_OBJID		9
 #define NAAAIM_AuthenReply_OBJID	10
 #define NAAAIM_OrgSearch_OBJID		11
+#define NAAAIM_IDqueryReply_OBJID	12

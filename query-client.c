@@ -28,6 +28,7 @@
 #include "Duct.h"
 #include "IDtoken.h"
 #include "Authenticator.h"
+#include "IDqueryReply.h"
 
 
 /* Variables static to this module. */
@@ -256,6 +257,8 @@ extern int main(int argc, char *argv[])
 
 	auto Authenticator authn = NULL;
 
+	auto IDqueryReply reply = NULL;
+
 
 	fputs("NAAAIM query client.\n\n", stdout);
 
@@ -399,6 +402,12 @@ extern int main(int argc, char *argv[])
 
 
 	/* Receive the referrals. */
+
+	if ( (reply = NAAAIM_IDqueryReply_Init()) == NULL ) {
+		fputs("!Error initializing referral reply object.\n", stderr);
+		goto done;
+	}
+
 	fputs("<Receiving referrals.\n", stdout);
 	for (lp= 0; lp < (Ptid_cnt - 1); ++lp) {
 		bufr->reset(bufr);
@@ -407,8 +416,16 @@ extern int main(int argc, char *argv[])
 			goto done;
 		}
 
+		if ( !reply->decode(reply, bufr) ) {
+			fputs("!Error decoding referral.\n", stderr);
+			goto done;
+		}
+
 		fprintf(stdout, ".referral %d: ", lp);
-		bufr->print(bufr);
+		if ( reply->is_type(reply, IDQreply_notfound) )
+			fputs("not found.\n", stdout);
+		else
+			fputs("found.\n", stdout);
 	}
 
 	retn = 0;
@@ -441,6 +458,8 @@ extern int main(int argc, char *argv[])
 		bufr->whack(bufr);
 	if ( authn != NULL )
 		authn->whack(authn);
+	if ( reply != NULL )
+		reply->whack(reply);
 
 	return retn;
 }

@@ -8,7 +8,7 @@
 # Variable declarations.
 CSRC = 	SHA256.c SHA256_hmac.c RSAkey.c OrgID.c PatientID.c RandomBuffer.c \
 	IDtoken.c Duct.c Authenticator.c AES256_cbc.c AuthenReply.c	   \
-	OrgSearch.c
+	OrgSearch.c IDqueryReply.c
 
 SERVERS = root-referral device-broker user-broker identity-broker
 
@@ -123,15 +123,18 @@ Authenticator.o: NAAAIM.h Authenticator.h RandomBuffer.h RSAkey.h IDtoken.h \
 AES256_cbc.o: AES256_cbc.h
 AuthenReply.o: NAAAIM.h AuthenReply.h
 OrgSearch.o: NAAAIM.h OrgSearch.h IDtoken.h
+IDqueryReply.o: NAAAIM.h IDqueryReply.h
 
-query-client.o: NAAAIM.h Duct.h IDtoken.h Authenticator.h
+query-client.o: NAAAIM.h Duct.h IDtoken.h Authenticator.h IDqueryReply.h
 
-root-referral.o: NAAAIM.h Duct.h IDtoken.h Authenticator.h
+root-referral.o: NAAAIM.h Duct.h IDtoken.h Authenticator.h AuthenReply.h \
+	IDqueryReply.h
 device-broker.o: NAAAIM.h Duct.h IDtoken.h Authenticator.h SHA256.h \
-	SHA256_hmac.h RSAkey.h
-user-broker.o: NAAAIM.h Duct.h IDtoken.h Authenticator.h
+	SHA256_hmac.h RSAkey.h AuthenReply.h
+user-broker.o: NAAAIM.h Duct.h IDtoken.h Authenticator.h SHA256.h \
+	SHA256_hmac.h RSAkey.h AuthenReply.h
 identity-broker.o: NAAAIM.h Duct.h IDtoken.h Authenticator.h AuthenReply.h \
-	OrgSearch.h
+	OrgSearch.h IDqueryReply.h
 
 genid.o: NAAAIM.h SHA256.h SHA256_hmac.h OrgID.h PatientID.h \
 	RandomBuffer.h RSAkey.h

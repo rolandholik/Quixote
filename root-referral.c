@@ -54,6 +54,7 @@
 #include "IDtoken.h"
 #include "Authenticator.h"
 #include "AuthenReply.h"
+#include "IDqueryReply.h"
 
 
 /* Variables static to this module. */
@@ -64,7 +65,7 @@ static unsigned int Query_count = 0;
 
 static struct query_slot {
 	_Bool filled;
-	Buffer bufr;
+	Buffer reply;
 } *Query_slots = NULL;
 
 
@@ -208,6 +209,10 @@ static _Bool initialize_query(const Duct const duct, const Buffer const bufr)
 {
 	auto _Bool retn = false;
 
+	auto unsigned int lp;
+
+	auto Buffer reply = NULL;
+
 
 	/* Read the number of slots from the client. */
 	bufr->reset(bufr);
@@ -220,11 +225,20 @@ static _Bool initialize_query(const Duct const duct, const Buffer const bufr)
 		Query_count == 1 ? "slot" : "slots");
 
 
-	/* Allocate an array of query structures to be filled. */
+	/*
+	 * Allocate an array of query structures to be filled and populate
+	 * each array element with a query reply structure.
+	 */
 	Query_slots = malloc(Query_count * sizeof(struct query_slot));
 	if ( Query_slots == NULL )
 		goto done;
-	memset(Query_slots, '\0', Query_count * sizeof(struct query_slot));
+
+	for (lp= 0; lp < Query_count; ++lp) {
+		if ( (reply = HurdLib_Buffer_Init()) == NULL )
+			goto done;
+		Query_slots[lp].reply  = reply;
+		Query_slots[lp].filled = false;
+	}
 
 	retn = true;
 
@@ -514,6 +528,8 @@ static _Bool dispatch_brokers(const Buffer const devauth,  \
 
 	auto Duct broker = NULL;
 
+	auto IDqueryReply reply;
+
 
 	fputs("\n.Connecting to identity brokerage.\n", stdout);
 
@@ -570,17 +586,33 @@ static _Bool dispatch_brokers(const Buffer const devauth,  \
 		goto done;
 	}
 
+
+	/* Receive identity referrals. */
+	if ( (reply = NAAAIM_IDqueryReply_Init()) == NULL ) {
+		fputs("!Error initializing query reply structure.\n", stderr);
+		goto done;
+	}
+
 	fputs("<Receiving identity referrals.\n", stdout);
 	for (lp= 0; lp < Query_count; ++lp) {
-		if ( (bfp = HurdLib_Buffer_Init()) == NULL ) {
-			fputs("Error receiving referrals.\n", stdout);
+		bufr->reset(bufr);
+		if ( !broker->receive_Buffer(broker, bufr) ) {
+			fputs("!Error receiving referral.\n", stderr);
 			goto done;
 		}
-		Query_slots[lp].bufr = bfp;
-		
-		if ( !broker->receive_Buffer(broker, bfp) ) {
-			fputs("!Error receiving referrals.\n", stdout);
+
+		if ( !reply->decode(reply, bufr) ) {
+			fputs("!Error decoding referral.\n", stderr);
 			goto done;
+		}
+
+		if ( !reply->is_type(reply, IDQreply_notfound) ) {
+			bfp = Query_slots[lp].reply;
+			if ( !bfp->add_Buffer(bfp, bufr) ) {
+				fputs("!Error saving referral.\n", stderr);
+				goto done;
+			}
+			Query_slots[lp].filled = true;
 		}
 	}
 
@@ -593,6 +625,9 @@ static _Bool dispatch_brokers(const Buffer const devauth,  \
 			fputs("Error closing connection.\n", stderr);
 		broker->whack(broker);
 	}
+
+	if ( reply != NULL )
+		reply->whack(reply);
 
 	return retn;
 }
@@ -619,9 +654,12 @@ static _Bool handle_connection(const Duct const duct)
 
 	auto unsigned int lp;
 
-	auto Buffer bufr     = NULL,
+	auto Buffer bfp,
+		    bufr     = NULL,
 		    devauth  = NULL,
 		    userauth = NULL;
+
+	auto IDqueryReply reply = NULL;
 
 
 	bufr	 = HurdLib_Buffer_Init();
@@ -666,9 +704,23 @@ static _Bool handle_connection(const Duct const duct)
 
 
 	/* Return referral information to the client. */
+	if ( (reply = NAAAIM_IDqueryReply_Init()) == NULL ) {
+		fputs("!Error initializing null referral reply.\n", stderr);
+		goto done;
+	}
+	bufr->reset(bufr);
+	if ( !reply->encode(reply, bufr) ) {
+		fputs("!Error encoding null referral reply.\n", stderr);
+		goto done;
+	}
+
 	fputs(">Returning identity referrals.\n", stdout);
 	for (lp= 0; lp < Query_count; ++lp) {
-		if ( !duct->send_Buffer(duct, Query_slots[lp].bufr) ) {
+		if ( Query_slots[lp].filled )
+			bfp = Query_slots[lp].reply;
+		else
+			bfp = bufr;
+		if ( !duct->send_Buffer(duct, bufr) ) {
 			fputs("!Error sending referrals.\n", stdout);
 			goto done;
 		}
@@ -691,6 +743,8 @@ static _Bool handle_connection(const Duct const duct)
 		devauth->whack(devauth);
 	if ( userauth != NULL )
 		userauth->whack(userauth);
+	if ( reply != NULL )
+		reply->whack(reply);
 
 	return retn;
 }
@@ -791,8 +845,7 @@ extern int main(int argc, char *argv[])
 
 	if ( Query_slots != NULL ) {
 		for (lp= 0; lp < Query_count; ++Query_count)
-			if ( Query_slots[lp].bufr != NULL )
-				Query_slots[lp].bufr->whack(Query_slots[lp].bufr);
+			Query_slots[lp].reply->whack(Query_slots[lp].reply);
 		free(Query_slots);
 	}
 
