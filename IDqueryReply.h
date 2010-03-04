@@ -41,6 +41,7 @@ struct NAAAIM_IDqueryReply
 {
 	/* External methods. */
 	_Bool (*set_ip_reply)(const IDqueryReply, const char *, int);
+	_Bool (*get_ip_reply)(const IDqueryReply, const Buffer, int *);
 	_Bool (*encode)(const IDqueryReply, const Buffer);
 	_Bool (*decode)(const IDqueryReply, const Buffer);
 	_Bool (*is_type)(const IDqueryReply, IDqueryReply_type);

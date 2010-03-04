@@ -168,7 +168,7 @@ static _Bool set_ip_reply(const IDqueryReply const this, \
                 goto done;
 
 	if ( ASN1_INTEGER_set(reply->port, port) != 1 )
-		got one;
+		goto done;
 
 
         asn_size = i2d_ip_reply(reply, p);
@@ -190,6 +190,77 @@ static _Bool set_ip_reply(const IDqueryReply const this, \
 		ip_reply_free(reply);
 
 	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method decodes and returns information for an IP address
+ * referral.  This reply indicates the client should contact the
+ * named site for additional information on th client identity.
+ *
+ * \param this		The reply which is to be initialized.
+ *
+ * \param hostname	The Buffer object to be loaded with the name
+ *			of the host to which a connection is to be
+ *			made.
+ *
+ * \param port		A pointer to the variable which is to be
+ *			loaded with the port number for the
+ *			connection.
+ *
+ * \return		A boolean value is used to indicate whether or
+ *			not the decoding was successful.  A true
+ *			value indicates success.
+ */
+
+static _Bool get_ip_reply(const IDqueryReply const this, \
+			  const Buffer const bufr, int * const port)
+
+{
+	auto const IDqueryReply_State const S = this->state;
+
+	auto _Bool retn = false;
+
+        auto unsigned char *asn = NULL;
+
+        auto unsigned const char *p = asn;
+
+	auto int asn_size;
+
+	auto ip_reply *reply = NULL;
+
+
+	if ( S->poisoned )
+		goto done;
+
+
+	p = S->payload->get(S->payload);
+	asn_size = S->payload->size(S->payload);
+        if ( !d2i_ip_reply(&reply, &p, asn_size) )
+                goto done;	
+
+	bufr->reset(bufr);
+	bufr->add(bufr, ASN1_STRING_data(reply->hostname), \
+		  ASN1_STRING_length(reply->hostname));
+	fprintf(stdout, "%s[%s]: hostname size = %d\n", __FILE__, __func__, \
+		ASN1_STRING_length(reply->hostname));
+
+	*port = ASN1_INTEGER_get(reply->port);
+
+	retn = true;
+
+	
+ done:
+	if ( retn == false )
+		S->poisoned = true;
+
+	if ( reply != NULL )
+		ip_reply_free(reply);
+
+	return retn;
+
 }
 
 
@@ -421,6 +492,7 @@ extern IDqueryReply NAAAIM_IDqueryReply_Init(void)
 
 	/* Method initialization. */
 	this->set_ip_reply = set_ip_reply;
+	this->get_ip_reply = get_ip_reply;
 
 	this->encode = encode;
 	this->decode = decode;

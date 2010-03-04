@@ -228,8 +228,43 @@ static _Bool load_patient_identity(const char * const filename)
 
 	return retn;
 }
-			
-			
+
+
+/**
+ * Private function.
+ *
+ * This function processes an identity query response.
+ *
+ * \param reply		The query which is to be processed.
+ */
+
+static void process_reply(const IDqueryReply const reply, \
+			  const Buffer const host)
+
+{
+	auto int port;
+
+
+	if ( reply->is_type(reply, IDQreply_notfound) ) {
+		fputs(".No identity reply information available.\n", stdout);
+		return;
+	}
+
+
+	/* Handle an IP address referral. */
+	if ( reply->is_type(reply, IDQreply_ipredirect) ) {
+		if ( !reply->get_ip_reply(reply, host, &port) )
+			goto done;
+		fprintf(stdout, ".Referral to %s at port %d.\n", \
+			host->get(host), port);
+	}
+
+
+ done:
+	return;
+}
+
+
 /*
  * Program entry point begins here.
  */
@@ -419,12 +454,9 @@ extern int main(int argc, char *argv[])
 			fputs("!Error decoding referral.\n", stderr);
 			goto done;
 		}
-
-		fprintf(stdout, ".referral %d: ", lp);
-		if ( reply->is_type(reply, IDQreply_notfound) )
-			fputs("not found.\n", stdout);
-		else
-			fputs("found.\n", stdout);
+		
+		fprintf(stdout, ".Processing referral %d.\n", lp);
+		process_reply(reply, bufr);
 	}
 
 	retn = 0;

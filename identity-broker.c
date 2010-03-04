@@ -343,11 +343,13 @@ static _Bool handle_connection(const Duct const duct)
 
 		if ( IDfinder->search(IDfinder, token) ) {
 			reply = Search_list[lp].reply;
-			if ( !reply->set_ip_reply(reply,	\
-						  "127.0.0.1",	\
-						  10902) ) {
-				err = "Error encoding ip.";
-				goto done;
+			if ( (lp == 2) || (lp == 4) ) {
+				if ( !reply->set_ip_reply(reply,	\
+				  "idfusion4.enjellic.com",	\
+							  10902) ) {
+					err = "Error encoding ip.";
+					goto done;
+				}
 			}
 			// IDfinder->get_match(IDfinder, bfp);
 		}

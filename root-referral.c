@@ -740,6 +740,12 @@ static _Bool handle_connection(const Duct const duct)
 			goto done;
 	}
 
+	if ( Query_slots != NULL ) {
+		for (lp= 0; lp < Query_count; ++lp)
+			Query_slots[lp].reply->whack(Query_slots[lp].reply);
+		free(Query_slots);
+	}
+
 	if ( bufr != NULL )
 		bufr->whack(bufr);
 	if ( devauth != NULL )
@@ -763,8 +769,6 @@ extern int main(int argc, char *argv[])
 	auto char *config;
 
 	auto int retn = 1;
-
-	auto unsigned int lp;
 
 	auto pid_t pid;
 
@@ -830,6 +834,7 @@ extern int main(int argc, char *argv[])
 		if ( pid == 0 ) {
 			if ( handle_connection(duct) )
 				retn = 0;
+			fputs(".Terminating connection.\n", stdout);
 			goto done;
 		}
 
@@ -845,13 +850,7 @@ extern int main(int argc, char *argv[])
 		     fputs("Error closing duct connection.\n", stderr);
 	     duct->whack(duct);
 	}
-
-	if ( Query_slots != NULL ) {
-		for (lp= 0; lp < Query_count; ++Query_count)
-			Query_slots[lp].reply->whack(Query_slots[lp].reply);
-		free(Query_slots);
-	}
-
+	
 	if ( parser != NULL )
 		parser->whack(parser);
 
