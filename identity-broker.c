@@ -56,6 +56,8 @@ static pid_t process_table[100];
 
 static OrgSearch IDfinder = NULL;
 
+static unsigned int IDcnt = 0;
+
 struct search_entry {
 	IDqueryReply reply;
 	IDtoken token;
@@ -335,8 +337,8 @@ static _Bool handle_connection(const Duct const duct)
 		err = "Error creating search array.";
 		goto done;
 	}
-	fprintf(stdout, ".Searching over %d %s.\n", Search_cnt, \
-		Search_cnt > 1 ? "identities" : "identity");
+	fprintf(stdout, ".Searching %d originating identities for %d %s.\n", \
+		IDcnt, Search_cnt, Search_cnt > 1 ? "identities" : "identity");
 
 	for (lp= 0; lp < Search_cnt; ++lp) {
 		token = Search_list[lp].token;
@@ -452,11 +454,13 @@ extern int main(int argc, char *argv[])
 		fputs("Error allocating search object.\n", stderr);
 		goto done;
 	}
-	fputs("\nLoading originating identity database.\n", stdout);
-	if ( !IDfinder->load(IDfinder, "/u/usr/src/npi/npi-search.txt") ) {
+	fputs("\n.Loading originating identity database.\n", stdout);
+	IDcnt = IDfinder->load(IDfinder, "/u/usr/src/npi/npi-full-search.txt");
+	if ( IDcnt == 0 ) {
 		fputs("Error loading search object.\n", stderr);
 		goto done;
 	}
+	fputs(".Load completed.\n", stdout);
 
 	/* Initialize SSL connection and wait for connections. */
 	if ( (duct = NAAAIM_Duct_Init()) == NULL ) {
@@ -475,11 +479,12 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
-	if ( !duct->init_port(duct, NULL, 11993) ) {
+	if ( !duct->init_port(duct, NULL, 11990) ) {
 		fputs("Cannot initialize port.\n", stderr);
 		goto done;
 	}
 
+	fputs("\n.Waiting for connections.\n", stdout);
 	while ( 1 ) {
 		if ( !duct->accept_connection(duct) ) {
 			fputs("Error on SSL connection accept.\n", stderr);

@@ -94,18 +94,18 @@ static void _init_state(const OrgSearch_State const S) {
  * \param infile	The name of the text file containing the
  *			originating identities.
  *
- * \return		A boolean file is used to indicate whether or
- *			not loading of the file was successful.  A true
- *			value is used to indicate the load was
+ * \return		The number of originating identities loaded is
+ *			returned to the caller.  A value of zero
+ *			indicates there was a problem with the load.
  *			successful.
  */
 
-static _Bool load(const OrgSearch const this, const char * const infile)
+static unsigned int load(const OrgSearch const this, const char * const infile)
 
 {
 	auto const OrgSearch_State const S = this->state;
 
-	auto _Bool retn = false;
+	auto unsigned int retn = 0;
 
 	auto char bufr[256];
 
@@ -152,7 +152,7 @@ static _Bool load(const OrgSearch const this, const char * const infile)
 		hex->reset(hex);
 	}
 
-	retn = true;
+	retn = S->idcnt;
 
 	
  done:

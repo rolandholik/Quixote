@@ -33,7 +33,7 @@ typedef struct NAAAIM_OrgSearch_State * OrgSearch_State;
 struct NAAAIM_OrgSearch
 {
 	/* External methods. */
-	_Bool (*load)(const OrgSearch, const char *);
+	unsigned int (*load)(const OrgSearch, const char *);
 	_Bool (*search)(const OrgSearch, const IDtoken);
 	_Bool (*get_match)(const OrgSearch, const Buffer);
 	void (*whack)(const OrgSearch);
