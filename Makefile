@@ -81,6 +81,9 @@ genrandom: genrandom.o RandomBuffer.o SHA256.o
 genid: genid.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl ${SSL_LIBRARY};
 
+gen-npi-search: gen-npi-search.o ${COBJS}
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
+
 token: token.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl ${SSL_LIBRARY};
 
