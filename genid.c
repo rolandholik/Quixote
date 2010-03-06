@@ -269,8 +269,8 @@ extern int main(int argc, char *argv[])
 		   token    = false;
 
 	auto char *ssnid,
-		  *anonymizer,
-		  *credential,
+		  *credential = NULL,
+		  *anonymizer = NULL,
 		  *config = NULL,
 		  *organization = NULL,
 		  *ssn = NULL;
@@ -289,7 +289,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Get the organizational identifier and SSN. */
-	while ( (retn = getopt(argc, argv, "DITpc:i:o:")) != EOF )
+	while ( (retn = getopt(argc, argv, "DITa:c:f:pi:o:")) != EOF )
 		switch ( retn ) {
 			case 'D':
 				domain = true;
@@ -300,7 +300,13 @@ extern int main(int argc, char *argv[])
 			case 'T':
 				token = true;
 				break;
+			case 'a':
+				anonymizer = optarg;
+				break;
 			case 'c':
+				credential = optarg;
+				break;
+			case 'f':
 				config = optarg;
 				break;
 			case 'i':
@@ -333,6 +339,7 @@ extern int main(int argc, char *argv[])
 
 	if ( !parser->parse(parser, config) ) {
 		fputs("Failed parsing of identity keys\n", stderr);
+		fprintf(stderr, "\tconfig = %s\n", config);
 		goto done;
 	}
 
@@ -348,14 +355,21 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
-	if ( (anonymizer = parser->get(parser, "anonymizer")) == NULL ) {
-		fputs("Anonymizer not available\n", stderr);
-		goto done;
+	if ( anonymizer == NULL ) {
+		if ( (anonymizer = parser->get(parser, "anonymizer")) == \
+		     NULL ) {
+			fputs("Anonymizer not available\n", stderr);
+			goto done;
+		}
 	}
 
-	if ( (credential = parser->get(parser, "credential")) == NULL ) {
-		fputs("Organizational credential not available.\n", stderr);
-		goto done;
+	if ( credential == NULL ) {
+		if ( (credential = parser->get(parser, "credential")) \
+		     == NULL ) {
+			fputs("Organizational credential not available.\n", \
+			      stderr);
+			goto done;
+		}
 	}
 
 	orgid->create(orgid, anonymizer, credential);
