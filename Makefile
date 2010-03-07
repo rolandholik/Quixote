@@ -8,7 +8,7 @@
 # Variable declarations.
 CSRC = 	SHA256.c SHA256_hmac.c RSAkey.c OrgID.c PatientID.c RandomBuffer.c \
 	IDtoken.c Duct.c Authenticator.c AES256_cbc.c AuthenReply.c	   \
-	OrgSearch.c IDqueryReply.c
+	OrgSearch.c IDqueryReply.c DBduct.c
 
 SERVERS = root-referral device-broker user-broker identity-broker
 
@@ -25,6 +25,12 @@ CC = gcc
 #
 SSL_INCLUDE = /usr/local/ssl/include
 SSL_LIBRARY = -L /usr/local/ssl/lib -l ssl
+
+#
+# Locations for the Postgresql files and libraries.
+#
+POSTGRES_INCLUDE = /usr/local/pgsql/include
+POSTGRES_LIBRARY = -L /usr/local/pgsql/lib -lpq
 
 CDEBUG = -O2 -fomit-frame-pointer -march=pentium2 ${DMALLOC}
 CDEBUG = -g ${DMALLOC}
@@ -52,7 +58,7 @@ COBJS = ${CSRC:.c=.o}
 
 LIBS = -l HurdLib
 
-CFLAGS := ${CFLAGS} -I./HurdLib -I${SSL_INCLUDE}
+CFLAGS := ${CFLAGS} -I./HurdLib -I${SSL_INCLUDE} -I${POSTGRES_INCLUDE}
 
 
 # Targets
@@ -97,7 +103,10 @@ ID_test: ID_test.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
 Duct_test: Duct_test.o ${COBJS}
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY}
+
+DBduct_test: DBduct_test.o DBduct.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${POSTGRES_LIBRARY};
 
 sha256key: sha256key.o SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
@@ -109,7 +118,8 @@ clean:
 	rm -f *.o *~ TAGS;
 	rm -f query-client
 	rm -f ${SERVERS}
-	rm -f genrandom genid token RSAkey_test ID_test Duct_test sha256key;
+	rm -f genrandom genid token RSAkey_test ID_test Duct_test sha256key \
+		gen-npi-search DBduct_test;
 
 
 # Source dependencies.
@@ -127,6 +137,7 @@ AES256_cbc.o: AES256_cbc.h
 AuthenReply.o: NAAAIM.h AuthenReply.h
 OrgSearch.o: NAAAIM.h OrgSearch.h IDtoken.h
 IDqueryReply.o: NAAAIM.h IDqueryReply.h
+DBDuct.o: NAAAIM.h DBduct.h
 
 query-client.o: NAAAIM.h Duct.h IDtoken.h Authenticator.h IDqueryReply.h
 
@@ -142,3 +153,5 @@ identity-broker.o: NAAAIM.h Duct.h IDtoken.h Authenticator.h AuthenReply.h \
 genid.o: NAAAIM.h SHA256.h SHA256_hmac.h OrgID.h PatientID.h \
 	RandomBuffer.h RSAkey.h
 sha256key.o: NAAAIM.h SHA256.h
+
+DBduct.o: DBduct.h

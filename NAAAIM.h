@@ -30,3 +30,4 @@
 #define NAAAIM_AuthenReply_OBJID	10
 #define NAAAIM_OrgSearch_OBJID		11
 #define NAAAIM_IDqueryReply_OBJID	12
+#define NAAAIM_DBduct_OBJID		13
