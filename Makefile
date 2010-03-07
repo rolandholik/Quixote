@@ -8,7 +8,7 @@
 # Variable declarations.
 CSRC = 	SHA256.c SHA256_hmac.c RSAkey.c OrgID.c PatientID.c RandomBuffer.c \
 	IDtoken.c Duct.c Authenticator.c AES256_cbc.c AuthenReply.c	   \
-	OrgSearch.c IDqueryReply.c DBduct.c
+	OrgSearch.c IDqueryReply.c
 
 SERVERS = root-referral device-broker user-broker identity-broker
 
@@ -58,7 +58,7 @@ COBJS = ${CSRC:.c=.o}
 
 LIBS = -l HurdLib
 
-CFLAGS := ${CFLAGS} -I./HurdLib -I${SSL_INCLUDE} -I${POSTGRES_INCLUDE}
+CFLAGS := ${CFLAGS} -I./HurdLib -I${SSL_INCLUDE}
 
 
 # Targets
@@ -110,6 +110,9 @@ DBduct_test: DBduct_test.o DBduct.o
 
 sha256key: sha256key.o SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
+
+DBduct.o: DBduct.c
+	$(CC) $(CFLAGS) -I${POSTGRES_INCLUDE} -c $< -o $@;
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};

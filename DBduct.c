@@ -289,6 +289,9 @@ static void whack(const DBduct const this)
 	auto const DBduct_State const S = this->state;
 
 
+	if ( S->have_result )
+		PQclear(S->result);
+
 	if ( S->connection != NULL )
 		PQfinish(S->connection);
 
