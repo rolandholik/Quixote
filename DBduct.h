@@ -36,6 +36,7 @@ struct NAAAIM_DBduct
 	_Bool (*init_connection)(const DBduct, const char *);
 	_Bool (*exec)(const DBduct, const char *);
 	int (*query)(const DBduct, const char *);
+	char * (*get_element)(const DBduct, int, int);
 	void (*print)(const DBduct);
 	void (*whack)(const DBduct);
 

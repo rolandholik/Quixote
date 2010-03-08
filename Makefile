@@ -90,6 +90,9 @@ genid: genid.o ${COBJS}
 gen-npi-search: gen-npi-search.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
+gen-brokerdb: gen-brokerdb.o ${COBJS} DBduct.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY} ${POSTGRES_LIBRARY};
+
 token: token.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl ${SSL_LIBRARY};
 
@@ -122,7 +125,7 @@ clean:
 	rm -f query-client
 	rm -f ${SERVERS}
 	rm -f genrandom genid token RSAkey_test ID_test Duct_test sha256key \
-		gen-npi-search DBduct_test;
+		gen-npi-search DBduct_test gen-brokerdb;
 
 
 # Source dependencies.

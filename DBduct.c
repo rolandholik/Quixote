@@ -226,6 +226,44 @@ static int query(const DBduct const this, const char * const cmd)
 /**
  * External public method.
  *
+ * This method implements returning one element out of the return
+ * matrix.
+ *
+ * \param this		The database object from an element is to be
+ *			returned.
+ *
+ * \param row		The number of the row in the reply which is
+ *			to be returned.
+ *
+ * \param column	The number of the column in the reply which is
+ *			be returned.
+ *
+ * \return		A character pointer to the return value is returned.
+ *			A null value is returned if an error is detected.
+ */
+
+static char * get_element(const DBduct const this, int const row, \
+			  int const column)
+
+{
+	auto const DBduct_State const S = this->state;
+
+
+	/* Sanity checks. */
+	if ( S->poisoned )
+		return NULL;
+	if ( row > S->rows )
+		return NULL;
+	if ( column > S->columns )
+		return NULL;
+
+	return PQgetvalue(S->result, row, column);
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements printing out the results of a query.  This
  * method is primarily for diagnostic purposes and simply prints out
  * the matrix of return results.
@@ -340,6 +378,7 @@ extern DBduct NAAAIM_DBduct_Init(void)
 	this->init_connection = init_connection;
 	this->exec	      = exec;
 	this->query	      = query;
+	this->get_element     = get_element;
 	this->print	      = print;
 
 	this->whack = whack;
