@@ -120,7 +120,7 @@ static void do_organization(const DBduct const keydb, \
 		orgid->reset(orgid);
 
 		snprintf(query, sizeof(query), "insert into idmap values " \
-			 "('%s', 1, nextval('idsequence'))", orgkey);
+			 "('%s', 2, nextval('idsequence'))", orgkey);
 		if ( !iddb->exec(iddb, query) ) {
 			fputs("Failed idmap insertion\n", stderr);
 			goto done;
