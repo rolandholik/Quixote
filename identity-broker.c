@@ -49,6 +49,7 @@
 #include "AuthenReply.h"
 #include "OrgSearch.h"
 #include "IDqueryReply.h"
+#include "DBduct.h"
 
 
 /* Variables static to this module. */
@@ -242,6 +243,76 @@ static _Bool setup_search_array(const AuthenReply const orgkey, \
 		
 	return retn;
 }
+
+
+/**
+ * Private function.
+ *
+ * This function is responsible for creating the reply which is to be
+ * generated for each identity in the requested query slots.
+ *
+ * \param  db		The object describing the database connection to
+ *			be used for looking up the organizatioinal identity.
+ *
+ * \param reply		The reply object which is to be populated.
+ *
+ * \param identity	A buffer containing the binary value of the
+ *			identity which was matched.
+ */
+
+static void resolve_reply(const DBduct const db,	  \
+			  const IDqueryReply const reply, \
+			  const Buffer const identity)
+
+{
+	auto char *p,
+		  query[160],
+		  orgid[NAAAIM_IDSIZE * 2 + 1];
+
+	auto unsigned lp = 0;
+
+
+	/* Generate the ASCII representation of the identity. */
+	if ( identity->poisoned(identity) || \
+	     (identity->size(identity) != NAAAIM_IDSIZE) ) {
+		fputs("!Invalid organizational identity.\n", stderr);
+		return;
+	}
+
+	p = orgid;
+	memset(orgid, '\0', sizeof(orgid));
+	while ( lp < identity->size(identity) ) {
+		sprintf(p + lp*2, "%02x", *(identity->get(identity)+lp));
+		++lp;
+	}
+
+
+	/* Determine if there is a mapping for this identity. */
+	snprintf(query, sizeof(query), "select type,id from idmap where " \
+		 "orgid = '%s'", orgid);
+	if ( (lp = db->query(db, query)) == -1 ) {
+		fputs("!Error executing database query.\n", stderr);
+		return;
+	}
+	if ( lp == 0 )
+		return;
+	if ( lp > 1 ) {
+		fputs("!Multiple originating identities.\n", stderr);
+		return;
+	}
+			
+
+	/*
+	 * A single query result was returned.  Lookup the type of response
+	 * to be encoded and then encode the appropriate reply object.
+	 */
+	if ( !reply->set_ip_reply(reply, "idfusion4.enjellic.com", 10902) ) {
+		fputs("!Error encoding reply\n", stderr);
+		return;
+	}
+       
+	return;
+}
 			
 		
 /**
@@ -275,6 +346,8 @@ static _Bool handle_connection(const Duct const duct)
 
 	auto IDqueryReply reply;
 
+	auto DBduct db = NULL;
+
 
 	if ( (bufr = HurdLib_Buffer_Init()) == NULL )
 		goto done;
@@ -283,6 +356,15 @@ static _Bool handle_connection(const Duct const duct)
 	orgid  = NAAAIM_AuthenReply_Init();
 	if ( (orgkey == NULL) || (orgid == NULL) )
 		goto done;
+
+
+	/* Initialize the database connection. */
+	if ( (db = NAAAIM_DBduct_Init()) == NULL )
+		goto done;
+	if ( !db->init_connection(db, "dbname=idbroker") ) {
+		err = "Cannot initialize database connection.";
+		goto done;
+	}
 
 
 	/* Send the connection banner. */
@@ -341,19 +423,14 @@ static _Bool handle_connection(const Duct const duct)
 		IDcnt, Search_cnt, Search_cnt > 1 ? "identities" : "identity");
 
 	for (lp= 0; lp < Search_cnt; ++lp) {
+		fprintf(stdout, ".resolving slot %d.\n", lp);
 		token = Search_list[lp].token;
 
 		if ( IDfinder->search(IDfinder, token) ) {
 			reply = Search_list[lp].reply;
-			if ( (lp == 2) || (lp == 4) ) {
-				if ( !reply->set_ip_reply(reply,	\
-				  "idfusion4.enjellic.com",	\
-							  10902) ) {
-					err = "Error encoding ip.";
-					goto done;
-				}
-			}
-			// IDfinder->get_match(IDfinder, bfp);
+			bufr->reset(bufr);
+			IDfinder->get_match(IDfinder, bufr);
+			resolve_reply(db, reply, bufr);
 		}
 	}
 
@@ -406,6 +483,8 @@ static _Bool handle_connection(const Duct const duct)
 		orgkey->whack(orgkey);
 	if ( orgid != NULL )
 		orgid->whack(orgid);
+	if ( db != NULL )
+		db->whack(db);
 
 	return retn;
 }
@@ -455,7 +534,7 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 	fputs("\n.Loading originating identity database.\n", stdout);
-	IDcnt = IDfinder->load(IDfinder, "/u/usr/src/npi/npi-full-search.txt");
+	IDcnt = IDfinder->load(IDfinder, "/u/usr/src/npi/npi-search.txt");
 	if ( IDcnt == 0 ) {
 		fputs("Error loading search object.\n", stderr);
 		goto done;
@@ -479,7 +558,7 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
-	if ( !duct->init_port(duct, NULL, 11990) ) {
+	if ( !duct->init_port(duct, NULL, 11993) ) {
 		fputs("Cannot initialize port.\n", stderr);
 		goto done;
 	}

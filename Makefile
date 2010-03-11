@@ -75,8 +75,8 @@ device-broker: device-broker.o ${COBJS}
 user-broker: user-broker.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
-identity-broker: identity-broker.o ${COBJS}
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
+identity-broker: identity-broker.o DBduct.o ${COBJS}
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY} ${POSTGRES_LIBRARY};
 
 query-client: query-client.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
@@ -154,7 +154,7 @@ device-broker.o: NAAAIM.h Duct.h IDtoken.h Authenticator.h SHA256.h \
 user-broker.o: NAAAIM.h Duct.h IDtoken.h Authenticator.h SHA256.h \
 	SHA256_hmac.h RSAkey.h AuthenReply.h
 identity-broker.o: NAAAIM.h Duct.h IDtoken.h Authenticator.h AuthenReply.h \
-	OrgSearch.h IDqueryReply.h
+	OrgSearch.h IDqueryReply.h DBduct.h
 
 genid.o: NAAAIM.h SHA256.h SHA256_hmac.h OrgID.h PatientID.h \
 	RandomBuffer.h RSAkey.h
