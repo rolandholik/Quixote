@@ -84,8 +84,9 @@ query-client: query-client.o ${COBJS}
 genrandom: genrandom.o RandomBuffer.o SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
-genid: genid.o ${COBJS}
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl ${SSL_LIBRARY};
+genid: genid.o ${COBJS} DBduct.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl ${SSL_LIBRARY} \
+		${POSTGRES_LIBRARY};
 
 gen-npi-search: gen-npi-search.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
@@ -157,7 +158,7 @@ identity-broker.o: NAAAIM.h Duct.h IDtoken.h Authenticator.h AuthenReply.h \
 	OrgSearch.h IDqueryReply.h DBduct.h
 
 genid.o: NAAAIM.h SHA256.h SHA256_hmac.h OrgID.h PatientID.h \
-	RandomBuffer.h RSAkey.h
+	RandomBuffer.h RSAkey.h DBduct.o
 sha256key.o: NAAAIM.h SHA256.h
 
 DBduct.o: DBduct.h

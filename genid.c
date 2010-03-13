@@ -12,6 +12,109 @@
 #include "PatientID.h"
 #include "RandomBuffer.h"
 #include "RSAkey.h"
+#include "DBduct.h"
+#include "String.h"
+
+
+/* Variables static to this module. */
+static String Credkey = NULL;
+
+
+/**
+ * Private function.
+ *
+ * This function implements the creation of an organizational identity.
+ *
+ * \param orgid		The organization management object in which the
+ *			identity is to be created.
+ *
+ * \param config	The object which provides configuration
+ *			information for object creation.
+ *
+ * \param dbname	The name of the database which contains identity
+ *			keying information.  A null value indicates the
+ *			database should not be queried.
+ *
+ * \param credential	A pointer to a null-terminated character buffer
+ *			containing the credential to be used for
+ *			generating the organizational identity.
+ *
+ * \return		If creation of the organizational identity is
+ *			successful the object to manage the identity is
+ *			returned to the caller.  A NULL value indicates
+ *			failure.
+ */
+
+static OrgID generate_organization_id(OrgID orgid, const Config const config, \
+				      const char * const dbname, 	      \
+				      char *credential)
+
+{
+	auto _Bool retn = false;
+
+	auto char *anonymizer = NULL,
+		  query[256];
+
+	auto DBduct db = NULL;
+
+
+	/*
+	 * Initialize the identity management object and determine the
+	 * credential to be used.
+	 */
+	if ( (orgid = NAAAIM_OrgID_Init()) == NULL )
+		goto done;
+
+	if ( credential == NULL ) {
+		if ( (credential = config->get(config, "credential")) \
+		     == NULL )
+			goto done;
+	}
+
+
+	/*
+	 * Retrieve organizational keying information from a database if
+	 * one has been defined.
+	 */
+	if ( dbname != NULL ) {
+		if ( (db = NAAAIM_DBduct_Init()) == NULL )
+			goto done;
+		if ( !db->init_connection(db, dbname) )
+			goto done;
+
+		snprintf(query, sizeof(query), "select orgkey,credkey from " \
+			 "npi where number = '%s'", credential);
+		if ( db->query(db, query) != 1 )
+			goto done;
+
+		anonymizer = db->get_element(db, 0, 0);
+
+		Credkey = HurdLib_String_Init_cstr(db->get_element(db, 0, 1));
+		if ( Credkey == NULL )
+			goto done;
+	}
+
+	if ( (anonymizer == NULL) ) {
+		if ( (anonymizer = config->get(config, "anonymizer")) == \
+		     NULL )
+			goto done;
+	}
+
+	orgid->create(orgid, anonymizer, credential);
+
+	retn = true;
+
+
+ done:
+	if ( db != NULL )
+		db->whack(db);
+	if ( retn == false ) {
+		orgid->whack(orgid);
+		orgid = NULL;
+	}
+
+	return orgid;
+}
 
 
 static _Bool permute_identity(const Config const parser,	   \
@@ -269,11 +372,13 @@ extern int main(int argc, char *argv[])
 		   token    = false;
 
 	auto char *ssnid,
+		  *err = NULL,
 		  *credential = NULL,
 		  *anonymizer = NULL,
 		  *config = NULL,
 		  *organization = NULL,
-		  *ssn = NULL;
+		  *ssn = NULL,
+		  *dbname = NULL;
 
 	auto int retn;
 
@@ -289,7 +394,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Get the organizational identifier and SSN. */
-	while ( (retn = getopt(argc, argv, "DITa:c:f:pi:o:")) != EOF )
+	while ( (retn = getopt(argc, argv, "DITa:c:d:f:pi:o:")) != EOF )
 		switch ( retn ) {
 			case 'D':
 				domain = true;
@@ -306,6 +411,9 @@ extern int main(int argc, char *argv[])
 			case 'c':
 				credential = optarg;
 				break;
+			case 'd':
+				dbname = optarg;
+				break;
 			case 'f':
 				config = optarg;
 				break;
@@ -320,10 +428,12 @@ extern int main(int argc, char *argv[])
 				break;
 		}
 
+#if 0
 	if ( (organization == NULL) || (ssn == NULL) ) {
-		fputs("Inputs not specified.\n", stderr);
-		return 1;
+		err = "Inputs not specified.";
+		goto done;
 	}
+#endif
 
 	if ( config == NULL )
 		config = "./orgid.txt";
@@ -333,56 +443,37 @@ extern int main(int argc, char *argv[])
 
 	/* Parse the organizational identity file. */
 	if ( (parser = HurdLib_Config_Init()) == NULL ) {
-		fputs("Failed Config init.\n", stderr);
+		err = "Failed Config init.";
 		goto done;
 	}
 
 	if ( !parser->parse(parser, config) ) {
-		fputs("Failed parsing of identity keys\n", stderr);
-		fprintf(stderr, "\tconfig = %s\n", config);
+		err = "Failed parsing of identity keys.";
 		goto done;
 	}
 
 
 	/* Generate the organizational identity. */
-	if ( (orgid = NAAAIM_OrgID_Init()) == NULL ) {
-		fputs("Failed organization object init.\n", stderr);
+	if ( dbname == NULL )
+		parser->set_section(parser, organization);
+
+	if ( (orgid = generate_organization_id(orgid, parser, dbname, \
+					       credential)) == NULL ) {
+		err = "Failure in organizational identity generation.";
 		goto done;
 	}
-
-	if ( !parser->set_section(parser, organization) ) {
-		fputs("Organization section not found.\n", stderr);
-		goto done;
-	}
-
-	if ( anonymizer == NULL ) {
-		if ( (anonymizer = parser->get(parser, "anonymizer")) == \
-		     NULL ) {
-			fputs("Anonymizer not available\n", stderr);
-			goto done;
-		}
-	}
-
-	if ( credential == NULL ) {
-		if ( (credential = parser->get(parser, "credential")) \
-		     == NULL ) {
-			fputs("Organizational credential not available.\n", \
-			      stderr);
-			goto done;
-		}
-	}
-
-	orgid->create(orgid, anonymizer, credential);
 
 
 	/* Create the user identity. */
 	if ( (ptid = NAAAIM_PatientID_Init()) == NULL ) {
-		fputs("Error creating patient identity object.\n", stderr);
+		err = "Error creating patient identity object.";
 		goto done;
 	}
 
-	if ( (ssnid = parser->get(parser, "ssnid")) == NULL ) {
-		fputs("SSN identifier not set\n", stderr);
+	if ( Credkey != NULL )
+		ssnid = Credkey->get(Credkey);
+	else if ( (ssnid = parser->get(parser, "ssnid")) == NULL ) {
+		err = "SSN identifier not set";
 		goto done;
 	}
 
@@ -425,6 +516,9 @@ extern int main(int argc, char *argv[])
 
 
  done:
+	if ( err != NULL )
+		fprintf(stderr, "%s\n", err);
+
 	if ( bufr != NULL )
 		bufr->whack(bufr);
 	if ( parser != NULL )
@@ -433,6 +527,9 @@ extern int main(int argc, char *argv[])
 		orgid->whack(orgid);
 	if ( ptid != NULL )
 		ptid->whack(ptid);
+
+	if ( Credkey != NULL )
+		Credkey->whack(Credkey);
 
 	return retn;
 }
