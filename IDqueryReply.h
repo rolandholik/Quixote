@@ -19,6 +19,7 @@
 
 #include <Origin.h>
 #include <Buffer.h>
+#include <String.h>
 
 
 /* Object type definitions. */
@@ -42,9 +43,12 @@ struct NAAAIM_IDqueryReply
 	/* External methods. */
 	_Bool (*set_ip_reply)(const IDqueryReply, const char *, int);
 	_Bool (*get_ip_reply)(const IDqueryReply, const Buffer, int *);
+	_Bool (*set_text_reply)(const IDqueryReply, const String);
+	_Bool (*get_text_reply)(const IDqueryReply, const String);
 	_Bool (*encode)(const IDqueryReply, const Buffer);
 	_Bool (*decode)(const IDqueryReply, const Buffer);
 	_Bool (*is_type)(const IDqueryReply, IDqueryReply_type);
+	void (*reset)(const IDqueryReply);
 	void (*whack)(const IDqueryReply);
 
 	/* Private state. */

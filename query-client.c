@@ -244,6 +244,8 @@ static void process_reply(const IDqueryReply const reply, \
 {
 	auto int port;
 
+	auto String text = NULL;
+
 
 	if ( reply->is_type(reply, IDQreply_notfound) ) {
 		fputs(".No identity reply information available.\n", stdout);
@@ -253,14 +255,32 @@ static void process_reply(const IDqueryReply const reply, \
 
 	/* Handle an IP address referral. */
 	if ( reply->is_type(reply, IDQreply_ipredirect) ) {
-		if ( !reply->get_ip_reply(reply, host, &port) )
+		if ( !reply->get_ip_reply(reply, host, &port) ) {
+			fputs("!Error decoding IP reply response.\n", stderr);
 			goto done;
+		}
 		fprintf(stdout, ".Referral to %s at port %d.\n", \
 			host->get(host), port);
 	}
 
+	/* Handle a text reply . */
+	if ( reply->is_type(reply, IDQreply_text) ) {
+		if ( (text = HurdLib_String_Init()) == NULL ) {
+			fputs("!Error initializing text response.\n", stderr);
+			goto done;
+		}
+		if ( !reply->get_text_reply(reply, text) ) {
+			fputs("!Error decoding text response.\n", stderr);
+			goto done;
+		}
+		text->print(text);
+	}
+
 
  done:
+	if ( text != NULL )
+		text->whack(text);
+
 	return;
 }
 
@@ -457,6 +477,7 @@ extern int main(int argc, char *argv[])
 		
 		fprintf(stdout, ".Processing referral %d.\n", lp);
 		process_reply(reply, bufr);
+		reply->reset(reply);
 	}
 
 	retn = 0;

@@ -101,6 +101,21 @@ IMPLEMENT_ASN1_FUNCTIONS(ip_reply)
 
 
 /**
+ * The following defines the inner ASN1 encoding sequence for a reply
+ * which contains text to be displayed by the query client.
+ */
+typedef struct {
+	ASN1_PRINTABLESTRING *text;
+} text_reply;
+
+ASN1_SEQUENCE(text_reply) = {
+	ASN1_SIMPLE(text_reply, text, ASN1_PRINTABLESTRING),
+} ASN1_SEQUENCE_END(text_reply)
+
+IMPLEMENT_ASN1_FUNCTIONS(text_reply)
+
+
+/**
  * Internal private method.
  *
  * This method is responsible for initializing the NAAAIM_IDqueryReply_State
@@ -163,7 +178,7 @@ static _Bool set_ip_reply(const IDqueryReply const this, \
 	if ( (reply = ip_reply_new()) == NULL )
 		goto done;
 
-        if ( ASN1_STRING_set(reply->hostname, hostname, strlen(hostname)) \
+        if ( ASN1_STRING_set(reply->hostname, hostname, strlen(hostname) + 1) \
 	     != 1 )
                 goto done;
 
@@ -174,7 +189,7 @@ static _Bool set_ip_reply(const IDqueryReply const this, \
         asn_size = i2d_ip_reply(reply, p);
         if ( asn_size < 0 )
                 goto done;
-
+	
 	if ( !S->payload->add(S->payload, asn, asn_size) )
 		goto done;
 
@@ -239,13 +254,11 @@ static _Bool get_ip_reply(const IDqueryReply const this, \
 	p = S->payload->get(S->payload);
 	asn_size = S->payload->size(S->payload);
         if ( !d2i_ip_reply(&reply, &p, asn_size) )
-                goto done;	
+                goto done;
 
 	bufr->reset(bufr);
 	bufr->add(bufr, ASN1_STRING_data(reply->hostname), \
 		  ASN1_STRING_length(reply->hostname));
-	fprintf(stdout, "%s[%s]: hostname size = %d\n", __FILE__, __func__, \
-		ASN1_STRING_length(reply->hostname));
 
 	*port = ASN1_INTEGER_get(reply->port);
 
@@ -258,6 +271,136 @@ static _Bool get_ip_reply(const IDqueryReply const this, \
 
 	if ( reply != NULL )
 		ip_reply_free(reply);
+
+	return retn;
+
+}
+
+
+/**
+ * External public method.
+ *
+ * This method is responsible for initializing and creating an object
+ * returns text information to be displayed by the query client.
+ *
+ * \param this		The reply which is to be encoded.
+ *
+ * \param text		A String object which contains the text to
+ *			be returned as the result of the query.
+ *
+ * \return		A boolean value is used to indicate whether or
+ *			not the encoding was successful.  A true
+ *			value indicates success.
+ */
+
+static _Bool set_text_reply(const IDqueryReply const this, \
+			    const String const text)
+
+{
+	auto const IDqueryReply_State const S = this->state;
+
+	auto _Bool retn = false;
+
+        auto unsigned char *asn = NULL;
+
+        auto unsigned char **p = &asn;
+
+	auto int asn_size;
+
+	auto text_reply *reply = NULL;
+
+
+	if ( S->poisoned )
+		goto done;
+
+
+	if ( (reply = text_reply_new()) == NULL )
+		goto done;
+
+        if ( ASN1_STRING_set(reply->text, text->get(text), \
+			     text->size(text) + 1) != 1 )
+                goto done;
+
+        asn_size = i2d_text_reply(reply, p);
+        if ( asn_size < 0 )
+                goto done;
+
+	if ( !S->payload->add(S->payload, asn, asn_size) )
+		goto done;
+
+	retn	= true;
+	S->type = IDQreply_text;
+	
+
+ done:
+	if ( retn == false )
+		S->poisoned = true;
+
+	if ( reply != NULL )
+		text_reply_free(reply);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method decodes and returns the text encoded in the identity
+ * query referral.
+ *
+ * \param this		The reply which is to be decoded.
+ *
+ * \param text		A String object which will be loaded with the
+ *			text information.
+ *
+ * \return		A boolean value is used to indicate whether or
+ *			not the decoding was successful.  A true
+ *			value indicates success.
+ */
+
+static _Bool get_text_reply(const IDqueryReply const this, \
+			    const String const text)
+
+{
+	auto const IDqueryReply_State const S = this->state;
+
+	auto _Bool retn = false;
+
+        auto unsigned char *asn = NULL;
+
+        auto unsigned const char *p = asn;
+
+	auto int asn_size;
+
+	auto text_reply *reply = NULL;
+
+
+	if ( S->poisoned )
+		goto done;
+
+
+	p = S->payload->get(S->payload);
+	asn_size = S->payload->size(S->payload);
+        if ( !d2i_text_reply(&reply, &p, asn_size) ) {
+		fprintf(stderr, "d2i error, size = %d.\n", asn_size);
+                goto done;	
+	}
+
+	if ( !text->add(text, (char *) ASN1_STRING_data(reply->text)) ) {
+		fputs("text add error.\n", stderr);
+		goto done;
+	}
+
+	retn = true;
+
+	
+ done:
+	if ( retn == false )
+		S->poisoned = true;
+
+	if ( reply != NULL )
+		text_reply_free(reply);
 
 	return retn;
 
@@ -431,6 +574,25 @@ static _Bool is_type(const IDqueryReply const this, \
 /**
  * External public method.
  *
+ * This method resets the object to prepare it for processing of an
+ * additional reply.
+ *
+ * \param this	A pointer to the object which is to be reset.
+ */
+
+static void reset(const IDqueryReply const this)
+
+{
+	this->state->type = IDQreply_notfound;
+	this->state->payload->reset(this->state->payload);
+
+	return;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a destructor for a IDqueryReply object.
  *
  * \param this	A pointer to the object which is to be destroyed.
@@ -494,11 +656,15 @@ extern IDqueryReply NAAAIM_IDqueryReply_Init(void)
 	this->set_ip_reply = set_ip_reply;
 	this->get_ip_reply = get_ip_reply;
 
+	this->set_text_reply = set_text_reply;
+	this->get_text_reply = get_text_reply;
+
 	this->encode = encode;
 	this->decode = decode;
 
 	this->is_type = is_type;
 
+	this->reset = reset;
 	this->whack = whack;
 
 	return this;

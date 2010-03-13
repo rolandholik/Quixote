@@ -248,10 +248,196 @@ static _Bool setup_search_array(const AuthenReply const orgkey, \
 /**
  * Private function.
  *
+ * This function looks up and encodes an IP address to be returned as
+ * resolution for a query.
+ *
+ * \param db	The database connection to be used for looking up the
+ *		IP address information.
+ *
+ * \param reply	The object to be used for encoding the reply.
+ *
+ * \param id	The table id number of the organization.
+ */
+
+static void ip_reply(const DBduct const db, const IDqueryReply const reply, \
+		     const char * const id)
+
+{
+	auto char query[256];
+
+
+	snprintf(query, sizeof(query), "select host,port from ip where " \
+		 "id = %s", id);
+	if ( db->query(db, query) != 1 )
+		return;
+
+	if ( !reply->set_ip_reply(reply, db->get_element(db, 0, 0), \
+				  atoi(db->get_element(db, 0, 1))) )
+		fputs("!Error encoding ip reply.\n", stderr);
+
+	return;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function looks up and encodes a telephone number to be used for
+ * obtaining information on the patient.
+ *
+ * \param db		The database connection to be used for looking up the
+ *			IP address information.
+ *
+ * \param reply		The object to be used for encoding the reply.
+ *
+ * \param orgtype	The type of provider originating the identity.
+ *
+ * \param id		The table id number of the organization.
+ */
+
+static void telephone_reply(const DBduct const db,	    \
+			    const IDqueryReply const reply, \
+			    const char * const orgtype, const char * const id)
+
+{
+	auto char query[256];
+
+	auto String text;
+
+
+	if ( (text = HurdLib_String_Init()) == NULL )
+		return;
+
+	snprintf(query, sizeof(query), "select telephone from %s where " \
+		 "id = %s", orgtype, id);
+	if ( db->query(db, query) != 1 ) {
+		goto done;
+	}
+
+	text->add(text, "Originating provider recommends telephone " \
+		  "contact.\nPlease call: ");
+
+	memset(query, '\0', sizeof(query));
+	snprintf(query, sizeof(query), "%s\n", db->get_element(db, 0, 0));
+	if ( strlen(query) == 11 ) {
+		memmove(query+4, query+3, strlen(query+3)+1);
+		*(query+3) = '-';
+		memmove(query+8, query+7, strlen(query+7)+1);
+		*(query+7) = '-';
+	}
+	text->add(text, query);
+	if ( !reply->set_text_reply(reply, text) ) {
+		fputs("!Error setting text reply\n", stderr);
+	}
+
+
+ done:
+	if ( text != NULL )
+		text->whack(text);
+
+	return;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function looks up the full data record for the originating
+ * organization and returns it to the caller.
+ *
+ * \param db		The database connection to be used for looking up the
+ *			IP address information.
+ *
+ * \param reply		The object to be used for encoding the reply.
+ *
+ * \param orgtype	The type of provider originating the identity.
+ *
+ * \param id		The table id number of the organization.
+ */
+
+static void information_reply(const DBduct const db,	      \
+			      const IDqueryReply const reply, \
+			      const char * const orgtype,     \
+			      const char * const id)
+
+{
+	auto char query[256];
+
+	auto int col = 2;
+
+	auto String text;
+
+
+	if ( (text = HurdLib_String_Init()) == NULL )
+		return;
+
+	snprintf(query, sizeof(query), "select * from %s where " \
+		 "id = %s", orgtype, id);
+	if ( db->query(db, query) != 1 ) {
+		goto done;
+	}
+
+	if ( strcmp(orgtype, "provider") == 0 ) {
+		text->add(text, "Originating provider information:\n");
+		snprintf(query, sizeof(query), "\tName: %s / %s\n", \
+			 db->get_element(db, 0, 1), db->get_element(db, 0, 2));
+		text->add(text, query);
+		col = 3;
+	}
+	else {
+		text->add(text, "Originating organization information:\n");
+		snprintf(query, sizeof(query), "\tName: %s\n", \
+			 db->get_element(db, 0, 1));
+		text->add(text, query);
+	}
+
+#if 0
+	snprintf(query, sizeof(query), "\tAddress: %s\n", \
+		 db->get_element(db, 0, col++));
+	text->add(text, query);
+#endif
+	snprintf(query, sizeof(query), "\t      %s\n", \
+		 db->get_element(db, 0, col++));
+	text->add(text, query);
+	snprintf(query, sizeof(query), "\t      %s, ", \
+		 db->get_element(db, 0, col++));
+	text->add(text, query);
+
+	snprintf(query, sizeof(query), "%s ", \
+		 db->get_element(db, 0, col++));
+	text->add(text, query);
+	snprintf(query, sizeof(query), "%s\n\n", \
+		 db->get_element(db, 0, col++));
+	text->add(text, query);
+	snprintf(query, sizeof(query), "\tTelephone: %s\n", \
+		 db->get_element(db, 0, col++));
+	text->add(text, query);
+	snprintf(query, sizeof(query), "\tTaxonomy:  %s\n", \
+		 db->get_element(db, 0, col));
+	text->add(text, query);
+
+	if ( !reply->set_text_reply(reply, text) ) {
+		fputs("!Error setting text reply\n", stderr);
+	}
+
+
+ done:
+	if ( text != NULL )
+		text->whack(text);
+
+	return;
+}
+
+
+/**
+ * Private function.
+ *
  * This function is responsible for creating the reply which is to be
  * generated for each identity in the requested query slots.
  *
- * \param  db		The object describing the database connection to
+ * \param slot		The query slot which is being resolved.
+ *
+ * \param db		The object describing the database connection to
  *			be used for looking up the organizatioinal identity.
  *
  * \param reply		The reply object which is to be populated.
@@ -260,13 +446,17 @@ static _Bool setup_search_array(const AuthenReply const orgkey, \
  *			identity which was matched.
  */
 
-static void resolve_reply(const DBduct const db,	  \
-			  const IDqueryReply const reply, \
+static void resolve_reply(unsigned const int slot, const DBduct const db, \
+			  const IDqueryReply const reply,		  \
 			  const Buffer const identity)
 
 {
 	auto char *p,
-		  query[160],
+		  *id,
+		  *orgtype,
+		  *reply_type,
+		  *err = NULL,
+		  query[256],
 		  orgid[NAAAIM_IDSIZE * 2 + 1];
 
 	auto unsigned lp = 0;
@@ -275,8 +465,8 @@ static void resolve_reply(const DBduct const db,	  \
 	/* Generate the ASCII representation of the identity. */
 	if ( identity->poisoned(identity) || \
 	     (identity->size(identity) != NAAAIM_IDSIZE) ) {
-		fputs("!Invalid organizational identity.\n", stderr);
-		return;
+		err = "Invalid organizational identity.";
+		goto done;
 	}
 
 	p = orgid;
@@ -287,18 +477,23 @@ static void resolve_reply(const DBduct const db,	  \
 	}
 
 
-	/* Determine if there is a mapping for this identity. */
-	snprintf(query, sizeof(query), "select type,id from idmap where " \
-		 "orgid = '%s'", orgid);
+	/*
+	 * Determine if there is a mapping for this identity and if one
+	 * exists retrieve the type of organization and the type o
+	 * reply.
+	 */
+	snprintf(query, sizeof(query), "select idmap.id,idmap.type," \
+		 "repdefn.reply from repdefn left join idmap on "    \
+		 "idmap.id = repdefn.id where orgid= '%s'", orgid);
 	if ( (lp = db->query(db, query)) == -1 ) {
-		fputs("!Error executing database query.\n", stderr);
-		return;
+		err = "Error executing database query.";
+		goto done;
 	}
 	if ( lp == 0 )
 		return;
 	if ( lp > 1 ) {
-		fputs("!Multiple originating identities.\n", stderr);
-		return;
+		err =  "Multiple originating identities.";
+		goto done;
 	}
 			
 
@@ -306,11 +501,40 @@ static void resolve_reply(const DBduct const db,	  \
 	 * A single query result was returned.  Lookup the type of response
 	 * to be encoded and then encode the appropriate reply object.
 	 */
-	if ( !reply->set_ip_reply(reply, "idfusion4.enjellic.com", 10902) ) {
-		fputs("!Error encoding reply\n", stderr);
-		return;
+	id	   = db->get_element(db, 0, 0);
+	orgtype	   = db->get_element(db, 0, 1);
+	reply_type = db->get_element(db, 0, 2);
+	if ( (id == NULL) || (orgtype == NULL) || (reply_type == NULL) ) {
+		err = "Failed to retrieve reply information.";
+		goto done;
 	}
-       
+	
+	if ( orgtype[0] == '1' )
+		orgtype = "provider";
+	else
+		orgtype = "organization";
+
+	fprintf(stdout, ".Resolving slot %d - ", slot);
+	switch ( reply_type[0] ) {
+		case '0':
+			fputs("ip referral.\n", stdout);
+			ip_reply(db, reply, id);
+			break;
+		case '1':
+			fputs("telephone referral.\n", stdout);
+			telephone_reply(db, reply, orgtype, id);
+			break;
+		case '2':
+			fputs("information referal.\n", stdout);
+			information_reply(db, reply, orgtype, id);
+			break;
+	}
+
+
+ done:
+	if ( err != NULL )
+		fprintf(stderr, "!%s\n", err);
+
 	return;
 }
 			
@@ -423,24 +647,14 @@ static _Bool handle_connection(const Duct const duct)
 		IDcnt, Search_cnt, Search_cnt > 1 ? "identities" : "identity");
 
 	for (lp= 0; lp < Search_cnt; ++lp) {
-		fprintf(stdout, ".resolving slot %d.\n", lp);
 		token = Search_list[lp].token;
 
 		if ( IDfinder->search(IDfinder, token) ) {
 			reply = Search_list[lp].reply;
 			bufr->reset(bufr);
 			IDfinder->get_match(IDfinder, bufr);
-			resolve_reply(db, reply, bufr);
+			resolve_reply(lp, db, reply, bufr);
 		}
-	}
-
-	for (lp= 0; lp < Search_cnt; ++lp) {
-		fprintf(stdout, ".slot %d: ", lp);
-		reply = Search_list[lp].reply;
-		if ( reply->is_type(reply, IDQreply_notfound) )
-			fputs("not found.\n", stdout);
-		else
-			fputs("found.\n", stdout);
 	}
 
 
