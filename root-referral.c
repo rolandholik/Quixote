@@ -834,7 +834,6 @@ extern int main(int argc, char *argv[])
 		if ( pid == 0 ) {
 			if ( handle_connection(duct) )
 				retn = 0;
-			fputs(".Terminating connection.\n", stdout);
 			goto done;
 		}
 
@@ -853,6 +852,9 @@ extern int main(int argc, char *argv[])
 	
 	if ( parser != NULL )
 		parser->whack(parser);
+
+	if ( pid == 0 )
+		fputs(".Client terminated.\n", stdout);
 
 	return retn;
 }

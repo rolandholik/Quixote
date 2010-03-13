@@ -813,5 +813,8 @@ extern int main(int argc, char *argv[])
 	if ( IDfinder != NULL )
 		IDfinder->whack(IDfinder);
 
+	if ( pid == 0 )
+		fputs(".Client terminated.\n", stdout);
+
 	return retn;
 }

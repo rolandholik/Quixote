@@ -567,7 +567,8 @@ extern int main(int argc, char *argv[])
 			goto done;
 		}
 		if ( pid == 0 ) {
-			retn = handle_connection(duct);
+			if ( handle_connection(duct) )
+				retn = 0;
 			goto done;
 		}
 
@@ -586,6 +587,9 @@ extern int main(int argc, char *argv[])
 
 	if ( parser != NULL )
 		parser->whack(parser);
+
+	if ( pid == 0 )
+		fputs(".Client terminated.\n", stdout);
 
 	return retn;
 }
