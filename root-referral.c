@@ -567,6 +567,9 @@ static int authenticate_device(const Duct const client,	  \
  * This function dispatches the identity element authenticators to each
  * of the defined identity brokerages.
  *
+ * \param config	The object holding the configuration for the
+ *			server.
+ *
  * \param devauth	The identity elements authenticated by the
  *			device authentication brokerage.
  *
@@ -583,12 +586,19 @@ static int authenticate_device(const Duct const client,	  \
  *			successful.
  */
 
-static _Bool dispatch_brokers(const Buffer const devauth,  \
+static _Bool dispatch_brokers(const Config const config,   \
+			      const Buffer const devauth,  \
 			      const Buffer const userauth, \
 			      const Buffer const bufr)
 
 {
 	auto _Bool retn = false;
+
+	auto char *certificate,
+		  *server,
+		  *portstr;
+
+	auto int port;
 
 	auto unsigned int lp;
 
@@ -599,7 +609,29 @@ static _Bool dispatch_brokers(const Buffer const devauth,  \
 	auto IDqueryReply reply;
 
 
-	fputs("\n.Connecting to identity brokerage.\n", stdout);
+	/* Setup configuration for device brokerage connection. */
+	if ( (certificate = config->get(config, "idbroker_cert")) \
+	     == NULL ) {
+		fputs("!Identity broker certificate not configured.\n", \
+		      stderr);
+		goto done;
+	}
+
+	if ( (server = config->get(config, "idbroker_server")) == NULL ) {
+		fputs("!Identity broker server not configured.\n", stderr);
+		goto done;
+	}
+
+	if ( (portstr = config->get(config, "idbroker_port")) == NULL )  {
+		fputs("!Identity broker server port not configured.\n", \
+		      stderr);
+		goto done;
+	}
+	port = atoi(portstr);
+
+	fprintf(stdout, "\n.Connecting to device authentication broker " \
+		"%s.\n", server);
+
 
 	/*
 	 * Initialize SSL connection and connect to the device identity
@@ -615,12 +647,12 @@ static _Bool dispatch_brokers(const Buffer const devauth,  \
 		goto done;
 	}
 
-	if ( !broker->load_certificates(broker, "./org-cert.pem") ) {
+	if ( !broker->load_certificates(broker, certificate) ) {
 		fputs("Cannot load certificates.\n", stderr);
 		goto done;
 	}
 
-	if ( !broker->init_port(broker, "localhost", 11993) ) {
+	if ( !broker->init_port(broker, server, port) ) {
 		fputs("Cannot initialize port.\n", stderr);
 		goto done;
 	}
@@ -783,7 +815,7 @@ static _Bool handle_connection(const Duct const duct, \
 
 
 	/* Dispatch authenticators to defined brokerage servers. */
-	if ( !dispatch_brokers(devauth, userauth, bufr) )
+	if ( !dispatch_brokers(config, devauth, userauth, bufr) )
 		goto done;
 
 
