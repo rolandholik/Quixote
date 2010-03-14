@@ -29,12 +29,13 @@
 
 
 /* Local defines. */
-#define EQUIPMENT "DakTech 5530"
 #define SERVER "Root Referral Server"
-#define SITE "Gardonville Cooperative Telephone"
-#define LOCATION "Brandon, MN"
+
+#define INSTALL_DIR "/opt/NAAAIM"
+#define CONFIG_FILE INSTALL_DIR "/etc/root-referral.conf"
 
 #define FAILED "Authentication failed."
+
 
 /* Include files. */
 #include <stdio.h>
@@ -261,6 +262,9 @@ static _Bool initialize_query(const Duct const duct, const Buffer const bufr)
  * \param client	The SSL connection object managing the connection
  *			from the client.
  *
+ * \param config	The object holding the configuration for the
+ *			server.
+ *
  * \param bufr		The Buffer object to be used for communicating
  *			with the user identity brokerage.  The reply
  *			from the identity brokerage will be returned in
@@ -272,17 +276,47 @@ static _Bool initialize_query(const Duct const duct, const Buffer const bufr)
  *			successful.
  */
 
-static int authenticate_user(const Duct const client, const Buffer const bufr)
+static int authenticate_user(const Duct const client,	\
+			     const Config const config,	\
+			     const Buffer const bufr)
 
 {
 	auto _Bool retn = false;
+
+	auto char *certificate,
+		  *server,
+		  *portstr;
+
+	auto int port;
 
 	auto Duct broker = NULL;
 
 	auto AuthenReply reply = NULL;
 
 
-	fputs("\n.Connecting to user authentication brokerage.\n", stdout);
+	/* Setup configuration for device brokerage connection. */
+	if ( (certificate = config->get(config, "user_authn_cert")) \
+	     == NULL ) {
+		fputs("!User broker certificate not configured.\n", stderr);
+		goto done;
+	}
+
+	if ( (server = config->get(config, "user_authn_server")) == NULL ) {
+		fputs("!User authentication server not configured.\n", \
+		      stderr);
+		goto done;
+	}
+
+	if ( (portstr = config->get(config, "user_authn_port")) == NULL )  {
+		fputs("!User authentication server port not configured.\n", \
+		      stderr);
+		goto done;
+	}
+	port = atoi(portstr);
+
+	fprintf(stdout, "\n.Connecting to user authentication broker %s.\n", \
+		server);
+
 
 	/*
 	 * Initialize SSL connection and connect to the user identity
@@ -298,12 +332,12 @@ static int authenticate_user(const Duct const client, const Buffer const bufr)
 		goto done;
 	}
 
-	if ( !broker->load_certificates(broker, "./org-cert.pem") ) {
+	if ( !broker->load_certificates(broker, certificate) ) {
 		fputs("Cannot load certificates.\n", stderr);
 		goto done;
 	}
 
-	if ( !broker->init_port(broker, "localhost", 11992) ) {
+	if ( !broker->init_port(broker, server, port) ) {
 		fputs("Cannot initialize port.\n", stderr);
 		goto done;
 	}
@@ -382,6 +416,9 @@ static int authenticate_user(const Duct const client, const Buffer const bufr)
  * \param client	The SSL connection object managing the connection
  *			from the client.
  *
+ * \param config	The object holding the configuration for the
+ *			server.
+ *
  * \param bufr		The Buffer object to be used for communicating
  *			with the device identity brokerage.  The reply
  *			from the identity brokerage will be returned in
@@ -393,18 +430,47 @@ static int authenticate_user(const Duct const client, const Buffer const bufr)
  *			successful.
  */
 
-static int authenticate_device(const Duct const client, \
+static int authenticate_device(const Duct const client,	  \
+			       const Config const config, \
 			       const Buffer const bufr)
 
 {
 	auto _Bool retn = false;
+
+	auto char *certificate,
+		  *server,
+		  *portstr;
+
+	auto int port;
 
 	auto Duct broker = NULL;
 
 	auto AuthenReply reply = NULL;
 
 
-	fputs("\n.Connecting to device authentication brokerage.\n", stdout);
+	/* Setup configuration for device brokerage connection. */
+	if ( (certificate = config->get(config, "device_authn_cert")) \
+	     == NULL ) {
+		fputs("!Device broker certificate not configured.\n", stderr);
+		goto done;
+	}
+
+	if ( (server = config->get(config, "device_authn_server")) == NULL ) {
+		fputs("!Device authentication server not configured.\n", \
+		      stderr);
+		goto done;
+	}
+
+	if ( (portstr = config->get(config, "device_authn_port")) == NULL )  {
+		fputs("!Device authentication server port not configured.\n", \
+		      stderr);
+		goto done;
+	}
+	port = atoi(portstr);
+
+	fprintf(stdout, "\n.Connecting to device authentication broker " \
+		"%s.\n", server);
+
 
 	/*
 	 * Initialize SSL connection and connect to the device identity
@@ -420,12 +486,12 @@ static int authenticate_device(const Duct const client, \
 		goto done;
 	}
 
-	if ( !broker->load_certificates(broker, "./org-cert.pem") ) {
+	if ( !broker->load_certificates(broker, certificate) ) {
 		fputs("Cannot load certificates.\n", stderr);
 		goto done;
 	}
 
-	if ( !broker->init_port(broker, "localhost", 11991) ) {
+	if ( !broker->init_port(broker, server, port) ) {
 		fputs("Cannot initialize port.\n", stderr);
 		goto done;
 	}
@@ -643,15 +709,21 @@ static _Bool dispatch_brokers(const Buffer const devauth,  \
  *
  * \param duct	The SSL connection object describing the accepted connection.
  *
+ * \parm config	The object describing the configuration for the server.
+ *
  * \return	A boolean value is used to indicate the success or
  *		failure of the connection.  A true value indicates the
  *		connection has been successfully processed.
  */
 
-static _Bool handle_connection(const Duct const duct)
+static _Bool handle_connection(const Duct const duct, \
+			       const Config const config)
 
 {
-	auto char banner[256];
+	auto char *site,
+		  *location,
+		  *equipment,
+		  banner[256];
 
 	auto int retn = false;
 
@@ -671,13 +743,22 @@ static _Bool handle_connection(const Duct const duct)
 	if ( (bufr == NULL) || (devauth == NULL) || (userauth == NULL) )
  		goto done;
 
+
+	/* Abstract and verify configuration information. */
+	if ( (site = config->get(config, "site")) == NULL )
+		site = "UNKNOWN";
+	if ( (location = config->get(config, "location")) == NULL )
+		location = "UNKNOWN";
+	if ( (equipment = config->get(config, "equipment")) == NULL )
+		equipment = "UNKNOWN";
 		
+
 	/* Send the connection banner. */
 	fprintf(stdout, "\n.Accepted client connection from %s.\n", \
 		duct->get_client(duct));
 
 	snprintf(banner, sizeof(banner), "%s / %s / %s\n%s\nHello\n", \
-		 SERVER, SITE, LOCATION, EQUIPMENT);
+		 SERVER, site, location, equipment);
 	bufr->add(bufr, (unsigned char *) banner, strlen(banner));
 	if ( !duct->send_Buffer(duct, bufr) )
 		goto done;
@@ -691,12 +772,12 @@ static _Bool handle_connection(const Duct const duct)
 	
 
 	/* Read and process device authenticator. */
-	if ( !authenticate_device(duct, bufr) )
+	if ( !authenticate_device(duct, config, bufr) )
 		goto done;
 	devauth->add_Buffer(devauth, bufr);
 	
 	/* Read and process user authenticator. */
-	if ( !authenticate_user(duct, bufr) )
+	if ( !authenticate_user(duct, config, bufr) )
 		goto done;
 	userauth->add_Buffer(userauth, bufr);
 
@@ -766,13 +847,15 @@ static _Bool handle_connection(const Duct const duct)
 extern int main(int argc, char *argv[])
 
 {
-	auto char *config;
+	auto char *err	       = NULL,
+		  *config_file = NULL;
 
-	auto int retn = 1;
+	auto int port,
+		 retn = 1;
 
 	auto pid_t pid;
 
-	auto Config parser = NULL;
+	auto Config config = NULL;
 
 	auto Duct duct = NULL;
 
@@ -785,13 +868,25 @@ extern int main(int argc, char *argv[])
 		switch ( retn ) {
 
 			case 'c':
-				config = optarg;
+				config_file = optarg;
 				break;
 		}
 	retn = 1;
 
-	if ( config == NULL )
-		config = "./root-referral.conf";
+
+	/* Load configuration. */
+	if ( config_file == NULL )
+		config_file = CONFIG_FILE;
+
+	if ( (config = HurdLib_Config_Init()) == NULL ) {
+		err = "Error initializing configuration.";
+		goto done;
+	}
+
+	if ( !config->parse(config, config_file) ) {
+		err = "Error parsing configuration file.";
+		goto done;
+	}
 
 
 	/* Initialize process table. */
@@ -800,39 +895,40 @@ extern int main(int argc, char *argv[])
 
 	/* Initialize SSL connection and wait for connections. */
 	if ( (duct = NAAAIM_Duct_Init()) == NULL ) {
-		fputs("Error on SSL object creation.\n", stderr);
+		err = "Error on SSL object creation.";
 		goto done;
 	}
 
 	if ( !duct->init_server(duct) ) {
-		fputs("Cannot initialize server mode.\n", stderr);
+		err = "Cannot initialize server mode.";
 		goto done;
 	}
 
-	if ( !duct->load_credentials(duct, "./org-private.pem", \
-				     "./org-cert.pem") ) {
-		fputs("Cannot load server credentials.\n", stderr);
+	if ( !duct->load_credentials(duct, config->get(config, "serverkey"), \
+				     config->get(config, "certificate")) ) {
+		err = "Cannot load server credentials.";
 		goto done;
 	}
 
-	if ( !duct->init_port(duct, NULL, 11990) ) {
-		fputs("Cannot initialize port.\n", stderr);
+	port = atoi(config->get(config, "port"));
+	if ( !duct->init_port(duct, NULL, port) ) {
+		err = "Cannot initialize port.";
 		goto done;
 	}
 
 	while ( 1 ) {
 		if ( !duct->accept_connection(duct) ) {
-			fputs("Error on SSL connection accept.\n", stderr);
+			err = "Error on SSL connection accept.";
 			goto done;
 		}
 
 		pid = fork();
 		if ( pid == -1 ) {
-			fputs("Connection fork failure.\n", stderr);
+			err = "Connection fork failure.";
 			goto done;
 		}
 		if ( pid == 0 ) {
-			if ( handle_connection(duct) )
+			if ( handle_connection(duct, config) )
 				retn = 0;
 			goto done;
 		}
@@ -844,14 +940,17 @@ extern int main(int argc, char *argv[])
 
 
  done:
+	if ( err != NULL )
+		fprintf(stderr, "!%s\n", err);
+
 	if ( duct != NULL ) {
 	     if ( !duct->whack_connection(duct) )
 		     fputs("Error closing duct connection.\n", stderr);
 	     duct->whack(duct);
 	}
 	
-	if ( parser != NULL )
-		parser->whack(parser);
+	if ( config != NULL )
+		config->whack(config);
 
 	if ( pid == 0 )
 		fputs(".Client terminated.\n", stdout);

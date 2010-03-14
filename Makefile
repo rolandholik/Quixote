@@ -67,7 +67,7 @@ all: ${COBJS} genrandom genid query-client servers
 servers: ${SERVERS}
 
 root-referral: root-referral.o ${COBJS}
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl ${SSL_LIBRARY};
 
 device-broker: device-broker.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl ${SSL_LIBRARY};
