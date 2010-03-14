@@ -382,20 +382,24 @@ static _Bool search_for_organization(const IDtoken const token, \
  *
  * This function is called after a fork to handle an accepted connection.
  *
- * \param duct	The SSL connection object describing the accepted connection.
+ * \param duct		The SSL connection object describing the accepted
+ *			connection.
  *
- * \param key	A pointer to a null-terminated string containing the
- *		name of the file containing the device public key.
+ * \param config	The object managing configuration for the user
+ *			broker.
  *
  * \return	A value of zero is used to indicate the connection has
  *		been handled successfully.  A value of 1 indicates
  *		connection handling has failed.
  */
 
-static int handle_connection(const Duct const duct, const char * const key)
+static int handle_connection(const Duct const duct, const Config const config)
 
 {
-	auto char banner[256];
+	auto char *key,
+		  *site,
+		  *location,
+		  banner[256];
 
 	auto int retn = 1;
 
@@ -416,14 +420,26 @@ static int handle_connection(const Duct const duct, const char * const key)
 		goto done;
 	if ( (reply = NAAAIM_AuthenReply_Init()) == NULL )
 		goto done;
-		
 
+
+	/* Abstract and verify configuration information. */
+	if ( (key = config->get(config, "device_public_key")) == NULL ) {
+		fputs("!Device public key not defined.\n", stderr);
+		goto done;
+	}
+
+	if ( (site = config->get(config, "site")) == NULL )
+		site = "UNKNOWN";
+	if ( (location = config->get(config, "location")) == NULL )
+		location = "UNKNOWN";
+
+		
 	/* Send the connection banner. */
 	fprintf(stdout, "\n.Accepted client connection from %s.\n", \
 		duct->get_client(duct));
 
 	snprintf(banner, sizeof(banner), "%s / %s / %s\nHello\n", SERVER, \
-		 SITE, LOCATION);
+		 site, location);
 	bufr->add(bufr, (unsigned char *) banner, strlen(banner));
 	if ( !duct->send_Buffer(duct, bufr) )
 		goto done;
@@ -507,9 +523,8 @@ static int handle_connection(const Duct const duct, const char * const key)
 extern int main(int argc, char *argv[])
 
 {
-	auto char *err		      = NULL,
-		  *config_file	      = NULL,
-		  *device_public_key  = NULL;
+	auto char *err		= NULL,
+		  *config_file	= NULL;
 
 	auto int port,
 		 retn = 1;
@@ -546,12 +561,6 @@ extern int main(int argc, char *argv[])
 
 	if ( !config->parse(config, config_file) ) {
 		err = "Error parsing configuration file.";
-		goto done;
-	}
-
-	device_public_key = config->get(config, "device_public_key");
-	if ( device_public_key == NULL ) {
-		err = "No device public key defined.";
 		goto done;
 	}
 
@@ -595,7 +604,7 @@ extern int main(int argc, char *argv[])
 			goto done;
 		}
 		if ( pid == 0 ) {
-			if ( handle_connection(duct, device_public_key) )
+			if ( handle_connection(duct, config) )
 				retn = 0;
 			goto done;
 		}
@@ -608,7 +617,7 @@ extern int main(int argc, char *argv[])
 
  done:
 	if ( err != NULL )
-		fprintf(stdout, "!%s\n", err);
+		fprintf(stderr, "!%s\n", err);
      
 	if ( duct != NULL ) {
 		if ( !duct->whack_connection(duct) )
