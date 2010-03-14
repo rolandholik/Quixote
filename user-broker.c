@@ -23,14 +23,16 @@
 
 
 /* Local defines. */
-#define SERVER "User Authentication Broker"
-#define SITE "Parsec Data Management"
-#define LOCATION "Billings, MT"
+#define SERVER "Identity Brokerage Server"
 
-#define USER_FILE "/u/usr/sources/NAAAIM/user/user-search.txt"
+#define INSTALL_DIR "/opt/NAAAIM"
+#define USER_FILE   INSTALL_DIR "/lib/user/user-search.txt"
+#define CONFIG_FILE INSTALL_DIR "/etc/user-broker.conf"
+
 
 /* Include files. */
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <stdbool.h>
 #include <string.h>
@@ -381,17 +383,24 @@ static _Bool search_for_organization(const IDtoken const token, \
  *
  * This function is called after a fork to handle an accepted connection.
  *
- * \param duct	The SSL connection object describing the accepted connection.
+ * \param duct		The SSL connection object describing the accepted
+ *			connection.
+ *
+ * \param config	The object managing configuration for the user
+ *			broker.
  *
  * \return	A value of zero is used to indicate the connection has
  *		been handled successfully.  A value of 1 indicates
  *		connection handling has failed.
  */
 
-static int handle_connection(const Duct const duct)
+static int handle_connection(const Duct const duct, const Config const config)
 
 {
-	auto char banner[256];
+	auto char *key,
+		  *site,
+		  *location,
+		  banner[256];
 
 	auto int retn = 1;
 
@@ -412,6 +421,18 @@ static int handle_connection(const Duct const duct)
 		goto done;
 	if ( (reply = NAAAIM_AuthenReply_Init()) == NULL )
 		goto done;
+
+
+	/* Abstract and verify configuration information. */
+	if ( (key = config->get(config, "user_public_key")) == NULL ) {
+		fputs("!User public key not defined.\n", stderr);
+		goto done;
+	}
+
+	if ( (site = config->get(config, "site")) == NULL )
+		site = "UNKNOWN";
+	if ( (location = config->get(config, "location")) == NULL )
+		location = "UNKNOWN";
 		
 
 	/* Send the connection banner. */
@@ -419,7 +440,7 @@ static int handle_connection(const Duct const duct)
 		duct->get_client(duct));
 
 	snprintf(banner, sizeof(banner), "%s / %s / %s\nHello\n", SERVER, \
-		 SITE, LOCATION);
+		 site, location);
 	bufr->add(bufr, (unsigned char *) banner, strlen(banner));
 	if ( !duct->send_Buffer(duct, bufr) )
 		goto done;
@@ -436,7 +457,7 @@ static int handle_connection(const Duct const duct)
 		goto done;
 	}
 
-	if ( !authn->decrypt(authn, "./org-public.pem") ) {
+	if ( !authn->decrypt(authn, key) ) {
 		fputs("Failed decryption of authenticator.\n", stderr);
 		goto done;
 	}
@@ -503,13 +524,15 @@ static int handle_connection(const Duct const duct)
 extern int main(int argc, char *argv[])
 
 {
-	auto char *config;
+	auto char *err		   = NULL,
+		  *config_file	   = NULL;
 
-	auto int retn = 1;
+	auto int port,
+		 retn = 1;
 
 	auto pid_t pid;
 
-	auto Config parser = NULL;
+	auto Config config = NULL;
 
 	auto Duct duct = NULL;
 
@@ -522,13 +545,25 @@ extern int main(int argc, char *argv[])
 		switch ( retn ) {
 
 			case 'c':
-				config = optarg;
+				config_file = optarg;
 				break;
 		}
 	retn = 1;
 
-	if ( config == NULL )
-		config = "./root-referral.conf";
+
+	/* Load configuration. */
+	if ( config_file == NULL )
+		config_file = CONFIG_FILE;
+
+	if ( (config = HurdLib_Config_Init()) == NULL ) {
+		err = "Error initializing configuration.";
+		goto done;
+	}
+
+	if ( !config->parse(config, config_file) ) {
+		err = "Error parsing configuration file.";
+		goto done;
+	}
 
 
 	/* Initialize process table. */
@@ -537,39 +572,40 @@ extern int main(int argc, char *argv[])
 
 	/* Initialize SSL connection and wait for connections. */
 	if ( (duct = NAAAIM_Duct_Init()) == NULL ) {
-		fputs("Error on SSL object creation.\n", stderr);
+		err = "Error on SSL object creation.";
 		goto done;
 	}
 
 	if ( !duct->init_server(duct) ) {
-		fputs("Cannot initialize server mode.\n", stderr);
+		err = "Cannot initialize server mode.";
 		goto done;
 	}
 
-	if ( !duct->load_credentials(duct, "./org-private.pem", \
-				     "./org-cert.pem") ) {
-		fputs("Cannot load server credentials.\n", stderr);
-		goto done;
+	if ( !duct->load_credentials(duct, config->get(config, "serverkey"), \
+				     config->get(config, "certificate")) ) {
+	     err = "Cannot load server credentials.";
+	     goto done;
 	}
 
-	if ( !duct->init_port(duct, NULL, 11992) ) {
-		fputs("Cannot initialize port.\n", stderr);
+	port = atoi(config->get(config, "port"));
+	if ( !duct->init_port(duct, NULL, port) ) {
+		err = "Cannot initialize port.";
 		goto done;
 	}
 
 	while ( 1 ) {
 		if ( !duct->accept_connection(duct) ) {
-			fputs("Error on SSL connection accept.\n", stderr);
+			err = "Error on SSL connection accept.";
 			goto done;
 		}
 
 		pid = fork();
 		if ( pid == -1 ) {
-			fputs("Connection fork failure.\n", stderr);
+			err = "Connection fork failure.";
 			goto done;
 		}
 		if ( pid == 0 ) {
-			if ( handle_connection(duct) )
+			if ( handle_connection(duct, config) )
 				retn = 0;
 			goto done;
 		}
@@ -581,14 +617,17 @@ extern int main(int argc, char *argv[])
 
 
  done:
+	if ( err != NULL )
+		fprintf(stderr, "!%s\n", err);
+
 	if ( duct != NULL ) {
 		if ( !duct->whack_connection(duct) )
 			fputs("Error closing connection.\n", stderr);
 		duct->whack(duct);
 	}
 
-	if ( parser != NULL )
-		parser->whack(parser);
+	if ( config != NULL )
+		config->whack(config);
 
 	if ( pid == 0 )
 		fputs(".Client terminated.\n", stdout);
