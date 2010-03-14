@@ -23,7 +23,7 @@
 
 
 /* Local defines. */
-#define SERVER "Identity Brokerage Server"
+#define SERVER "User Authentication Broker"
 
 #define INSTALL_DIR "/opt/NAAAIM"
 #define USER_FILE   INSTALL_DIR "/lib/user/user-search.txt"
