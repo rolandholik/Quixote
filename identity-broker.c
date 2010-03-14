@@ -24,11 +24,13 @@
 
 /* Local defines. */
 #define SERVER "Identity Brokerage Server"
-#define SITE "Clear Lake Cooperative Telephone"
-#define LOCATION "Clear Lake, SD"
+
+#define INSTALL_DIR "/opt/NAAAIM"
+#define CONFIG_FILE INSTALL_DIR "/etc/identity-broker.conf"
 
 #define FAILED "Failed.\n"
 #define SUCCESS "OK.\n"
+
 
 /* Include files. */
 #include <stdio.h>
@@ -546,15 +548,21 @@ static void resolve_reply(unsigned const int slot, const DBduct const db, \
  *
  * \param duct	The SSL connection object describing the accepted connection.
  *
+ * \parm config	The object describing the configuration for the server.
+ *
  * \return	A boolean value is used to indicate the success or
  *		failure of the connection.  A true value indicates the
  *		connection has been successfully processed.
  */
 
-static _Bool handle_connection(const Duct const duct)
+static _Bool handle_connection(const Duct const duct, \
+			       const Config const config)
 
 {
 	auto char *err,
+		  *site,
+		  *location,
+		  *dbparams,
 		  banner[256];
 
 	auto int retn = false;
@@ -582,10 +590,22 @@ static _Bool handle_connection(const Duct const duct)
 		goto done;
 
 
+	/* Abstract and verify configuration information. */
+	if ( (dbparams = config->get(config, "database")) == NULL ) {
+		err = "No database parameters defined.";
+		goto done;
+	}
+
+	if ( (site = config->get(config, "site")) == NULL )
+		site = "UNKNOWN";
+	if ( (location = config->get(config, "location")) == NULL )
+		location = "UNKNOWN";
+
+
 	/* Initialize the database connection. */
 	if ( (db = NAAAIM_DBduct_Init()) == NULL )
 		goto done;
-	if ( !db->init_connection(db, "dbname=idbroker") ) {
+	if ( !db->init_connection(db, dbparams) ) {
 		err = "Cannot initialize database connection.";
 		goto done;
 	}
@@ -596,7 +616,7 @@ static _Bool handle_connection(const Duct const duct)
 		duct->get_client(duct));
 
 	snprintf(banner, sizeof(banner), "%s / %s / %s\nHello\n", SERVER, \
-		 SITE, LOCATION);
+		 site, location);
 	bufr->add(bufr, (unsigned char *) banner, strlen(banner));
 	if ( !duct->send_Buffer(duct, bufr) )
 		goto done;
@@ -711,13 +731,16 @@ static _Bool handle_connection(const Duct const duct)
 extern int main(int argc, char *argv[])
 
 {
-	auto char *config;
+	auto char *err	       = NULL,
+		  *search_file = NULL,
+		  *config_file = NULL;
 
-	auto int retn = 1;
+	auto int port,
+		 retn = 1;
 
 	auto pid_t pid;
 
-	auto Config parser = NULL;
+	auto Config config = NULL;
 
 	auto Duct duct = NULL;
 
@@ -730,67 +753,86 @@ extern int main(int argc, char *argv[])
 		switch ( retn ) {
 
 			case 'c':
-				config = optarg;
+				config_file = optarg;
 				break;
 		}
 	retn = 1;
 
-	if ( config == NULL )
-		config = "./identity-brokerage.conf";
+
+	/* Load configuration. */
+	if ( config_file == NULL )
+		config_file = CONFIG_FILE;
+
+	if ( (config = HurdLib_Config_Init()) == NULL ) {
+		err = "Error initializing configuration.";
+		goto done;
+	}
+
+	if ( !config->parse(config, config_file) ) {
+		err = "Error parsing configuration file.";
+		goto done;
+	}
 
 
 	/* Initialize process table. */
 	init_process_table();
 
+
 	/* Initialize and organizational identity search object. */
 	if ( (IDfinder = NAAAIM_OrgSearch_Init()) == NULL ) {
-		fputs("Error allocating search object.\n", stderr);
+		err = "Error allocating search object.";
 		goto done;
 	}
 	fputs("\n.Loading originating identity database.\n", stdout);
-	IDcnt = IDfinder->load(IDfinder, "/u/usr/src/npi/npi-search.txt");
+	
+	if ( (search_file = config->get(config, "search_file")) == NULL ) {
+		err = "Search file not specified.";
+		goto done;
+	}
+	IDcnt = IDfinder->load(IDfinder, search_file);
 	if ( IDcnt == 0 ) {
-		fputs("Error loading search object.\n", stderr);
+		err = "Error loading search object.";
 		goto done;
 	}
 	fputs(".Load completed.\n", stdout);
 
 	/* Initialize SSL connection and wait for connections. */
 	if ( (duct = NAAAIM_Duct_Init()) == NULL ) {
-		fputs("Error on SSL object creation.\n", stderr);
+		err = "Error on SSL object creation.";
 		goto done;
 	}
 
 	if ( !duct->init_server(duct) ) {
-		fputs("Cannot initialize server mode.\n", stderr);
+		err = "Cannot initialize server mode.";
 		goto done;
 	}
 
-	if ( !duct->load_credentials(duct, "./org-private.pem", \
-				     "./org-cert.pem") ) {
-		fputs("Cannot load server credentials.\n", stderr);
+	if ( !duct->load_credentials(duct, config->get(config, "serverkey"), \
+				     config->get(config, "certificate")) ) {
+		err = "Cannot load server credentials.";
 		goto done;
 	}
 
-	if ( !duct->init_port(duct, NULL, 11993) ) {
-		fputs("Cannot initialize port.\n", stderr);
+	port = atoi(config->get(config, "port"));
+	if ( !duct->init_port(duct, NULL, port) ) {
+		err = "Cannot initialize port.";
 		goto done;
 	}
 
 	fputs("\n.Waiting for connections.\n", stdout);
 	while ( 1 ) {
 		if ( !duct->accept_connection(duct) ) {
-			fputs("Error on SSL connection accept.\n", stderr);
+			err = "Error on SSL connection accept.";
 			goto done;
 		}
 
 		pid = fork();
 		if ( pid == -1 ) {
-			fputs("Connection fork failure.\n", stderr);
+			err = "Connection fork failure.";
 			goto done;
 		}
 		if ( pid == 0 ) {
-			if ( handle_connection(duct) )
+			if ( handle_connection(duct, config) )
 				retn = 0;
 			goto done;
 		}
@@ -802,14 +844,17 @@ extern int main(int argc, char *argv[])
 
 
  done:
+	if ( err != NULL )
+		fprintf(stderr, "!%s\n", err);
+
 	if ( duct != NULL ) {
 		if ( !duct->whack_connection(duct) )
 			fputs("Error closing connection.\n", stderr);
 		duct->whack(duct);
 	}
 
-	if ( parser != NULL )
-		parser->whack(parser);
+	if ( config != NULL )
+		config->whack(config);
 	if ( IDfinder != NULL )
 		IDfinder->whack(IDfinder);
 

@@ -76,7 +76,8 @@ user-broker: user-broker.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl ${SSL_LIBRARY};
 
 identity-broker: identity-broker.o DBduct.o ${COBJS}
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY} ${POSTGRES_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl ${SSL_LIBRARY} \
+		${POSTGRES_LIBRARY};
 
 query-client: query-client.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
