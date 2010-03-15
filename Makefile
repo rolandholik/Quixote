@@ -80,7 +80,7 @@ identity-broker: identity-broker.o DBduct.o ${COBJS}
 		${POSTGRES_LIBRARY};
 
 query-client: query-client.o ${COBJS}
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl ${SSL_LIBRARY};
 
 genrandom: genrandom.o RandomBuffer.o SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};

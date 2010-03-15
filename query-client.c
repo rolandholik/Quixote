@@ -12,6 +12,11 @@
  **************************************************************************/
 
 
+/* Local defines. */
+#define INSTALL_DIR "/opt/NAAAIM"
+#define CONFIG_FILE INSTALL_DIR "/etc/query-client.conf"
+
+
 /* Include files. */
 #include <stdio.h>
 #include <unistd.h>
@@ -292,9 +297,14 @@ static void process_reply(const IDqueryReply const reply, \
 extern int main(int argc, char *argv[])
 
 {
-	auto char *config;
+	auto char *server,
+		  *certificate,
+		  *err	       = NULL,
+		  *idfile      = NULL,
+		  *config_file = NULL;
 
-	auto int retn = 1;
+	auto int port,
+		 retn = 1;
 
 	auto unsigned int lp = 0;
 
@@ -302,7 +312,7 @@ extern int main(int argc, char *argv[])
 
 	auto Buffer bufr = NULL;
 
-	auto Config parser = NULL;
+	auto Config config = NULL;
 
 	auto Duct duct = NULL;
 
@@ -318,20 +328,56 @@ extern int main(int argc, char *argv[])
 	fputs("NAAAIM query client.\n\n", stdout);
 
 	/* Get the organizational identifier and SSN. */
-	while ( (retn = getopt(argc, argv, "c:")) != EOF )
+	while ( (retn = getopt(argc, argv, "c:i:")) != EOF )
 		switch ( retn ) {
 
 			case 'c':
-				config = optarg;
+				config_file = optarg;
+				break;
+			case 'i':
+				idfile = optarg;
 				break;
 		}
-	retn = 1;
 
-	if ( config == NULL )
-		config = "./query-client.conf";
+	if ( idfile == NULL ) {
+		err = "No patient identity file specified.";
+		goto done;
+	}
 
+
+	/* Load configuration. */
+	if ( config_file == NULL )
+		config_file = CONFIG_FILE;
+
+	if ( (config = HurdLib_Config_Init()) == NULL ) {
+		err = "Error initializing configuration.";
+		goto done;
+	}
+
+	if ( !config->parse(config, config_file) ) {
+		err = "Error parsing configuration file.";
+		fprintf(stderr, "file = %s\n", config_file);
+		goto done;
+	}
+
+	if ( (server = config->get(config, "server")) == NULL ) {
+		err = "Root referral server not specified.";
+		goto done;
+	}
+	if ( (certificate = config->get(config, "certificate")) == NULL ) {
+		err = "Root referral certificate not specified.";
+		goto done;
+	}
+	if ( config->get(config, "port") == NULL ) {
+		err = "Root referral port not specified.";
+		goto done;
+	}
+	port = atoi(config->get(config, "port"));
+
+
+	/* Allocate a utility buffer to be used for communications. */
 	if ( (bufr = HurdLib_Buffer_Init()) == NULL ) {
-		fputs("Cannot initialize receive buffer.\n", stderr);
+		err = "Cannot initialize receive buffer.";
 		goto done;
 	}
 
@@ -340,16 +386,16 @@ extern int main(int argc, char *argv[])
 	device	= NAAAIM_IDtoken_Init();
 	user	= NAAAIM_IDtoken_Init();
 	if ( (device == NULL) || (user == NULL ) ) {
-		fputs("Cannot initialize identity tokens\n", stderr);
+		err = "Cannot initialize identity tokens";
 		goto done;
 	}
 	if ( !load_identities("./device1.txt", "./user1.txt", device, user) ) {
-		fputs("Error loading identities.\n", stderr);
+		err = "Error loading identities.";
 		goto done;
 	}
 
-	if ( !load_patient_identity("./patient1.txt") ) {
-		fputs("Error loading patient identity.\n", stderr);
+	if ( !load_patient_identity(idfile) ) {
+		err = "Error loading patient identity.";
 		goto done;
 	}
 
@@ -358,35 +404,35 @@ extern int main(int argc, char *argv[])
 	start_time = time(NULL);
 
 	if ( (duct = NAAAIM_Duct_Init()) == NULL ) {
-		fputs("Error on SSL object creation.\n", stderr);
+		err = "Error on SSL object creation.";
 		goto done;
 	}
 
 	if ( !duct->init_client(duct) ) {
-		fputs("Cannot initialize server mode.\n", stderr);
+		err = "Cannot initialize server mode.";
 		goto done;
 	}
 
-	if ( !duct->load_certificates(duct, "./org-cert.pem") ) {
-		fputs("Cannot load certificates.\n", stderr);
+	if ( !duct->load_certificates(duct, certificate) ) {
+		err = "Cannot load certificates.";
 		goto done;
 	}
 
-	if ( !duct->init_port(duct, "localhost", 11990) ) {
-		fputs("Cannot initialize port.\n", stderr);
+	if ( !duct->init_port(duct, server, port) ) {
+		err = "Cannot initialize port.";
 		goto done;
 	}
 
 	fputs(".Connecting to root referral server.\n", stdout);
 	if ( !duct->init_connection(duct) ) {
-		fputs("Cannot initialize connection.\n", stderr);
+		err = "Cannot initialize connection.";
 		goto done;
 	}
 
 
 	/* Obtain connection banner. */
 	if ( !duct->receive_Buffer(duct, bufr) ) {
-		fputs("!Error receiving connection banner.\n", stderr);
+		err = "Error receiving connection banner.";
 		goto done;
 	}
 	bufr->add(bufr, (unsigned char *) "\0", sizeof(1));
@@ -402,21 +448,21 @@ extern int main(int argc, char *argv[])
 	lp = htonl(Ptid_cnt - 1);
 	bufr->add(bufr, (unsigned char *) &lp, sizeof(lp));
 	if ( !duct->send_Buffer(duct, bufr) ) {
-		fputs("!Cannot send query slots.\n", stderr);
+		err = "Cannot send query slots.";
 		goto done;
 	}
 
 
 	/* Initialize an authenticator object. */
 	if ( (authn = NAAAIM_Authenticator_Init()) == NULL ) {
-		fputs("!Cannot initialize authenticator.\n", stderr);
+		err = "Cannot initialize authenticator.";
 		goto done;
 	}
 
 
 	/* Initialize and load device identity. */
 	if ( !authn->add_identity(authn, device) ) {
-		fputs("!Cannot add device identity.\n", stderr);
+		err = "Cannot add device identity.";
 		goto done;
 	}
 
@@ -430,11 +476,13 @@ extern int main(int argc, char *argv[])
 	fputs(">Sending device authenticator.\n", stdout);
 	bufr->reset(bufr);
 	if ( !authn->encode(authn, bufr) ) {
-		fputs("!Error encoding device authenticator.\n", stderr);
+		err = "Error encoding device authenticator.";
 		goto done;
 	}
-	if ( !duct->send_Buffer(duct, bufr) )
-		fputs("!Error transmitting device authenticator.\n", stderr);
+	if ( !duct->send_Buffer(duct, bufr) ) {
+		err = "Error transmitting device authenticator.";
+		goto done;
+	}
 
 
 	/* Send the user authenticator. */
@@ -449,16 +497,18 @@ extern int main(int argc, char *argv[])
 	authn->encrypt(authn, "./org-private.pem");
 	bufr->reset(bufr);
 	if ( !authn->encode(authn, bufr) ) {
-		fputs("!Error encoding user authenticator.\n", stderr);
+		err = "Error encoding user authenticator.";
 		goto done;
 	}
-	if ( !duct->send_Buffer(duct, bufr) )
-		fputs("!Error transmitting device authenticator.\n", stderr);
+	if ( !duct->send_Buffer(duct, bufr) ) {
+		err = "Error transmitting device authenticator.";
+		goto done;
+	}
 
 
 	/* Receive the referrals. */
 	if ( (reply = NAAAIM_IDqueryReply_Init()) == NULL ) {
-		fputs("!Error initializing referral reply object.\n", stderr);
+		err = "Error initializing referral reply object.";
 		goto done;
 	}
 
@@ -466,12 +516,12 @@ extern int main(int argc, char *argv[])
 	for (lp= 0; lp < (Ptid_cnt - 1); ++lp) {
 		bufr->reset(bufr);
 		if ( !duct->receive_Buffer(duct, bufr) ) {
-			fputs("!Error receiving referrals.\n", stderr);
+			err = "Error receiving referrals.";
 			goto done;
 		}
 
 		if ( !reply->decode(reply, bufr) ) {
-			fputs("!Error decoding referral.\n", stderr);
+			err = "Error decoding referral.";
 			goto done;
 		}
 		
@@ -484,8 +534,11 @@ extern int main(int argc, char *argv[])
 
 
  done:
-	fprintf(stdout, ".Query complete, time = %ld seconds.\n", \
-		time(NULL) - start_time);
+	if ( err != NULL )
+		fprintf(stderr, "!%s\n", err);
+	else
+		fprintf(stdout, ".Query complete, time = %ld seconds.\n", \
+			time(NULL) - start_time);
 
 	if ( duct != NULL ) {
 		if ( !duct->whack_connection(duct) )
@@ -504,8 +557,8 @@ extern int main(int argc, char *argv[])
 		free(Ptid_list);
 	}
 
-	if ( parser != NULL )
-		parser->whack(parser);
+	if ( config != NULL )
+		config->whack(config);
 	if ( bufr != NULL )
 		bufr->whack(bufr);
 	if ( authn != NULL )
