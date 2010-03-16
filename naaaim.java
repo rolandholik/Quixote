@@ -21,11 +21,11 @@ import javax.swing.JLabel;
  * @author mpiehl
  */
 
-public class mainJFrame extends javax.swing.JFrame {
+public class naaaim extends javax.swing.JFrame {
     /*Global Variable to hold program name*/
     public static String glob;
     /** Creates new form mainJFrame */
-    public mainJFrame() {
+    public naaaim() {
         initComponents();
     }
 
@@ -171,7 +171,7 @@ public class mainJFrame extends javax.swing.JFrame {
 
        }
        catch (IOException ex) {
-            Logger.getLogger(mainJFrame.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(naaaim.class.getName()).log(Level.SEVERE, null, ex);
         }
 
 
@@ -192,7 +192,7 @@ public class mainJFrame extends javax.swing.JFrame {
 
         java.awt.EventQueue.invokeLater(new Runnable() {
             public void run() {
-                new mainJFrame().setVisible(true);
+                new naaaim().setVisible(true);
             }
         });
     }
