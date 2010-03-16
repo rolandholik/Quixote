@@ -111,6 +111,9 @@ static _Bool load_identity(const IDtoken const token, \
 	auto FILE *infile = NULL;
 
 
+	if ( filename == NULL )
+		goto done;
+
 	if ( (infile = fopen(filename, "r")) == NULL )
 		goto done;
 
@@ -166,10 +169,25 @@ static _Bool load_identities(const char * const devname,     \
 			     const IDtoken const user)
 
 {
-	if ( !load_identity(device, devname) )
+	auto char *err = NULL;
+
+
+	if ( !load_identity(device, devname) ) {
+		err = "Error loading device identity.";
+		goto done;
+	}
+
+	if ( !load_identity(user, username) ) {
+		err = "Error loading user identity.";
+		goto done;
+	}
+
+
+ done:
+	if ( err != NULL ) {
+		fprintf(stderr, "!%s\n", err);
 		return false;
-	if ( !load_identity(user, username) )
-		return false;
+	}
 
 	return true;
 }
@@ -222,8 +240,6 @@ static _Bool load_patient_identity(const char * const filename)
 		++Ptid_cnt;
 	}
 
-	fprintf(stdout, ".Loaded %d patient identity %s.\n", Ptid_cnt - 1, \
-		Ptid_cnt == 2 ? "token" : "tokens");
 	retn = true;
 
 
@@ -301,6 +317,10 @@ extern int main(int argc, char *argv[])
 		  *certificate,
 		  *err	       = NULL,
 		  *idfile      = NULL,
+		  *deviceid    = NULL,
+		  *devicekey   = NULL,
+		  *userid      = NULL,
+		  *userkey     = NULL,
 		  *config_file = NULL;
 
 	auto int port,
@@ -328,14 +348,20 @@ extern int main(int argc, char *argv[])
 	fputs("NAAAIM query client.\n\n", stdout);
 
 	/* Get the organizational identifier and SSN. */
-	while ( (retn = getopt(argc, argv, "c:i:")) != EOF )
+	while ( (retn = getopt(argc, argv, "c:d:i:u:")) != EOF )
 		switch ( retn ) {
 
 			case 'c':
 				config_file = optarg;
 				break;
+			case 'd':
+				deviceid = optarg;
+				break;
 			case 'i':
 				idfile = optarg;
+				break;
+			case 'u':
+				userid = optarg;
 				break;
 		}
 
@@ -374,6 +400,20 @@ extern int main(int argc, char *argv[])
 	}
 	port = atoi(config->get(config, "port"));
 
+	if ( userid == NULL )
+		userid = config->get(config, "userid");
+	if ( (userkey = config->get(config, "userkey")) == NULL ) {
+		err = "User authenticatoin key not specified.";
+		goto done;
+	}
+		
+	if ( deviceid == NULL )
+		deviceid = config->get(config, "deviceid");
+	if ( (devicekey = config->get(config, "devicekey")) == NULL ) {
+		err = "Device authentication key not specified.";
+		goto done;
+	}
+
 
 	/* Allocate a utility buffer to be used for communications. */
 	if ( (bufr = HurdLib_Buffer_Init()) == NULL ) {
@@ -389,15 +429,21 @@ extern int main(int argc, char *argv[])
 		err = "Cannot initialize identity tokens";
 		goto done;
 	}
-	if ( !load_identities("./device1.txt", "./user1.txt", device, user) ) {
-		err = "Error loading identities.";
+
+	if ( !load_identities(deviceid, userid, device, user) )
 		goto done;
-	}
 
 	if ( !load_patient_identity(idfile) ) {
 		err = "Error loading patient identity.";
 		goto done;
 	}
+	if ( Ptid_cnt == 1 ) {
+		err = "No patient identities found.";
+		goto done;
+	}
+	else
+		fprintf(stdout, ".Loaded %d patient identity %s.\n", \
+			Ptid_cnt - 1, Ptid_cnt == 2 ? "token" : "tokens");
 
 
 	/* Initialize SSL connection and attach to root referral server. */
@@ -437,6 +483,7 @@ extern int main(int argc, char *argv[])
 	}
 	bufr->add(bufr, (unsigned char *) "\0", sizeof(1));
 	print_buffer(bufr);
+	fputc('\n', stdout);
 
 
 	/*
@@ -471,7 +518,7 @@ extern int main(int argc, char *argv[])
 		authn->add_element(authn, patient->get_element(patient, \
 						       IDtoken_orgkey));
 	}
-	authn->encrypt(authn, "./org-private.pem");
+	authn->encrypt(authn, devicekey);
 
 	fputs(">Sending device authenticator.\n", stdout);
 	bufr->reset(bufr);
@@ -494,14 +541,14 @@ extern int main(int argc, char *argv[])
 		authn->add_element(authn, patient->get_element(patient, \
 						       IDtoken_orgid));
 	}
-	authn->encrypt(authn, "./org-private.pem");
+	authn->encrypt(authn, userkey);
 	bufr->reset(bufr);
 	if ( !authn->encode(authn, bufr) ) {
 		err = "Error encoding user authenticator.";
 		goto done;
 	}
 	if ( !duct->send_Buffer(duct, bufr) ) {
-		err = "Error transmitting device authenticator.";
+		err = "Error transmitting user authenticator.";
 		goto done;
 	}
 
