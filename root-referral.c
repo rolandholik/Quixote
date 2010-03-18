@@ -629,7 +629,7 @@ static _Bool dispatch_brokers(const Config const config,   \
 	}
 	port = atoi(portstr);
 
-	fprintf(stdout, "\n.Connecting to device authentication broker " \
+	fprintf(stdout, "\n.Connecting to identity brokerage server " \
 		"%s.\n", server);
 
 
