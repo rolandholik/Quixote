@@ -75,7 +75,7 @@ static void print_buffer(const Buffer const bufr)
 	do {
 		if ( (p = strchr(begin, '\n')) != NULL ) {
 			*p = '\0';
-			fprintf(stdout, "<%s\n", begin);
+			fprintf(stderr, "<%s\n", begin);
 			begin = p;
 			++begin;
 		}
@@ -483,7 +483,7 @@ extern int main(int argc, char *argv[])
 	}
 	bufr->add(bufr, (unsigned char *) "\0", sizeof(1));
 	print_buffer(bufr);
-	fputc('\n', stdout);
+	fputc('\n', stderr);
 
 
 	/*
@@ -530,6 +530,7 @@ extern int main(int argc, char *argv[])
 		err = "Error transmitting device authenticator.";
 		goto done;
 	}
+	fflush(stdout);
 
 
 	/* Send the user authenticator. */
@@ -551,6 +552,7 @@ extern int main(int argc, char *argv[])
 		err = "Error transmitting user authenticator.";
 		goto done;
 	}
+	fflush(stdout);
 
 
 	/* Receive the referrals. */
@@ -559,7 +561,8 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
-	fputs("<Receiving referrals.\n", stdout);
+	fputs("<Waiting for referrals.\n", stdout);
+
 	for (lp= 0; lp < (Ptid_cnt - 1); ++lp) {
 		bufr->reset(bufr);
 		if ( !duct->receive_Buffer(duct, bufr) ) {
@@ -575,6 +578,7 @@ extern int main(int argc, char *argv[])
 		fprintf(stdout, ".Processing referral %d.\n", lp);
 		process_reply(reply, bufr);
 		reply->reset(reply);
+		fflush(stdout);
 	}
 
 	retn = 0;

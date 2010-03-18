@@ -1,0 +1,4 @@
+#! /bin/bash
+
+../query-client -i ../jeri.idt
+exit $?;
