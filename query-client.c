@@ -60,7 +60,7 @@ static void print_buffer(const Buffer const bufr)
 
 	/* Sanity check. */
 	if ( bufr->size(bufr) > 160 ){
-		fputs(".reply too long to print", stdout);
+		fputs(".reply too long to print", stderr);
 		return;
 	} 
 
@@ -257,16 +257,20 @@ static _Bool load_patient_identity(const char * const filename)
  * This function processes an identity query response.
  *
  * \param reply		The query which is to be processed.
+ *
+ * \param slot		The referral request being processed.
  */
 
 static void process_reply(const IDqueryReply const reply, \
-			  const Buffer const host)
+			  const Buffer const host, unsigned const int slot)
 
 {
 	auto int port;
 
 	auto String text = NULL;
 
+
+	fprintf(stdout, "Information for patient provider %d:\n", slot + 1);
 
 	if ( reply->is_type(reply, IDQreply_notfound) ) {
 		fputs(".No identity reply information available.\n", stdout);
@@ -280,7 +284,8 @@ static void process_reply(const IDqueryReply const reply, \
 			fputs("!Error decoding IP reply response.\n", stderr);
 			goto done;
 		}
-		fprintf(stdout, ".Referral to %s at port %d.\n", \
+		fputs("\tClinical information available at:\n", stdout);
+		fprintf(stdout, "\t\tHostname: %s\n\t\tPort %d.\n", \
 			host->get(host), port);
 	}
 
@@ -345,7 +350,7 @@ extern int main(int argc, char *argv[])
 	auto IDqueryReply reply = NULL;
 
 
-	fputs("NAAAIM query client.\n\n", stdout);
+	fputs("NAAAIM query client.\n\n", stderr);
 
 	/* Get the organizational identifier and SSN. */
 	while ( (retn = getopt(argc, argv, "c:d:i:u:")) != EOF )
@@ -442,7 +447,7 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 	else
-		fprintf(stdout, ".Loaded %d patient identity %s.\n", \
+		fprintf(stderr, ".Loaded %d patient identity %s.\n", \
 			Ptid_cnt - 1, Ptid_cnt == 2 ? "token" : "tokens");
 
 
@@ -469,7 +474,7 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
-	fputs(".Connecting to root referral server.\n", stdout);
+	fputs(".Connecting to root referral server.\n", stderr);
 	if ( !duct->init_connection(duct) ) {
 		err = "Cannot initialize connection.";
 		goto done;
@@ -520,7 +525,7 @@ extern int main(int argc, char *argv[])
 	}
 	authn->encrypt(authn, devicekey);
 
-	fputs(">Sending device authenticator.\n", stdout);
+	fputs(">Sending device authenticator.\n", stderr);
 	bufr->reset(bufr);
 	if ( !authn->encode(authn, bufr) ) {
 		err = "Error encoding device authenticator.";
@@ -530,11 +535,10 @@ extern int main(int argc, char *argv[])
 		err = "Error transmitting device authenticator.";
 		goto done;
 	}
-	fflush(stdout);
 
 
 	/* Send the user authenticator. */
-	fputs(">Sending user authenticator.\n", stdout);
+	fputs(">Sending user authenticator.\n", stderr);
 	authn->reset(authn);
 	authn->add_identity(authn, user);
 	for (lp= 0; Ptid_list[lp] != NULL; ++lp) {
@@ -552,7 +556,6 @@ extern int main(int argc, char *argv[])
 		err = "Error transmitting user authenticator.";
 		goto done;
 	}
-	fflush(stdout);
 
 
 	/* Receive the referrals. */
@@ -561,7 +564,7 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
-	fputs("<Waiting for referrals.\n", stdout);
+	fputs("<Waiting for referrals.\n", stderr);
 
 	for (lp= 0; lp < (Ptid_cnt - 1); ++lp) {
 		bufr->reset(bufr);
@@ -575,10 +578,9 @@ extern int main(int argc, char *argv[])
 			goto done;
 		}
 		
-		fprintf(stdout, ".Processing referral %d.\n", lp);
-		process_reply(reply, bufr);
+		fprintf(stderr, ".Processing referral %d.\n", lp);
+		process_reply(reply, bufr, lp);
 		reply->reset(reply);
-		fflush(stdout);
 	}
 
 	retn = 0;
@@ -588,7 +590,7 @@ extern int main(int argc, char *argv[])
 	if ( err != NULL )
 		fprintf(stderr, "!%s\n", err);
 	else
-		fprintf(stdout, ".Query complete, time = %ld seconds.\n", \
+		fprintf(stderr, ".Query complete, time = %ld seconds.\n", \
 			time(NULL) - start_time);
 
 	if ( duct != NULL ) {

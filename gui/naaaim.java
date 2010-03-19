@@ -115,6 +115,9 @@ public class naaaim
 
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {
 
+	/* Location information. */
+	java.awt.Point locn = getLocation();
+
 	/* Text areas for query output and console log. */
 	query_output = new JTextArea();
 	query_output.setEditable(false);
@@ -142,11 +145,16 @@ public class naaaim
 	log_content.add(log_pane);
 
 	/* Set screen sizes and the output and console windows. */
-	query_frame.setSize(500, 500);
-	query_frame.setVisible(true);
-
 	log_frame.setSize(500, 500);
 	log_frame.setVisible(true);
+	locn.translate(0, 115);
+	log_frame.setLocation(locn);
+
+	query_frame.setSize(500, 500);
+	query_frame.setVisible(true);
+	locn = log_frame.getLocation();
+	locn.translate(500, 0);
+	query_frame.setLocation(locn);
 
 
 	/*
@@ -161,16 +169,15 @@ public class naaaim
 		String line, error;
 
 		try {
-		    while ((line = br.readLine()) != null) {
-			query_output.append(line + "\n");
-			System.out.println(line);
-		    }
-
 		    while ((error = ac.readLine()) != null) {
 			log_output.append(error + "\n");
 			System.out.println(error);
 		    }
 
+		    while ((line = br.readLine()) != null) {
+			query_output.append(line + "\n");
+			System.out.println(line);
+		    }
 		}
 		catch (IOException ex) {
 		    Logger.getLogger(naaaim.class.getName()).log(Level.SEVERE,
@@ -216,19 +223,10 @@ public class naaaim
 	    ArrayList<String> results = new ArrayList<String>();
 
 	    worker.execute();
-
-	    /*Debugging*/
-	    //System.out.println("contents: " + results);
-
-	    /* Append each line to the text area. */
-//	    for(int i = 0; i < results.size(); i++) {
-//		query_output.append(results.get(i));
-//		query_output.append("\n");
-//	    }
-
 	}
 	catch (IOException ex) {
-            Logger.getLogger(naaaim.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(naaaim.class.getName()).log(Level.SEVERE, null,
+							 ex);
         }
     }
 
