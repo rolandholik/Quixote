@@ -1,4 +1,6 @@
 #! /bin/bash
 
-../query-client -i ../jeri.idt
+mkfifo /var/lib/NAAAIM/query-client;
+../query-client -i /var/run/query-client
+rm /var/lib/NAAAIM/query-client;
 exit $?;

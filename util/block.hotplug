@@ -1,0 +1,52 @@
+#! /bin/bash
+
+#
+# ESD block device handler.
+#	This script handles mounting of a filesytem on a partition.
+#	The partition is read for any patient identity tokens which
+#	are written to the /var/run/query-client FIFO.
+#
+
+# Variable declarations.
+declare -r Sysfs="/sys"
+
+
+#
+# This function implements mounting and reading of a USB based
+# IDfusion identity fob.
+#
+function load_identities() {
+
+	local ESD_device="/dev/$DEVNAME";
+
+
+	logger -p info -t hotplug "$SEQNUM: Scanning for identities.";
+
+	logger -p info -t "hotplug $SEQNUM:" Mounting $ESD_device;
+	mount $ESD_device /mnt;
+	for file in /mnt/*.idt;
+	do
+		logger -p info -t "hotplug $SEQNUM:" Found token $file;
+		if [ "$file" != "/mnt/*.idt" ]; then
+			if [ -e "/var/lib/NAAAIM/query-client" ]; then
+				cat $file >/var/run/query-client;
+				umount /mnt;
+				return;
+			fi;
+		fi;
+	done;
+
+	umount /mnt;
+	return;
+}
+
+
+# Selection action based environment variable passed to hotplug script.
+case $ACTION in
+	add)	if [ "$DEVTYPE" = "partition" ]; then
+			load_identities;
+		fi;;
+esac;
+
+
+exit 0;
