@@ -4,11 +4,12 @@
 # ESD block device handler.
 #	This script handles mounting of a filesytem on a partition.
 #	The partition is read for any patient identity tokens which
-#	are written to the /var/run/query-client FIFO.
+#	are written to the query client FIFO.
 #
 
 # Variable declarations.
 declare -r Sysfs="/sys"
+declare -r ESD_fifo="/var/lib/NAAAIM/query-client";
 
 
 #
@@ -20,19 +21,22 @@ function load_identities() {
 	local ESD_device="/dev/$DEVNAME";
 
 
-	logger -p info -t hotplug "$SEQNUM: Scanning for identities.";
+	# Early exit if the client FIFO does not exit.
+	if [ ! -e "$ESD_fifo" ]; then
+		logger -p into -t "hotplug $SEQNUM" query fifo not found.
+		 return;
+	fi;
 
-	logger -p info -t "hotplug $SEQNUM:" Mounting $ESD_device;
+
+	logger -p info -t "hotplug $SEQNUM" \
+		Scanning $ESD_DEVICE for identity tokens.;
+
 	mount $ESD_device /mnt;
-	for file in /mnt/*.idt;
+	for ESD_file in /mnt/*.idt;
 	do
-		logger -p info -t "hotplug $SEQNUM:" Found token $file;
+		logger -p info -t "hotplug $SEQNUM" Found token $ESD_file;
 		if [ "$file" != "/mnt/*.idt" ]; then
-			if [ -e "/var/lib/NAAAIM/query-client" ]; then
-				cat $file >/var/run/query-client;
-				umount /mnt;
-				return;
-			fi;
+			cat $ESD_file >$ESD_fifo;
 		fi;
 	done;
 

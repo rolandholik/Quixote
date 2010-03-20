@@ -1,6 +1,15 @@
 #! /bin/bash
 
-mkfifo /var/lib/NAAAIM/query-client;
-../query-client -i /var/run/query-client
-rm /var/lib/NAAAIM/query-client;
-exit $?;
+FIFO="/var/lib/NAAAIM/query-client";
+
+mkfifo $FIFO;
+if [ $? -ne 0 ]; then
+	echo "Unable to create client FIFO.";
+	exit 1;
+fi;
+
+../query-client -i $FIFO;
+retn=$?;
+
+rm -f $FIFO;
+exit $retn;
