@@ -31,7 +31,8 @@ typedef	enum {
 	IDQreply_notfound,
 	IDQreply_ipredirect,
 	IDQreply_phone,
-	IDQreply_text
+	IDQreply_text,
+	IDQreply_sms,
 } IDqueryReply_type;
 
 
@@ -45,6 +46,8 @@ struct NAAAIM_IDqueryReply
 	_Bool (*get_ip_reply)(const IDqueryReply, const Buffer, int *);
 	_Bool (*set_text_reply)(const IDqueryReply, const String);
 	_Bool (*get_text_reply)(const IDqueryReply, const String);
+	_Bool (*set_sms_reply)(const IDqueryReply, const String);
+	_Bool (*get_sms_reply)(const IDqueryReply, const String);
 	_Bool (*encode)(const IDqueryReply, const Buffer);
 	_Bool (*decode)(const IDqueryReply, const Buffer);
 	_Bool (*is_type)(const IDqueryReply, IDqueryReply_type);

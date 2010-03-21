@@ -431,6 +431,52 @@ static void information_reply(const DBduct const db,	      \
 }
 
 
+/*
+ * Private function.
+ *
+ * This function looks up and encodes an sms address to which an
+ * informatory text message is to be sent on the patient.
+ *
+ * \param db		The database connection to be used for looking up the
+ *			sms address information.
+ *
+ * \param reply		The object to be used for encoding the reply.
+ *
+ * \param id		The table id number of the organization.
+ */
+
+static void sms_reply(const DBduct const db, \
+		      const IDqueryReply const reply, const char * const id)
+
+{
+	auto char query[256];
+
+	auto String text;
+
+
+	if ( (text = HurdLib_String_Init()) == NULL )
+		return;
+
+	snprintf(query, sizeof(query), "select address from sms where " \
+		 "id = %s", id);
+	if ( db->query(db, query) != 1 ) {
+		goto done;
+	}
+
+	text->add(text, db->get_element(db, 0, 0));
+	if ( !reply->set_sms_reply(reply, text) ) {
+		fputs("!Error setting sms reply\n", stderr);
+	}
+
+
+ done:
+	if ( text != NULL )
+		text->whack(text);
+
+	return;
+}
+
+
 /**
  * Private function.
  *
@@ -527,8 +573,12 @@ static void resolve_reply(unsigned const int slot, const DBduct const db, \
 			telephone_reply(db, reply, orgtype, id);
 			break;
 		case '2':
-			fputs("information referal.\n", stdout);
+			fputs("information referral.\n", stdout);
 			information_reply(db, reply, orgtype, id);
+			break;
+		case '3':
+			fputs("sms referral.\n", stdout);
+			sms_reply(db, reply, id);
 			break;
 	}
 

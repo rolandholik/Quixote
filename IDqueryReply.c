@@ -116,6 +116,23 @@ IMPLEMENT_ASN1_FUNCTIONS(text_reply)
 
 
 /**
+ * The following defines the ASN1 encoding sequence for a reply which
+ * contains an e-mail address to which an SMS message is to be sent
+ * alerting the recipient of an incident involving their patient.
+ */
+
+typedef struct {
+	ASN1_PRINTABLESTRING *address;
+} sms_reply;
+
+ASN1_SEQUENCE(sms_reply) = {
+	ASN1_SIMPLE(sms_reply, address, ASN1_PRINTABLESTRING),
+} ASN1_SEQUENCE_END(sms_reply)
+
+IMPLEMENT_ASN1_FUNCTIONS(sms_reply)
+
+
+/**
  * Internal private method.
  *
  * This method is responsible for initializing the NAAAIM_IDqueryReply_State
@@ -410,6 +427,137 @@ static _Bool get_text_reply(const IDqueryReply const this, \
 /**
  * External public method.
  *
+ * This method is responsible for initializing and creating an object
+ * returning an SMS address to which a message is to be encoded.
+ *
+ * \param this		The reply which is to be encoded.
+ *
+ * \param text		A String object which contains the text to
+ *			be returned as the result of the query.
+ *
+ * \return		A boolean value is used to indicate whether or
+ *			not the encoding was successful.  A true
+ *			value indicates success.
+ */
+
+static _Bool set_sms_reply(const IDqueryReply const this, \
+			   const String const address)
+
+{
+	auto const IDqueryReply_State const S = this->state;
+
+	auto _Bool retn = false;
+
+        auto unsigned char *asn = NULL;
+
+        auto unsigned char **p = &asn;
+
+	auto int asn_size;
+
+	auto sms_reply *reply = NULL;
+
+
+	if ( S->poisoned )
+		goto done;
+
+
+	if ( (reply = sms_reply_new()) == NULL )
+		goto done;
+
+        if ( ASN1_STRING_set(reply->address, address->get(address), \
+			     address->size(address) + 1) != 1 )
+                goto done;
+
+        asn_size = i2d_sms_reply(reply, p);
+        if ( asn_size < 0 )
+                goto done;
+
+	if ( !S->payload->add(S->payload, asn, asn_size) )
+		goto done;
+
+	retn	= true;
+	S->type = IDQreply_sms;
+	
+
+ done:
+	if ( retn == false )
+		S->poisoned = true;
+
+	if ( reply != NULL )
+		sms_reply_free(reply);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method decodes and returns an sms address encoded in the identity
+ * query referral.
+ *
+ * \param this		The reply which is to be decoded.
+ *
+ * \param address	A String object which will be loaded with the
+ *			sms address information.
+ *
+ * \return		A boolean value is used to indicate whether or
+ *			not the decoding was successful.  A true
+ *			value indicates success.
+ */
+
+static _Bool get_sms_reply(const IDqueryReply const this, \
+			   const String const address)
+
+{
+	auto const IDqueryReply_State const S = this->state;
+
+	auto _Bool retn = false;
+
+        auto unsigned char *asn = NULL;
+
+        auto unsigned const char *p = asn;
+
+	auto int asn_size;
+
+	auto sms_reply *reply = NULL;
+
+
+	if ( S->poisoned )
+		goto done;
+
+
+	p = S->payload->get(S->payload);
+	asn_size = S->payload->size(S->payload);
+        if ( !d2i_sms_reply(&reply, &p, asn_size) ) {
+		fprintf(stderr, "d2i error, size = %d.\n", asn_size);
+                goto done;	
+	}
+
+	if ( !address->add(address, \
+			   (char *) ASN1_STRING_data(reply->address)) ) {
+		fputs("text add error.\n", stderr);
+		goto done;
+	}
+
+	retn = true;
+
+	
+ done:
+	if ( retn == false )
+		S->poisoned = true;
+
+	if ( reply != NULL )
+		sms_reply_free(reply);
+
+	return retn;
+
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements outer encoding of the query reply.  It produces
  * the DER encoding of the on wire reply.
  *
@@ -658,6 +806,9 @@ extern IDqueryReply NAAAIM_IDqueryReply_Init(void)
 
 	this->set_text_reply = set_text_reply;
 	this->get_text_reply = get_text_reply;
+
+	this->set_sms_reply = set_sms_reply;
+	this->get_sms_reply = get_sms_reply;
 
 	this->encode = encode;
 	this->decode = decode;

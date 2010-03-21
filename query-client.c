@@ -254,6 +254,46 @@ static _Bool load_patient_identity(const char * const filename)
 /**
  * Private function.
  *
+ * This function sends an e-mail to initiate an SMS message to a
+ * provider.
+ *
+ * \param address	The address to which the SMS message is to be
+ *			sent.
+ *
+ * \return		A boolean value is used to indicate the success
+ *			or failure of initiating the message.  A true
+ *			value is used to indicate the message was
+ *			successfully sent.
+ */
+
+static _Bool send_sms_message(const String const address)
+
+{
+	auto char bufr[256];
+
+	auto FILE *mailer = NULL;
+
+
+	snprintf(bufr, sizeof(bufr), "mail %s", address->get(address));
+	if ( (mailer = popen(bufr, "w")) == NULL )
+		return false;
+
+	fputs("Medical information query from EMT-Intermediate.\n", mailer);
+	fprintf(mailer, "Please contact: %s\n", "320-524-2160");
+
+	if ( pclose(mailer) == -1 )
+		return false;
+
+	fprintf(stdout, "Forwarded SMS message to %s\n", \
+		address->get(address));
+
+	return true;
+}
+
+	
+/**
+ * Private function.
+ *
  * This function processes an identity query response.
  *
  * \param reply		The query which is to be processed.
@@ -300,6 +340,21 @@ static void process_reply(const IDqueryReply const reply, \
 			goto done;
 		}
 		text->print(text);
+	}
+
+
+	/* Handle an SMS reply. */
+	if ( reply->is_type(reply, IDQreply_sms) ) {
+		
+		if ( (text = HurdLib_String_Init()) == NULL ) {
+			fputs("!Error initializing text response.\n", stderr);
+			goto done;
+		}
+		if ( !reply->get_sms_reply(reply, text) ) {
+			fputs("!Error decoding text response.\n", stderr);
+			goto done;
+		}
+		send_sms_message(text);
 	}
 
 
