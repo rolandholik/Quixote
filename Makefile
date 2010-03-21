@@ -10,7 +10,8 @@ CSRC = 	SHA256.c SHA256_hmac.c RSAkey.c OrgID.c PatientID.c RandomBuffer.c \
 	IDtoken.c Duct.c Authenticator.c AES256_cbc.c AuthenReply.c	   \
 	OrgSearch.c IDqueryReply.c
 
-SERVERS = root-referral device-broker user-broker identity-broker
+SERVERS = root-referral device-broker user-broker identity-broker \
+	provider-server
 
 CC = gcc
 
@@ -76,6 +77,10 @@ user-broker: user-broker.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl ${SSL_LIBRARY};
 
 identity-broker: identity-broker.o DBduct.o ${COBJS}
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl ${SSL_LIBRARY} \
+		${POSTGRES_LIBRARY};
+
+provider-server: provider-server.o DBduct.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl ${SSL_LIBRARY} \
 		${POSTGRES_LIBRARY};
 
@@ -157,6 +162,7 @@ user-broker.o: NAAAIM.h Duct.h IDtoken.h Authenticator.h SHA256.h \
 	SHA256_hmac.h RSAkey.h AuthenReply.h
 identity-broker.o: NAAAIM.h Duct.h IDtoken.h Authenticator.h AuthenReply.h \
 	OrgSearch.h IDqueryReply.h DBduct.h
+provider-server.o: NAAAIM.h Duct.h DBduct.h RSAkey.h SHA256.h
 
 genid.o: NAAAIM.h SHA256.h SHA256_hmac.h OrgID.h PatientID.h \
 	RandomBuffer.h RSAkey.h DBduct.o

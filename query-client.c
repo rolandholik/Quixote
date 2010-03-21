@@ -16,6 +16,8 @@
 #define INSTALL_DIR "/opt/NAAAIM"
 #define CONFIG_FILE INSTALL_DIR "/etc/query-client.conf"
 
+#define CERTIFICATE "/opt/NAAAIM/lib/identity-provider/server-cert.pem"
+
 
 /* Include files. */
 #include <stdio.h>
@@ -47,10 +49,12 @@ static IDtoken *Ptid_list    = NULL;
  * This is a utility function which prints the contents of a text
  * buffer received from a server.
  *
- * \param bufr	The buffer object containing the text to be printed.
+ * \param bufr		The buffer object containing the text to be printed.
+ *
+ * \param output	The file descriptor to which output is directed.
  */
 
-static void print_buffer(const Buffer const bufr)
+static void print_buffer(const Buffer const bufr, FILE *output)
 
 {
 	auto char *p,
@@ -75,12 +79,13 @@ static void print_buffer(const Buffer const bufr)
 	do {
 		if ( (p = strchr(begin, '\n')) != NULL ) {
 			*p = '\0';
-			fprintf(stderr, "<%s\n", begin);
+			fprintf(output, "<%s\n", begin);
 			begin = p;
 			++begin;
 		}
 	} while ( p != NULL );
 
+	fflush(output);
 	return;
 }
 
@@ -254,6 +259,123 @@ static _Bool load_patient_identity(const char * const filename)
 /**
  * Private function.
  *
+ * This function implements a provider query.
+ *
+ * \param reply		The reply which contains the ip referral
+ *			information.
+ *
+ * \param slot		The entry in the patient identity table being
+ *			processed.
+ *
+ * \param buffer	A utility buffer to  be used in implementing the
+ *			query.
+ *
+ * \return		A boolean value is used to indicate the success
+ *			or failure of the query.  A true
+ *			value is used to indicate the message was
+ *			successfully sent.
+ */
+
+static _Bool send_provider_query(const IDqueryReply const reply, \
+				 unsigned int const slot,	 \
+				 const Buffer const bufr)
+
+{
+	auto _Bool retn = false;
+
+	auto char *err = NULL;
+
+	auto int port;
+
+	auto Duct duct = NULL;
+
+	auto IDtoken ptid = Ptid_list[slot];
+
+
+	if ( !reply->get_ip_reply(reply, bufr, &port) ) {
+		err = "Error decoding IP reply response";
+		goto done;
+	}
+
+	fprintf(stderr, ".Initiating IP referral to %s:%d\n", \
+		bufr->get(bufr), port);
+
+
+	/* Open SSL connection to IP referral target. */
+	if ( (duct = NAAAIM_Duct_Init()) == NULL ) {
+		err = "Error creating SSL object creation.";
+		goto done;
+	}
+
+	if ( !duct->init_client(duct) ) {
+		err = "Cannot initialize client mode.";
+		goto done;
+	}
+
+	if ( !duct->load_certificates(duct, CERTIFICATE) ) {
+		err = "Cannot load certificates.";
+		goto done;
+	}
+
+	if ( !duct->init_port(duct, (char *) bufr->get(bufr), port) ) {
+		err = "Cannot initialize port.";
+		goto done;
+	}
+
+	if ( !duct->init_connection(duct) ) {
+		err = "Cannot initialize connection.";
+		goto done;
+	}
+
+
+	/* Obtain connection banner. */
+	bufr->reset(bufr);
+	if ( !duct->receive_Buffer(duct, bufr) ) {
+		err = "Error receiving connection banner.";
+		goto done;
+	}
+	bufr->add(bufr, (unsigned char *) "\0", sizeof(1));
+	print_buffer(bufr, stderr);
+	fputc('\n', stderr);
+
+
+	/* Send patient identity. */
+	if ( !duct->send_Buffer(duct, ptid->get_element(ptid, IDtoken_id)) ) {
+		err = "Error sending patient identity.\n";
+		goto done;
+	}
+
+
+	/* Receive and print query response. */
+	bufr->reset(bufr);
+	if ( !duct->receive_Buffer(duct, bufr) ) {
+		err = "Error receiving query response.";
+		goto done;
+	}
+
+	fputs("Clinical condition summary:\n", stdout);
+	fprintf(stdout, "%s", bufr->get(bufr));
+
+	retn = true;
+
+
+ done:
+ 	if ( duct != NULL ) {
+		if ( !duct->whack_connection(duct) )
+			err = "Error closing connection.";
+		duct->whack(duct);
+	}
+
+	if ( err != NULL )
+		fprintf(stderr, "!%s\n", err);
+
+	return retn;
+}
+	
+
+/**
+ * Private function.
+ *
  * This function sends an e-mail to initiate an SMS message to a
  * provider.
  *
@@ -298,15 +420,15 @@ static _Bool send_sms_message(const String const address)
  *
  * \param reply		The query which is to be processed.
  *
+ * \param bufr		A utility buffer
+ *
  * \param slot		The referral request being processed.
  */
 
 static void process_reply(const IDqueryReply const reply, \
-			  const Buffer const host, unsigned const int slot)
+			  const Buffer const bufr, unsigned const int slot)
 
 {
-	auto int port;
-
 	auto String text = NULL;
 
 
@@ -314,20 +436,14 @@ static void process_reply(const IDqueryReply const reply, \
 
 	if ( reply->is_type(reply, IDQreply_notfound) ) {
 		fputs(".No identity reply information available.\n", stdout);
-		return;
+		goto done;
 	}
 
 
 	/* Handle an IP address referral. */
-	if ( reply->is_type(reply, IDQreply_ipredirect) ) {
-		if ( !reply->get_ip_reply(reply, host, &port) ) {
-			fputs("!Error decoding IP reply response.\n", stderr);
-			goto done;
-		}
-		fputs("\tClinical information available at:\n", stdout);
-		fprintf(stdout, "\t\tHostname: %s\n\t\tPort %d.\n", \
-			host->get(host), port);
-	}
+	if ( reply->is_type(reply, IDQreply_ipredirect) )
+		send_provider_query(reply, slot, bufr);
+
 
 	/* Handle a text reply . */
 	if ( reply->is_type(reply, IDQreply_text) ) {
@@ -359,6 +475,9 @@ static void process_reply(const IDqueryReply const reply, \
 
 
  done:
+	fputs("--------------------------------------------\n\n", stdout);
+	
+
 	if ( text != NULL )
 		text->whack(text);
 
@@ -515,7 +634,7 @@ extern int main(int argc, char *argv[])
 	}
 
 	if ( !duct->init_client(duct) ) {
-		err = "Cannot initialize server mode.";
+		err = "Cannot initialize client.";
 		goto done;
 	}
 
@@ -542,7 +661,7 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 	bufr->add(bufr, (unsigned char *) "\0", sizeof(1));
-	print_buffer(bufr);
+	print_buffer(bufr, stderr);
 	fputc('\n', stderr);
 
 
