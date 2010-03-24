@@ -580,6 +580,11 @@ static void resolve_reply(unsigned const int slot, const DBduct const db, \
 			fputs("sms referral.\n", stdout);
 			sms_reply(db, reply, id);
 			break;
+		case '4':
+			fputs("bimodal sms referral.\n", stdout);
+			ip_reply(db, reply, id);
+			sms_reply(db, reply, id);
+			break;
 	}
 
 

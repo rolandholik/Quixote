@@ -123,10 +123,12 @@ IMPLEMENT_ASN1_FUNCTIONS(text_reply)
 
 typedef struct {
 	ASN1_PRINTABLESTRING *address;
+	ASN1_OCTET_STRING *referral;
 } sms_reply;
 
 ASN1_SEQUENCE(sms_reply) = {
-	ASN1_SIMPLE(sms_reply, address, ASN1_PRINTABLESTRING),
+	ASN1_SIMPLE(sms_reply, address,  ASN1_PRINTABLESTRING),
+	ASN1_SIMPLE(sms_reply, referral, ASN1_OCTET_STRING)
 } ASN1_SEQUENCE_END(sms_reply)
 
 IMPLEMENT_ASN1_FUNCTIONS(sms_reply)
@@ -468,6 +470,22 @@ static _Bool set_sms_reply(const IDqueryReply const this, \
 			     address->size(address) + 1) != 1 )
                 goto done;
 
+	/*
+	 * If the object has been previously initialized with an IP
+	 * address referral this is taken as an indication that a
+	 * bimodal SMS referral is to be conducted.  Encode the
+	 * current payload as a binary element.
+	 */
+	if ( S->type == IDQreply_ipredirect ) {
+		if ( ASN1_OCTET_STRING_set(reply->referral,		\
+					   S->payload->get(S->payload),	\
+					   S->payload->size(S->payload)) != 1 )
+			goto done;
+
+		S->type = IDQreply_sms_bimodal;
+		S->payload->reset(S->payload);
+	}
+
         asn_size = i2d_sms_reply(reply, p);
         if ( asn_size < 0 )
                 goto done;
@@ -476,7 +494,8 @@ static _Bool set_sms_reply(const IDqueryReply const this, \
 		goto done;
 
 	retn	= true;
-	S->type = IDQreply_sms;
+	if ( S->type != IDQreply_sms_bimodal )
+		S->type = IDQreply_sms;
 	
 
  done:
@@ -538,6 +557,16 @@ static _Bool get_sms_reply(const IDqueryReply const this, \
 			   (char *) ASN1_STRING_data(reply->address)) ) {
 		fputs("text add error.\n", stderr);
 		goto done;
+	}
+
+	if ( S->type == IDQreply_sms_bimodal ) {
+		S->payload->reset(S->payload);
+		S->payload->add(S->payload,			   \
+				ASN1_STRING_data(reply->referral), \
+				ASN1_STRING_length(reply->referral));
+		if ( S->payload->poisoned(S->payload) )
+			goto done;
+		S->type = IDQreply_ipredirect;
 	}
 
 	retn = true;

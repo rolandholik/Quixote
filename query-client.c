@@ -460,7 +460,8 @@ static void process_reply(const IDqueryReply const reply, \
 
 
 	/* Handle an SMS reply. */
-	if ( reply->is_type(reply, IDQreply_sms) ) {
+	if ( reply->is_type(reply, IDQreply_sms) ||
+	     reply->is_type(reply, IDQreply_sms_bimodal) ) {
 		
 		if ( (text = HurdLib_String_Init()) == NULL ) {
 			fputs("!Error initializing text response.\n", stderr);
@@ -471,6 +472,9 @@ static void process_reply(const IDqueryReply const reply, \
 			goto done;
 		}
 		send_sms_message(text);
+
+		if ( reply->is_type(reply, IDQreply_ipredirect) )
+			send_provider_query(reply, slot, bufr);
 	}
 
 

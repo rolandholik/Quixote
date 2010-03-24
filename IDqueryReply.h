@@ -33,6 +33,7 @@ typedef	enum {
 	IDQreply_phone,
 	IDQreply_text,
 	IDQreply_sms,
+	IDQreply_sms_bimodal,
 } IDqueryReply_type;
 
 
