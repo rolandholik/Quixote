@@ -48,7 +48,7 @@ struct NAAAIM_IDqueryReply
 	_Bool (*set_text_reply)(const IDqueryReply, const String);
 	_Bool (*get_text_reply)(const IDqueryReply, const String);
 	_Bool (*set_sms_reply)(const IDqueryReply, const String);
-	_Bool (*get_sms_reply)(const IDqueryReply, const String);
+	_Bool (*get_sms_reply)(const IDqueryReply, const String, int *);
 	_Bool (*encode)(const IDqueryReply, const Buffer);
 	_Bool (*decode)(const IDqueryReply, const Buffer);
 	_Bool (*is_type)(const IDqueryReply, IDqueryReply_type);

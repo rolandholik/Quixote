@@ -149,7 +149,7 @@ Authenticator.o: NAAAIM.h Authenticator.h RandomBuffer.h RSAkey.h IDtoken.h \
 AES256_cbc.o: AES256_cbc.h
 AuthenReply.o: NAAAIM.h AuthenReply.h
 OrgSearch.o: NAAAIM.h OrgSearch.h IDtoken.h
-IDqueryReply.o: NAAAIM.h IDqueryReply.h
+IDqueryReply.o: NAAAIM.h IDqueryReply.h RandomBuffer.h
 DBDuct.o: NAAAIM.h DBduct.h
 
 query-client.o: NAAAIM.h Duct.h IDtoken.h Authenticator.h IDqueryReply.h

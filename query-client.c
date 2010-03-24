@@ -340,6 +340,7 @@ static _Bool send_provider_query(const IDqueryReply const reply, \
 
 
 	/* Send patient identity. */
+	fputs(">Sending provider query.\n", stderr);
 	if ( !duct->send_Buffer(duct, ptid->get_element(ptid, IDtoken_id)) ) {
 		err = "Error sending patient identity.\n";
 		goto done;
@@ -347,6 +348,7 @@ static _Bool send_provider_query(const IDqueryReply const reply, \
 
 
 	/* Receive and print query response. */
+	fputs("<Waiting for provider query.\n", stderr);
 	bufr->reset(bufr);
 	if ( !duct->receive_Buffer(duct, bufr) ) {
 		err = "Error receiving query response.";
@@ -406,7 +408,7 @@ static _Bool send_sms_message(const String const address)
 	if ( pclose(mailer) == -1 )
 		return false;
 
-	fprintf(stdout, "Forwarded SMS message to %s\n", \
+	fprintf(stdout, "Forwarded SMS message to: %s\n", \
 		address->get(address));
 
 	return true;
@@ -429,6 +431,8 @@ static void process_reply(const IDqueryReply const reply, \
 			  const Buffer const bufr, unsigned const int slot)
 
 {
+	auto int verifier;
+
 	auto String text = NULL;
 
 
@@ -467,14 +471,16 @@ static void process_reply(const IDqueryReply const reply, \
 			fputs("!Error initializing text response.\n", stderr);
 			goto done;
 		}
-		if ( !reply->get_sms_reply(reply, text) ) {
+		if ( !reply->get_sms_reply(reply, text, &verifier) ) {
 			fputs("!Error decoding text response.\n", stderr);
 			goto done;
 		}
 		send_sms_message(text);
 
-		if ( reply->is_type(reply, IDQreply_ipredirect) )
+		if ( reply->is_type(reply, IDQreply_ipredirect) ) {
+			fprintf(stdout, "Callback verifier: %0X\n\n", verifier);
 			send_provider_query(reply, slot, bufr);
+		}
 	}
 
 

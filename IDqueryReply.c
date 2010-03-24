@@ -28,6 +28,7 @@
 
 #include "NAAAIM.h"
 #include "IDqueryReply.h"
+#include "RandomBuffer.h"
 
 
 /* Verify library/object header file inclusions. */
@@ -123,11 +124,13 @@ IMPLEMENT_ASN1_FUNCTIONS(text_reply)
 
 typedef struct {
 	ASN1_PRINTABLESTRING *address;
+	ASN1_INTEGER *verifier;
 	ASN1_OCTET_STRING *referral;
 } sms_reply;
 
 ASN1_SEQUENCE(sms_reply) = {
 	ASN1_SIMPLE(sms_reply, address,  ASN1_PRINTABLESTRING),
+	ASN1_SIMPLE(sms_reply, verifier, ASN1_INTEGER),
 	ASN1_SIMPLE(sms_reply, referral, ASN1_OCTET_STRING)
 } ASN1_SEQUENCE_END(sms_reply)
 
@@ -454,9 +457,14 @@ static _Bool set_sms_reply(const IDqueryReply const this, \
 
         auto unsigned char **p = &asn;
 
-	auto int asn_size;
+	auto int asn_size,
+		 rvalue;
 
 	auto sms_reply *reply = NULL;
+
+	auto Buffer bufr;
+
+	auto RandomBuffer rbufr = NULL;
 
 
 	if ( S->poisoned )
@@ -480,6 +488,17 @@ static _Bool set_sms_reply(const IDqueryReply const this, \
 		if ( ASN1_OCTET_STRING_set(reply->referral,		\
 					   S->payload->get(S->payload),	\
 					   S->payload->size(S->payload)) != 1 )
+			goto done;
+
+		if ( (rbufr = NAAAIM_RandomBuffer_Init()) == NULL )
+			goto done;
+
+		rbufr->generate(rbufr, sizeof(int));
+		bufr = rbufr->get_Buffer(rbufr);
+		rvalue = *((int *) bufr->get(bufr));
+		rbufr->whack(rbufr);
+
+		if ( ASN1_INTEGER_set(reply->verifier, rvalue) != 1 )
 			goto done;
 
 		S->type = IDQreply_sms_bimodal;
@@ -520,13 +539,17 @@ static _Bool set_sms_reply(const IDqueryReply const this, \
  * \param address	A String object which will be loaded with the
  *			sms address information.
  *
+ * \param verifier	A pointer to an integer which is to be loaded
+ *			with the verifier value if this is a bimodal
+ *			reply.
+ *
  * \return		A boolean value is used to indicate whether or
  *			not the decoding was successful.  A true
  *			value indicates success.
  */
 
 static _Bool get_sms_reply(const IDqueryReply const this, \
-			   const String const address)
+			   const String const address, int * const verifier)
 
 {
 	auto const IDqueryReply_State const S = this->state;
@@ -566,6 +589,8 @@ static _Bool get_sms_reply(const IDqueryReply const this, \
 				ASN1_STRING_length(reply->referral));
 		if ( S->payload->poisoned(S->payload) )
 			goto done;
+
+		*verifier = ASN1_INTEGER_get(reply->verifier);
 		S->type = IDQreply_ipredirect;
 	}
 
