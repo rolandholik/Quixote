@@ -36,6 +36,7 @@
 #include "IDtoken.h"
 #include "Authenticator.h"
 #include "IDqueryReply.h"
+#include "ProviderQuery.h"
 
 
 /* Variables static to this module. */
@@ -264,10 +265,9 @@ static _Bool load_patient_identity(const char * const filename)
  * \param reply		The reply which contains the ip referral
  *			information.
  *
- * \param slot		The entry in the patient identity table being
- *			processed.
+ * \param query		The query which is to be sent.
  *
- * \param buffer	A utility buffer to  be used in implementing the
+ * \param buffer	A utility buffer to be used in implementing the
  *			query.
  *
  * \return		A boolean value is used to indicate the success
@@ -276,8 +276,8 @@ static _Bool load_patient_identity(const char * const filename)
  *			successfully sent.
  */
 
-static _Bool send_provider_query(const IDqueryReply const reply, \
-				 unsigned int const slot,	 \
+static _Bool send_provider_query(const IDqueryReply const reply,  \
+				 const ProviderQuery const query, \
 				 const Buffer const bufr)
 
 {
@@ -288,8 +288,6 @@ static _Bool send_provider_query(const IDqueryReply const reply, \
 	auto int port;
 
 	auto Duct duct = NULL;
-
-	auto IDtoken ptid = Ptid_list[slot];
 
 
 	if ( !reply->get_ip_reply(reply, bufr, &port) ) {
@@ -341,7 +339,14 @@ static _Bool send_provider_query(const IDqueryReply const reply, \
 
 	/* Send patient identity. */
 	fputs(">Sending provider query.\n", stderr);
-	if ( !duct->send_Buffer(duct, ptid->get_element(ptid, IDtoken_id)) ) {
+
+	bufr->reset(bufr);
+	if ( !query->encode(query, bufr) ) {
+		err = "Error encoding query.";
+		goto done;
+	}
+
+	if ( !duct->send_Buffer(duct, bufr) ) {
 		err = "Error sending patient identity.\n";
 		goto done;
 	}
@@ -398,12 +403,13 @@ static _Bool send_sms_message(const String const address)
 	auto FILE *mailer = NULL;
 
 
-	snprintf(bufr, sizeof(bufr), "mail %s", address->get(address));
+	snprintf(bufr, sizeof(bufr), "mail -I /home/greg/.mushrc-client " \
+		 "%s", address->get(address));
 	if ( (mailer = popen(bufr, "w")) == NULL )
 		return false;
 
 	fputs("Medical information query from EMT-Intermediate.\n", mailer);
-	fprintf(mailer, "Please contact: %s\n", "320-524-2160");
+	fprintf(mailer, "Please contact: %s\n", "701-361-2319");
 
 	if ( pclose(mailer) == -1 )
 		return false;
@@ -435,6 +441,10 @@ static void process_reply(const IDqueryReply const reply, \
 
 	auto String text = NULL;
 
+	auto ProviderQuery query = NULL;
+
+	auto IDtoken ptid = Ptid_list[slot];
+
 
 	fprintf(stdout, "Information for patient provider %d:\n", slot + 1);
 
@@ -442,11 +452,6 @@ static void process_reply(const IDqueryReply const reply, \
 		fputs(".No identity reply information available.\n", stdout);
 		goto done;
 	}
-
-
-	/* Handle an IP address referral. */
-	if ( reply->is_type(reply, IDQreply_ipredirect) )
-		send_provider_query(reply, slot, bufr);
 
 
 	/* Handle a text reply . */
@@ -463,9 +468,27 @@ static void process_reply(const IDqueryReply const reply, \
 	}
 
 
+	/* Allocate a query object. */
+	if ( (query = NAAAIM_ProviderQuery_Init()) == NULL ) {
+		fputs("!Error initializing query object.", stderr);
+		goto done;
+	}
+
+	/* Handle an IP address referral. */
+	if ( reply->is_type(reply, IDQreply_ipredirect) ) {
+		if ( !query->set_simple_query(query, ptid->get_element(ptid, \
+							      IDtoken_id)) ) {
+			fputs("!Error loading patient identity.", stderr);
+			goto done;
+		}
+		send_provider_query(reply, query, bufr);
+	}
+
+
 	/* Handle an SMS reply. */
 	if ( reply->is_type(reply, IDQreply_sms) ||
 	     reply->is_type(reply, IDQreply_sms_bimodal) ) {
+		auto Buffer id = ptid->get_element(ptid, IDtoken_id);
 		
 		if ( (text = HurdLib_String_Init()) == NULL ) {
 			fputs("!Error initializing text response.\n", stderr);
@@ -477,9 +500,17 @@ static void process_reply(const IDqueryReply const reply, \
 		}
 		send_sms_message(text);
 
-		if ( reply->is_type(reply, IDQreply_ipredirect) ) {
-			fprintf(stdout, "Callback verifier: %0X\n\n", verifier);
-			send_provider_query(reply, slot, bufr);
+		if ( !query->set_simple_query_sms(query, id, text->get(text), \
+						  verifier) ) {
+			fputs("!Error loading patient identity.", stderr);
+			goto done;
+		}
+
+		if ( reply->is_type(reply, IDQreply_ipredirect) ) {	
+
+			fprintf(stdout, "Callback verifier: %0X\n\n", \
+				verifier);
+			send_provider_query(reply, query, bufr);
 		}
 	}
 
@@ -490,6 +521,8 @@ static void process_reply(const IDqueryReply const reply, \
 
 	if ( text != NULL )
 		text->whack(text);
+	if ( query != NULL )
+		query->whack(query);
 
 	return;
 }

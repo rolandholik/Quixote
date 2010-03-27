@@ -40,6 +40,7 @@
 #include "DBduct.h"
 #include "RSAkey.h"
 #include "SHA256.h"
+#include "ProviderQuery.h"
 
 
 /* Variables static to this module. */
@@ -120,6 +121,66 @@ static void update_process_table(void)
 					WEXITSTATUS(status));
 			}
 	return;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function sends an e-mail to initiate an SMS message to a
+ * provider.
+ *
+ * \param db		The database object which will be used to
+ *			obtain patient information for the referral.
+ *
+ * \param ptid		The database id number assigned to the patient.
+ *
+ * \param address	The address to which the SMS message is to be
+ *			sent.
+ *
+ * \param verifier	The numeric verifier code to be transmitted
+ *			with the SMS message.
+ *
+ * \return		A boolean value is used to indicate the success
+ *			or failure of initiating the message.  A true
+ *			value is used to indicate the message was
+ *			successfully sent.
+ */
+
+static _Bool send_sms_message(const DBduct const db, long int const ptid, \
+			      const String const address, int const verifier)
+
+{
+	auto char bufr[256];
+
+	auto FILE *mailer = NULL;
+
+
+	snprintf(bufr, sizeof(bufr), "mail -I /home/greg/.mushrc-provider " \
+		 "%s", address->get(address));
+	if ( (mailer = popen(bufr, "w")) == NULL )
+		return false;
+
+	fputs("Follow up for clinical query from EMT-Intermediate.\n", mailer);
+	fprintf(mailer, "Verifier code: %X\n", verifier);
+
+	/* Query for the patient name. */
+	fputs("Patient: ", mailer);
+	snprintf(bufr, sizeof(bufr), "select * from name where id = %ld", \
+		 ptid);
+	if ( db->query(db, bufr) == 1 )
+		fprintf(mailer, "%s\n", db->get_element(db, 0, 0));
+	else
+		fputs("not available.\n", mailer);
+
+
+	if ( pclose(mailer) == -1 )
+		return false;
+
+	fprintf(stdout, ".Forwarded SMS message to: %s\n", \
+		address->get(address));
+
+	return true;
 }
 
 
@@ -489,11 +550,16 @@ static _Bool handle_connection(const Duct const duct)
 		  *dbparams,
 		  banner[256];
 
-	auto int retn = false;
+	auto int verifier,
+		 retn = false;
 
 	auto Buffer bufr = NULL;
 
+	auto String address = NULL;
+
 	auto DBduct db = NULL;
+
+	auto ProviderQuery query = NULL;
 
 
 	if ( (bufr = HurdLib_Buffer_Init()) == NULL )
@@ -535,28 +601,84 @@ static _Bool handle_connection(const Duct const duct)
 
 
 	/* Read the patient identity block. */
-	bufr->reset(bufr);
 	fputs("<Receiving patient identity.\n", stdout);
+	bufr->reset(bufr);
 	if ( !duct->receive_Buffer(duct, bufr) ) {
 		err = "Error receiving patient identity.";
 		goto done;
 	}
 
+	fputs(".Decoding query.\n", stdout);
+	if ( (query = NAAAIM_ProviderQuery_Init()) == NULL ) {
+		err = "Failed to initialize query object.";
+		goto done;
+	}
+
+	if ( !query->decode(query, bufr) ) {
+		err = "Failed to decode query.";
+		goto done;
+	}
+
+
+	/* Handle a basic information query. */
+	if ( query->type(query) == PQquery_simple ) {
+		fputs(".Processing simple query.\n", stdout);
+
+		bufr->reset(bufr);
+		if ( !query->get_simple_query(query, bufr) ) {
+			err = "Failed to extract patient identity from query.";
+			goto done;
+		}
+
+		if ( !verify_patient_identity(db, bufr) ) {
+			err = "Unable to verify patient identity.";
+			goto done;
+		}
+
+		if ( !process_query(db, bufr) ) {
+			err = "Error processing query.";
+			goto done;
+		}
+	}
+
+
 	/*
-	 * Decrypt the identity block and verify authorization of the
-	 * token and the patient identity.
+	 * Handle a basic information query with SMS referral of
+	 * patient information.
 	 */
-	if ( !verify_patient_identity(db, bufr) ) {
-		err = "Unable to fulfill query request.";
-		goto done;
+	if ( query->type(query) == PQquery_simple_sms ) {
+		auto long int ptid;
+
+		fputs(".Processing simple query with SMS referral.\n", stdout);
+
+		if ( (address = HurdLib_String_Init()) == NULL ) {
+			err = "Error initializing address string.";
+			goto done;
+		}
+
+		bufr->reset(bufr);
+		if ( !query->get_simple_query_sms(query, bufr, address, \
+						  &verifier) ) {
+			err = "Failed to extract patient identity from query.";
+			goto done;
+		}
+
+		if ( !verify_patient_identity(db, bufr) ) {
+			err = "Unable to verify patient identity.";
+			goto done;
+		}
+		ptid = atol((char *) bufr->get(bufr));
+		
+
+		if ( !process_query(db, bufr) ) {
+			err = "Error processing query.";
+			goto done;
+		}
+
+		send_sms_message(db, ptid, address, verifier);
 	}
 
 
-	/* Return basic query information. */
-	if ( !process_query(db, bufr) ) {
-		err = "Error on query processing.";
-		goto done;
-	}
 	if ( !duct->send_Buffer(duct, bufr) ) {
 		err = "Unable to send query response.";
 		goto done;
@@ -579,6 +701,10 @@ static _Bool handle_connection(const Duct const duct)
 		bufr->whack(bufr);
 	if ( db != NULL )
 		db->whack(db);
+	if ( query != NULL )
+		query->whack(query);
+	if ( address != NULL )
+		address->whack(address);
 
 	return retn;
 }
