@@ -35,6 +35,7 @@ struct NAAAIM_OrgSearch
 	/* External methods. */
 	unsigned int (*load)(const OrgSearch, const char *);
 	_Bool (*search)(const OrgSearch, const IDtoken);
+	_Bool (*setup_parallel)(const OrgSearch, unsigned int);
 	_Bool (*get_match)(const OrgSearch, const Buffer);
 	void (*whack)(const OrgSearch);
 

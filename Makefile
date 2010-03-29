@@ -8,7 +8,7 @@
 # Variable declarations.
 CSRC = 	SHA256.c SHA256_hmac.c RSAkey.c OrgID.c PatientID.c RandomBuffer.c \
 	IDtoken.c Duct.c Authenticator.c AES256_cbc.c AuthenReply.c	   \
-	OrgSearch.c IDqueryReply.c ProviderQuery.c
+	IDqueryReply.c ProviderQuery.c
 
 SERVERS = root-referral device-broker user-broker identity-broker \
 	provider-server
@@ -76,8 +76,8 @@ device-broker: device-broker.o ${COBJS}
 user-broker: user-broker.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl ${SSL_LIBRARY};
 
-identity-broker: identity-broker.o DBduct.o ${COBJS}
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl ${SSL_LIBRARY} \
+identity-broker: identity-broker.o DBduct.o OrgSearch.o ${COBJS}
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lrt -lfl ${SSL_LIBRARY} \
 		${POSTGRES_LIBRARY};
 
 provider-server: provider-server.o DBduct.o ${COBJS}

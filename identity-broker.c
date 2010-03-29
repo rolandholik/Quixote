@@ -793,6 +793,8 @@ extern int main(int argc, char *argv[])
 	auto int port,
 		 retn = 1;
 
+	auto unsigned int processors;
+
 	auto pid_t pid;
 
 	auto Config config = NULL;
@@ -850,6 +852,14 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 	fputs(".Load completed.\n", stdout);
+
+	if ( config->get(config, "processors") != NULL ) {
+		processors = atoi(config->get(config, "processors"));
+		if ( !IDfinder->setup_parallel(IDfinder, processors) ) {
+			err = "Cannot initialize parallel search.";
+			goto done;
+		}
+	}
 
 	/* Initialize SSL connection and wait for connections. */
 	if ( (duct = NAAAIM_Duct_Init()) == NULL ) {
