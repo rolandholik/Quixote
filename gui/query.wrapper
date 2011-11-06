@@ -8,7 +8,7 @@ if [ $? -ne 0 ]; then
 	exit 1;
 fi;
 
-../query-client -i $FIFO;
+/opt/NAAAIM/bin/query-client -i $FIFO;
 retn=$?;
 
 rm -f $FIFO;
