@@ -32,3 +32,4 @@
 #define NAAAIM_IDqueryReply_OBJID	12
 #define NAAAIM_DBduct_OBJID		13
 #define NAAAIM_ProviderQuery_OBJID	14
+#define NAAAIM_LCDriver_OBJID		15
