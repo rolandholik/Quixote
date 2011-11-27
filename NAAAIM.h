@@ -33,3 +33,4 @@
 #define NAAAIM_DBduct_OBJID		13
 #define NAAAIM_ProviderQuery_OBJID	14
 #define NAAAIM_LCDriver_OBJID		15
+#define NAAAIM_SmartCard_OBJID		16

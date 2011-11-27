@@ -4,7 +4,7 @@
 
 
 # Variable declarations.
-CSRC = LCDriver.c
+CSRC = LCDriver.c SmartCard.c
 
 CLIENTS = query-server
 
@@ -44,9 +44,10 @@ LDFLAGS = -g ${DMALLOC_LIBS} -L../HurdLib
 #
 COBJS = ${CSRC:.c=.o}
 
-LIBS = -lHurdLib -lusb -lhid -lusblcd
+LIBS = -lHurdLib -lusb -lhid -lusblcd -lpcsclite -lusb-1.0
 
-CFLAGS := ${CFLAGS} -I.. -I../HurdLib -I${SSL_INCLUDE}
+CFLAGS := ${CFLAGS} -I.. -I../HurdLib -I${SSL_INCLUDE} \
+	-I/usr/local/include/PCSC
 
 
 # Targets
@@ -65,6 +66,8 @@ clean:
 
 
 # Source dependencies.
-query-server.o: LCDriver.h
+query-server.o: LCDriver.h SmartCard.h
 
 LCDriver.o: LCDriver.h
+
+SmartCard.o: SmartCard.h

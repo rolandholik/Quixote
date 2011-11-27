@@ -13,6 +13,8 @@ CSRC = 	SHA256.c SHA256_hmac.c RSAkey.c OrgID.c PatientID.c RandomBuffer.c \
 SERVERS = root-referral device-broker user-broker identity-broker \
 	provider-server
 
+SUBDIRS = client
+
 CC = gcc
 
 # Uncomment the following two lines to enable compilation with memory debug
@@ -62,8 +64,14 @@ LIBS = -l HurdLib
 CFLAGS := ${CFLAGS} -I./HurdLib -I${SSL_INCLUDE}
 
 
+#
+# Target directives.
+#
+.PHONY: client
+
+
 # Targets
-all: ${COBJS} genrandom genid query-client servers
+all: ${COBJS} genrandom genid query-client servers ${SUBDIRS}
 
 servers: ${SERVERS}
 
@@ -124,10 +132,17 @@ sha256key: sha256key.o SHA256.o
 DBduct.o: DBduct.c
 	$(CC) $(CFLAGS) -I${POSTGRES_INCLUDE} -c $< -o $@;
 
+#
+# Subdirectory targets.
+#
+client:
+	${MAKE} -C $@;
+
 tags:
 	/opt/emacs/bin/etags *.{h,c};
 
 clean:
+	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i clean; done
 	rm -f *.o *~ TAGS;
 	rm -f query-client
 	rm -f ${SERVERS}

@@ -446,7 +446,12 @@ static void process_reply(const IDqueryReply const reply, \
 	auto IDtoken ptid = Ptid_list[slot];
 
 
+#if 0
 	fprintf(stdout, "Information for patient provider %d:\n", slot + 1);
+#else
+	fprintf(stdout, "Provider %d:\n", slot + 1);
+#endif
+	
 
 	if ( reply->is_type(reply, IDQreply_notfound) ) {
 		fputs(".No identity reply information available.\n", stdout);
@@ -516,7 +521,9 @@ static void process_reply(const IDqueryReply const reply, \
 
 
  done:
+#if 0
 	fputs("--------------------------------------------\n\n", stdout);
+#endif
 	
 
 	if ( text != NULL )

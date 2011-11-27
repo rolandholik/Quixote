@@ -316,8 +316,10 @@ static void telephone_reply(const DBduct const db,	    \
 		goto done;
 	}
 
+#if 0
 	text->add(text, "Originating provider recommends telephone " \
 		  "contact.\nPlease call: ");
+#endif
 
 	memset(query, '\0', sizeof(query));
 	snprintf(query, sizeof(query), "%s\n", db->get_element(db, 0, 0));

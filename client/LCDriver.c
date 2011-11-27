@@ -242,6 +242,7 @@ static LCDriver_key read_key(const LCDriver const this)
 			break;
 		}
 	}
+	S->lcd->keystate(S->lcd, &valid_key, key);
 
 	return retn;
 }
