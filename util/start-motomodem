@@ -1,0 +1,26 @@
+#! /bin/bash
+
+#
+# Script to wait for ttyUSB device and start PPP daemon.
+#
+
+declare -i Cnt=0;
+
+
+sleep 5;
+while [ $Cnt -lt 5 ];
+do
+	logger -p info -t hotplug "Checking for TTY device cnt #$Cnt";
+	grep -q ttyUSB /proc/devices;
+	if [ $? -eq 0 ]; then
+		logger -p info -t hotplug "Starting pppd daemon.";
+		/usr/sbin/pppd file /etc/ppp/ppp-client-cell.rc;
+		break;
+	fi;
+	let Cnt+=1;
+done;
+
+
+exit 0;
+
+
