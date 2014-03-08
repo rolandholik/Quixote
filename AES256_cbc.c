@@ -106,47 +106,40 @@ static void _init_state(const AES256_cbc_State const S) {
 static Buffer encrypt(const AES256_cbc const this, Buffer in)
 
 {
-	auto const AES256_cbc_State const S = this->state;
+	const AES256_cbc_State const S = this->state;
 
-	auto unsigned char *bp = in->get(in),
-		            encbuf[EVP_CIPHER_CTX_block_size(&S->context)];
+	unsigned char *bp = in->get(in),
+			    encbuf[S->blocksize];
 
-	auto size_t lp;
+	int lp,
+	    encsize,
+	    rounds,
+	    residual;
 
-	auto int insize,
-		 encsize,
-		 rounds,
-		 bpamt = in->size(in);
+	size_t size = in->size(in);
 
 
 	if ( S->mode != encrypt_mode )
 		return NULL;
-	if ( bpamt == 0 )
+	if ( size == 0 )
 		return NULL;
 
-	rounds = in->size(in) / S->blocksize;
-	if ( (in->size(in) % S->blocksize) != 0 )
-		++rounds;
+	
+	rounds   = size / S->blocksize;
+	residual = size % S->blocksize;
 
 	for (lp= 0; lp < rounds; ++lp) {
-		if ( bpamt > S->blocksize )
-			insize = S->blocksize;
-		else
-			insize = bpamt;
-
 		if ( !EVP_EncryptUpdate(&S->context, encbuf, &encsize, bp, \
-					insize) )
+					S->blocksize) )
 			return NULL;
-
 		if ( encsize > 0 )
 			S->buffer->add(S->buffer, encbuf, encsize);
-		bp    += S->blocksize;
-		bpamt -= S->blocksize;
+		bp += S->blocksize;
 	}
 
-	if ( !EVP_EncryptFinal_ex(&S->context, encbuf, &encsize) )
+	if ( !EVP_EncryptFinal_ex(&S->context, encbuf, &residual) )
 		return NULL;
-	S->buffer->add(S->buffer, encbuf, encsize);
+	S->buffer->add(S->buffer, encbuf, residual);
 
 	return S->buffer;
 }
@@ -168,27 +161,27 @@ static Buffer encrypt(const AES256_cbc const this, Buffer in)
 static Buffer decrypt(const AES256_cbc const this, Buffer in)
 
 {
-	auto const AES256_cbc_State const S = this->state;
+	const AES256_cbc_State const S = this->state;
 
-	auto unsigned char *bp = in->get(in),
-		           decbuf[EVP_CIPHER_CTX_block_size(&S->context) * 2];
+	unsigned char *bp = in->get(in),
+		      decbuf[S->blocksize * 2];
 
-	auto size_t lp;
+	unsigned int lp,
+		     rounds;
 
-	auto int rounds,
-		 decsize;
+	int decsize;
 
 
 	if ( S->mode != decrypt_mode )
 		return NULL;
-	if ( in->size == 0 )
+	if ( in->size(in) == 0 )
 		return NULL;
 
 	rounds = in->size(in) / S->blocksize;
 
 	for (lp= 0; lp < rounds; ++lp) {
 		memcpy(decbuf, bp, S->blocksize);
-			
+
 		if ( !EVP_DecryptUpdate(&S->context, decbuf, &decsize, bp, \
 					S->blocksize) )
 			return NULL;
@@ -197,7 +190,7 @@ static Buffer decrypt(const AES256_cbc const this, Buffer in)
 		bp += S->blocksize;
 	}
 
-	if ( !EVP_DecryptFinal_ex(&S->context, decbuf, &decsize) ) 
+	if ( !EVP_DecryptFinal_ex(&S->context, decbuf, &decsize) )
 		return NULL;
 	S->buffer->add(S->buffer, decbuf, decsize);
 
@@ -227,7 +220,7 @@ static Buffer get_Buffer(const AES256_cbc const this)
 /**
  * External public method.
  *
- * This method implements a destructor for a AES256_CBC object.
+v * This method implements a destructor for a AES256_CBC object.
  *
  * \param this	A pointer to the object which is to be destroyed.
  */
@@ -235,7 +228,7 @@ static Buffer get_Buffer(const AES256_cbc const this)
 static void whack(const AES256_cbc const this)
 
 {
-	auto const AES256_cbc_State const S = this->state;
+	const AES256_cbc_State const S = this->state;
 
 
 	if ( S->buffer != NULL )
@@ -258,11 +251,11 @@ static void whack(const AES256_cbc const this)
 extern AES256_cbc NAAAIM_AES256_cbc_Init(void)
 
 {
-	auto Origin root;
+	Origin root;
 
-	auto AES256_cbc this = NULL;
+	AES256_cbc this = NULL;
 
-	auto struct HurdLib_Origin_Retn retn;
+	struct HurdLib_Origin_Retn retn;
 
 
 	/* Get the root object. */
@@ -311,9 +304,9 @@ extern AES256_cbc NAAAIM_AES256_cbc_Init_encrypt(const Buffer const key, \
 						 const Buffer const iv)
 
 {
-	auto AES256_cbc_State S;
+	AES256_cbc_State S;
 
-	auto AES256_cbc this;
+	AES256_cbc this;
 
 
 	if ( (this = NAAAIM_AES256_cbc_Init()) == NULL )
@@ -350,9 +343,9 @@ extern AES256_cbc NAAAIM_AES256_cbc_Init_decrypt(const Buffer const key, \
 						 const Buffer const iv)
 
 {
-	auto AES256_cbc_State S;
+	AES256_cbc_State S;
 
-	auto AES256_cbc this;
+	AES256_cbc this;
 
 
 	if ( (this = NAAAIM_AES256_cbc_Init()) == NULL )
