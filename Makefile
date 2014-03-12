@@ -10,12 +10,14 @@ CSRC = 	SHA256.c SHA256_hmac.c RSAkey.c OrgID.c PatientID.c RandomBuffer.c \
 	IDtoken.c Duct.c Authenticator.c AES256_cbc.c AuthenReply.c	   \
 	IDqueryReply.c ProviderQuery.c
 
-SERVERS = root-referral device-broker user-broker identity-broker \
-	provider-server
+# SERVERS = root-referral device-broker user-broker identity-broker \
+# 	provider-server
+SERVERS = root-referral device-broker user-broker
 
-SUBDIRS = client
+SUBDIRS = utils # client
 
-CC = gcc
+# CC = gcc
+CC = musl-gcc
 
 # Uncomment the following two lines to enable compilation with memory debug
 # support
@@ -26,8 +28,8 @@ CC = gcc
 #
 # Locations of SSL include files and libraries
 #
-SSL_INCLUDE = /usr/local/ssl/include
-SSL_LIBRARY = -L /usr/local/ssl/lib -l ssl
+SSL_INCLUDE = /usr/local/musl/include
+SSL_LIBRARY = -L /usr/local/musl/lib -l ssl
 
 #
 # Locations for the Postgresql files and libraries.
@@ -44,7 +46,7 @@ CFLAGS = -Wall ${CDEBUG} -I./HurdLib # -pedantic-errors -ansi
 LIBS = HurdLib
 
 # LDFLAGS = -s -L/usr/local/krb5/lib 
-LDFLAGS = -g ${DMALLOC_LIBS} -L./HurdLib
+LDFLAGS = -g ${DMALLOC_LIBS} -Wl,-rpath-link /usr/local/musl/lib -L./HurdLib
 
 
 #
@@ -67,13 +69,14 @@ CFLAGS := ${CFLAGS} -I./HurdLib -I${SSL_INCLUDE}
 #
 # Target directives.
 #
-.PHONY: client
+.PHONY: client utils
 
 
 # Targets
-all: ${COBJS} genrandom genid query-client servers ${SUBDIRS}
+# all: ${COBJS} genrandom genid query-client servers ${SUBDIRS}
+all: ${COBJS} genrandom query-client servers ${SUBDIRS}
 
-servers: ${SERVERS}
+servers: ${SERVERS} ${TOOLS}
 
 root-referral: root-referral.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl ${SSL_LIBRARY};
@@ -132,10 +135,14 @@ sha256key: sha256key.o SHA256.o
 DBduct.o: DBduct.c
 	$(CC) $(CFLAGS) -I${POSTGRES_INCLUDE} -c $< -o $@;
 
+
 #
 # Subdirectory targets.
 #
 client:
+	${MAKE} -C $@;
+
+utils:
 	${MAKE} -C $@;
 
 tags:
