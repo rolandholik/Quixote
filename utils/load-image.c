@@ -225,7 +225,6 @@ static _Bool load_image(const char * const fname, CO(Buffer, image), \
 		fputs("Failed read buffer.\n", stderr);
 		goto done;
 	}
-	fprintf(stderr, "%s image size: %zu\n", fname, image->size(image));
 
 	hmac->add_Buffer(hmac, checksum);
 	hmac->add_Buffer(hmac, image);
@@ -324,44 +323,6 @@ static _Bool load_filesystem(CO(char *, fname), CO(Buffer, image))
  done:
 	WHACK(device);
 	return retn;
-}
-
-
-/**
- * Private function.
- *
- * This function is responsible for switching execution to the root of
- * the loaded filesystem.
- *
- * \param device	A character pointer to the name of the device
- *			which has been loaded with the filesystem
- *			image.
-
- * \return              This function does not return if successful.  If
- *			this function returns an error occurred in the
- *			transition to the new root.
- */
-
-void switch_root(CO(char *, device))
-
-{
-	if ( mount(device, "/mnt", "ext3", 0, NULL) == -1 ) {
-		fputs("Failed mount.\n", stderr);
-		return;
-	}
-
-	if ( chdir("/mnt") == -1 ) {
-		fputs("Failed chroot change directory.\n", stderr);
-		return;
-	}
-	if ( chroot("/mnt") == -1 ) {
-		fputs("Failed chroot.\n", stderr);
-		return;
-	}
-
-	execl("/usr/local/bin/dash", "/usr/local/bin/dash", NULL);
-	fputs("Failed shell execution.\n", stderr);
-	return;
 }
      
 	
@@ -470,11 +431,6 @@ extern int main(int argc, char *argv[])
 	WHACK(image);
 	WHACK(file);
 	WHACK(cipher);
-
-	if ( retn ) {
-		switch_root(output);
-		retn = false;
-	}
 
 	return retn ? 0 : 1;
 }

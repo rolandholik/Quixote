@@ -4,9 +4,9 @@
 
 
 # Variable declarations.
-CSRC = gen-image.c load-image.c
+CSRC = gen-image.c load-image.c boot.c
 
-TOOLS = gen-image load-image
+TOOLS = gen-image load-image boot
 
 CC = musl-gcc
 
@@ -63,6 +63,9 @@ gen-image: gen-image.o
 load-image: load-image.o
 	${CC} ${LDFLAGS} -o $@ $^ ../AES256_cbc.o ../SHA256_hmac.o ${LIBS} \
 		-ltpm_unseal ${SSL_LIBRARY};
+
+boot: boot.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};
