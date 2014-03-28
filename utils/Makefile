@@ -4,9 +4,9 @@
 
 
 # Variable declarations.
-CSRC = gen-image.c load-image.c boot.c
+CSRC = gen-image.c load-image.c boot.c Netconfig.c IPsec.c
 
-TOOLS = gen-image load-image boot
+TOOLS = gen-image load-image boot possum
 
 CC = musl-gcc
 
@@ -67,6 +67,9 @@ load-image: load-image.o
 boot: boot.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
+possum: possum.o Netconfig.o IPsec.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl;
+
 tags:
 	/opt/emacs/bin/etags *.{h,c};
 clean:
@@ -75,3 +78,7 @@ clean:
 
 
 # Source dependencies.
+Netconfig.o: Netconfig.h
+IPsec.o: IPsec.h
+
+possum.o: Netconfig.h IPsec.h

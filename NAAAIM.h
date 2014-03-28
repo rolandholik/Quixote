@@ -34,3 +34,6 @@
 #define NAAAIM_ProviderQuery_OBJID	14
 #define NAAAIM_LCDriver_OBJID		15
 #define NAAAIM_SmartCard_OBJID		16
+
+#define NAAAIM_Netconfig_OBJID		17
+#define NAAAIM_IPsec_OBJID		18
