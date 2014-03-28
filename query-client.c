@@ -32,7 +32,7 @@
 #include <Buffer.h>
 
 #include "NAAAIM.h"
-#include "Duct.h"
+#include "SSLDuct.h"
 #include "IDtoken.h"
 #include "Authenticator.h"
 #include "IDqueryReply.h"
@@ -287,7 +287,7 @@ static _Bool send_provider_query(const IDqueryReply const reply,  \
 
 	auto int port;
 
-	auto Duct duct = NULL;
+	auto SSLDuct duct = NULL;
 
 
 	if ( !reply->get_ip_reply(reply, bufr, &port) ) {
@@ -300,7 +300,7 @@ static _Bool send_provider_query(const IDqueryReply const reply,  \
 
 
 	/* Open SSL connection to IP referral target. */
-	if ( (duct = NAAAIM_Duct_Init()) == NULL ) {
+	if ( (duct = NAAAIM_SSLDuct_Init()) == NULL ) {
 		err = "Error creating SSL object creation.";
 		goto done;
 	}
@@ -563,7 +563,7 @@ extern int main(int argc, char *argv[])
 
 	auto Config config = NULL;
 
-	auto Duct duct = NULL;
+	auto SSLDuct duct = NULL;
 
 	auto IDtoken patient,
 		     device  = NULL,
@@ -678,7 +678,7 @@ extern int main(int argc, char *argv[])
 	/* Initialize SSL connection and attach to root referral server. */
 	start_time = time(NULL);
 
-	if ( (duct = NAAAIM_Duct_Init()) == NULL ) {
+	if ( (duct = NAAAIM_SSLDuct_Init()) == NULL ) {
 		err = "Error on SSL object creation.";
 		goto done;
 	}

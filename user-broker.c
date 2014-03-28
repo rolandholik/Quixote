@@ -43,7 +43,7 @@
 #include <Buffer.h>
 
 #include "NAAAIM.h"
-#include "Duct.h"
+#include "SSLDuct.h"
 #include "IDtoken.h"
 #include "Authenticator.h"
 #include "SHA256.h"
@@ -394,7 +394,8 @@ static _Bool search_for_organization(const IDtoken const token, \
  *		connection handling has failed.
  */
 
-static int handle_connection(const Duct const duct, const Config const config)
+static int handle_connection(const SSLDuct const duct, \
+			     const Config const config)
 
 {
 	auto char *key,
@@ -534,7 +535,7 @@ extern int main(int argc, char *argv[])
 
 	auto Config config = NULL;
 
-	auto Duct duct = NULL;
+	auto SSLDuct duct = NULL;
 
 
 	fprintf(stdout, "%s started.\n", SERVER);
@@ -571,7 +572,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Initialize SSL connection and wait for connections. */
-	if ( (duct = NAAAIM_Duct_Init()) == NULL ) {
+	if ( (duct = NAAAIM_SSLDuct_Init()) == NULL ) {
 		err = "Error on SSL object creation.";
 		goto done;
 	}

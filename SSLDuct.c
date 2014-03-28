@@ -27,7 +27,7 @@
 #include <String.h>
 
 #include "NAAAIM.h"
-#include "Duct.h"
+#include "SSLDuct.h"
 
 
 /* Verify library/object header file inclusions. */
@@ -35,7 +35,7 @@
 #error Library identifier not defined.
 #endif
 
-#if !defined(NAAAIM_Duct_OBJID)
+#if !defined(NAAAIM_SSLDuct_OBJID)
 #error Object identifier not defined.
 #endif
 
@@ -55,8 +55,8 @@ static unsigned char dhg[] = {
 };
 
 
-/** Duct private state information. */
-struct NAAAIM_Duct_State
+/** SSLDuct private state information. */
+struct NAAAIM_SSLDuct_State
 {
 	/* The root object. */
 	Origin root;
@@ -143,7 +143,7 @@ static const char * _get_ssl_error(SSL *connection, int const err)
 /**
  * Internal private method.
  *
- * This method is responsible for initializing the NAAAIM_Duct_State
+ * This method is responsible for initializing the NAAAIM_SSLDuct_State
  * structure which holds state information for each instantiated object.
  * The object is started out in poisoned state to catch any attempt
  * to use the object without initializing it.
@@ -152,10 +152,10 @@ static const char * _get_ssl_error(SSL *connection, int const err)
  *        is to be initialized.
  */
 
-static void _init_state(const Duct_State const S) {
+static void _init_state(const SSLDuct_State const S) {
 
 	S->libid = NAAAIM_LIBID;
-	S->objid = NAAAIM_Duct_OBJID;
+	S->objid = NAAAIM_SSLDuct_OBJID;
 
 
 	S->poisoned	= true;
@@ -186,7 +186,7 @@ static void _init_state(const Duct_State const S) {
  *		to indicate success.
  */
 
-static _Bool _init_crypto(const Duct_State const S)
+static _Bool _init_crypto(const SSLDuct_State const S)
 
 {
 	 static _Bool initialized = false;
@@ -207,9 +207,9 @@ static _Bool _init_crypto(const Duct_State const S)
  * Internal private method.
  *
  * This method implements initialization of a port on which a server
- * Duct object listens for SSL connections.
+ * SSLDuct object listens for SSL connections.
  *
- * \param	A pointer to the state information for a server Duct
+ * \param	A pointer to the state information for a server SSLDuct
  *		object.
  *
  * \return	A boolean return value is used to indicate success or
@@ -217,7 +217,7 @@ static _Bool _init_crypto(const Duct_State const S)
  *		to indicate success.
  */
 
-static _Bool _init_server_port(const Duct_State const S, const int port)
+static _Bool _init_server_port(const SSLDuct_State const S, const int port)
 
 {
 	auto const char *err = NULL;
@@ -260,7 +260,7 @@ static _Bool _init_server_port(const Duct_State const S, const int port)
  * This method implements initialization of a port on which a client
  * will attempt an SSL based connection.
  *
- * \param	A pointer to the state information for a client Duct
+ * \param	A pointer to the state information for a client SSLDuct
  *		object.
  *
  * \return	A boolean return value is used to indicate success or
@@ -268,7 +268,7 @@ static _Bool _init_server_port(const Duct_State const S, const int port)
  *		to indicate success.
  */
 
-static _Bool _init_client_port(const Duct_State const S, \
+static _Bool _init_client_port(const SSLDuct_State const S, \
 			       const char * const host, const int port)
 
 {
@@ -318,7 +318,7 @@ static _Bool _init_client_port(const Duct_State const S, \
  *
  * This method initializes the object to be a server object.
  *
- * \param this	The Duct object which is to be initialized to be an
+ * \param this	The SSLDuct object which is to be initialized to be an
  *		SSL server.
  *
  * \return	A boolean value is returned to indicate whether or
@@ -326,10 +326,10 @@ static _Bool _init_client_port(const Duct_State const S, \
  *		value indicates the server was successfully initialized.
  */
 
-static _Bool init_server(const Duct const this)
+static _Bool init_server(const SSLDuct const this)
 
 {
-	auto const Duct_State const S = this->state;
+	auto const SSLDuct_State const S = this->state;
 
 	auto _Bool retn = false;
 
@@ -386,7 +386,7 @@ static _Bool init_server(const Duct const this)
  *
  * This method initializes the object to be a client object.
  *
- * \param this	The Duct object which is to be initialized to be an
+ * \param this	The SSLDuct object which is to be initialized to be an
  *		SSL client.
  *
  * \return	A boolean value is returned to indicate whether or
@@ -394,10 +394,10 @@ static _Bool init_server(const Duct const this)
  *		value indicates the client was successfully initialized.
  */
 
-static _Bool init_client(const Duct const this)
+static _Bool init_client(const SSLDuct const this)
 
 {
-	auto const Duct_State const S = this->state;
+	auto const SSLDuct_State const S = this->state;
 
 	auto _Bool retn = false;
 
@@ -439,11 +439,11 @@ static _Bool init_client(const Duct const this)
  *		returned.
  */
 
-static _Bool load_credentials(const Duct const this, const char * const key, \
-			      const char * const cert)
+static _Bool load_credentials(const SSLDuct const this, \
+			      const char * const key, const char * const cert)
 
 {
-	auto const Duct_State const S = this->state;
+	auto const SSLDuct_State const S = this->state;
 
 	auto _Bool retn = false;
 
@@ -476,7 +476,7 @@ static _Bool load_credentials(const Duct const this, const char * const key, \
  * This method implements the loading of certificates which will be used
  * to verify the SSL peer.
  *
- * \param this	The Duct object into which the certificates will be
+ * \param this	The SSLDuct object into which the certificates will be
  *		loaded.
  *
  * \param certfile	A null-terminated character buffer containing the
@@ -489,11 +489,11 @@ static _Bool load_credentials(const Duct const this, const char * const key, \
  *		returned.
  */
 
-static _Bool load_certificates(const Duct const this, \
+static _Bool load_certificates(const SSLDuct const this, \
 			       const char * const certfile)
 
 {
-	auto const Duct_State const S = this->state;
+	auto const SSLDuct_State const S = this->state;
 
 
 	if ( S->poisoned )
@@ -525,7 +525,7 @@ static _Bool load_certificates(const Duct const this, \
  *		is poisoned.
  */
 
-static _Bool init_port(const Duct const this, const char * const host, \
+static _Bool init_port(const SSLDuct const this, const char * const host, \
 		       int const port)
 
 {
@@ -556,10 +556,10 @@ static _Bool init_port(const Duct const this, const char * const host, \
  *		descriptor of the connected socket is returned.
  */
 
-static _Bool accept_connection(const Duct const this)
+static _Bool accept_connection(const SSLDuct const this)
 
 {
-	auto const Duct_State const S = this->state;
+	auto const SSLDuct_State const S = this->state;
 
 	auto const char *err = NULL;
 
@@ -649,17 +649,17 @@ static _Bool accept_connection(const Duct const this)
  * This method implements initiation of an SSL client connection to
  * a previously instituted socket connection.
  *
- * \param this	The client Duct object which is to initiate a connection.
+ * \param this	The client SSLDuct object which is to initiate a connection.
  *
  * \return	A boolean value is used to indicate whether or not
  *		initiation of an SSL connection was successful.  A true
  *		value indicates the connection was successful.
  */
 
-static _Bool init_connection(const Duct const this)
+static _Bool init_connection(const SSLDuct const this)
 
 {
-	auto const Duct_State const S = this->state;
+	auto const SSLDuct_State const S = this->state;
 
 	auto const char *err = NULL;
 
@@ -669,7 +669,7 @@ static _Bool init_connection(const Duct const this)
 
 
 	if ( S->poisoned ) {
-		err = "Duct object is poisoned";
+		err = "SSLDuct object is poisoned";
 		goto done;
 	}
 
@@ -721,17 +721,17 @@ static _Bool init_connection(const Duct const this)
  * This method implements sending the contents of a specified Buffer object
  * over a previously established connection.
  *
- * \param this	The Duct object over which the Buffer is to be sent.
+ * \param this	The SSLDuct object over which the Buffer is to be sent.
  *
  * \return	A boolean value is used to indicate whether or the
  *		write was successful.  A true value indicates the
  *		transmission was successful.
  */
 
-static _Bool send_Buffer(const Duct const this, const Buffer bf)
+static _Bool send_Buffer(const SSLDuct const this, const Buffer bf)
 
 {
-	auto const Duct_State const S = this->state;
+	auto const SSLDuct_State const S = this->state;
 
 	auto _Bool retn = false;
 
@@ -769,17 +769,17 @@ static _Bool send_Buffer(const Duct const this, const Buffer bf)
  * This method implements loading the specified number of bytes into
  * the provided Buffer object.
  *
- * \param this	The Duct object from which data is to be read.
+ * \param this	The SSLDuct object from which data is to be read.
  *
  * \return	A boolean value is used to indicate whether or the
  *		read was successful.  A true value indicates the receive
  *		was successful.
  */
 
-static _Bool receive_Buffer(const Duct const this, const Buffer bf)
+static _Bool receive_Buffer(const SSLDuct const this, const Buffer bf)
 
 {
-	auto const Duct_State const S = this->state;
+	auto const SSLDuct_State const S = this->state;
 
 	auto _Bool retn = false;
 
@@ -824,13 +824,13 @@ static _Bool receive_Buffer(const Duct const this, const Buffer bf)
  * This method implements returning the hostname of the client which
  * initiated a connection to a Server object.
  *
- * \param this	The Duct object whose hostname is to be printed.
+ * \param this	The SSLDuct object whose hostname is to be printed.
  *
  * \return	A pointer to a null-terminated character buffer containing
  *		the hostname.
  */
 
-static char * get_client(const Duct const this)
+static char * get_client(const SSLDuct const this)
 
 {
 	/* Sanity checks. */
@@ -852,17 +852,17 @@ static char * get_client(const Duct const this)
  * a server object the reset method is used to close the file descriptor
  * associated with a connection which has been accepted.
  *
- * \param this	The Duct object which is to be reset.
+ * \param this	The SSLDuct object which is to be reset.
  *
  * \return	A boolean value is returned to indicate whether or not
  *		the reset was successful.  A true value indicates the
  *		reset was successful.
  */
 
-static _Bool reset(const Duct const this)
+static _Bool reset(const SSLDuct const this)
 
 {
-	auto const Duct_State const S = this->state;
+	auto const SSLDuct_State const S = this->state;
 
 	auto _Bool retn = false;
 
@@ -892,14 +892,14 @@ static _Bool reset(const Duct const this)
  * This method shuts down the SSL transport connection between two
  * connected peers.
  *
- * \param this	The Duct object whose transport layer is to be
+ * \param this	The SSLDuct object whose transport layer is to be
  *		shutdown.
  */
 
-static _Bool whack_connection(const Duct const this)
+static _Bool whack_connection(const SSLDuct const this)
 
 {
-	auto const Duct_State const S = this->state;
+	auto const SSLDuct_State const S = this->state;
 
 	auto _Bool retn = false;
 
@@ -929,15 +929,15 @@ static _Bool whack_connection(const Duct const this)
 /**
  * External public method.
  *
- * This method implements a destructor for a Duct object.
+ * This method implements a destructor for a SSLDuct object.
  *
  * \param this	A pointer to the object which is to be destroyed.
  */
 
-static void whack(const Duct const this)
+static void whack(const SSLDuct const this)
 
 {
-	auto const Duct_State const S = this->state;
+	auto const SSLDuct_State const S = this->state;
 
 
 	/* Free loaded error strings. */
@@ -969,18 +969,18 @@ static void whack(const Duct const this)
 /**
  * External constructor call.
  *
- * This function implements a constructor call for a Duct object.
+ * This function implements a constructor call for a SSLDuct object.
  *
- * \return	A pointer to the initialized Duct.  A null value
+ * \return	A pointer to the initialized SSLDuct.  A null value
  *		indicates an error was encountered in object generation.
  */
 
-extern Duct NAAAIM_Duct_Init(void)
+extern SSLDuct NAAAIM_SSLDuct_Init(void)
 
 {
 	auto Origin root;
 
-	auto Duct this = NULL;
+	auto SSLDuct this = NULL;
 
 	auto struct HurdLib_Origin_Retn retn;
 
@@ -989,9 +989,9 @@ extern Duct NAAAIM_Duct_Init(void)
 	root = HurdLib_Origin_Init();
 
 	/* Allocate the object and internal state. */
-	retn.object_size  = sizeof(struct NAAAIM_Duct);
-	retn.state_size   = sizeof(struct NAAAIM_Duct_State);
-	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_Duct_OBJID, &retn) )
+	retn.object_size  = sizeof(struct NAAAIM_SSLDuct);
+	retn.state_size   = sizeof(struct NAAAIM_SSLDuct_State);
+	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_SSLDuct_OBJID, &retn) )
 		return NULL;
 	this	    	  = retn.object;
 	this->state 	  = retn.state;

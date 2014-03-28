@@ -24,7 +24,6 @@
 #define NAAAIM_PatientID_OBJID		4
 #define NAAAIM_RandomBuffer_OBJID	5
 #define NAAAIM_IDtoken_OBJID		6
-#define NAAAIM_Duct_OBJID		7
 #define NAAAIM_Authenticator_OBJID	8
 #define NAAAIM_AES256_cbc_OBJID		9
 #define NAAAIM_AuthenReply_OBJID	10
@@ -34,6 +33,7 @@
 #define NAAAIM_ProviderQuery_OBJID	14
 #define NAAAIM_LCDriver_OBJID		15
 #define NAAAIM_SmartCard_OBJID		16
+#define NAAAIM_SSLDuct_OBJID		17
 
-#define NAAAIM_Netconfig_OBJID		17
-#define NAAAIM_IPsec_OBJID		18
+#define NAAAIM_Netconfig_OBJID		18
+#define NAAAIM_IPsec_OBJID		19

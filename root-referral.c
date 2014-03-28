@@ -51,7 +51,7 @@
 #include <Buffer.h>
 
 #include "NAAAIM.h"
-#include "Duct.h"
+#include "SSLDuct.h"
 #include "IDtoken.h"
 #include "Authenticator.h"
 #include "AuthenReply.h"
@@ -205,7 +205,8 @@ static void print_buffer(const Buffer const bufr)
  *			true value indicates success.
  */
 
-static _Bool initialize_query(const Duct const duct, const Buffer const bufr)
+static _Bool initialize_query(const SSLDuct const duct, \
+			      const Buffer const bufr)
 
 {
 	auto _Bool retn = false;
@@ -276,7 +277,7 @@ static _Bool initialize_query(const Duct const duct, const Buffer const bufr)
  *			successful.
  */
 
-static int authenticate_user(const Duct const client,	\
+static int authenticate_user(const SSLDuct const client,	\
 			     const Config const config,	\
 			     const Buffer const bufr)
 
@@ -289,7 +290,7 @@ static int authenticate_user(const Duct const client,	\
 
 	auto int port;
 
-	auto Duct broker = NULL;
+	auto SSLDuct broker = NULL;
 
 	auto AuthenReply reply = NULL;
 
@@ -322,7 +323,7 @@ static int authenticate_user(const Duct const client,	\
 	 * Initialize SSL connection and connect to the user identity
 	 * brokerage server.
 	 */
-	if ( (broker = NAAAIM_Duct_Init()) == NULL ) {
+	if ( (broker = NAAAIM_SSLDuct_Init()) == NULL ) {
 		fputs("Error on SSL object creation.\n", stderr);
 		goto done;
 	}
@@ -430,7 +431,7 @@ static int authenticate_user(const Duct const client,	\
  *			successful.
  */
 
-static int authenticate_device(const Duct const client,	  \
+static int authenticate_device(const SSLDuct const client,	  \
 			       const Config const config, \
 			       const Buffer const bufr)
 
@@ -443,7 +444,7 @@ static int authenticate_device(const Duct const client,	  \
 
 	auto int port;
 
-	auto Duct broker = NULL;
+	auto SSLDuct broker = NULL;
 
 	auto AuthenReply reply = NULL;
 
@@ -476,7 +477,7 @@ static int authenticate_device(const Duct const client,	  \
 	 * Initialize SSL connection and connect to the device identity
 	 * brokerage server.
 	 */
-	if ( (broker = NAAAIM_Duct_Init()) == NULL ) {
+	if ( (broker = NAAAIM_SSLDuct_Init()) == NULL ) {
 		fputs("Error on SSL object creation.\n", stderr);
 		goto done;
 	}
@@ -604,7 +605,7 @@ static _Bool dispatch_brokers(const Config const config,   \
 
 	auto Buffer bfp;
 
-	auto Duct broker = NULL;
+	auto SSLDuct broker = NULL;
 
 	auto IDqueryReply reply;
 
@@ -637,7 +638,7 @@ static _Bool dispatch_brokers(const Config const config,   \
 	 * Initialize SSL connection and connect to the device identity
 	 * brokerage server.
 	 */
-	if ( (broker = NAAAIM_Duct_Init()) == NULL ) {
+	if ( (broker = NAAAIM_SSLDuct_Init()) == NULL ) {
 		fputs("Error on SSL object creation.\n", stderr);
 		goto done;
 	}
@@ -748,7 +749,7 @@ static _Bool dispatch_brokers(const Config const config,   \
  *		connection has been successfully processed.
  */
 
-static _Bool handle_connection(const Duct const duct, \
+static _Bool handle_connection(const SSLDuct const duct, \
 			       const Config const config)
 
 {
@@ -889,7 +890,7 @@ extern int main(int argc, char *argv[])
 
 	auto Config config = NULL;
 
-	auto Duct duct = NULL;
+	auto SSLDuct duct = NULL;
 
  
 	fprintf(stdout, "%s started.\n", SERVER);
@@ -926,7 +927,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Initialize SSL connection and wait for connections. */
-	if ( (duct = NAAAIM_Duct_Init()) == NULL ) {
+	if ( (duct = NAAAIM_SSLDuct_Init()) == NULL ) {
 		err = "Error on SSL object creation.";
 		goto done;
 	}
