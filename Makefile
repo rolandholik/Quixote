@@ -7,14 +7,14 @@
 
 # Variable declarations.
 CSRC = 	SHA256.c SHA256_hmac.c RSAkey.c OrgID.c PatientID.c RandomBuffer.c \
-	IDtoken.c SSLDuct.c Authenticator.c AES256_cbc.c AuthenReply.c	   \
-	IDqueryReply.c ProviderQuery.c
+	IDtoken.c Authenticator.c AES256_cbc.c AuthenReply.c	   \
+	IDqueryReply.c ProviderQuery.c SSLDuct.c 
 
 # SERVERS = root-referral device-broker user-broker identity-broker \
 # 	provider-server
 SERVERS = root-referral device-broker user-broker
 
-SUBDIRS = utils # client
+SUBDIRS = lib utils # client
 
 # CC = gcc
 CC = musl-gcc
@@ -69,7 +69,7 @@ CFLAGS := ${CFLAGS} -I./HurdLib -I${SSL_INCLUDE}
 #
 # Target directives.
 #
-.PHONY: client utils
+.PHONY: client ${SUBDIRS}
 
 
 # Targets
@@ -140,6 +140,9 @@ DBduct.o: DBduct.c
 # Subdirectory targets.
 #
 client:
+	${MAKE} -C $@;
+
+lib:
 	${MAKE} -C $@;
 
 utils:
