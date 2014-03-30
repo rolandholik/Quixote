@@ -25,7 +25,7 @@ CDEBUG = -g ${DMALLOC}
 CFLAGS = -Wall ${CDEBUG}
 
 # LDFLAGS = -s -L/usr/local/krb5/lib 
-LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib -L../HurdLib 
+LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib -L../lib -L../HurdLib
 
 
 #
@@ -40,9 +40,9 @@ LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib -L../HurdLib
 #
 COBJS = ${CSRC:.c=.o}
 
-LIBS = -lHurdLib
+LIBS = -lHurdLib -lNAAAIM
 
-CFLAGS := ${CFLAGS} -I.. -I../HurdLib -I${SSL_INCLUDE} \
+CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I${SSL_INCLUDE} \
 	-I${MUSL_INCLUDE}/tpm_tools -I${MUSL_INCLUDE}/tss
 
 

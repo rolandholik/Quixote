@@ -16,14 +16,7 @@
 
 
 /* Local defines. */
-/* Macro to clear object pointer if not NULL. */
-#define WHACK(obj) if (obj != NULL) {obj->whack(obj); obj = NULL;}
-
-/* Macro for defining a pointer to a constance object. */
-#define CO(obj, var) const obj const var
-
-/* Setkey utility location. */
-#define SETKEY_PATH "/usr/local/sbin/setkey"
+#define POSSUM_PORT 575
 
 
 /* Include files. */
@@ -37,12 +30,157 @@
 #include <HurdLib.h>
 #include <Buffer.h>
 #include <Config.h>
+#include <Duct.h>
 
 #include "Netconfig.h"
 #include "IPsec.h"
 
 
 /* Variable static to this file. */
+
+
+/**
+ * Private function.
+ *
+ * This function implements POSSUM host mode.  In this mode a
+ * connection is listened for on the default POSSUM port for a tunnel
+ * request.  Upon receipt of a connection the authentication challenge
+ * is received from the client and interpreted for validity.
+ *
+ * If the challenge packet is from a known client it is decrypted and
+ * the hardware attestation quote is verified.  The DH public key is
+ * used in combination with an ephemeral key to encode a nonce to
+ * be used as the shared secret.  The shared secret is encrypted
+ * against the public key supplied by the guest.
+ *
+ * The NONCE supplied by the guest is used as an HMAC key to hash the
+ * shared secret key with an expectation the client will perform the
+ * same transormation.
+ *
+ * A listening socket is then opened and a tunnel based verification
+ * connection is listened for.
+ *
+ * \param cfg	The configuration parameter which is used for
+ *		master mode.
+ *
+ * \return	A boolean value is used to indicate whether or not a
+ *		POSSUM connection was successfully processed.  A false
+ *		value indicates a connection failure was experienced
+ *		while a true value indicates succss.
+ */
+
+static _Bool host_mode(CO(Config, cfg))
+
+{
+	_Bool retn = false;
+
+	Duct duct = NULL;
+
+	Buffer bufr = NULL;
+
+
+	duct = NAAAIM_Duct_Init();
+	bufr = HurdLib_Buffer_Init();
+	if ( (duct == NULL) || (bufr == NULL) )
+		goto done;
+
+	duct->init_server(duct);
+	duct->init_port(duct, NULL, POSSUM_PORT);
+	duct->accept_connection(duct);
+
+	if ( !duct->receive_Buffer(duct, bufr) ) {
+		fputs("Error receiving data.\n", stderr);
+		goto done;
+	}
+	fputs("Identifier challenge: \n", stderr);
+	bufr->print(bufr);
+
+	retn = true;
+
+ done:
+	WHACK(duct);
+	WHACK(bufr);
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function implements POSSUM client mode.  In this mode a
+ * connection is established to the system which is running in host
+ * POSSUM hhost mode.
+ *
+ * When a connection is restablished the identification challenge is
+ * composed and sent to the host.  The identification challenges
+ * consists of the following elements encoded in an ASN1 block.
+ *
+ *	SCRYPT salt and identity challenge.
+ *	Requested authentication time.
+ *	Encrypted authentication block encrypted under OTEDKS
+ *		DH public key
+ *		Random NONCE
+ *		Hardware quote
+ *	HMAC checksum over all elements under SHA256(OTEDKS || PCR19)
+ *
+ * The client then waits for a host response.  The host response is
+ * encoded in the above format.
+ *
+ * The host response is authenticated and decrypted.  The IPsec
+ * encryption and authentication keys are extracted from the NONCE and
+ * used to configure the IPsec tunnel.
+ *
+ * A tunnel connection is then established and authenticated with the
+ * remote host.
+ *
+ * \param cfg	The configuration parameter which is used for
+ *		master mode.
+ *
+ * \return	A boolean value is used to indicate whether or not a
+ *		POSSUM connection was successfully processed.  A false
+ *		value indicates a connection failure was experienced
+ *		while a true value indicates succss.
+ */
+
+static _Bool client_mode(CO(Config, cfg))
+
+{
+	_Bool retn = false;
+
+	const char * remote_ip;
+
+	Duct duct = NULL;
+
+	Buffer bufr = NULL;
+
+	
+	duct = NAAAIM_Duct_Init();
+	bufr = HurdLib_Buffer_Init();
+	if ( (duct == NULL) || (bufr == NULL) )
+		goto done;
+
+	if ( (remote_ip = cfg->get(cfg, "remote_ip")) == NULL )
+		goto done;
+
+	duct->init_client(duct);
+	if ( !duct->init_port(duct, remote_ip, POSSUM_PORT) )
+		goto done;
+
+	bufr->add_hexstring(bufr, "feadbeaf");
+	if ( !duct->send_Buffer(duct, bufr) ) {
+		fputs("Error sending identifier.\n", stderr);
+		goto done;
+	}
+
+	retn = true;
+
+ done:
+	WHACK(duct);
+	WHACK(bufr);
+
+	return retn;
+}
 
 
 /**
@@ -114,7 +252,7 @@ extern int main(int argc, char *argv[])
 
 	int opt;
 
-	enum {initialize, accept} mode;
+	enum {host, client} mode;
 
 	Config config = NULL;
 
@@ -125,13 +263,13 @@ extern int main(int argc, char *argv[])
 
 
 	/* Get the root image and passwd file name. */
-	while ( (opt = getopt(argc, argv, "ACp:")) != EOF )
+	while ( (opt = getopt(argc, argv, "CHp:")) != EOF )
 		switch ( opt ) {
-			case 'A':
-				mode = initialize;
+			case 'C':
+				mode = client;
 				break;
-			case 'I':
-				mode = accept;
+			case 'H':
+				mode = host;
 				break;
 
 			case 'p':
@@ -158,6 +296,18 @@ extern int main(int argc, char *argv[])
 		fputs("Personality section not found.\n", stderr);
 		goto done;
 	}
+
+
+	/* Select execution mode. */
+	switch ( mode ) {
+		case host:
+			host_mode(config);
+			break;
+		case client:
+			client_mode(config);
+			break;
+	}
+	goto done;
 
 	/* Setup physical link. */
 	local_ip   = config->get(config, "local_ip");
