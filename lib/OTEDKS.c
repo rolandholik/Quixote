@@ -1,12 +1,22 @@
 /** \file
- * This file contains the implementation of an object for creating and
- * managing One Time Identification (OTI) keys.  These keys are 256 bits
- * in length and are designed to be used as keys for the AES encryption
- * of OTI payloads.
+ * This file contains the implementation of an object which creates
+ * 256 bit symmetric keys from an identity via One Time Epoch
+ * Differential Key Scheduling (OTEDKS).  The key scheduling is driven
+ * by the combination of a time differential and a user identification
+ * key.
+ *
+ * The time epoch differential is computed from the requested
+ * authentication time and the 'birthdate' of the identity.  This
+ * implementation uses the first 128 bits of the random key generated
+ * at the time of identity creation as the birthdate of the identity.
+ *
+ * The remaining 128 bits is used as the user identification key.
  */
+
 
 /**************************************************************************
  * (C)Copyright 2007, The Open Hurderos Foundation. All rights reserved.
+ * (C)Copyright 2014, IDfusion, LLC. All rights resevered.
  *
  * Please refer to the file named COPYING in the top of the source tree
  * for licensing information.
@@ -19,23 +29,25 @@
 #include <time.h>
 #include <netinet/in.h>
 
-#include <krb5.h>
-
 #include <Origin.h>
+#include <HurdLib.h>
 #include <Buffer.h>
 
-#include "KerDAP.h"
+#include "NAAAIM.h"
 #include "SHA256.h"
 #include "SHA256_hmac.h"
-#include "OTIkey.h"
+#include "OTEDKS.h"
+
+/* State extraction macro. */
+#define STATE(var) CO(OTEDKS_State, var) = this->state
 
 
 /* Verify library/object header file inclusions. */
-#if !defined(KerDAP_LIBID)
+#if !defined(NAAAIM_LIBID)
 #error Library identifier not defined.
 #endif
 
-#if !defined(KerDAP_OTIkey_OBJID)
+#if !defined(NAAAIM_OTEDKS_OBJID)
 #error Object identifier not defined.
 #endif
 
@@ -43,8 +55,8 @@
 #define IV_SIZE 16
 
 
-/** OTIkey private state information. */
-struct KerDAP_OTIkey_State
+/** OTEDKS private state information. */
+struct NAAAIM_OTEDKS_State
 {
 	/* The root object. */
 	Origin root;
@@ -84,7 +96,7 @@ struct KerDAP_OTIkey_State
 /**
  * Internal private method.
  *
- * This method is responsible for initializing the KerDAP_OTIkey_State
+ * This method is responsible for initializing the NAAAIM_OTEDKS_State
  * structure which holds state information for each instantiated object.
  *
  * \param S	A pointer to the object containing the state information which
@@ -93,10 +105,10 @@ struct KerDAP_OTIkey_State
  * \parram epoch	The epoch time of the identity.
  */
 
-static void _init_state(const OTIkey_State const S, time_t const epoch)
+static void _init_state(CO(OTEDKS_State, S), time_t const epoch)
 {
-	S->libid = KerDAP_LIBID;
-	S->objid = KerDAP_OTIkey_OBJID;
+	S->libid = NAAAIM_LIBID;
+	S->objid = NAAAIM_OTEDKS_OBJID;
 
 	S->epoch  = epoch;
 	S->offset = 0;
@@ -120,7 +132,7 @@ static void _init_state(const OTIkey_State const S, time_t const epoch)
  *		value indicates success.
  */
 
-static _Bool _init_aggregates(const OTIkey_State const S)
+static _Bool _init_aggregates(CO(OTEDKS_State, S))
 
 {
 	if ( (S->key = HurdLib_Buffer_Init()) == NULL )
@@ -132,10 +144,10 @@ static _Bool _init_aggregates(const OTIkey_State const S)
 	if ( (S->hmac_key = HurdLib_Buffer_Init()) == NULL )
 		return false;
 
-	if ( (S->digest = KerDAP_SHA256_Init()) == NULL )
+	if ( (S->digest = NAAAIM_SHA256_Init()) == NULL )
 		return false;
 
-	if ( (S->hmac = KerDAP_SHA256_hmac_Init(S->hmac_key)) == NULL )
+	if ( (S->hmac = NAAAIM_SHA256_hmac_Init(S->hmac_key)) == NULL )
 		return false;
 
 	return true;
@@ -167,16 +179,15 @@ static _Bool _init_aggregates(const OTIkey_State const S)
  *			true value indicates success.
  */
 
-static _Bool create_vector1(const OTIkey const this, \
-			    const Buffer const userkey)
+static _Bool create_vector1(CO(OTEDKS, this), CO(Buffer, userkey))
 
 {
-	auto const OTIkey_State const S = this->state;
+	STATE(S);
 
-	auto uint32_t offset = htonl(S->offset),
+	uint32_t offset = htonl(S->offset),
 		      epoch  = htonl(S->epoch);
 
-	auto struct tm *epoch_tm;
+	struct tm *epoch_tm;
 
 
 	/* Create the HMAC key by salting the user key. */
@@ -254,23 +265,21 @@ static _Bool create_vector1(const OTIkey const this, \
  *			true value indicates success.
  */
 
-static _Bool create_vector2(const OTIkey const this, \
-			    const Buffer const userkey, \
-			    const Buffer const tokenhash)
+static _Bool create_vector2(CO(OTEDKS, this), CO(Buffer, userkey), \
+			    CO(Buffer, tokenhash))
 
 {
-	auto const OTIkey_State const S = this->state;
+	STATE(S);
 
-	auto uint32_t offset = htonl(S->offset);
+	uint32_t offset = htonl(S->offset);
 
-	auto Buffer tb;
+	Buffer tb;
 
 
 	/* Compute the hash of the identity token. */
 	S->hmac_key->add_Buffer(S->hmac_key, tokenhash);
 	S->hmac_key->add(S->hmac_key, (unsigned char *) &offset, \
 			 sizeof(offset));
-
 #if 0
 	fputs("Token hash: ", stdout);
 	tokenhash->print(tokenhash);
@@ -324,12 +333,12 @@ static _Bool create_vector2(const OTIkey const this, \
  *		success.
  */
 
-static _Bool iterate(const OTIkey const this)
+static _Bool iterate(CO(OTEDKS, this))
 
 {
-	auto const OTIkey_State const S = this->state;
+	STATE(S);
 
-	auto int round = S->rounds;
+	int round = S->rounds;
 
 
 	while ( round > 0 ) {
@@ -394,11 +403,11 @@ static _Bool iterate(const OTIkey const this)
  *			an error is detected a NULL value is returned.
  */
 
-static Buffer compute(const OTIkey const this, time_t const authtime, \
-		      const Buffer const userkey,  const Buffer const token)
+static Buffer compute(CO(OTEDKS, this), time_t const authtime, \
+		      CO(Buffer, userkey), CO(Buffer, token))
 
 {
-	auto const OTIkey_State const S = this->state;
+	STATE(S);
 
 
 	/* Compute the epoch time offset. */
@@ -435,10 +444,10 @@ static Buffer compute(const OTIkey const this, time_t const authtime, \
  *		pointer is returned.
  */
 
-static Buffer get_key(const OTIkey const this)
+static Buffer get_key(CO(OTEDKS, this))
 
 {
-	auto const OTIkey_State const S = this->state;
+	STATE(S);
 
 
 	if ( S->key->size(S->key) == 0 )
@@ -460,10 +469,10 @@ static Buffer get_key(const OTIkey const this)
  *		pointer is returned.
  */
 
-static Buffer get_iv(const OTIkey const this)
+static Buffer get_iv(CO(OTEDKS, this))
 
 {
-	auto const OTIkey_State const S = this->state;
+	STATE(S);
 
 
 	if ( S->iv->size(S->iv) == 0 )
@@ -480,10 +489,11 @@ static Buffer get_iv(const OTIkey const this)
  * \param this	The key scheduler which is to be reset.
  */
 
-static void reset(const OTIkey const this)
+static void reset(CO(OTEDKS, this))
 
 {
-	auto const OTIkey_State const S = this->state;
+	STATE(S);
+
 
 	S->offset = 0;
 	S->rounds = 0;
@@ -501,15 +511,15 @@ static void reset(const OTIkey const this)
 /**
  * External public method.
  *
- * This method implements a destructor for a OTIkey object.
+ * This method implements a destructor for a OTEDKS object.
  *
  * \param this	A pointer to the object which is to be destroyed.
  */
 
-static void whack(const OTIkey const this)
+static void whack(CO(OTEDKS, this))
 
 {
-	auto const OTIkey_State const S = this->state;
+	STATE(S);
 
 
 	if ( S->key != NULL )
@@ -531,31 +541,31 @@ static void whack(const OTIkey const this)
 /**
  * External constructor call.
  *
- * This function implements a constructor call for a OTIkey object.
+ * This function implements a constructor call for a OTEDKS object.
  *
- * \return	A pointer to the initialized OTIkey.  A null value
+ * \return	A pointer to the initialized OTEDKS.  A null value
  *		indicates an error was encountered in object generation.
  * 
- * \param epoch		The epoch time of the pre-identification token.
+ * \param epoch		The epoch time of the requested authentication.
  */
 
-extern OTIkey KerDAP_OTIkey_Init(time_t const epoch)
+extern OTEDKS NAAAIM_OTEDKS_Init(time_t const epoch)
 
 {
-	auto Origin root;
+	Origin root;
 
-	auto OTIkey this = NULL;
+	OTEDKS this = NULL;
 
-	auto struct HurdLib_Origin_Retn retn;
+	struct HurdLib_Origin_Retn retn;
 
 
 	/* Get the root object. */
 	root = HurdLib_Origin_Init();
 
 	/* Allocate the object and internal state. */
-	retn.object_size  = sizeof(struct KerDAP_OTIkey);
-	retn.state_size   = sizeof(struct KerDAP_OTIkey_State);
-	if ( !root->init(root, KerDAP_LIBID, KerDAP_OTIkey_OBJID, &retn) )
+	retn.object_size  = sizeof(struct NAAAIM_OTEDKS);
+	retn.state_size   = sizeof(struct NAAAIM_OTEDKS_State);
+	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_OTEDKS_OBJID, &retn) )
 		return NULL;
 	this	    	  = retn.object;
 	this->state 	  = retn.state;

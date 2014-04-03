@@ -4,9 +4,9 @@
 
 
 # Variable declarations.
-CSRC = Duct.c
+CSRC = Duct.c OTEDKS.c
 
-TESTS = Duct_test
+TESTS = Duct_test OTEDKS_test
 
 CC = musl-gcc
 
@@ -64,15 +64,20 @@ tests: ${TESTS} ${COBJS}
 Duct_test: Duct_test.o Duct.o
 	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib
 
+OTEDKS_test: OTEDKS_test.o OTEDKS.o ../SHA256.o ../IDtoken.o ../SHA256_hmac.o
+	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib -L \
+		/usr/local/musl/ssl/lib -l ssl;
+
 tags:
 	/opt/emacs/bin/etags *.{h,c};
 clean:
 	rm -f *.o *~ TAGS;
 	rm -f ${LIBRARY};
-	rm -f ${TESTS};
+	rm -f ${TESTS} OTEDKS.out;
 
 
 # Source dependencies.
 Duct.o: Duct.h ../NAAAIM.h
+OTEDKS.o: ../NAAAIM.h OTEDKS.h
 
 Duct_test.o: Duct.h ../NAAAIM.h

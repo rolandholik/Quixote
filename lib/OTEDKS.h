@@ -1,51 +1,51 @@
 /** \file
  * This file contains the API definitions for an object used to create
- * and manipulate symmetric keys to One Time Identification (OTI) 
- * identification.  This file should be included by any files which create
- * or use such objects.
+ * symmetric keys from identity tokens using One Time Epoch
+ * Differential Key Scheduling.
  */
 
 /**************************************************************************
  * (C)Copyright 2007, The Open Hurderos Foundation. All rights reserved.
+ * (C)Copyright 2014, IDfusion, LLC. All rights reserved.
  *
  * Please refer to the file named COPYING in the top of the source tree
  * for licensing information.
  **************************************************************************/
 
-#ifndef KerDAP_OTIkey_HEADER
-#define KerDAP_OTIkey_HEADER
+#ifndef NAAAIM_OTEDKS_HEADER
+#define NAAAIM_OTEDKS_HEADER
 
 
 /* Object type definitions. */
-typedef struct KerDAP_OTIkey * OTIkey;
+typedef struct NAAAIM_OTEDKS * OTEDKS;
 
-typedef struct KerDAP_OTIkey_State * OTIkey_State;
+typedef struct NAAAIM_OTEDKS_State * OTEDKS_State;
 
 /**
- * External OTIkey object representation.
+ * External OTEDKS object representation.
  */
-struct KerDAP_OTIkey
+struct NAAAIM_OTEDKS
 {
 	/* External methods. */
 
-	_Bool (*create_vector1)(const OTIkey, const Buffer);
-	_Bool (*create_vector2)(const OTIkey, const Buffer, const Buffer);
-	_Bool (*iterate)(const OTIkey);
+	_Bool (*create_vector1)(const OTEDKS, const Buffer);
+	_Bool (*create_vector2)(const OTEDKS, const Buffer, const Buffer);
+	_Bool (*iterate)(const OTEDKS);
 
-	Buffer (*compute)(const OTIkey, time_t, const Buffer, const Buffer);
+	Buffer (*compute)(const OTEDKS, time_t, const Buffer, const Buffer);
 
-	Buffer (*get_key)(const OTIkey);
-	Buffer (*get_iv)(const OTIkey);
+	Buffer (*get_key)(const OTEDKS);
+	Buffer (*get_iv)(const OTEDKS);
 
-	void (*reset)(const OTIkey);
-	void (*whack)(const OTIkey);
+	void (*reset)(const OTEDKS);
+	void (*whack)(const OTEDKS);
 
 	/* Private state. */
-	OTIkey_State state;
+	OTEDKS_State state;
 };
 
 
-/* OTIkey constructor call. */
-extern OTIkey KerDAP_OTIkey_Init(time_t);
+/* OTEDKS constructor call. */
+extern OTEDKS NAAAIM_OTEDKS_Init(time_t);
 
 #endif
