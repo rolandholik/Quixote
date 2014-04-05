@@ -137,9 +137,19 @@ static Buffer encrypt(const AES256_cbc const this, Buffer in)
 		bp += S->blocksize;
 	}
 
-	if ( !EVP_EncryptFinal_ex(&S->context, encbuf, &residual) )
+	if ( residual != 0 ) {
+		if ( !EVP_EncryptUpdate(&S->context, encbuf, &encsize, bp, \
+					residual) )
+			return NULL;
+		if ( encsize > 0 )
+			S->buffer->add(S->buffer, encbuf, encsize);
+	}
+		
+	if ( !EVP_EncryptFinal_ex(&S->context, encbuf, &encsize) )
 		return NULL;
-	S->buffer->add(S->buffer, encbuf, residual);
+	if ( encsize > 0 )
+		S->buffer->add(S->buffer, encbuf, encsize);
+
 
 	return S->buffer;
 }
@@ -166,20 +176,24 @@ static Buffer decrypt(const AES256_cbc const this, Buffer in)
 	unsigned char *bp = in->get(in),
 		      decbuf[S->blocksize * 2];
 
-	unsigned int lp,
-		     rounds;
+	int lp,
+	    decsize,
+	    rounds,
+	    residual;
 
-	int decsize;
+	size_t size = in->size(in);
 
 
 	if ( S->mode != decrypt_mode )
 		return NULL;
-	if ( in->size(in) == 0 )
+	if ( size == 0 )
 		return NULL;
 
-	rounds = in->size(in) / S->blocksize;
 
-	for (lp= 0; lp < rounds; ++lp) {
+	rounds   = size / S->blocksize;
+	residual = size % S->blocksize;
+
+	for (lp= 0; lp < rounds; ++lp ) {
 		memcpy(decbuf, bp, S->blocksize);
 
 		if ( !EVP_DecryptUpdate(&S->context, decbuf, &decsize, bp, \
@@ -192,7 +206,8 @@ static Buffer decrypt(const AES256_cbc const this, Buffer in)
 
 	if ( !EVP_DecryptFinal_ex(&S->context, decbuf, &decsize) )
 		return NULL;
-	S->buffer->add(S->buffer, decbuf, decsize);
+	if ( decsize > 0 )
+		S->buffer->add(S->buffer, decbuf, decsize);
 
 	return S->buffer;
 }
