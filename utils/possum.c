@@ -16,7 +16,16 @@
 
 
 /* Local defines. */
+#if 0
 #define POSSUM_PORT 575
+#else
+#define POSSUM_PORT 10902
+#endif
+
+/* Object initialization macros. */
+#define CCALL(lib,obj,init) lib##_##obj##_##init
+#define INIT(lib, obj, var, action) \
+	if ( (var = CCALL(lib,obj,Init)()) == NULL ) action
 
 
 /* Include files. */
@@ -30,10 +39,13 @@
 #include <HurdLib.h>
 #include <Buffer.h>
 #include <Config.h>
+
 #include <Duct.h>
+#include <IDtoken.h>
 
 #include "Netconfig.h"
 #include "IPsec.h"
+#include "PossumPacket.h"
 
 
 /* Variable static to this file. */
@@ -74,32 +86,65 @@ static _Bool host_mode(CO(Config, cfg))
 {
 	_Bool retn = false;
 
+	char *cfg_item;
+
+	FILE *token_file = NULL;
+
 	Duct duct = NULL;
 
 	Buffer bufr = NULL;
 
+	IDtoken token = NULL;
+	
+	PossumPacket packet = NULL;
 
-	duct = NAAAIM_Duct_Init();
-	bufr = HurdLib_Buffer_Init();
-	if ( (duct == NULL) || (bufr == NULL) )
+
+	/* Load host identity token. */
+	INIT(NAAAIM, IDtoken, token, goto done);
+	if ( (cfg_item = cfg->get(cfg, "identity")) == NULL )
+		goto done;
+	if ( (token_file = fopen(cfg_item, "r")) == NULL )
+		goto done;
+	if ( !token->parse(token, token_file) )
 		goto done;
 
+	/* Setup the network port. */
+	INIT(HurdLib, Buffer, bufr, goto done);
+
+	INIT(NAAAIM, Duct, duct, goto done);
 	duct->init_server(duct);
 	duct->init_port(duct, NULL, POSSUM_PORT);
 	duct->accept_connection(duct);
 
-	if ( !duct->receive_Buffer(duct, bufr) ) {
-		fputs("Error receiving data.\n", stderr);
+	/* Wait for a packet to arrive. */
+	fputs("Waiting for packet.\n", stderr);
+	if ( !duct->receive_Buffer(duct, bufr) )
+		goto done;
+
+	INIT(NAAAIM, PossumPacket, packet, goto done);
+	fputs("Decoding packet\n", stderr);
+	if ( !packet->decode_packet1(packet, bufr) )
+		goto done;
+	fputs("Received packet.\n", stdout);
+	packet->print(packet);
+
+	bufr->reset(bufr);
+	if ( !packet->get_authenticator(packet, token, bufr) ) {
+		fputs("Failed authenticator decryption.\n", stdout);
 		goto done;
 	}
-	fputs("Identifier challenge: \n", stderr);
+	fputs("\nDecrypted authenticator:\n", stdout);
 	bufr->print(bufr);
-
+	
 	retn = true;
 
  done:
+	if ( token_file != NULL )
+		fclose(token_file);
 	WHACK(duct);
 	WHACK(bufr);
+	WHACK(token);
+	WHACK(packet);
 
 	return retn;
 }
@@ -148,26 +193,47 @@ static _Bool client_mode(CO(Config, cfg))
 {
 	_Bool retn = false;
 
-	const char * remote_ip;
+	const char *cfg_item;
+
+	FILE *token_file = NULL;
 
 	Duct duct = NULL;
 
 	Buffer bufr = NULL;
 
+	IDtoken token = NULL;
+
+	PossumPacket packet = NULL;
+
 	
-	duct = NAAAIM_Duct_Init();
-	bufr = HurdLib_Buffer_Init();
-	if ( (duct == NULL) || (bufr == NULL) )
+	/* Load identity token. */
+	INIT(NAAAIM, IDtoken, token, goto done);
+	if ( (cfg_item = cfg->get(cfg, "identity")) == NULL )
+		goto done;
+	if ( (token_file = fopen(cfg_item, "r")) == NULL )
+		goto done;
+	if ( !token->parse(token, token_file) )
 		goto done;
 
-	if ( (remote_ip = cfg->get(cfg, "remote_ip")) == NULL )
+	/* Setup a connection to the remote host. */
+	if ( (cfg_item = cfg->get(cfg, "remote_ip")) == NULL )
 		goto done;
 
+	INIT(NAAAIM, Duct, duct, goto done);
 	duct->init_client(duct);
-	if ( !duct->init_port(duct, remote_ip, POSSUM_PORT) )
+	if ( !duct->init_port(duct, cfg_item, POSSUM_PORT) )
 		goto done;
 
-	bufr->add_hexstring(bufr, "feadbeaf");
+	/* Send a session initiation packet. */
+	INIT(HurdLib, Buffer, bufr, goto done);
+
+	INIT(NAAAIM, PossumPacket, packet, goto done);
+	packet->create_packet1(packet, token);
+	fputs("Sending packet.\n", stdout);
+	packet->print(packet);
+
+	if ( !packet->encode_packet1(packet, bufr) )
+		goto done;
 	if ( !duct->send_Buffer(duct, bufr) ) {
 		fputs("Error sending identifier.\n", stderr);
 		goto done;
@@ -176,8 +242,12 @@ static _Bool client_mode(CO(Config, cfg))
 	retn = true;
 
  done:
+	if ( token_file != NULL )
+		fclose(token_file);
 	WHACK(duct);
 	WHACK(bufr);
+	WHACK(token);
+	WHACK(packet);
 
 	return retn;
 }
@@ -211,7 +281,7 @@ static _Bool setup_tunnel_interface(CO(char *, iface), CO(char *, ip), \
 
 	Netconfig netconfig = NULL;
 
-
+	goto done;
 	fprintf(stderr, "iface: %s\n", iface);
 	fprintf(stderr, "ip: %s/%s\n", ip, ip_mask);
 	fprintf(stderr, "remote: %s/%s\n", net_remote, net_mask);
@@ -301,10 +371,18 @@ extern int main(int argc, char *argv[])
 	/* Select execution mode. */
 	switch ( mode ) {
 		case host:
-			host_mode(config);
+			if ( !host_mode(config) ) {
+				fputs("Error initiating host mode.\n", \
+				      stderr);
+				goto done;
+			}
 			break;
 		case client:
-			client_mode(config);
+			if ( !client_mode(config) ) {
+				fputs("Error initiating client mode.\n", \
+				      stderr);
+				goto done;
+			}
 			break;
 	}
 	goto done;
@@ -365,7 +443,6 @@ extern int main(int argc, char *argv[])
 	}
 
 	/* Configure secure network interface and route. */
-#if 0
 	local_ip = config->get(config, "secure_local_ip");
 	
 	if ( !setup_tunnel_interface(interface, local_ip, local_mask, \
@@ -373,7 +450,6 @@ extern int main(int argc, char *argv[])
 		fputs("Error setting up tunnel interface.\n", stderr);
 		return 1;
 	}
-#endif
 
 
  done:

@@ -4,7 +4,7 @@
 
 
 # Variable declarations.
-CSRC = gen-image.c load-image.c boot.c Netconfig.c IPsec.c
+CSRC = gen-image.c load-image.c boot.c Netconfig.c IPsec.c PossumPacket.c
 
 TOOLS = gen-image load-image boot possum
 
@@ -67,8 +67,9 @@ load-image: load-image.o
 boot: boot.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
-possum: possum.o Netconfig.o IPsec.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl;
+possum: possum.o Netconfig.o IPsec.o PossumPacket.o
+	${CC} ${LDFLAGS} -o $@ $^ ../IDtoken.o ../SHA256_hmac.o ../SHA256.o \
+		../RandomBuffer.o ../AES256_cbc.o ${SSL_LIBRARY} ${LIBS} -lfl;
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};
@@ -81,4 +82,5 @@ clean:
 Netconfig.o: Netconfig.h
 IPsec.o: IPsec.h
 
-possum.o: Netconfig.h IPsec.h
+possum.o: Netconfig.h IPsec.h PossumPacket.h ../IDtoken.h ../SHA256_hmac.h \
+	../RandomBuffer.h ../AES256_cbc.h ../SHA256.h
