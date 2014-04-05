@@ -18,7 +18,13 @@ typedef struct NAAAIM_IDtoken * IDtoken;
 
 typedef struct NAAAIM_IDtoken_State * IDtoken_State;
 
-typedef enum {IDtoken_orgkey, IDtoken_orgid, IDtoken_id} IDtoken_element;
+typedef enum {
+	IDtoken_orgkey,
+	IDtoken_orgid,
+	IDtoken_id,
+	IDtoken_key
+} IDtoken_element;
+
 
 /**
  * External IDtoken object representation.

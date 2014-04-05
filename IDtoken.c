@@ -200,6 +200,10 @@ static Buffer get_element(const IDtoken const this, \
 		case IDtoken_id:
 			return S->ptid;
 			break;
+		case IDtoken_key:
+			return S->idkey;
+			break;
+
 		default:
 			return NULL;
 			break;
@@ -372,8 +376,8 @@ static _Bool parse(const IDtoken const this, FILE *input)
 		}
 		if ( strcmp(inbufr, PTID_END) == 0 ) {
 			ptid_started = false;
-			if ( S->ptid->size(S->ptid) != 256 )
-				goto err;
+			if ( (S->ptid->size(S->ptid) != 256) &&
+			     (S->ptid->size(S->ptid) != 32) )
 			continue;
 		}
 		if ( ptid_started ) {
