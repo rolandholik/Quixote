@@ -27,14 +27,16 @@ struct NAAAIM_PossumPacket
 {
 	/* External methods. */
 	_Bool (*create_packet1)(const PossumPacket, const IDtoken);
+	_Bool (*get_identity)(const PossumPacket, const Buffer);
 	_Bool (*get_authenticator)(const PossumPacket, const IDtoken, \
 				   const Buffer);
-	_Bool (*add_element)(const PossumPacket, const Buffer);
-	_Bool (*get_element)(const PossumPacket, const Buffer);
-	_Bool (*encrypt)(const PossumPacket);
-	_Bool (*decrypt)(const PossumPacket);
-	_Bool (*encode_packet1)(const PossumPacket, const Buffer);
-	_Bool (*decode_packet1)(const PossumPacket, const Buffer);
+	_Bool (*encode_packet1)(const PossumPacket, const Buffer, \
+				const Buffer);
+	_Bool (*decode_packet1)(const PossumPacket, const IDtoken, \
+				const Buffer, const Buffer);
+	_Bool (*set_schedule)(const PossumPacket, const IDtoken, \
+			      time_t);
+
 	void (*print)(const PossumPacket);
 	void (*reset)(const PossumPacket);
 	void (*whack)(const PossumPacket);

@@ -11,11 +11,6 @@
  **************************************************************************/
 
 /* Local defines. */
-/* Object initialization macros. */
-#define CCALL(lib,obj,init) lib##_##obj##_##init
-#define INIT(lib, obj, var, action) \
-	if ( (var = CCALL(lib,obj,Init)()) == NULL ) action
-
 #define BIRTHDATE 1396167420
 
 
@@ -23,6 +18,9 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <string.h>
+#include <time.h>
+#include <arpa/inet.h>
 
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
@@ -70,6 +68,11 @@ struct NAAAIM_PossumPacket_State
 	_Bool poisoned;
 
 	/**
+	 * The key scheduler to be used.
+	 */
+	OTEDKS otedks;
+
+	/**
 	 * The replay nonce which will be used as the key to generate
 	 * the shared secret from the diffie-hellman based key.
 	 */
@@ -89,6 +92,10 @@ struct NAAAIM_PossumPacket_State
 	/* The Buffer object holding the identity authenticator. */
 	Buffer authenticator;
 
+	/**
+	 * A Buffer object which holds the HMAC checksum over a packet.
+	 */
+	Buffer checksum;
 };
 
 
@@ -98,13 +105,11 @@ struct NAAAIM_PossumPacket_State
  * the wire.
  */
 typedef struct {
-	ASN1_OCTET_STRING *identity;
 	ASN1_INTEGER *auth_time;
 	ASN1_OCTET_STRING *authenticator;
 } packet1_payload;
 
 ASN1_SEQUENCE(packet1_payload) = {
-	ASN1_SIMPLE(packet1_payload, identity,  ASN1_OCTET_STRING),
 	ASN1_SIMPLE(packet1_payload, auth_time, ASN1_INTEGER),
 	ASN1_SIMPLE(packet1_payload, authenticator, \
 		    ASN1_OCTET_STRING),
@@ -128,15 +133,75 @@ static void _init_state(CO(PossumPacket_State, S)) {
 	S->libid = NAAAIM_LIBID;
 	S->objid = NAAAIM_PossumPacket_OBJID;
 
-	S->poisoned = false;
+	S->poisoned	 = false;
+	S->otedks	 = NULL;
 	S->nonce	 = NULL;
 	S->identity	 = NULL;
 	S->authenticator = NULL;
+	S->checksum	 = NULL;
 
 	return;
 }
 
 
+/**
+ * Internal private method.
+ *
+ * This function computes the packet checksum over the supplied buffer.
+ *
+ * \param this		The object whose packet checksum is to be
+ *			computed.
+ *
+ * \param packet	The state of the object for which the
+ *			authenticator is being built.
+ *
+ * \param status	A buffer containing the software status to be
+ *			used in encoding the checksum.
+ *
+ * \return		If an error is encountered a false value is
+ *			returned, a true value indicates the authenticator
+ *			was constructed.
+ */
+
+static _Bool compute_checksum(CO(PossumPacket_State, S), \
+			      CO(Buffer, status), CO(Buffer, packet))
+
+{
+	_Bool retn = false;
+
+	Buffer b;
+
+	SHA256 hmac_key;
+
+	SHA256_hmac hmac;
+
+
+	/* Verify the packet checksum. */
+	INIT(NAAAIM, SHA256, hmac_key, goto done);
+	hmac_key->add(hmac_key, status);
+	hmac_key->add(hmac_key, S->otedks->get_key(S->otedks));
+	if ( !hmac_key->compute(hmac_key) )
+		goto done;
+	b = hmac_key->get_Buffer(hmac_key);
+
+	if ( (hmac = NAAAIM_SHA256_hmac_Init(b)) == NULL )
+		goto done;
+	hmac->add_Buffer(hmac, packet);
+	if ( !hmac->compute(hmac) )
+		goto done;
+
+	if ( S->checksum->add_Buffer(S->checksum, hmac->get_Buffer(hmac)) )
+		retn = true;
+	S->checksum->print(S->checksum);
+
+ done:
+	WHACK(hmac_key);
+	WHACK(hmac);
+
+	return retn;
+}
+
+			 
 /**
  * Internal private function.
  *
@@ -155,18 +220,15 @@ static void _init_state(CO(PossumPacket_State, S)) {
  * \param state		The state of the object for which the
  *			authenticator is being built.
  *
- * \param idkey		A Buffer object containing the identity key.
- *
- * \param idhash	A Buffer object containing the hash of the
- *			identity.
+ * \param otedks	The key scheduler to be used to create the
+ *			authenticator.
  *
  * \return		If an error is encountered a false value is
  *			returned, a true value indicates the authenticator
  *			was constructed.
  */
 
-static _Bool create_authenticator(CO(PossumPacket_State, S), \
-				  CO(Buffer, idkey), CO(Buffer, idhash))
+static _Bool create_authenticator(CO(PossumPacket_State, S))
 
 {
 	_Bool retn = false;
@@ -175,9 +237,7 @@ static _Bool create_authenticator(CO(PossumPacket_State, S), \
 
 	Buffer key,
 	       iv,
-	       auth;
-
-	OTEDKS otedks;
+	       auth = NULL;
 
 	AES256_cbc cipher;
 
@@ -197,16 +257,10 @@ static _Bool create_authenticator(CO(PossumPacket_State, S), \
 	if ( !auth->add_hexstring(auth, "0000fead0000beaf") )
 		goto done;
 
-	/* Generate the OTEDKS key. */
-	if ( (otedks = NAAAIM_OTEDKS_Init(BIRTHDATE)) == NULL )
-		goto done;
-	S->auth_time = time(NULL);
-	if ( !otedks->compute(otedks, S->auth_time, idkey, idhash) )
-		goto done;
-	key = otedks->get_key(otedks);
-	iv  = otedks->get_iv(otedks);
-
 	/* Encrypt the authenticator. */
+	key = S->otedks->get_key(S->otedks);
+	iv  = S->otedks->get_iv(S->otedks);
+
 	if ( (cipher = NAAAIM_AES256_cbc_Init_encrypt(key, iv)) == NULL )
 		goto done;
 	if ( cipher->encrypt(cipher, auth) == NULL )
@@ -220,8 +274,8 @@ static _Bool create_authenticator(CO(PossumPacket_State, S), \
  done:
 	if ( !retn )
 		S->poisoned = true;
+
 	WHACK(auth);
-	WHACK(otedks);
 	WHACK(cipher);
 
 	return retn;
@@ -235,9 +289,11 @@ static _Bool create_authenticator(CO(PossumPacket_State, S), \
  * packet.  This packet is sent by the client to identify and attest
  * the state of the client.
  *
- * \param this	The object whose packet 1 state is to be created.
+ * \param this		The object whose packet 1 state is to be
+ *			created.
  *
- * \param token	The identity token to be used to create the state.
+ * \param token		The identity token to be used to create the
+ *			state.
  *
  * \return	A boolean value is used to indicate the sucess or
  *		failure of creating the packet.  A false value
@@ -254,23 +310,23 @@ static _Bool create_packet1(CO(PossumPacket, this), CO(IDtoken, token))
 	_Bool retn = false;
 
 	Buffer b,
-	       key;
+	       key = NULL;
 
 	RandomBuffer nonce = NULL;
-
-	SHA256 hash = NULL;
 
 	SHA256_hmac hmac = NULL;
 
 
+	/* Status checks. */
 	if ( S->poisoned )
+		goto done;
+	if ( token == NULL )
 		goto done;
 
 	/* Load the identification challenge nonce. */
 	INIT(NAAAIM, RandomBuffer, nonce, goto done);
 	nonce->generate(nonce, 256 / 8);
 	S->identity->add_Buffer(S->identity, nonce->get_Buffer(nonce));
-
 
 	/* Hash the organization key and identity with the nonce. */
 	if ( (hmac = NAAAIM_SHA256_hmac_Init(S->identity)) == NULL )
@@ -288,30 +344,57 @@ static _Bool create_packet1(CO(PossumPacket, this), CO(IDtoken, token))
 	if ( !S->identity->add_Buffer(S->identity, hmac->get_Buffer(hmac)) )
 		goto done;
 
+	/* Create the authenticator based on the OTEDKS key. */
+	if ( create_authenticator(S) )
+		retn = true;
 
-	/* Build the authenticator. */
-	INIT(NAAAIM, SHA256, hash, goto done);
-	if ( (b = token->get_element(token, IDtoken_id)) == NULL )
+ done:
+	WHACK(key);
+	WHACK(nonce);
+	WHACK(hmac);
+
+	if ( retn == false )
+		S->poisoned = true;
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements retrieval of the asserted identity.
+ *
+ * \param this	The packet whose identity is to be retrieved.
+ *
+ * \param bufr	The Buffer object which the identity is to be
+ *		loaded into.
+ *
+ * \return	A boolean value is used to indicate the sucess or
+ *		failure of loading the elements.  On failure the object
+ *		is poisoned for future activity.
+ */
+
+static _Bool get_identity(CO(PossumPacket, this), CO(Buffer, bufr))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Status checks. */
+	if ( S->poisoned )
 		goto done;
-	hash->add(hash, b);
-	if ( !hash->compute(hash) )
+	if ( (bufr == NULL) || bufr->poisoned(bufr) )
 		goto done;
 
-	if ( (key = token->get_element(token, IDtoken_key)) == NULL )
-		goto done;
-
-	if ( !create_authenticator(S, key, hash->get_Buffer(hash)) )
+	if ( !bufr->add_Buffer(bufr, S->identity) )
 		goto done;
 
 	retn = true;
 
-
  done:
-	WHACK(nonce)
-	WHACK(hash);
-	WHACK(hmac);
-
-	if ( retn == false )
+	if ( !retn )
 		S->poisoned = true;
 	return retn;
 }
@@ -403,261 +486,26 @@ static _Bool get_authenticator(CO(PossumPacket, this), CO(IDtoken, token), \
 /**
  * External public method.
  *
- * This method implements adding the identity elements which are to be
- * authenticated.
- *
- * \param this	The authenticator to which an element is to be added.
- *
- * \param bufr	The element which is to be added.
- *
- * \return	A boolean value is used to indicate the sucess or
- *		failure of loading the elements.  On failure the object
- *		is poisoned for future use.
- */
-
-static _Bool add_element(CO(PossumPacket, this), CO(Buffer, element))
-
-{
-	STATE(S);
-
-	_Bool retn = false;
-
-
-	if ( S->poisoned || element->poisoned(element) )
-		goto done;
-
-	retn = true;
-
-
- done:
-	if ( retn == false )
-		S->poisoned = true;
-
-	return retn;
-}
-
-
-/**
- * External public method.
- *
- * This method implements retrieving the identity elements have been
- * authenticated.
- *
- * \param this	The authenticator to from which the elements are to
- *		be retroeved. an element is to be added.
- *
- * \param bufr	The Buffer object which is to be loaded with the
- *		authenicated identity elements.
- *
- * \return	A boolean value is used to indicate the sucess or
- *		failure of loading the elements.  On failure the object
- *		is poisoned for future use.
- */
-
-static _Bool get_element(CO(PossumPacket, this), CO(Buffer, bufr))
-
-{
-	STATE(S);
-
-	_Bool retn = false;
-
-
-	if ( S->poisoned )
-		goto done;
-
-	retn = true;
-
-
- done:
-	if ( retn == false )
-		S->poisoned = true;
-
-	return retn;
-}
-
-
-/**
- * External public method.
- *
- * This method is responsible for generating a single use key for
- * encrypting the identity elements which are to be authenticated by
- * the target identifying organization.  The symmetric key is itself
- * encrypted in the authenticator's private RSA key.
- *
- * \param this	The PossumPacket object whose elements are to be
- *		encrypted.
- *
- * \param rsa	A pointer to a null-terminated buffer containing the
- *		RSA private key to be used for encrypting the
- *		symmetric key.
- *
- * \return	A boolean value is used to return success or failure of
- *		key generation.  A true value is used to indicate
- *		success.
- */
-
-static _Bool encrypt(CO(PossumPacket, this))
-
-{
-#if 0
-	STATE(S);
-
-	_Bool retn = false;
-
-	Buffer encrypted,
-		    iv = NULL;
-
-	RandomBuffer randbufr = NULL;
-
-	AES256_cbc aes256 = NULL;
-
-
-	/* Sanity checks. */
-	if ( S->poisoned )
-		goto done;
-
-
-	/* Generate the random key and initialization vector. */
-	if ( (randbufr = NAAAIM_RandomBuffer_Init()) == NULL )
-		goto done;
-	randbufr->generate(randbufr, (256 / 2) / 8);
-
-	if ( (iv = HurdLib_Buffer_Init()) == NULL )
-		goto done;
-	iv->add_Buffer(iv, randbufr->get_Buffer(randbufr));
-
-	randbufr->generate(randbufr, 256 / 8);
-	S->key->add_Buffer(S->key, randbufr->get_Buffer(randbufr));
-
-
-	/* Encrypt the elements. */
-	if ( (aes256 = NAAAIM_AES256_cbc_Init_encrypt(S->key, iv)) == NULL )
-		goto done;
-	if ( (encrypted = aes256->encrypt(aes256, S->elements)) == NULL )
-		goto done;
-
-	S->elements->reset(S->elements);
-	if ( !S->elements->add_Buffer(S->elements, encrypted) )
-		goto done;
-
-
-	/* Encrypt the random key. */
-	S->key->add_Buffer(S->key, iv);
-		
-	retn = true;
-
-
- done:
-	if ( retn == false )
-		S->poisoned = true;
-
-	if ( iv != NULL )
-		iv->whack(iv);
-	if ( randbufr != NULL )
-		randbufr->whack(randbufr);
-	if ( aes256 != NULL )
-		aes256->whack(aes256);
-
-	return retn;
-#endif
-	return 1;
-}
-
-
-/**
- * External public method.
- *
- * This method is responsible for decrypting a previously encrypted
- * authenticator payload.  The symmetric key and initialization vector
- * are obtained from the RSA encrypted key package and used to
- * decrypt the target identity elements.
- *
- * \param this	The PossumPacket object whose elements are to be
- *		decrypted..
- *
- * \param rsa	A pointer to a null-terminated buffer containing the
- *		RSA public key to be used for decrypting the symmetric
- *		key and initialization vector.
- *
- * \return	A boolean value is used to return success or failure of
- *		key generation.  A true value is used to indicate
- *		success.
- */
-
-static _Bool decrypt(CO(PossumPacket, this))
-
-{
-#if 0
-	STATE(S);
-
-	_Bool retn = false;
-
-	Buffer decrypted,
-		    iv = NULL;
-
-	AES256_cbc aes256 = NULL;
-
-
-	/* Sanity checks. */
-	if ( S->poisoned )
-		goto done;
-
-
-	/* Decrypt the initialization vector and symmetric key. */
-	if ( (iv = HurdLib_Buffer_Init()) == NULL )
-		goto done;
-
-	iv->add(iv, S->key->get(S->key) + (256 / 8), 128 / 8);
-	S->key->shrink(S->key, 128 / 8);
-
-
-	/* Encrypt the elements. */
-	if ( (aes256 = NAAAIM_AES256_cbc_Init_decrypt(S->key, iv)) == NULL )
-		goto done;
-	if ( (decrypted = aes256->decrypt(aes256, S->elements)) == NULL )
-		goto done;
-
-	S->elements->reset(S->elements);
-	if ( !S->elements->add_Buffer(S->elements, decrypted) )
-		goto done;
-
-	retn = true;
-
-
- done:
-	if ( retn == false )
-		S->poisoned = true;
-
-	if ( iv != NULL )
-		iv->whack(iv);
-	if ( aes256 != NULL )
-		aes256->whack(aes256);
-
-	return retn;
-#endif
-	return 1;
-}
-
-
-/**
- * External public method.
- *
  * This method implements the encoding of the contents of the
  * PossumPacket object into an ASN1 structure.  The binary encoding
  * is loaded into a Buffer object provided by the caller.
  *
- * \param this	The packet1 payload whose elements are to be
- *		encoded for transmission.
+ * \param this		The packet1 payload whose elements are to be
+ *			encoded for transmission.
  *
- * \param bufr	The Buffer object which the payload is to be encoded
- *		into.
+ * \param status	The software status to be used in encoding the
+ *			packet.
+ *
+ * \param bufr		The Buffer object which the payload is to be encoded
+ *			into.
  *
  * \return	A boolean value is used to return success or failure of
  *		the encoding.  A true value is used to indicate
  *		success.  Failure results in poisoning of the object.
  */
 
-static _Bool encode_packet1(CO(PossumPacket, this), CO(Buffer, bufr))
+static _Bool encode_packet1(CO(PossumPacket, this), CO(Buffer, status),
+			    CO(Buffer, bufr))
 
 {
 	STATE(S);
@@ -670,22 +518,30 @@ static _Bool encode_packet1(CO(PossumPacket, this), CO(Buffer, bufr))
 
 	int asn_size;
 
+	uint32_t auth_time;
+
 	packet1_payload *packet1 = NULL;
 
 
-	if ( S->poisoned || bufr->poisoned(bufr) )
+	/* Arguement status check. */
+	if ( S->poisoned )
+		goto done;
+	if ( (status == NULL ) || status->poisoned(status) )
+		goto done;
+	if ( (bufr == NULL) || bufr->poisoned(bufr) )
 		goto done;
 
+	/* Add the identity assertion to the packet. */
+	bufr->add_Buffer(bufr, S->identity);
 
+	/* Add the authentication time. */
+	auth_time = htonl(S->auth_time);
+	if ( !bufr->add(bufr, (unsigned char *) &auth_time, \
+			sizeof(auth_time)) )
+		goto done;
+
+	/* ASN1 encode the authenticator. */
 	if ( (packet1 = packet1_payload_new()) == NULL )
-		goto done;
-
-        if ( ASN1_OCTET_STRING_set(packet1->identity,			\
-				   S->identity->get(S->identity),	\
-                                   S->identity->size(S->identity)) != 1 )
-                goto done;
-
-	if ( ASN1_INTEGER_set(packet1->auth_time, S->auth_time) != 1 )
 		goto done;
 
         if ( ASN1_OCTET_STRING_set(packet1->authenticator,		     \
@@ -700,8 +556,11 @@ static _Bool encode_packet1(CO(PossumPacket, this), CO(Buffer, bufr))
 	if ( !bufr->add(bufr, asn, asn_size) )
 		goto done;
 
-	retn = true;
-	
+	/* Append the checksum to the packet. */
+	if ( !compute_checksum(S, status, bufr) )
+		goto done;
+	if ( bufr->add_Buffer(bufr, S->checksum) )
+		retn = true;
 
  done:
 	if ( retn == false )
@@ -716,22 +575,33 @@ static _Bool encode_packet1(CO(PossumPacket, this), CO(Buffer, bufr))
 /**
  * External public method.
  *
- * This method implements decoding the contents of a DER encoded ASN1
- * structure into an PossumPacket object.  The binary encoding is
- * provided by a Buffer supplied by the caller.
+ * This method implements verification of a type 1 packet and
+ * subjsequent decoding of the authenticator.  The type 1 packet
+ * consists of the following three fields:
  *
- * \param this	The PossumPacket object which is to receive the
- *		encoded object.
+ *	Identity assertion
+ *	32-bit authentication time in network byte order.
+ *	Authenticator
+ *	HMAC-SHA256 checksum over the three data elements of the
+ *	packet.
+ *	
+ * \param this		The PossumPacket object which is to receive the
+ *			encoded object.
  *
- * \param bufr	A buffer object containing the encoded structure to
- *		loaded.
+ * \param token		The identity token of the client which had initiatied
+ *			the packet.
+ *
+ * \param status	The anticipated software status of the client.
+ *
+ * \param packet	The type 1 packet being decoded.
  *
  * \return	A boolean value is used to return success or failure of
  *		the decoding.  A true value is used to indicate
  *		success.  Failure results in poisoning of the object.
  */
 
-static _Bool decode_packet1(CO(PossumPacket, this), CO(Buffer, bufr))
+static _Bool decode_packet1(CO(PossumPacket, this), CO(IDtoken, token),
+			    CO(Buffer, status), CO(Buffer, packet))
 
 {
 	STATE(S);
@@ -746,20 +616,44 @@ static _Bool decode_packet1(CO(PossumPacket, this), CO(Buffer, bufr))
 
 	packet1_payload *packet1 = NULL;
 
+	Buffer payload = NULL;
 
-	if ( S->poisoned || bufr->poisoned(bufr) )
+
+	/* Arguement status checks. */
+	if ( S->poisoned )
+		goto done;
+	if ( token == NULL )
+		goto done;
+	if ( (status == NULL) || status->poisoned(status) )
+		goto done;
+	if ( (packet == NULL) || packet->poisoned(packet) )
 		goto done;
 
+	/* Extract the authentication time and initialize the scheduler. */
+	S->auth_time = *((uint32_t *) (packet->get(packet) + 2*NAAAIM_IDSIZE));
+	S->auth_time = ntohl(S->auth_time);
+	fprintf(stdout, "Auth time: %d\n", (int) S->auth_time);
+	this->set_schedule(this, token, S->auth_time);
 
-	p = bufr->get(bufr);
-	asn_size = bufr->size(bufr);
+	/* Compute the checksum over the packet. */
+	INIT(HurdLib, Buffer, payload, goto done);
+	if ( !payload->add(payload, packet->get(packet), \
+			   packet->size(packet) - NAAAIM_IDSIZE) )
+		goto done;
+	if ( !compute_checksum(S, status, payload) )
+		goto done;
+
+	p  = packet->get(packet) + packet->size(packet);
+	p -= NAAAIM_IDSIZE;
+	if ( memcmp(S->checksum->get(S->checksum), p, NAAAIM_IDSIZE) != 0 )
+		goto done;
+
+	
+	/* Decode the authenticator. */
+	p = packet->get(packet) + 2*NAAAIM_IDSIZE + sizeof(uint32_t);
+	asn_size = packet->size(packet) - 3*NAAAIM_IDSIZE - sizeof(uint32_t);
         if ( !d2i_packet1_payload(&packet1, &p, asn_size) )
-                goto done;	
-
-	S->identity->add(S->identity, ASN1_STRING_data(packet1->identity), \
-		       ASN1_STRING_length(packet1->identity));
-
-	S->auth_time = ASN1_INTEGER_get(packet1->auth_time);
+                goto done;
 
 	S->authenticator->add(S->authenticator, \
 			      ASN1_STRING_data(packet1->authenticator), \
@@ -771,9 +665,78 @@ static _Bool decode_packet1(CO(PossumPacket, this), CO(Buffer, bufr))
  done:
 	if ( retn == false )
 		S->poisoned = true;
-
 	if ( packet1 != NULL )
 		packet1_payload_free(packet1);
+
+	WHACK(payload);
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method sets the key schedule to be used for the POSSUM exchange.
+ *
+ * \param this		The exchange for which the schedule is to be set.
+ *
+ * \param token		The identity token to be used for the scheduler.
+ *
+ * \param auth_time	The authentication time to be used for scheduling
+ *			the key.
+ *
+ * \return		A boolean value is used to indicate whether or
+ *			not key scheduling was successful.  A true
+ *			value indicates the schedule was set with a false
+ *			value indicating an error was experienced.
+ */
+
+static _Bool set_schedule(CO(PossumPacket, this), CO(IDtoken, token), \
+			  time_t auth_time)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	Buffer idkey,
+	       idhash;
+
+	SHA256 hash = NULL;
+
+
+	/* Verify arguements. */
+	if ( S->poisoned )
+		goto done;
+	if ( token == NULL )
+		goto done;
+
+	/* Set the authentication time. */
+	S->auth_time = auth_time;
+
+	/*
+	 * Get the identity elements to be used from the token.  If
+	 * the identity is not a hash value compute the hash of
+	 * the identity.
+	 */
+	INIT(NAAAIM, SHA256, hash, goto done);
+	if ( (idkey = token->get_element(token, IDtoken_key)) == NULL )
+		goto done;
+	if ( (idhash = token->get_element(token, IDtoken_id)) == NULL )
+		goto done;
+	if ( idhash->size(idhash) != NAAAIM_IDSIZE ) {
+		hash->add(hash, idhash);
+		if ( !hash->compute(hash) )
+			goto done;
+		idhash = hash->get_Buffer(hash);
+	}
+
+	if ( S->otedks->compute(S->otedks, S->auth_time, idkey, idhash) )
+		retn = true;
+
+ done:
+	WHACK(hash);
+
 	return retn;
 }
 
@@ -850,9 +813,11 @@ static void whack(CO(PossumPacket, this))
 
 
 	/* Release Buffer elements. */
+	WHACK(S->otedks);
 	WHACK(S->nonce);
 	WHACK(S->identity);
 	WHACK(S->authenticator);
+	WHACK(S->checksum);
 
 	S->root->whack(S->root, this, S);
 	return;
@@ -895,18 +860,20 @@ extern PossumPacket NAAAIM_PossumPacket_Init(void)
 	_init_state(this->state);
 
 	/* Initialize aggregate objects. */
+	if ( (this->state->otedks = NAAAIM_OTEDKS_Init(BIRTHDATE)) == NULL )
+		goto err;
 	INIT(HurdLib, Buffer, this->state->identity, goto err);
 	INIT(HurdLib, Buffer, this->state->authenticator, goto err);
+	INIT(HurdLib, Buffer, this->state->checksum, goto err);
 
 	/* Method initialization. */
 	this->create_packet1 = create_packet1;
+	this->get_identity	= get_identity;
 	this->get_authenticator = get_authenticator;
-	this->add_element  = add_element;
-	this->get_element  = get_element;
-	this->encrypt	   = encrypt;
-	this->decrypt	   = decrypt;
 	this->encode_packet1	   = encode_packet1;
 	this->decode_packet1	   = decode_packet1;
+
+	this->set_schedule = set_schedule;
 	this->print	   = print;
 	this->reset	   = reset;
 	this->whack	   = whack;
@@ -914,6 +881,11 @@ extern PossumPacket NAAAIM_PossumPacket_Init(void)
 	return this;
 
  err:
+	WHACK(this->state->otedks);
+	WHACK(this->state->identity);
+	WHACK(this->state->authenticator);
+	WHACK(this->state->checksum);
+
 	whack(this);
 	return NULL;
 }

@@ -21,11 +21,7 @@
 #else
 #define POSSUM_PORT 10902
 #endif
-
-/* Object initialization macros. */
-#define CCALL(lib,obj,init) lib##_##obj##_##init
-#define INIT(lib, obj, var, action) \
-	if ( (var = CCALL(lib,obj,Init)()) == NULL ) action
+#define SOFTWARE_STATUS "85259aa7bd524ba11404dbb5a379a8a876fe8442"
 
 
 /* Include files. */
@@ -34,14 +30,17 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <time.h>
 #include <errno.h>
 
 #include <HurdLib.h>
 #include <Buffer.h>
 #include <Config.h>
 
+#include <NAAAIM.h>
 #include <Duct.h>
 #include <IDtoken.h>
+#include <SHA256_hmac.h>
 
 #include "Netconfig.h"
 #include "IPsec.h"
@@ -49,6 +48,92 @@
 
 
 /* Variable static to this file. */
+
+
+/**
+ * Private function.
+ *
+ * This function is responsible for searching the list of attestable
+ * clients based on the identification challenge.
+ *
+ * \param clients	A character string containing the name of
+ *			the file which holds the list of clients.
+ *
+ * \param packet	The Buffer object containing the type 1 POSSUM
+ *			packet which was received.
+ *
+ * \param token		An identity token populated with the identity
+ *			of the client.
+ *
+ * \return		A true value is used to indicate the search
+ *			for the client was successful.  A false value
+ *			is returned if the search was unsuccessful.
+ */
+
+static _Bool find_client(CO(char *, clients), CO(Buffer, packet), \
+			 CO(IDtoken, token))
+
+{
+	_Bool retn = false;
+
+	FILE *client_file = NULL;
+
+	Buffer b,
+	       idkey	= NULL,
+	       identity = NULL;
+
+	SHA256_hmac idf;
+
+
+	if ( (client_file = fopen(clients, "r")) == NULL )
+		goto done;
+
+	/* Load the identity key/salt and the asserted client identity. */
+	INIT(HurdLib, Buffer, idkey, goto done);
+	if ( !idkey->add(idkey, packet->get(packet), NAAAIM_IDSIZE) )
+		goto done;
+
+	INIT(HurdLib, Buffer, identity, goto done);
+	if ( !identity->add(identity, packet->get(packet) + NAAAIM_IDSIZE, \
+			    NAAAIM_IDSIZE) )
+		goto done;
+
+	if ( (idf = NAAAIM_SHA256_hmac_Init(idkey)) == NULL )
+		goto done;
+
+	/*
+	 * Extract each available identity and compute its identity
+	 * assertion against the value provided by the caller.
+	 */
+	while ( token->parse(token, client_file) ) {
+		if ( (b = token->get_element(token, IDtoken_orgkey)) == NULL )
+			goto done;
+		idf->add_Buffer(idf, b);
+
+		if ( (b = token->get_element(token, IDtoken_orgid)) == NULL )
+			goto done;
+		idf->add_Buffer(idf, b);
+
+		if ( !idf->compute(idf) )
+			goto done;
+
+		if ( identity->equal(identity, idf->get_Buffer(idf)) ) {
+			fputs("Matched identity:\n", stdout);
+			token->print(token);
+			retn = true;
+			goto done;
+		}
+
+		idf->reset(idf);
+	}
+
+ done:
+	WHACK(idkey);
+	WHACK(identity);
+	WHACK(idf);
+
+	return retn;
+}
 
 
 /**
@@ -92,23 +177,16 @@ static _Bool host_mode(CO(Config, cfg))
 
 	Duct duct = NULL;
 
-	Buffer bufr = NULL;
+	Buffer receive = NULL,
+	       bufr = NULL;
 
 	IDtoken token = NULL;
 	
 	PossumPacket packet = NULL;
 
 
-	/* Load host identity token. */
-	INIT(NAAAIM, IDtoken, token, goto done);
-	if ( (cfg_item = cfg->get(cfg, "identity")) == NULL )
-		goto done;
-	if ( (token_file = fopen(cfg_item, "r")) == NULL )
-		goto done;
-	if ( !token->parse(token, token_file) )
-		goto done;
-
 	/* Setup the network port. */
+	INIT(HurdLib, Buffer, receive, goto done);
 	INIT(HurdLib, Buffer, bufr, goto done);
 
 	INIT(NAAAIM, Duct, duct, goto done);
@@ -118,13 +196,31 @@ static _Bool host_mode(CO(Config, cfg))
 
 	/* Wait for a packet to arrive. */
 	fputs("Waiting for packet.\n", stderr);
-	if ( !duct->receive_Buffer(duct, bufr) )
+	if ( !duct->receive_Buffer(duct, receive) )
 		goto done;
 
+	/* Find the client identity. */
+	if ( (cfg_item = cfg->get(cfg, "client_list")) == NULL )
+		goto done;
+
+	INIT(NAAAIM, IDtoken, token, goto done);
+	if ( !find_client(cfg_item, receive, token) ) {
+		fputs("Could not find client.\n", stderr);
+		goto done;
+	}
+
+	/* Verify and decode packet. */
 	INIT(NAAAIM, PossumPacket, packet, goto done);
 	fputs("Decoding packet\n", stderr);
-	if ( !packet->decode_packet1(packet, bufr) )
+#if 0
+	bufr->add_hexstring(bufr, SOFTWARE_STATUS);
+#else
+	bufr->add_hexstring(bufr, "85259aa7bd524ba11404dbb5a379a8a876fe8441");
+#endif
+	if ( !packet->decode_packet1(packet, token, bufr, receive) ) {
+		fputs("Failed packet decode.\n", stdout);
 		goto done;
+	}
 	fputs("Received packet.\n", stdout);
 	packet->print(packet);
 
@@ -141,7 +237,9 @@ static _Bool host_mode(CO(Config, cfg))
  done:
 	if ( token_file != NULL )
 		fclose(token_file);
+
 	WHACK(duct);
+	WHACK(receive);
 	WHACK(bufr);
 	WHACK(token);
 	WHACK(packet);
@@ -199,7 +297,8 @@ static _Bool client_mode(CO(Config, cfg))
 
 	Duct duct = NULL;
 
-	Buffer bufr = NULL;
+	Buffer software = NULL,
+	       bufr	= NULL;
 
 	IDtoken token = NULL;
 
@@ -226,13 +325,15 @@ static _Bool client_mode(CO(Config, cfg))
 
 	/* Send a session initiation packet. */
 	INIT(HurdLib, Buffer, bufr, goto done);
+	INIT(HurdLib, Buffer, software, goto done);
 
 	INIT(NAAAIM, PossumPacket, packet, goto done);
+	packet->set_schedule(packet, token, time(NULL));
 	packet->create_packet1(packet, token);
-	fputs("Sending packet.\n", stdout);
-	packet->print(packet);
 
-	if ( !packet->encode_packet1(packet, bufr) )
+	fputs("Encoding packet.\n", stdout);
+	software->add_hexstring(software, SOFTWARE_STATUS);
+	if ( !packet->encode_packet1(packet, software, bufr) )
 		goto done;
 	if ( !duct->send_Buffer(duct, bufr) ) {
 		fputs("Error sending identifier.\n", stderr);
@@ -244,7 +345,9 @@ static _Bool client_mode(CO(Config, cfg))
  done:
 	if ( token_file != NULL )
 		fclose(token_file);
+
 	WHACK(duct);
+	WHACK(software);
 	WHACK(bufr);
 	WHACK(token);
 	WHACK(packet);
