@@ -36,7 +36,8 @@
 #define NAAAIM_SmartCard_OBJID		16
 #define NAAAIM_SSLDuct_OBJID		17
 #define NAAAIM_OTEDKS_OBJID		18
+#define NAAAIM_Curve25519_OBJID		19
 
-#define NAAAIM_Netconfig_OBJID		19
-#define NAAAIM_IPsec_OBJID		20
-#define NAAAIM_PossumPacket_OBJID	21
+#define NAAAIM_Netconfig_OBJID		20
+#define NAAAIM_IPsec_OBJID		21
+#define NAAAIM_PossumPacket_OBJID	22
