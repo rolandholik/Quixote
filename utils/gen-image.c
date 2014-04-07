@@ -22,12 +22,6 @@
  */
 #define FIELD_OFFSET 7
 
-/* Macro for defining a pointer to a constance object. */
-#define CO(obj, var) const obj const var
-
-/* Macro to clear object pointer if not NULL. */
-#define WHACK(obj) if (obj != NULL) obj->whack(obj)
-
 
 /* Include files. */
 #include <stdio.h>
