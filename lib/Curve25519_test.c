@@ -12,8 +12,6 @@
 #include <File.h>
 
 #include <NAAAIM.h>
-#include <RandomBuffer.h>
-
 #include "Curve25519.h"
 
 
@@ -22,79 +20,50 @@ extern int main(int argc, char *argv[])
 {
 	_Bool retn = 1;
 
-	uint8_t lp;
+	Curve25519 ours	  = NULL,
+		   theirs = NULL;
 
-	uint8_t their_public[32],
-		their_private[32];
-
-	uint8_t our_public[32],
-		our_private[32];
-
-	uint8_t shared_key[32],
-		use_key[32];
-
-	uint8_t bp[32] = {9};
-
-	Curve25519 ec = NULL;
-
-	Buffer b;
-
-	RandomBuffer rnd = NULL;
+	Buffer b,
+	       shared = NULL;
 
 
-	INIT(NAAAIM, Curve25519, ec, goto done);
-
-	/* Create our public/private keypair. */
-	INIT(NAAAIM, RandomBuffer, rnd, goto done);
-	if ( !rnd->generate(rnd, 32) )
+	/* Create the public/private keypairs. */
+	INIT(NAAAIM, Curve25519, ours, goto done);
+	fputs("Generate our keypair.\n", stdout);
+	if ( !ours->generate(ours) )
 		goto done;
-	b = rnd->get_Buffer(rnd);
-	memcpy(our_private, b->get(b), b->size(b));
-	fputs("Our private:\n", stdout);
+	fputs("Our public:\n", stdout);
+	b = ours->get_public(ours);
 	b->print(b);
 
-	ec->curve25519(ec, our_public, our_private, bp);
-	fputs("Our public key: \n", stdout);
-	for (lp= 0; lp < sizeof(our_public); ++lp)
-		fprintf(stdout, "%02x", our_public[lp]);
-	fputs("\n\n", stdout);
-
-	/* Create their public/private keypair. */
-	if ( !rnd->generate(rnd, 32) )
+	INIT(NAAAIM, Curve25519, theirs, goto done);
+	if ( !theirs->generate(theirs) )
 		goto done;
-	b = rnd->get_Buffer(rnd);
-	memcpy(their_private, b->get(b), b->size(b));
-	fputs("Their private:\n", stdout);
+	fputs("\nTheir public:\n", stdout);
+	b = theirs->get_public(theirs);
 	b->print(b);
 
-	ec->curve25519(ec, their_public, their_private, bp);
-	fputs("Their public key: \n", stdout);
-	for (lp= 0; lp < sizeof(their_public); ++lp)
-		fprintf(stdout, "%02x", their_public[lp]);
-	fputs("\n\n", stdout);
+	/* Generate a shared secret. */
+	INIT(HurdLib, Buffer, shared, goto done);
+	if ( !ours->compute(ours, theirs->get_public(theirs), shared) )
+		goto done;
+	fputs("\nOur key:\n", stdout);
+	shared->print(shared);
 
-
-	/* Generate a shared key. */
-	ec->curve25519(ec, shared_key, our_private, their_public);
-	fputs("Host key: \n", stdout);
-	for (lp= 0; lp < sizeof(shared_key); ++lp)
-		fprintf(stdout, "%02x", shared_key[lp]);
-	fputs("\n\n", stdout);
-
-	/* Extract shared key. */
-	ec->curve25519(ec, use_key, their_private, our_public);
-	fputs("Client key: \n", stdout);
-	for (lp= 0; lp < sizeof(use_key); ++lp)
-		fprintf(stdout, "%02x", use_key[lp]);
-	fputs("\n", stdout);
-	
-
+	/* Confirm the shared secret. */
+	shared->reset(shared);
+	if ( !theirs->compute(theirs, ours->get_public(ours), shared) )
+		goto done;
+	fputs("\nTheir key:\n", stdout);
+	shared->print(shared);
 
 	retn = 0;
 
+
  done:
-	WHACK(ec);
-	WHACK(rnd);
+	WHACK(ours);
+	WHACK(theirs);
+	WHACK(shared);
 
 	return retn;
 }

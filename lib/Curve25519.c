@@ -68,13 +68,15 @@
 
 /* Include files. */
 #include <stdint.h>
-#include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 
 #include <Origin.h>
 #include <HurdLib.h>
+#include <Buffer.h>
 
 #include "NAAAIM.h"
+#include "RandomBuffer.h"
 #include "Curve25519.h"
 
 /* State extraction macro. */
@@ -103,7 +105,16 @@ struct NAAAIM_Curve25519_State
 	/* Object identifier. */
 	uint32_t objid;
 
+	/* Object status. */
+	_Bool poisoned;
+
+	/** The private portion of the keypair. */
+	Buffer private;
+
+	/** The public portion of the keypair. */
+	Buffer public;
 };
+
 
 typedef uint8_t u8;
 typedef uint64_t limb;
@@ -593,15 +604,26 @@ static void crecip(felem out, const felem z)
 
 
 /**
- * Internal private method.
+ * Internal private function.
  *
- * This function was originally the main entry point of the program
- * but is now treated as an internal private method which runs the
- * curve computation against the object specific values.
+ * This function was originally the main entry point of the program.
+ * It is preserved as the callpoint for the object oriented interface
+ * to key generation.
+ *
+ * \param mypublic	A pointer to a character buffer which will
+ *			receive key output.
+ *
+ * \param secret	A pointer to a character buffer containing the
+ *			private key value.
+ *
+ * \param base		A pointer to a character buffer containing the
+ *			basepoint for the curve.
+ *
+ * \return		No return value is defined.
  */
 
-static void curve25519_donna(CO(Curve25519, this), uint8_t *mypublic, \
-			     const uint8_t *secret, const uint8_t *basepoint)
+static void curve25519_donna(uint8_t *mypublic, const uint8_t *secret, \
+			     const uint8_t *basepoint)
 
 {
 	limb bp[5], x[5], z[5], zmone[5];
@@ -629,19 +651,186 @@ static void curve25519_donna(CO(Curve25519, this), uint8_t *mypublic, \
  * Internal private method.
  *
  * This method is responsible for initializing the NAAAIM_Curve25519_State
- * structure which holds state information for each instantiated object.
+ * structure which holds state information for each instantiated
+ * object.
+ *
+ * This object starts out in poisoned status and the call to the
+ * ->generate method activates the object.
  *
  * \param S	A pointer to the object containing the state
  *		information which is to be initialized.
  */
 
-static void _init_state(const Curve25519_State const S)
+static void _init_state(CO(Curve25519_State, S))
 
 {
 	S->libid = NAAAIM_LIBID;
 	S->objid = NAAAIM_Curve25519_OBJID;
 
+	S->poisoned = false;
+	S->private  = NULL;
+	S->public   = NULL;
+
 	return;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements generation of a public/private keypair.
+ * This function must be called before any subsequent calls to other
+ * methods.
+ *
+ * \param this	A pointer to the object which is to have a keypair
+ *		generated.
+ */
+
+static _Bool generate(CO(Curve25519, this))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	uint8_t public[32],
+		private[32],
+		bp[32] = {9};
+
+	Buffer b;
+
+	RandomBuffer rnd = NULL;
+
+
+	/* Generate and save the private key. */
+	INIT(NAAAIM, RandomBuffer, rnd, goto done);
+	if ( !rnd->generate(rnd, sizeof(private)) )
+		goto done;
+	b = rnd->get_Buffer(rnd);
+
+	memcpy(private, b->get(b), sizeof(private));
+	if ( !S->private->add_Buffer(S->private, b) )
+		goto done;
+
+	/* Generate the key pair. */
+	curve25519_donna(public, private, bp);
+
+	/* Save the public key. */
+	if ( S->public->add(S->public, public, sizeof(public)) )
+		retn = true;
+
+ done:
+	if ( !retn ) 
+		S->poisoned = false;
+
+	WHACK(rnd);
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements computation of a shared secret based on
+ * the private key entrained in the object and a provided public
+ * key.
+ *
+ * \param this	The object which is to have a shared secret generated
+ *		from.
+ *
+ * \param pub	An object containing the public key which the shared
+ *		secret is to be generated from.
+ *
+ * \param key	The object into which the key is to be loaded.
+ *
+ * \return	A boolean value is used to indicate the status of
+ *		key generation.  A false value indicates a failure
+ *		which will be secondary to input parameters or status
+ *		of the object.  A true value indicates the key is
+ *		valid.
+ */
+
+static _Bool compute(CO(Curve25519, this), CO(Buffer, pub), CO(Buffer, key))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	uint8_t shared[32],
+		private[32],
+		public[32];
+
+
+	/* Arguement check. */
+	if ( S->poisoned )
+		goto done;
+	if ( (pub == NULL) || pub->poisoned(pub) || (pub->size(pub) != 32) )
+		goto done;
+	if ( (key == NULL) || key->poisoned(key) )
+		goto done;
+
+	/* Load public/private values and call the generator. */
+	memcpy(private, S->private->get(S->private), sizeof(private));
+	memcpy(public, pub->get(pub), sizeof(public));
+	curve25519_donna(shared, private, public);
+
+	/* Copy the shared key to the object provided by the caller. */
+	if ( key->add(key, shared, sizeof(shared)) )
+		retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements retrieval of the public key from the object.
+ *
+ * \param this	The object from which the public key is to be retrieved.
+ *
+ * \return	A null value is returned if the object is poisoned or
+ *		if a key has not been generatd.
+ */
+
+static Buffer get_public(CO(Curve25519, this))
+
+{
+	STATE(S);
+
+	Buffer pub = S->public;
+
+
+	/* Arguement checks. */
+	if ( S->poisoned )
+		return NULL;
+	if ( pub->poisoned(pub) || (pub->size(pub) != 32) )
+		return NULL;
+
+	/* Return the public key. */
+	return pub;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements access to the status of the curve
+ * generation logic.
+ *
+ * \param this	A pointer to the object which is to be queried.
+ */
+
+static _Bool poisoned(CO(Curve25519, this))
+
+{
+	return this->state->poisoned;
 }
 
 
@@ -657,6 +846,9 @@ static void whack(CO(Curve25519, this))
 
 {
 	STATE(S);
+
+	WHACK(S->private);
+	WHACK(S->public);
 
 	S->root->whack(S->root, this, S);
 	return;
@@ -694,15 +886,26 @@ extern Curve25519 NAAAIM_Curve25519_Init(void)
 	this->state 	  = retn.state;
 	this->state->root = root;
 
-	/* Initialize aggregate objects. */
-
 	/* Initialize object state. */
 	_init_state(this->state);
 
-	/* Method initialization. */
-	this->curve25519 = curve25519_donna;
+	/* Initialize aggregate objects. */
+	INIT(HurdLib, Buffer, this->state->private, goto err);
+	INIT(HurdLib, Buffer, this->state->public,  goto err);
 
-	this->whack = whack;
+	/* Method initialization. */
+	this->generate	 = generate;
+	this->compute	 = compute;
+	this->get_public = get_public;
+
+	this->poisoned = poisoned;
+	this->whack    = whack;
 
 	return this;
+
+
+ err:
+	WHACK(this->state->private);
+	WHACK(this->state->public);
+	return NULL;
 }

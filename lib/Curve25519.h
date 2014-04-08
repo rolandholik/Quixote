@@ -26,8 +26,11 @@ typedef struct NAAAIM_Curve25519_State * Curve25519_State;
 struct NAAAIM_Curve25519
 {
 	/* External methods. */
-	void (*curve25519)(const Curve25519, uint8_t *, const uint8_t *, \
-			   const uint8_t *);
+	_Bool (*generate)(const Curve25519);
+	_Bool (*compute)(const Curve25519, const Buffer, const Buffer);
+	Buffer (*get_public)(const Curve25519);
+
+	_Bool (*poisoned)(const Curve25519);
 	void (*whack)(const Curve25519);
 
 	/* Private state. */
