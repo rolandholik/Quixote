@@ -76,14 +76,14 @@ extern int main(int argc, char *argv[])
 
 	/* Generate a shared key. */
 	ec->curve25519(ec, shared_key, our_private, their_public);
-	fputs("Our shared key: \n", stdout);
+	fputs("Host key: \n", stdout);
 	for (lp= 0; lp < sizeof(shared_key); ++lp)
 		fprintf(stdout, "%02x", shared_key[lp]);
 	fputs("\n\n", stdout);
 
 	/* Extract shared key. */
-	ec->curve25519(ec, use_key, shared_key, our_private);
-	fputs("Key to use: \n", stdout);
+	ec->curve25519(ec, use_key, their_private, our_public);
+	fputs("Client key: \n", stdout);
 	for (lp= 0; lp < sizeof(use_key); ++lp)
 		fprintf(stdout, "%02x", use_key[lp]);
 	fputs("\n", stdout);
