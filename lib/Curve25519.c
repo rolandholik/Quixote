@@ -720,6 +720,10 @@ static _Bool generate(CO(Curve25519, this))
 		retn = true;
 
  done:
+	memset(public, '\0', sizeof(public));
+	memset(private, '\0', sizeof(private));
+	memset(bp, '\0', sizeof(bp));
+
 	if ( !retn ) 
 		S->poisoned = false;
 
@@ -781,6 +785,10 @@ static _Bool compute(CO(Curve25519, this), CO(Buffer, pub), CO(Buffer, key))
 
 
  done:
+	memset(shared, '\0', sizeof(shared));
+	memset(private, '\0', sizeof(shared));
+	memset(public, '\0', sizeof(public));
+
 	if ( !retn )
 		S->poisoned = true;
 
