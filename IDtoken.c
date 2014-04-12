@@ -260,6 +260,10 @@ static _Bool set_element(const IDtoken const this,	\
 			if ( !S->ptid->add_Buffer(S->ptid, bufr) )
 				goto done;
 			break;
+		case IDtoken_key:
+			if ( !S->idkey->add_Buffer(S->idkey, bufr) )
+				goto done;
+			break;
 		default:
 			goto done;
 			break;
