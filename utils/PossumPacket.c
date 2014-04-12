@@ -53,6 +53,8 @@
 #error Object identifier not defined.
 #endif
 
+#define POSSUMPACKET_MAGIC1 ((NAAAIM_LIBID << 16) | NAAAIM_PossumPacket_OBJID)
+
 
 /** PossumPacket private state information. */
 struct NAAAIM_PossumPacket_State
@@ -73,6 +75,11 @@ struct NAAAIM_PossumPacket_State
 	 * The key scheduler to be used.
 	 */
 	OTEDKS otedks;
+
+	/**
+	 * Packet magic number.
+	 */
+	uint32_t magic;
 
 	/**
 	 * Requested authentication time.
@@ -106,18 +113,21 @@ struct NAAAIM_PossumPacket_State
 };
 
 
+
 /**
  * The following definitions define the ASN1 encoding sequence for
  * the DER encoding of the authenticator which will be transmitted over
  * the wire.
  */
 typedef struct {
+	ASN1_INTEGER *magic;
 	ASN1_OCTET_STRING *nonce;
 	ASN1_OCTET_STRING *public;
         ASN1_OCTET_STRING *hardware;
 } packet1_payload;
 
 ASN1_SEQUENCE(packet1_payload) = {
+	ASN1_SIMPLE(packet1_payload, magic,	ASN1_INTEGER),
 	ASN1_SIMPLE(packet1_payload, nonce,	ASN1_OCTET_STRING),
 	ASN1_SIMPLE(packet1_payload, public,	ASN1_OCTET_STRING),
 	ASN1_SIMPLE(packet1_payload, hardware,	ASN1_OCTET_STRING),
@@ -344,10 +354,16 @@ static _Bool create_authenticator(CO(PossumPacket_State, S), CO(Buffer, bufr))
 	packet1_payload *packet1 = NULL;
 
 
+	/* Set the packet magic number. */
+	S->magic = POSSUMPACKET_MAGIC1;
+
 	/* ASN1 encode the authenticator. */
 	INIT(HurdLib, Buffer, auth, goto done);
 
 	if ( (packet1 = packet1_payload_new()) == NULL )
+		goto done;
+
+	if ( ASN1_INTEGER_set(packet1->magic, S->magic) != 1 )
 		goto done;
 
 	if ( ASN1_OCTET_STRING_set(packet1->nonce, S->nonce->get(S->nonce), \
@@ -574,6 +590,7 @@ static _Bool decode_packet1(CO(PossumPacket, this), CO(IDtoken, token),
         if ( !d2i_packet1_payload(&packet1, &p, asn_size) )
                 goto done;
 
+
 	S->nonce->add(S->nonce, ASN1_STRING_data(packet1->nonce), \
 		      ASN1_STRING_length(packet1->nonce));
 	S->public->add(S->public, ASN1_STRING_data(packet1->public), \
@@ -581,9 +598,10 @@ static _Bool decode_packet1(CO(PossumPacket, this), CO(IDtoken, token),
 	S->hardware->add(S->hardware, ASN1_STRING_data(packet1->hardware), \
 			 ASN1_STRING_length(packet1->hardware));
 
-	retn = true;
+	S->magic = ASN1_INTEGER_get(packet1->magic);
+	if ( S->magic == POSSUMPACKET_MAGIC1 )
+		retn = true;
 
-	
  done:
 	if ( retn == false )
 		S->poisoned = true;
@@ -685,6 +703,7 @@ static void print(CO(PossumPacket, this))
 	if ( S->poisoned )
 		fputs("* POISONED *\n", stdout);
 
+	fprintf(stdout, "magic: %08x\n", S->magic);
 	fprintf(stdout, "time: %d\n", (int) S->auth_time);
 
 	fputs("nonce:\n", stdout);
