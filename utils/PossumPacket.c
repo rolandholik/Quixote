@@ -53,7 +53,17 @@
 #error Object identifier not defined.
 #endif
 
+/* Protocol packet numbers. */
 #define POSSUMPACKET_MAGIC1 ((NAAAIM_LIBID << 16) | NAAAIM_PossumPacket_OBJID)
+
+/* Protocol definitions. */
+#define TRIPLEDES_CBC	1
+#define HMAC_MD5	1
+#define EC		1
+#define CURVE25519	1
+
+#define POSSUM_PROTOCOL1 (TRIPLEDES_CBC << 24) | (HMAC_MD5 << 16 ) | \
+			 (EC << 8) | CURVE25519
 
 
 /** PossumPacket private state information. */
@@ -80,6 +90,11 @@ struct NAAAIM_PossumPacket_State
 	 * Packet magic number.
 	 */
 	uint32_t magic;
+
+	/**
+	 * Protocol number.
+	 */
+	uint32_t protocol;
 
 	/**
 	 * Requested authentication time.
@@ -113,7 +128,6 @@ struct NAAAIM_PossumPacket_State
 };
 
 
-
 /**
  * The following definitions define the ASN1 encoding sequence for
  * the DER encoding of the authenticator which will be transmitted over
@@ -121,6 +135,7 @@ struct NAAAIM_PossumPacket_State
  */
 typedef struct {
 	ASN1_INTEGER *magic;
+	ASN1_INTEGER *protocol;
 	ASN1_OCTET_STRING *nonce;
 	ASN1_OCTET_STRING *public;
         ASN1_OCTET_STRING *hardware;
@@ -128,6 +143,7 @@ typedef struct {
 
 ASN1_SEQUENCE(packet1_payload) = {
 	ASN1_SIMPLE(packet1_payload, magic,	ASN1_INTEGER),
+	ASN1_SIMPLE(packet1_payload, protocol,	ASN1_INTEGER),
 	ASN1_SIMPLE(packet1_payload, nonce,	ASN1_OCTET_STRING),
 	ASN1_SIMPLE(packet1_payload, public,	ASN1_OCTET_STRING),
 	ASN1_SIMPLE(packet1_payload, hardware,	ASN1_OCTET_STRING),
@@ -357,6 +373,9 @@ static _Bool create_authenticator(CO(PossumPacket_State, S), CO(Buffer, bufr))
 	/* Set the packet magic number. */
 	S->magic = POSSUMPACKET_MAGIC1;
 
+	/* Set the packet protocol number. */
+	S->protocol = POSSUM_PROTOCOL1;
+
 	/* ASN1 encode the authenticator. */
 	INIT(HurdLib, Buffer, auth, goto done);
 
@@ -364,6 +383,9 @@ static _Bool create_authenticator(CO(PossumPacket_State, S), CO(Buffer, bufr))
 		goto done;
 
 	if ( ASN1_INTEGER_set(packet1->magic, S->magic) != 1 )
+		goto done;
+
+	if ( ASN1_INTEGER_set(packet1->protocol, S->protocol) != 1 )
 		goto done;
 
 	if ( ASN1_OCTET_STRING_set(packet1->nonce, S->nonce->get(S->nonce), \
@@ -553,6 +575,8 @@ static _Bool decode_packet1(CO(PossumPacket, this), CO(IDtoken, token),
 	S->auth_time = ntohl(S->auth_time);
 	this->set_schedule(this, token, S->auth_time);
 
+	/* Set the protocol number. */
+
 	/* Compute the checksum over the packet. */
 	INIT(HurdLib, Buffer, payload, goto done);
 	if ( !payload->add(payload, packet->get(packet), \
@@ -591,6 +615,10 @@ static _Bool decode_packet1(CO(PossumPacket, this), CO(IDtoken, token),
                 goto done;
 
 
+	S->magic = ASN1_INTEGER_get(packet1->magic);
+
+	S->protocol = ASN1_INTEGER_get(packet1->protocol);
+
 	S->nonce->add(S->nonce, ASN1_STRING_data(packet1->nonce), \
 		      ASN1_STRING_length(packet1->nonce));
 	S->public->add(S->public, ASN1_STRING_data(packet1->public), \
@@ -598,7 +626,6 @@ static _Bool decode_packet1(CO(PossumPacket, this), CO(IDtoken, token),
 	S->hardware->add(S->hardware, ASN1_STRING_data(packet1->hardware), \
 			 ASN1_STRING_length(packet1->hardware));
 
-	S->magic = ASN1_INTEGER_get(packet1->magic);
 	if ( S->magic == POSSUMPACKET_MAGIC1 )
 		retn = true;
 
@@ -704,6 +731,7 @@ static void print(CO(PossumPacket, this))
 		fputs("* POISONED *\n", stdout);
 
 	fprintf(stdout, "magic: %08x\n", S->magic);
+	fprintf(stdout, "protocol: %08x\n", S->protocol);
 	fprintf(stdout, "time: %d\n", (int) S->auth_time);
 
 	fputs("nonce:\n", stdout);
