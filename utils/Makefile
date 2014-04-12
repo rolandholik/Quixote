@@ -6,7 +6,7 @@
 # Variable declarations.
 CSRC = gen-image.c load-image.c boot.c Netconfig.c IPsec.c PossumPacket.c
 
-TOOLS = gen-image load-image boot possum
+TOOLS = gen-image load-image boot possum gen-id-verifier
 
 CC = musl-gcc
 
@@ -70,6 +70,10 @@ boot: boot.o
 possum: possum.o Netconfig.o IPsec.o PossumPacket.o
 	${CC} ${LDFLAGS} -o $@ $^ ../IDtoken.o ../SHA256_hmac.o ../SHA256.o \
 		../RandomBuffer.o ../AES256_cbc.o ${SSL_LIBRARY} ${LIBS} -lfl;
+
+gen-id-verifier: gen-id-verifier.o
+	${CC} ${LDFLAGS} -o $@ $^ ../IDtoken.o ../SHA256_hmac.o ../SHA256.o \
+		${SSL_LIBRARY} ${LIBS}
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};
