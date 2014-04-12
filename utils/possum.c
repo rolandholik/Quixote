@@ -41,6 +41,7 @@
 #include <Duct.h>
 #include <IDtoken.h>
 #include <SHA256_hmac.h>
+#include <Curve25519.h>
 
 #include "Netconfig.h"
 #include "IPsec.h"
@@ -118,8 +119,6 @@ static _Bool find_client(CO(char *, clients), CO(Buffer, packet), \
 			goto done;
 
 		if ( identity->equal(identity, idf->get_Buffer(idf)) ) {
-			fputs("Matched identity:\n", stdout);
-			token->print(token);
 			retn = true;
 			goto done;
 		}
@@ -195,7 +194,6 @@ static _Bool host_mode(CO(Config, cfg))
 	duct->accept_connection(duct);
 
 	/* Wait for a packet to arrive. */
-	fputs("Waiting for packet.\n", stderr);
 	if ( !duct->receive_Buffer(duct, receive) )
 		goto done;
 
@@ -211,27 +209,13 @@ static _Bool host_mode(CO(Config, cfg))
 
 	/* Verify and decode packet. */
 	INIT(NAAAIM, PossumPacket, packet, goto done);
-	fputs("Decoding packet\n", stderr);
-#if 0
 	bufr->add_hexstring(bufr, SOFTWARE_STATUS);
-#else
-	bufr->add_hexstring(bufr, "85259aa7bd524ba11404dbb5a379a8a876fe8441");
-#endif
-	if ( !packet->decode_packet1(packet, token, bufr, receive) ) {
-		fputs("Failed packet decode.\n", stdout);
+	receive->print(receive);
+	if ( !packet->decode_packet1(packet, token, bufr, receive) )
 		goto done;
-	}
+
 	fputs("Received packet.\n", stdout);
 	packet->print(packet);
-
-	bufr->reset(bufr);
-	if ( !packet->get_authenticator(packet, token, bufr) ) {
-		fputs("Failed authenticator decryption.\n", stdout);
-		goto done;
-	}
-	fputs("\nDecrypted authenticator:\n", stdout);
-	bufr->print(bufr);
-	
 	retn = true;
 
  done:
@@ -302,6 +286,8 @@ static _Bool client_mode(CO(Config, cfg))
 
 	IDtoken token = NULL;
 
+	Curve25519 dhkey = NULL;
+
 	PossumPacket packet = NULL;
 
 	
@@ -326,19 +312,22 @@ static _Bool client_mode(CO(Config, cfg))
 	/* Send a session initiation packet. */
 	INIT(HurdLib, Buffer, bufr, goto done);
 	INIT(HurdLib, Buffer, software, goto done);
+	INIT(NAAAIM, Curve25519, dhkey, goto done);
 
 	INIT(NAAAIM, PossumPacket, packet, goto done);
 	packet->set_schedule(packet, token, time(NULL));
-	packet->create_packet1(packet, token);
 
-	fputs("Encoding packet.\n", stdout);
+	dhkey->generate(dhkey);
+	packet->create_packet1(packet, token, dhkey);
+
 	software->add_hexstring(software, SOFTWARE_STATUS);
 	if ( !packet->encode_packet1(packet, software, bufr) )
 		goto done;
-	if ( !duct->send_Buffer(duct, bufr) ) {
-		fputs("Error sending identifier.\n", stderr);
+	if ( !duct->send_Buffer(duct, bufr) )
 		goto done;
-	}
+
+	fputs("Sent packet:\n", stdout);
+	packet->print(packet);
 
 	retn = true;
 
@@ -350,6 +339,7 @@ static _Bool client_mode(CO(Config, cfg))
 	WHACK(software);
 	WHACK(bufr);
 	WHACK(token);
+	WHACK(dhkey);
 	WHACK(packet);
 
 	return retn;

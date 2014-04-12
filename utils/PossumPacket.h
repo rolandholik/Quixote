@@ -26,17 +26,14 @@ typedef struct NAAAIM_PossumPacket_State * PossumPacket_State;
 struct NAAAIM_PossumPacket
 {
 	/* External methods. */
-	_Bool (*create_packet1)(const PossumPacket, const IDtoken);
-	_Bool (*get_identity)(const PossumPacket, const Buffer);
-	_Bool (*get_authenticator)(const PossumPacket, const IDtoken, \
-				   const Buffer);
+	_Bool (*create_packet1)(const PossumPacket, const IDtoken, \
+				const Curve25519);
 	_Bool (*encode_packet1)(const PossumPacket, const Buffer, \
 				const Buffer);
 	_Bool (*decode_packet1)(const PossumPacket, const IDtoken, \
 				const Buffer, const Buffer);
 	_Bool (*set_schedule)(const PossumPacket, const IDtoken, \
 			      time_t);
-
 	void (*print)(const PossumPacket);
 	void (*reset)(const PossumPacket);
 	void (*whack)(const PossumPacket);
