@@ -20,6 +20,12 @@ typedef struct NAAAIM_PossumPacket * PossumPacket;
 
 typedef struct NAAAIM_PossumPacket_State * PossumPacket_State;
 
+typedef enum {
+	PossumPacket_nonce,
+	PossumPacket_public,
+	PossumPacket_hardware
+} PossumPacket_element;
+
 /**
  * External PossumPacket object representation.
  */
@@ -34,6 +40,7 @@ struct NAAAIM_PossumPacket
 				const Buffer, const Buffer);
 	_Bool (*set_schedule)(const PossumPacket, const IDtoken, \
 			      time_t);
+	Buffer (*get_element)(const PossumPacket, const PossumPacket_element);
 	void (*print)(const PossumPacket);
 	void (*reset)(const PossumPacket);
 	void (*whack)(const PossumPacket);

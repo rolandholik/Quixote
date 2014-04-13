@@ -21,7 +21,8 @@
 #else
 #define POSSUM_PORT 10902
 #endif
-#define SOFTWARE_STATUS "85259aa7bd524ba11404dbb5a379a8a876fe8442"
+#define CLIENT_SOFTWARE_STATUS "7398070fb095323464af0e9e961d5bf0e024d291faaf994bc5968293b65c33e6"
+#define HOST_SOFTWARE_STATUS "e0fa54a0ba2832e4cb5bd2304956c753c16d66f300f8b46cb3a4e69af2efa73c"
 
 
 /* Include files. */
@@ -49,6 +50,95 @@
 
 
 /* Variable static to this file. */
+
+
+/**
+ * Private function.
+ *
+ * This function is responsible for generating the shared key which
+ * will be used between the client and host.
+ *
+ * The shared key is based on the following:
+ *
+ *	HMAC_dhkey(client_nonce ^ host_nonce)
+ *
+ *	Where dhkey is the shared secret generated from the Diffie-Hellman
+ *	key exchange.
+ *
+ * \param nonce1	The first nonce to be used in key generation.
+ *
+ * \param nonce2	The second nonce to be used in key generation.
+ *
+ * \param dhkey		The Diffie-Hellman key to be used in computing
+ *			the shared secret.
+
+ * \param public	The public key to be used in combination with
+ *			the public key in the dhkey parameter to generate
+ *			shared secret.
+ *
+ * \param shared	The object which the generated key is to be
+ *			loaded into.
+ *
+ * \return		A true value is used to indicate the key was
+ *			successfully generated.  A false value indicates
+ *			the key parameter does not contain a valid
+ *			value.
+ */
+
+static _Bool generate_shared_key(CO(Buffer, nonce1), CO(Buffer, nonce2),    \
+				 CO(Curve25519, dhkey), CO(Buffer, public), \
+				 CO(Buffer, shared))
+
+{
+	_Bool retn = false;
+
+	unsigned char *p,
+		      *p1;
+
+	unsigned int lp;
+
+	Buffer xor = NULL,
+	       key = NULL;
+
+	SHA256_hmac hmac;
+
+
+	/* XOR the supplied nonces. */
+	INIT(HurdLib, Buffer, xor, goto done);
+	if ( nonce1->size(nonce1) != nonce2->size(nonce2) )
+		goto done;
+	if ( !xor->add_Buffer(xor, nonce1) )
+		goto done;
+
+	p  = xor->get(xor);
+	p1 = nonce2->get(nonce2);
+	for (lp= 0; lp < xor->size(xor); ++lp) {
+		*p ^= *p1;
+		++p;
+		++p1;
+	}
+
+	/*
+	 * Generate the HMAC_SHA256 hash of the XOR'ed buffer under the
+	 * computered shared key.
+	 */
+	INIT(HurdLib, Buffer, key, goto done);
+	dhkey->compute(dhkey, public, key);
+
+	if ( (hmac = NAAAIM_SHA256_hmac_Init(key)) == NULL )
+		goto done;
+	hmac->add_Buffer(hmac, key);
+	hmac->compute(hmac);
+	if ( shared->add_Buffer(shared, hmac->get_Buffer(hmac)) )
+		retn = true;
+
+ done:
+	WHACK(xor);
+	WHACK(key);
+	WHACK(hmac);
+
+	return retn;
+}
 
 
 /**
@@ -138,6 +228,37 @@ static _Bool find_client(CO(char *, clients), CO(Buffer, packet), \
 /**
  * Private function.
  *
+ * This function is responsible for composing the reply packet to
+ * the initial packet1 request from the initiator.
+ *
+ * \param duct		The network connection which the response is
+ *			to be transmitted over.
+ *
+ * \param packet	The packet to be used for sending the
+ *			response.
+ *
+ * \param dhkey		The Diffie-Hellman key to be used for the
+ *			exchange.
+ *
+ * \return		A true value is used to indicate composition
+ *			and transmission of the packet was
+ *			successful.  A false value indicates the
+ *			process was unsuccessful.
+ */
+
+#if 0
+static _Bool send_host_response(CO(Duct, duct), CO(PossumPacket, packet), \
+				CO(Curve25519, dhkey))
+
+{
+	return false;
+}
+#endif
+
+
+/**
+ * Private function.
+ *
  * This function implements POSSUM host mode.  In this mode a
  * connection is listened for on the default POSSUM port for a tunnel
  * request.  Upon receipt of a connection the authentication challenge
@@ -176,17 +297,23 @@ static _Bool host_mode(CO(Config, cfg))
 
 	Duct duct = NULL;
 
-	Buffer receive = NULL,
-	       bufr = NULL;
+	Buffer b,
+	       netbufr		= NULL,
+	       nonce		= NULL,
+	       software		= NULL,
+	       public		= NULL,
+	       shared_key	= NULL;
 
 	IDtoken token = NULL;
 	
 	PossumPacket packet = NULL;
 
+	Curve25519 dhkey = NULL;
+
 
 	/* Setup the network port. */
-	INIT(HurdLib, Buffer, receive, goto done);
-	INIT(HurdLib, Buffer, bufr, goto done);
+	INIT(HurdLib, Buffer, netbufr, goto done);
+	INIT(HurdLib, Buffer, software, goto done);
 
 	INIT(NAAAIM, Duct, duct, goto done);
 	duct->init_server(duct);
@@ -194,7 +321,7 @@ static _Bool host_mode(CO(Config, cfg))
 	duct->accept_connection(duct);
 
 	/* Wait for a packet to arrive. */
-	if ( !duct->receive_Buffer(duct, receive) )
+	if ( !duct->receive_Buffer(duct, netbufr) )
 		goto done;
 
 	/* Find the client identity. */
@@ -202,31 +329,95 @@ static _Bool host_mode(CO(Config, cfg))
 		goto done;
 
 	INIT(NAAAIM, IDtoken, token, goto done);
-	if ( !find_client(cfg_item, receive, token) ) {
-		fputs("Could not find client.\n", stderr);
+	if ( !find_client(cfg_item, netbufr, token) )
 		goto done;
-	}
+
+	/* Locate and load the client file. */
 
 	/* Verify and decode packet. */
 	INIT(NAAAIM, PossumPacket, packet, goto done);
-	bufr->add_hexstring(bufr, SOFTWARE_STATUS);
-	receive->print(receive);
-	if ( !packet->decode_packet1(packet, token, bufr, receive) )
+	software->add_hexstring(software, CLIENT_SOFTWARE_STATUS);
+	if ( !packet->decode_packet1(packet, token, software, netbufr) )
+		goto done;
+	fputs("Incoming client packet 1.\n", stdout);
+	packet->print(packet);
+
+	/* Verify hardware quote. */
+
+	/* Verify protocol. */
+
+	/* Save the client provided nonce and public key. */
+	fputs("Saving nonce and public key.\n", stdout);
+	INIT(HurdLib, Buffer, nonce, goto done);
+	if ( (b = packet->get_element(packet, PossumPacket_nonce)) == NULL )
+		goto done;
+	if ( !nonce->add_Buffer(nonce, b) )
 		goto done;
 
-	fputs("Received packet.\n", stdout);
+	INIT(HurdLib, Buffer, public, goto done);
+	if ( (b = packet->get_element(packet, PossumPacket_public)) == NULL )
+		goto done;
+	if ( !public->add_Buffer(public, b) )
+		goto done;
+
+	/* Generate DH public key for shared secret. */
+	fputs("Generting DH key.\n", stdout);
+	INIT(NAAAIM, Curve25519, dhkey, goto done);
+	dhkey->generate(dhkey);
+
+	/* Compose and send a reply packet. */
+	fputs("Getting identity.\n", stdout);
+	if ( (cfg_item = cfg->get(cfg, "identity")) == NULL )
+		goto done;
+	if ( (token_file = fopen(cfg_item, "r")) == NULL )
+		goto done;
+	token->reset(token);
+	if ( !token->parse(token, token_file) )
+		goto done;
+	
+	fputs("Composing packet.\n", stdout);
+	packet->reset(packet);
+	netbufr->reset(netbufr);
+
+	packet->set_schedule(packet, token, time(NULL));
+	packet->create_packet1(packet, token, dhkey);
+
+	software->reset(software);
+	software->add_hexstring(software, HOST_SOFTWARE_STATUS);
+	if ( !packet->encode_packet1(packet, software, netbufr) )
+		goto done;
+	if ( !duct->send_Buffer(duct, netbufr) )
+		goto done;
+	fputs("Sent host packet 1:\n", stdout);
 	packet->print(packet);
+
+	INIT(HurdLib, Buffer, shared_key, goto done;);
+	if ( (b = packet->get_element(packet, PossumPacket_nonce)) == NULL )
+		goto done;
+
+	if ( !generate_shared_key(b, nonce, dhkey, public, shared_key) )
+		goto done;
+	fputs("\nShared key:\n", stdout);
+	shared_key->hprint(shared_key);
+
+
 	retn = true;
 
  done:
+	sleep(5);
+
 	if ( token_file != NULL )
 		fclose(token_file);
 
 	WHACK(duct);
-	WHACK(receive);
-	WHACK(bufr);
+	WHACK(netbufr);
+	WHACK(nonce);
+	WHACK(software);
+	WHACK(public);
+	WHACK(shared_key);
 	WHACK(token);
 	WHACK(packet);
+	WHACK(dhkey);
 
 	return retn;
 }
@@ -281,8 +472,12 @@ static _Bool client_mode(CO(Config, cfg))
 
 	Duct duct = NULL;
 
-	Buffer software = NULL,
-	       bufr	= NULL;
+	Buffer b,
+	       public,
+	       nonce	  = NULL,
+	       software	  = NULL,
+	       bufr	  = NULL,
+	       shared_key = NULL;
 
 	IDtoken token = NULL;
 
@@ -320,15 +515,58 @@ static _Bool client_mode(CO(Config, cfg))
 	dhkey->generate(dhkey);
 	packet->create_packet1(packet, token, dhkey);
 
-	software->add_hexstring(software, SOFTWARE_STATUS);
+	software->add_hexstring(software, CLIENT_SOFTWARE_STATUS);
 	if ( !packet->encode_packet1(packet, software, bufr) )
 		goto done;
 	if ( !duct->send_Buffer(duct, bufr) )
 		goto done;
 
-	fputs("Sent packet:\n", stdout);
+	fputs("Sent client packet 1:\n", stdout);
 	packet->print(packet);
 
+	/* Extract nonce and public key. */
+	INIT(HurdLib, Buffer, nonce, goto done);
+	if ( (b = packet->get_element(packet, PossumPacket_nonce)) == NULL )
+		goto done;
+	nonce->add_Buffer(nonce, b);
+
+	/* Wait for a packet to arrive. */
+	packet->reset(packet);
+	bufr->reset(bufr);
+	if ( !duct->receive_Buffer(duct, bufr) )
+		goto done;
+
+	/* Find the host identity. */
+	if ( (cfg_item = cfg->get(cfg, "client_list")) == NULL )
+		goto done;
+
+	token->reset(token);
+	if ( !find_client(cfg_item, bufr, token) )
+		goto done;
+
+	software->reset(software);
+	software->add_hexstring(software, HOST_SOFTWARE_STATUS);
+	if ( !packet->decode_packet1(packet, token, software, bufr) ) {
+		fprintf(stdout, "%s: Failed decode packet.\n", __func__);
+		goto done;
+	}
+
+	fputs("\nReceived host packet 1.\n", stdout);
+	packet->print(packet);
+
+	INIT(HurdLib, Buffer, shared_key, goto done;);
+	if ( (b = packet->get_element(packet, PossumPacket_public)) == NULL )
+		goto done;
+	public = b;
+
+	if ( (b = packet->get_element(packet, PossumPacket_nonce)) == NULL )
+		goto done;
+
+	if ( !generate_shared_key(b, nonce, dhkey, public, shared_key) )
+		goto done;
+	fputs("\nShared key:\n", stdout);
+	shared_key->hprint(shared_key);
+	
 	retn = true;
 
  done:
@@ -336,8 +574,10 @@ static _Bool client_mode(CO(Config, cfg))
 		fclose(token_file);
 
 	WHACK(duct);
+	WHACK(nonce);
 	WHACK(software);
 	WHACK(bufr);
+	WHACK(shared_key);
 	WHACK(token);
 	WHACK(dhkey);
 	WHACK(packet);

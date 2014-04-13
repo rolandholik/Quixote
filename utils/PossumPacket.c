@@ -331,6 +331,102 @@ static _Bool create_packet1(CO(PossumPacket, this), CO(IDtoken, token),
 	return retn;
 }
 
+
+/**
+ * External public method.
+ *
+ * This method implements the creation of the second POSSUM exchange
+ * packet.  This packet is sent by the host in response to a
+ * POSSUM packet1 to verify and attest to the status of the host.
+ *
+ * \param this		The object whose packet 2 state is to be
+ *			created.
+ *
+ * \param token		The identity token to be used to create the
+ *			state.
+ *
+ * \param dh		The elliptic curve to be used to implement
+ *			the shared key.
+ *
+ * \return	A boolean value is used to indicate the sucess or
+ *		failure of creating the packet.  A false value
+ *		indicates creation failed while a true indicates it
+ *		was successful.
+ */
+
+#if 0
+static _Bool create_packet2(CO(PossumPacket, this), CO(IDtoken, token),
+			    CO(Curve25519, dh))
+
+{
+
+	STATE(S);
+
+	_Bool retn = false;
+
+	Buffer b;
+
+	RandomBuffer rnd = NULL;
+
+	SHA256_hmac hmac = NULL;
+
+
+	/* Status checks. */
+	if ( S->poisoned )
+		goto done;
+	if ( token == NULL )
+		goto done;
+	if ( (dh == NULL) || dh->poisoned(dh) )
+		goto done;
+
+	/* Load the identification challenge nonce. */
+	INIT(NAAAIM, RandomBuffer, rnd, goto done);
+	rnd->generate(rnd, 256 / 8);
+	S->identity->add_Buffer(S->identity, rnd->get_Buffer(rnd));
+
+	/* Hash the organization key and identity with the nonce. */
+	if ( (hmac = NAAAIM_SHA256_hmac_Init(S->identity)) == NULL )
+		goto done;
+
+	if ( (b = token->get_element(token, IDtoken_orgkey)) == NULL )
+		goto done;
+	hmac->add_Buffer(hmac, b);
+
+	if ( (b = token->get_element(token, IDtoken_orgid)) == NULL )
+		goto done;
+	hmac->add_Buffer(hmac, b);
+
+	hmac->compute(hmac);
+	if ( !S->identity->add_Buffer(S->identity, hmac->get_Buffer(hmac)) )
+		goto done;
+
+	/* Add 32 bytes for the replay nonce. */
+	rnd->generate(rnd, 32);
+	if ( !S->nonce->add_Buffer(S->nonce, rnd->get_Buffer(rnd)) )
+		goto done;
+
+	/* Add the Diffie-Hellman key. */
+	if ( (b = dh->get_public(dh)) == NULL )
+		goto done;
+	if ( !S->public->add_Buffer(S->public, b) )
+		goto done;
+
+	/* Add the hardware status quote. */
+	if ( !S->hardware->add_hexstring(S->hardware, "0000fead0000beaf") )
+		goto done;
+
+	retn = true;
+
+ done:
+ 	WHACK(rnd);
+	WHACK(hmac);
+
+	if ( retn == false )
+		S->poisoned = true;
+	return retn;
+}
+#endif
+
 			 
 /**
  * Internal private method.
@@ -714,6 +810,52 @@ static _Bool set_schedule(CO(PossumPacket, this), CO(IDtoken, token), \
 /**
  * External public method.
  *
+ * This method implements a general accessor for retrieving components
+ * of a POSSUM packet.
+ *
+ * \param this		The packet whose element is to be retrieved.
+ *
+ * \param element	The enumerated type of the element to be
+ *			retrieved.
+ *
+ * \return		The requested Buffer object is returned.  A
+ *			NULL value is used to indicate that an
+ *			unknown element was requested.
+ */
+
+static Buffer get_element(CO(PossumPacket, this), \
+			   const PossumPacket_element element)
+
+{
+	STATE(S);
+
+
+	if ( S->poisoned )
+		return NULL;
+
+	switch ( element ) {
+		case PossumPacket_nonce:
+			return S->nonce;
+			break;
+		case PossumPacket_public:
+			return S->public;
+			break;
+		case PossumPacket_hardware:
+			return S->hardware;
+			break;
+
+		default:
+			return NULL;
+			break;
+	}
+
+	return NULL;
+}
+
+
+/**
+ * External public method.
+ *
  * This method prints the contents of an PossumPacket object.  The
  * status, ie, whether or not the object has been poisoned is also
  * indicated.
@@ -769,8 +911,15 @@ static void reset(CO(PossumPacket, this))
 	if ( S->poisoned )
 		return;
 
+	S->magic	= 0;
+	S->protocol	= 0;
+	S->auth_time	= 0;
+
+	S->otedks->reset(S->otedks);
+	S->nonce->reset(S->nonce);
+	S->public->reset(S->public);
+	S->hardware->reset(S->hardware);
 	S->identity->reset(S->identity);
-	S->auth_time = 0;
 
 	return;
 }
@@ -852,6 +1001,8 @@ extern PossumPacket NAAAIM_PossumPacket_Init(void)
 	this->decode_packet1 = decode_packet1;
 
 	this->set_schedule = set_schedule;
+	this->get_element  = get_element;
+
 	this->print	   = print;
 	this->reset	   = reset;
 	this->whack	   = whack;
