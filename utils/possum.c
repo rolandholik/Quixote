@@ -21,11 +21,10 @@
 #else
 #define POSSUM_PORT 10902
 #endif
-#define CLIENT_SOFTWARE_STATUS "7398070fb095323464af0e9e961d5bf0e024d291faaf994bc5968293b65c33e6"
-#define HOST_SOFTWARE_STATUS "e0fa54a0ba2832e4cb5bd2304956c753c16d66f300f8b46cb3a4e69af2efa73c"
 
 
 /* Include files. */
+#include <stdint.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -41,6 +40,7 @@
 #include <NAAAIM.h>
 #include <Duct.h>
 #include <IDtoken.h>
+#include <SHA256.h>
 #include <SHA256_hmac.h>
 #include <Curve25519.h>
 
@@ -136,6 +136,181 @@ static _Bool generate_shared_key(CO(Buffer, nonce1), CO(Buffer, nonce2),    \
 	WHACK(xor);
 	WHACK(key);
 	WHACK(hmac);
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function is responsible for configuring a physical interface
+ * over which the IPsec tunnel will be constructed.
+ *
+ * \param ip	The IP address to be assigned to the interface.
+ *
+ * \param mask	The netmask to be applied to the interface address.
+ *
+ * \param gw	The gateway address, this may be NULL in which case
+ *		a default route will not be set.
+ *
+ * \return	A boolean value is used to indicate the status of the
+ *		interface configuration.  Failure is denoted by returning
+ *		a false value while success is indicated by a true value.
+ */
+
+static _Bool setup_tunnel_interface(CO(char *, iface), CO(char *, ip), \
+				    CO(char *, ip_mask),	       \
+				    CO(char *, net_remote),	       \
+				    CO(char *, net_mask))
+
+{
+	_Bool retn = false;
+
+	Netconfig netconfig = NULL;
+
+
+	fprintf(stderr, "iface: %s\n", iface);
+	fprintf(stderr, "ip: %s/%s\n", ip, ip_mask);
+	fprintf(stderr, "remote: %s/%s\n", net_remote, net_mask);
+
+	if ( (netconfig = NAAAIM_Netconfig_Init()) == NULL )
+		goto done;
+	if ( !netconfig->set_address(netconfig, iface, ip, ip_mask) )
+		goto done;
+	if ( !netconfig->set_route(netconfig, net_remote, ip, net_mask) )
+		goto done;
+
+	retn = true;
+
+ done:
+	WHACK(netconfig);
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function is responsible for starting an IPsec tunnel based on
+ * the specified configuration and parameters.
+ *
+ * \param cfg		The configuration object which specifies the
+ *			parameters for the connection.
+ *
+ * \param protocol	The numeric description of the protocol.
+ *
+ * \param spi		The security parameter index to be used.
+ *
+ * \param shared_key	The object containing the shared key to be
+ *			used in establishing the connection.
+ *
+ * \return	A boolean value is used to indicate the status of the
+ *		connection being started.  Failure is denoted by
+ *		returning a false value while success is indicated by
+ *		a true value.
+ */
+
+static _Bool setup_ipsec(CO(Config, cfg), const uint32_t protocol, \
+			 const uint32_t spi, CO(Buffer, shared_key))
+
+{
+	_Bool retn = false;
+
+	unsigned char *k;
+
+	char *interface,
+	     *local_ip,
+	     *local_mask,
+	     *remote_ip,
+	     *local_net,
+	     *remote_net,
+	     *net_mask;
+
+	Buffer enc_key = NULL,
+	       mac_key = NULL;
+
+	SHA256 sha256 = NULL;
+
+	IPsec ipsec = NULL;
+
+
+	/* Initialize IPsec configuration object. */
+	INIT(NAAAIM, IPsec, ipsec, goto done);
+
+	/* Extract IPsec parameters. */
+	local_ip   = cfg->get(cfg, "local_ip");
+	local_mask = cfg->get(cfg, "local_mask");
+	remote_ip  = cfg->get(cfg, "remote_ip");
+	if ( (local_ip == NULL) || (local_mask == NULL) || \
+	     (remote_ip == NULL) )
+		goto done;
+
+	/* Setup the encryption key. */
+	INIT(HurdLib, Buffer, enc_key, goto done);
+	k = shared_key->get(shared_key);
+	if ( !enc_key->add(enc_key, k, 192 / 8) )
+		goto done;
+	fprintf(stdout, "%s: IPSEC encryption key:\n", __func__);
+	enc_key->hprint(enc_key);
+	fputc('\n', stdout);
+
+	/* Setup the authentication key. */
+	INIT(HurdLib, Buffer, mac_key, goto done);
+	INIT(NAAAIM, SHA256, sha256, goto done);
+
+	sha256->add(sha256, shared_key);
+	sha256->compute(sha256);
+	if ( (k = sha256->get(sha256)) == NULL )
+		goto done;
+	if ( !mac_key->add(mac_key, k, 128 / 8) )
+		goto done;
+	fprintf(stdout, "%s: IPSEC authentication key:\n", __func__);
+	mac_key->hprint(mac_key);
+	fputc('\n', stdout);
+
+	/* Setup the security association. */
+	if ( !ipsec->setup_sa(ipsec, local_ip, remote_ip, 0x201, \
+			      "3des-cbc", enc_key, "hmac-md5", mac_key) ) {
+		fputs("Error setting security association 1.\n", stderr);
+		goto done;
+	}
+
+	/* Setup the security policy database. */
+	local_net  = cfg->get(cfg, "secure_local_net");
+	remote_net = cfg->get(cfg, "secure_remote_net");
+	net_mask   = cfg->get(cfg, "secure_net_mask");
+	if ( (local_net == NULL) || (remote_net == NULL) || \
+	     (net_mask == NULL) ) {
+		fputs("Error in network parameter specifications.\n", stderr);
+		goto done;
+	}
+
+	if ( !ipsec->setup_spd(ipsec, local_ip, remote_ip, \
+			       local_net, remote_net, net_mask) ) {
+		fputs("Error setting security policy 1.\n", stderr);
+		goto done;
+	}
+
+	/* Configure secure network interface and route. */
+	interface = cfg->get(cfg, "interface");
+	local_ip  = cfg->get(cfg, "secure_local_ip");
+	if ( (interface == NULL) || (local_ip == NULL) )
+		goto done;
+	
+	if ( !setup_tunnel_interface(interface, local_ip, local_mask, \
+				     remote_net, net_mask) ) {
+		fputs("Error setting up tunnel interface.\n", stderr);
+		return 1;
+	}
+
+	retn = true;
+
+ done:
+	WHACK(enc_key);
+	WHACK(mac_key);
+	WHACK(sha256);
+	WHACK(ipsec);
 
 	return retn;
 }
@@ -277,8 +452,8 @@ static _Bool send_host_response(CO(Duct, duct), CO(PossumPacket, packet), \
  * A listening socket is then opened and a tunnel based verification
  * connection is listened for.
  *
- * \param cfg	The configuration parameter which is used for
- *		master mode.
+ * \param cfg		The configuration parameter which is used for
+ *			master mode.
  *
  * \return	A boolean value is used to indicate whether or not a
  *		POSSUM connection was successfully processed.  A false
@@ -323,6 +498,9 @@ static _Bool host_mode(CO(Config, cfg))
 	/* Wait for a packet to arrive. */
 	if ( !duct->receive_Buffer(duct, netbufr) )
 		goto done;
+	fprintf(stdout, "%s: Raw receive packet:\n", __func__);
+	netbufr->hprint(netbufr);
+	fputc('\n', stdout);
 
 	/* Find the client identity. */
 	if ( (cfg_item = cfg->get(cfg, "client_list")) == NULL )
@@ -336,18 +514,20 @@ static _Bool host_mode(CO(Config, cfg))
 
 	/* Verify and decode packet. */
 	INIT(NAAAIM, PossumPacket, packet, goto done);
-	software->add_hexstring(software, CLIENT_SOFTWARE_STATUS);
+	if ( (cfg_item = cfg->get(cfg, "remote_software")) == NULL )
+		goto done;
+	software->add_hexstring(software, cfg_item);
 	if ( !packet->decode_packet1(packet, token, software, netbufr) )
 		goto done;
-	fputs("Incoming client packet 1.\n", stdout);
+	fprintf(stdout, "%s: Incoming client packet 1:\n", __func__);
 	packet->print(packet);
+	fputc('\n', stdout);
 
 	/* Verify hardware quote. */
 
 	/* Verify protocol. */
 
 	/* Save the client provided nonce and public key. */
-	fputs("Saving nonce and public key.\n", stdout);
 	INIT(HurdLib, Buffer, nonce, goto done);
 	if ( (b = packet->get_element(packet, PossumPacket_nonce)) == NULL )
 		goto done;
@@ -361,12 +541,10 @@ static _Bool host_mode(CO(Config, cfg))
 		goto done;
 
 	/* Generate DH public key for shared secret. */
-	fputs("Generting DH key.\n", stdout);
 	INIT(NAAAIM, Curve25519, dhkey, goto done);
 	dhkey->generate(dhkey);
 
 	/* Compose and send a reply packet. */
-	fputs("Getting identity.\n", stdout);
 	if ( (cfg_item = cfg->get(cfg, "identity")) == NULL )
 		goto done;
 	if ( (token_file = fopen(cfg_item, "r")) == NULL )
@@ -375,7 +553,6 @@ static _Bool host_mode(CO(Config, cfg))
 	if ( !token->parse(token, token_file) )
 		goto done;
 	
-	fputs("Composing packet.\n", stdout);
 	packet->reset(packet);
 	netbufr->reset(netbufr);
 
@@ -383,41 +560,46 @@ static _Bool host_mode(CO(Config, cfg))
 	packet->create_packet1(packet, token, dhkey);
 
 	software->reset(software);
-	software->add_hexstring(software, HOST_SOFTWARE_STATUS);
+	if ( (cfg_item = cfg->get(cfg, "software")) == NULL )
+		goto done;
+	software->add_hexstring(software, cfg_item);
 	if ( !packet->encode_packet1(packet, software, netbufr) )
 		goto done;
 	if ( !duct->send_Buffer(duct, netbufr) )
 		goto done;
-	fputs("Sent host packet 1:\n", stdout);
+	fprintf(stdout, "%s: Sent host packet 1:\n", __func__);
 	packet->print(packet);
+	fputc('\n', stdout);
 
-	INIT(HurdLib, Buffer, shared_key, goto done;);
+	INIT(HurdLib, Buffer, shared_key, goto done);
 	if ( (b = packet->get_element(packet, PossumPacket_nonce)) == NULL )
 		goto done;
 
 	if ( !generate_shared_key(b, nonce, dhkey, public, shared_key) )
 		goto done;
-	fputs("\nShared key:\n", stdout);
-	shared_key->hprint(shared_key);
+	fprintf(stdout, "%s: shared key:\n", __func__);
+	shared_key->print(shared_key);
+	fputc('\n', stdout);
 
+	setup_ipsec(cfg, 1, 0x201, shared_key);
 
 	retn = true;
 
  done:
-	sleep(5);
 
 	if ( token_file != NULL )
 		fclose(token_file);
 
+	sleep(5);
 	WHACK(duct);
 	WHACK(netbufr);
 	WHACK(nonce);
 	WHACK(software);
 	WHACK(public);
-	WHACK(shared_key);
 	WHACK(token);
 	WHACK(packet);
 	WHACK(dhkey);
+	WHACK(shared_key);
 
 	return retn;
 }
@@ -452,8 +634,8 @@ static _Bool host_mode(CO(Config, cfg))
  * A tunnel connection is then established and authenticated with the
  * remote host.
  *
- * \param cfg	The configuration parameter which is used for
- *		master mode.
+ * \param cfg		The configuration parameter which is used for
+ *			master mode.
  *
  * \return	A boolean value is used to indicate whether or not a
  *		POSSUM connection was successfully processed.  A false
@@ -515,14 +697,17 @@ static _Bool client_mode(CO(Config, cfg))
 	dhkey->generate(dhkey);
 	packet->create_packet1(packet, token, dhkey);
 
-	software->add_hexstring(software, CLIENT_SOFTWARE_STATUS);
+	if ( (cfg_item = cfg->get(cfg, "software")) == NULL )
+		goto done;
+	software->add_hexstring(software, cfg_item);
 	if ( !packet->encode_packet1(packet, software, bufr) )
 		goto done;
 	if ( !duct->send_Buffer(duct, bufr) )
 		goto done;
 
-	fputs("Sent client packet 1:\n", stdout);
+	fprintf(stdout, "%s: Sent client packet 1:\n", __func__);
 	packet->print(packet);
+	fputc('\n', stdout);
 
 	/* Extract nonce and public key. */
 	INIT(HurdLib, Buffer, nonce, goto done);
@@ -535,6 +720,9 @@ static _Bool client_mode(CO(Config, cfg))
 	bufr->reset(bufr);
 	if ( !duct->receive_Buffer(duct, bufr) )
 		goto done;
+	fprintf(stdout, "%s: Raw receive packet:\n", __func__);
+	bufr->hprint(bufr);
+	fputc('\n', stdout);
 
 	/* Find the host identity. */
 	if ( (cfg_item = cfg->get(cfg, "client_list")) == NULL )
@@ -545,16 +733,18 @@ static _Bool client_mode(CO(Config, cfg))
 		goto done;
 
 	software->reset(software);
-	software->add_hexstring(software, HOST_SOFTWARE_STATUS);
+	if ( (cfg_item = cfg->get(cfg, "remote_software")) == NULL )
+		goto done;
+	software->add_hexstring(software, cfg_item);
 	if ( !packet->decode_packet1(packet, token, software, bufr) ) {
 		fprintf(stdout, "%s: Failed decode packet.\n", __func__);
 		goto done;
 	}
 
-	fputs("\nReceived host packet 1.\n", stdout);
+	fprintf(stdout, "%s: Received host packet 1.\n", __func__);
 	packet->print(packet);
+	fputc('\n', stdout);
 
-	INIT(HurdLib, Buffer, shared_key, goto done;);
 	if ( (b = packet->get_element(packet, PossumPacket_public)) == NULL )
 		goto done;
 	public = b;
@@ -562,11 +752,14 @@ static _Bool client_mode(CO(Config, cfg))
 	if ( (b = packet->get_element(packet, PossumPacket_nonce)) == NULL )
 		goto done;
 
+	INIT(HurdLib, Buffer, shared_key, goto done);
 	if ( !generate_shared_key(b, nonce, dhkey, public, shared_key) )
 		goto done;
-	fputs("\nShared key:\n", stdout);
-	shared_key->hprint(shared_key);
-	
+	fprintf(stdout, "%s: shared key:\n", __func__);
+	shared_key->print(shared_key);
+	fputc('\n', stdout);
+
+	setup_ipsec(cfg, 1, 0x201, shared_key);
 	retn = true;
 
  done:
@@ -577,59 +770,11 @@ static _Bool client_mode(CO(Config, cfg))
 	WHACK(nonce);
 	WHACK(software);
 	WHACK(bufr);
-	WHACK(shared_key);
 	WHACK(token);
 	WHACK(dhkey);
 	WHACK(packet);
+	WHACK(shared_key);
 
-	return retn;
-}
-
-
-/**
- * Private function.
- *
- * This function is responsible for configuring a physical interface
- * over which the IPsec tunnel will be constructed.
- *
- * \param ip	The IP address to be assigned to the interface.
- *
- * \param mask	The netmask to be applied to the interface address.
- *
- * \param gw	The gateway address, this may be NULL in which case
- *		a default route will not be set.
- *
- * \return	A boolean value is used to indicate the status of the
- *		interface configuration.  Failure is denoted by returning
- *		a false value while success is indicated by a true value.
- */
-
-static _Bool setup_tunnel_interface(CO(char *, iface), CO(char *, ip), \
-				    CO(char *, ip_mask),	       \
-				    CO(char *, net_remote),	       \
-				    CO(char *, net_mask))
-
-{
-	_Bool retn = false;
-
-	Netconfig netconfig = NULL;
-
-	goto done;
-	fprintf(stderr, "iface: %s\n", iface);
-	fprintf(stderr, "ip: %s/%s\n", ip, ip_mask);
-	fprintf(stderr, "remote: %s/%s\n", net_remote, net_mask);
-
-	if ( (netconfig = NAAAIM_Netconfig_Init()) == NULL )
-		goto done;
-	if ( !netconfig->set_address(netconfig, iface, ip, ip_mask) )
-		goto done;
-	if ( !netconfig->set_route(netconfig, net_remote, ip, net_mask) )
-		goto done;
-
-	retn = true;
-
- done:
-	WHACK(netconfig);
 	return retn;
 }
 
@@ -643,26 +788,13 @@ extern int main(int argc, char *argv[])
 {
 	int retn = 1;
 
-	char *p,
-	     *personality,
-	     *interface,
-	     *local_ip,
-	     *local_mask,
-	     *remote_ip,
-	     *local_net,
-	     *remote_net,
-	     *net_mask;
+	char *personality;
 
 	int opt;
 
 	enum {host, client} mode;
 
 	Config config = NULL;
-
-	Buffer key     = NULL,
-	       mac_key = NULL;
-
-	IPsec ipsec = NULL;
 
 
 	/* Get the root image and passwd file name. */
@@ -720,76 +852,8 @@ extern int main(int argc, char *argv[])
 	}
 	goto done;
 
-	/* Setup physical link. */
-	local_ip   = config->get(config, "local_ip");
-	local_mask = config->get(config, "local_mask");
-	remote_ip  = config->get(config, "remote_ip");
-	interface  = config->get(config, "interface");
-	if ( (local_ip == NULL) || (local_mask == NULL) || \
-	     (remote_ip == NULL) ) {
-		fputs("Client/host IP specification error.\n", stderr);
-		goto done;
-	}
-
-	/* Setup security association. */
-	if ( (ipsec = NAAAIM_IPsec_Init()) == NULL )
-		goto done;
-
-	if ( (key = HurdLib_Buffer_Init()) == NULL )
-		goto done;
-
-	if ( (p = config->get(config, "enc_key")) == NULL ) {
-		fputs("Error loading encryption key.\n", stderr);
-		goto done;
-	}
-	key->add_hexstring(key, p);
-
-	if ( (mac_key = HurdLib_Buffer_Init()) == NULL )
-		goto done;
-
-	if ( (p = config->get(config, "mac_key")) == NULL ) {
-		fputs("Error load mac key.\n", stderr);
-		goto done;
-	}
-	mac_key->add_hexstring(mac_key, p);
-
-	if ( !ipsec->setup_sa(ipsec, local_ip, remote_ip, 0x201, \
-			      "3des-cbc", key, "hmac-md5", mac_key) ) {
-		fputs("Error setting security association 1.\n", stderr);
-		goto done;
-	}
-
-
-	local_net = config->get(config, "secure_local_net");
-	remote_net = config->get(config, "secure_remote_net");
-	net_mask = config->get(config, "secure_net_mask");
-	if ( (local_net == NULL) || (remote_net == NULL) || \
-	     (net_mask == NULL) ) {
-		fputs("Error in network parameter specifications.\n", stderr);
-		goto done;
-	}
-
-	if ( !ipsec->setup_spd(ipsec, local_ip, remote_ip, \
-			       local_net, remote_net, net_mask) ) {
-		fputs("Error setting security policy 1.\n", stderr);
-		goto done;
-	}
-
-	/* Configure secure network interface and route. */
-	local_ip = config->get(config, "secure_local_ip");
-	
-	if ( !setup_tunnel_interface(interface, local_ip, local_mask, \
-				     remote_net, net_mask) ) {
-		fputs("Error setting up tunnel interface.\n", stderr);
-		return 1;
-	}
-
-
  done:
 	WHACK(config);
-	WHACK(key);
-	WHACK(mac_key);
-	WHACK(ipsec);
 
 	return retn;
 }
