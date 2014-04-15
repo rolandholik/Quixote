@@ -10,15 +10,6 @@
  **************************************************************************/
 
 /* Local defines. */
-/* Macro for defining a pointer to a constance object. */
-#define CO(obj, var) const obj const var
-
-/* Macro to extract state state information into the specified variable. */
-#define STATE(var) CO(NAAAIM_IPsec_State, var) = this->state
-
-/* Macro to clear object pointer if not NULL. */
-#define WHACK(obj) if (obj != NULL) {obj->whack(obj); obj = NULL;}
-
 /* Path to the setkey utility. */
 #define SETKEY "/usr/local/sbin/setkey"
 
@@ -49,6 +40,9 @@
 #error Object identifier not defined.
 #endif
 
+/* Macro to extract state state information into the specified variable. */
+#define STATE(var) CO(IPsec_State, var) = this->state
+
 
 /** IPsec private state information. */
 struct NAAAIM_IPsec_State
@@ -62,6 +56,8 @@ struct NAAAIM_IPsec_State
 	/* Object identifier. */
 	uint32_t objid;
 
+	/* Object status. */
+	_Bool poisoned;
 };
 
 
@@ -71,14 +67,17 @@ struct NAAAIM_IPsec_State
  * This method is responsible for initializing the NAAAIM_IPsec_State
  * structure which holds state information for each instantiated object.
  *
- * \param S A pointer to the object containing the state information which
- *        is to be initialized.
+ * \param S	A pointer to the object containing the state information
+ *		which is to be initialized.
  */
 
-static void _init_state(const IPsec_State const S) {
+static void _init_state(CO(IPsec_State, S))
 
+{
 	S->libid = NAAAIM_LIBID;
 	S->objid = NAAAIM_IPsec_OBJID;
+
+	S->poisoned = false;
 
 	return;
 }
@@ -105,15 +104,16 @@ static _Bool _execute(CO(String, cmd))
 
 	FILE *setkey;
 
-	
-	if ( (setkey = popen(SETKEY " -c", "w")) == NULL )
+	/* Arguement verification. */
+	if ( (cmd == NULL) || cmd->poisoned(cmd) )
 		goto done;
 
+	/* Open a pipe to the setkey binary and output command. */
+	if ( (setkey = popen(SETKEY " -c", "w")) == NULL )
+		goto done;
 	fprintf(setkey, "%s\n", cmd->get(cmd));
-
 	if ( pclose(setkey) != -1 )
 		retn = true;
-
 
  done:
 	return retn;
@@ -138,20 +138,33 @@ static _Bool _execute(CO(String, cmd))
 static void add_hex_Buffer(CO(Buffer, input), CO(String, output))
 
 {
-	unsigned char *p = input->get(input);
+	unsigned char *p;
 
 	char bufr[3];
 
-	size_t lp = 0,
-	       cnt = input->size(input);
+	size_t cnt,
+	       lp = 0;
 
 
+	/* Arguement validation. */
+	if ( (input == NULL) || input->poisoned(input) )
+		goto done;
+	if ( (output == NULL) || output->poisoned(output) )
+		goto done;
+
+	/*
+	 * Convert the bytes in the buffer into their hexadecimal
+	 * equivalents.
+	 */
+	p   = input->get(input);
+	cnt = input->size(input);
 	for (lp= 0; lp < cnt; ++lp) {
 		snprintf(bufr, sizeof(bufr), "%02x", *p);
 		output->add(output, bufr);
 		++p;
 	}
 
+ done:
 	return;
 }
 
@@ -254,24 +267,34 @@ static _Bool setup_sa(CO(IPsec, this), CO(char *, local), CO(char *, remote), \
 		      CO(char *, mac_alg), CO(Buffer, mac_key))
 
 {
+	STATE(S);
+
 	_Bool retn = false;
 
 	String cmd = NULL;
 
 
-	if ( enc_key->poisoned(enc_key) || mac_key->poisoned(mac_key) )
+	/* Arguement validation. */
+	if ( (enc_key == NULL) || enc_key->poisoned(enc_key) )
+		goto done;
+	if ( (mac_key == NULL) || mac_key->poisoned(mac_key) )
 		goto done;
 
-	if ( (cmd = HurdLib_String_Init()) == NULL )
-		goto done;
-
+	INIT(HurdLib, String, cmd, goto done);
 	_emit_sa(cmd, local, remote, spi, enc_alg, enc_key, mac_alg, mac_key);
 	_emit_sa(cmd, remote, local, spi, enc_alg, enc_key, mac_alg, mac_key);
+	fprintf(stdout, "%s: SA command\n", __func__);
+	cmd->print(cmd);
 
+	if ( cmd->poisoned(cmd) )
+		goto done;
 	if ( _execute(cmd) )
 		retn = true;
 
  done:
+	if ( !retn )
+		S->poisoned = true;
+
 	WHACK(cmd);
 
 	return retn;
@@ -381,9 +404,6 @@ static _Bool setup_spd(CO(IPsec, this), CO(char *, local),	  \
 	String cmd = NULL;
 
 
-	if ( (cmd = HurdLib_String_Init()) == NULL )
-		goto done;
-
 	/* Calculate CIDR count. */
 	while ( mask ) {
 		if ( mask & 0x1 )
@@ -391,16 +411,43 @@ static _Bool setup_spd(CO(IPsec, this), CO(char *, local),	  \
 		mask >>= 1;
 	}
 
+	INIT(HurdLib, String, cmd, goto done);
 	_emit_spd(cmd, "out", local, remote, local_net, remote_net, cidr);
 	_emit_spd(cmd, "in", remote, local, remote_net, local_net, cidr);
+	fprintf(stdout, "%s: SPD command\n", __func__);
+	cmd->print(cmd);
 
+	if ( cmd->poisoned(cmd) )
+		goto done;
 	if ( _execute(cmd) )
 		retn = true;
 
 
  done:
 	WHACK(cmd);
+
 	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements the return of the object status.
+ *
+ * \param this	A pointer to the object whose status is to be
+ *		returned.
+ *
+ * \return	The return value will be either true or false based
+ *		on the poisoned status in the variable.
+ */
+
+static _Bool poisoned(CO(IPsec, this))
+
+{
+	STATE(S);
+
+	return S->poisoned;
 }
 
 
@@ -412,11 +459,10 @@ static _Bool setup_spd(CO(IPsec, this), CO(char *, local),	  \
  * \param this	A pointer to the object which is to be destroyed.
  */
 
-static void whack(const IPsec const this)
+static void whack(CO(IPsec, this))
 
 {
-	auto const IPsec_State const S = this->state;
-
+	STATE(S);
 
 	S->root->whack(S->root, this, S);
 	return;
@@ -463,7 +509,8 @@ extern IPsec NAAAIM_IPsec_Init(void)
 	this->setup_sa  = setup_sa;
 	this->setup_spd = setup_spd;
 
-	this->whack = whack;
+	this->poisoned = poisoned;
+	this->whack    = whack;
 
 	return this;
 }

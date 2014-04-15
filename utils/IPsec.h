@@ -30,6 +30,7 @@ struct NAAAIM_IPsec
 	_Bool (*setup_spd)(const IPsec, const char *, const char *, \
 			   const char *, const char *, const char *);
 
+	_Bool (*poisoned)(const IPsec);
 	void (*whack)(const IPsec);
 
 	/* Private state. */
