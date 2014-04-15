@@ -30,6 +30,7 @@ struct NAAAIM_IPsec
 	_Bool (*setup_spd)(const IPsec, const char *, const char *, \
 			   const char *, const char *, const char *);
 
+	_Bool (*have_spi)(const IPsec, const uint32_t);
 	_Bool (*poisoned)(const IPsec);
 	void (*whack)(const IPsec);
 

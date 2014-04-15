@@ -19,6 +19,9 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdint.h>
+#include <string.h>
+#include <errno.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
@@ -431,6 +434,93 @@ static _Bool setup_spd(CO(IPsec, this), CO(char *, local),	  \
 
 
 /**
+* External public method.
+*
+* This method implements a check to determine whether or not a
+* Security Parameter Index (SPI) value is in use.  It does this by
+* running the setkey in 'dump' mode and parsing the output for
+* spi= directives.
+*
+* Since this object is querying a system global value which may
+* be modified at any time any locking is considered to be the
+* responsibility of the caller.
+*
+* \param this	The object which will be requesting the SPI check.
+*
+* \param spi	The SPI value which is to be verified.
+*
+* \return	If the specified SPI value is not currently active a
+*		false value will be returned.  If the SPI is in use a
+*		true value is returned.  If an error is encountered
+*		the object is poisoned so there is a method of
+*		deteting whether or not the operation was successful
+*		from an operational perspective.
+*/
+
+static _Bool have_spi(CO(IPsec, this), const uint32_t spi)
+
+{
+	STATE(S);
+
+	_Bool found = false,
+	      retn  = false;
+
+	char *p,
+	     *pend,
+	     bufr[256];
+
+	long int value;
+
+	const char * const tag = "spi=";
+
+	FILE *setkey = NULL;
+
+
+	/* Open a pipe to the setkey binary and output command. */
+	if ( (setkey = popen(SETKEY " -D", "r")) == NULL )
+		goto done;
+
+	/* Parse the output for fields with spi= values. */
+	while ( fgets(bufr, sizeof(bufr), setkey) != NULL ) {
+		if ( (p = strchr(bufr, '\n')) != NULL )
+			*p = '\0';
+		if ( (p = strstr(bufr, tag)) == NULL )
+			continue;
+
+		/* Found spi= tag, parse foward to start of number. */
+		while ( (*p != '\0') && (*p != '=') )
+			++p;
+
+		/* Parse forward until the end of the number. */
+		pend = ++p;
+		while ( (*pend != '\0') && (*pend != '(') )
+			++pend;
+		*pend = '\0';
+
+		/* Convert the number into an integer and check value. */
+		value = strtol(p, NULL, 10);
+		if ( errno == ERANGE )
+			goto done;
+		if ( value == spi ) {
+			found = true;
+			break;
+		}
+	}
+	retn = true;
+
+ done:
+	if ( (setkey != NULL) && (pclose(setkey) == -1) )
+	     retn = false;
+	if ( !retn ) {
+		found	    = false;
+		S->poisoned = true;
+	}
+
+	return found;
+}
+
+
+/**
  * External public method.
  *
  * This method implements the return of the object status.
@@ -509,6 +599,7 @@ extern IPsec NAAAIM_IPsec_Init(void)
 	this->setup_sa  = setup_sa;
 	this->setup_spd = setup_spd;
 
+	this->have_spi = have_spi;
 	this->poisoned = poisoned;
 	this->whack    = whack;
 
