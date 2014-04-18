@@ -97,6 +97,11 @@ struct NAAAIM_PossumPacket_State
 	uint32_t protocol;
 
 	/**
+	 * Security parameter index.
+	 */
+	uint32_t spi;
+
+	/**
 	 * Requested authentication time.
 	 */
 	time_t auth_time;
@@ -136,6 +141,7 @@ struct NAAAIM_PossumPacket_State
 typedef struct {
 	ASN1_INTEGER *magic;
 	ASN1_INTEGER *protocol;
+	ASN1_INTEGER *spi;
 	ASN1_OCTET_STRING *nonce;
 	ASN1_OCTET_STRING *public;
         ASN1_OCTET_STRING *hardware;
@@ -144,6 +150,7 @@ typedef struct {
 ASN1_SEQUENCE(packet1_payload) = {
 	ASN1_SIMPLE(packet1_payload, magic,	ASN1_INTEGER),
 	ASN1_SIMPLE(packet1_payload, protocol,	ASN1_INTEGER),
+	ASN1_SIMPLE(packet1_payload, spi,	ASN1_INTEGER),
 	ASN1_SIMPLE(packet1_payload, nonce,	ASN1_OCTET_STRING),
 	ASN1_SIMPLE(packet1_payload, public,	ASN1_OCTET_STRING),
 	ASN1_SIMPLE(packet1_payload, hardware,	ASN1_OCTET_STRING),
@@ -168,6 +175,10 @@ static void _init_state(CO(PossumPacket_State, S)) {
 	S->objid = NAAAIM_PossumPacket_OBJID;
 
 	S->poisoned	 = false;
+	S->magic	 = 0;
+	S->protocol	 = 0;
+	S->spi		 = 0;
+	S->auth_time	 = 0;
 
 	S->otedks	 = NULL;
 	S->nonce	 = NULL;
@@ -256,6 +267,8 @@ static _Bool compute_checksum(CO(PossumPacket_State, S),	      \
  * \param dh		The elliptic curve to be used to implement
  *			the shared key.
  *
+ * \param spi		The Security Parameter Index to be proposed/used.
+ *
  * \return	A boolean value is used to indicate the sucess or
  *		failure of creating the packet.  A false value
  *		indicates creation failed while a true indicates it
@@ -263,7 +276,7 @@ static _Bool compute_checksum(CO(PossumPacket_State, S),	      \
  */
 
 static _Bool create_packet1(CO(PossumPacket, this), CO(IDtoken, token),
-			    CO(Curve25519, dh))
+			    CO(Curve25519, dh), const uint32_t spi)
 
 {
 
@@ -283,6 +296,11 @@ static _Bool create_packet1(CO(PossumPacket, this), CO(IDtoken, token),
 		goto done;
 	if ( token == NULL )
 		goto done;
+	if ( (dh == NULL) || dh->poisoned(dh) )
+		goto done;
+
+	/* Set the Security Parameter Index. */
+	S->spi = spi;
 
 	/* Load the identification challenge nonce. */
 	INIT(NAAAIM, RandomBuffer, rnd, goto done);
@@ -482,6 +500,9 @@ static _Bool create_authenticator(CO(PossumPacket_State, S), CO(Buffer, bufr))
 		goto done;
 
 	if ( ASN1_INTEGER_set(packet1->protocol, S->protocol) != 1 )
+		goto done;
+
+	if ( ASN1_INTEGER_set(packet1->spi, S->spi) != 1 )
 		goto done;
 
 	if ( ASN1_OCTET_STRING_set(packet1->nonce, S->nonce->get(S->nonce), \
@@ -710,10 +731,9 @@ static _Bool decode_packet1(CO(PossumPacket, this), CO(IDtoken, token),
         if ( !d2i_packet1_payload(&packet1, &p, asn_size) )
                 goto done;
 
-
-	S->magic = ASN1_INTEGER_get(packet1->magic);
-
+	S->magic    = ASN1_INTEGER_get(packet1->magic);
 	S->protocol = ASN1_INTEGER_get(packet1->protocol);
+	S->spi	    = ASN1_INTEGER_get(packet1->spi);
 
 	S->nonce->add(S->nonce, ASN1_STRING_data(packet1->nonce), \
 		      ASN1_STRING_length(packet1->nonce));
@@ -810,6 +830,46 @@ static _Bool set_schedule(CO(PossumPacket, this), CO(IDtoken, token), \
 /**
  * External public method.
  *
+ * This method implements a general accessor for retrieving numeric
+ * element from a POSSUM packet.
+ *
+ * \param this		The packet whose element value to be retrieved.
+ *
+ * \param element	The enumerated type of the value to be
+ *			retrieved.
+ *
+ * \return		The requested Buffer object is returned.  A
+ *			NULL value is used to indicate that an
+ *			unknown element was requested.
+ */
+
+static uint32_t get_value(CO(PossumPacket, this), \
+			  const PossumPacket_value value)
+
+{
+	STATE(S);
+
+
+	if ( S->poisoned )
+		return 0;
+
+	switch ( value ) {
+		case PossumPacket_spi:
+			return S->spi;
+			break;
+
+		default:
+			return 0;
+			break;
+	}
+
+	return 0;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a general accessor for retrieving components
  * of a POSSUM packet.
  *
@@ -875,6 +935,7 @@ static void print(CO(PossumPacket, this))
 	fprintf(stdout, "magic: %08x\n", S->magic);
 	fprintf(stdout, "protocol: %08x\n", S->protocol);
 	fprintf(stdout, "time: %d\n", (int) S->auth_time);
+	fprintf(stdout, "spi: %08x\n", S->spi);
 
 	fputs("nonce:\n", stdout);
 	S->nonce->print(S->nonce);
@@ -1001,6 +1062,7 @@ extern PossumPacket NAAAIM_PossumPacket_Init(void)
 	this->decode_packet1 = decode_packet1;
 
 	this->set_schedule = set_schedule;
+	this->get_value	   = get_value;
 	this->get_element  = get_element;
 
 	this->print	   = print;

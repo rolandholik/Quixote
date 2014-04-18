@@ -26,6 +26,10 @@ typedef enum {
 	PossumPacket_hardware
 } PossumPacket_element;
 
+typedef enum {
+	PossumPacket_spi
+} PossumPacket_value;
+
 /**
  * External PossumPacket object representation.
  */
@@ -33,13 +37,14 @@ struct NAAAIM_PossumPacket
 {
 	/* External methods. */
 	_Bool (*create_packet1)(const PossumPacket, const IDtoken, \
-				const Curve25519);
+				const Curve25519, const uint32_t);
 	_Bool (*encode_packet1)(const PossumPacket, const Buffer, \
 				const Buffer);
 	_Bool (*decode_packet1)(const PossumPacket, const IDtoken, \
 				const Buffer, const Buffer);
 	_Bool (*set_schedule)(const PossumPacket, const IDtoken, \
 			      time_t);
+	uint32_t (*get_value)(const PossumPacket, const PossumPacket_value);
 	Buffer (*get_element)(const PossumPacket, const PossumPacket_element);
 	void (*print)(const PossumPacket);
 	void (*reset)(const PossumPacket);

@@ -22,6 +22,10 @@
 #define POSSUM_PORT 10902
 #endif
 
+#define CLIENT_SPI_ARENA	0x10000
+#define HOST_SPI_ARENA		0x20000
+#define RESERVE_SPI_ARENA	0x30000
+
 
 /* Include files. */
 #include <stdint.h>
@@ -43,6 +47,7 @@
 #include <SHA256.h>
 #include <SHA256_hmac.h>
 #include <Curve25519.h>
+#include <RandomBuffer.h>
 
 #include "Netconfig.h"
 #include "IPsec.h"
@@ -270,7 +275,7 @@ static _Bool setup_ipsec(CO(Config, cfg), const uint32_t protocol, \
 	fputc('\n', stdout);
 
 	/* Setup the security association. */
-	if ( !ipsec->setup_sa(ipsec, local_ip, remote_ip, 0x201, \
+	if ( !ipsec->setup_sa(ipsec, local_ip, remote_ip, spi, \
 			      "3des-cbc", enc_key, "hmac-md5", mac_key) ) {
 		fputs("Error setting security association 1.\n", stderr);
 		goto done;
@@ -315,6 +320,72 @@ static _Bool setup_ipsec(CO(Config, cfg), const uint32_t protocol, \
 	return retn;
 }
 
+
+/**
+ * Private function.
+ *
+ * This function is responsible for two forms of functionality.  The
+ * first form, if the spi value is set to zero, checks to see if the
+ * SPI is in use in the specified arena.
+ *
+ * In the second form an unused SPI is nominated from the specified
+ * allocation arena.
+ *
+ * \param base	The SPI arena from which the proposal is to be taken.
+ *
+ * \param spi	The SPI which is to be checked.  A zero value is used
+ *		to indicate that a proposal should be made.
+ *
+ * \return	If a proposal values a value of zero is returned to
+ *		the caller.
+ */
+
+static uint32_t propose_spi(CO(uint32_t, base), uint32_t use_spi)
+
+{
+        uint16_t cnt;
+
+	uint32_t spi = 0;
+
+	Buffer b;
+
+	IPsec ipsec = NULL;
+
+	RandomBuffer rnd = NULL;
+
+
+	/* Check to see if an SPI has been proposed and is in use. */
+	INIT(NAAAIM, IPsec, ipsec, goto done);
+	if ( use_spi != 0 ) {
+		use_spi += base;
+		if ( !ipsec->have_spi(ipsec, use_spi) )
+			spi = use_spi;
+		goto done;
+	}
+
+	/* Propose an SPI based on the supplied base. */
+	INIT(NAAAIM, RandomBuffer, rnd, goto done);
+	cnt = 0;
+	spi = 0;
+	while ( (spi == 0) && (cnt < UINT16_MAX) ) {
+		rnd->generate(rnd, 2);
+		b = rnd->get_Buffer(rnd);
+		spi = *((uint16_t *) b->get(b));
+		if ( ipsec->have_spi(ipsec, spi) )
+			spi = 0;
+	}
+	if ( spi == 0 )
+		goto done;
+	if ( base == RESERVE_SPI_ARENA )
+		spi += base;
+
+ done:
+	WHACK(ipsec);
+	WHACK(rnd);
+
+	return spi;
+}
+	
 
 /**
  * Private function.
@@ -468,6 +539,9 @@ static _Bool host_mode(CO(Config, cfg))
 
 	char *cfg_item;
 
+	uint32_t tspi,
+		 spi;
+
 	FILE *token_file = NULL;
 
 	Duct duct = NULL;
@@ -556,8 +630,22 @@ static _Bool host_mode(CO(Config, cfg))
 	packet->reset(packet);
 	netbufr->reset(netbufr);
 
+	/*
+	 * Check both SPI's proposed by the caller.  If neither are
+	 * available allocate an SPI from the reserve arena.
+	 */
+	if ( (tspi = packet->get_value(packet, PossumPacket_spi)) == 0 )
+		goto done;
+	spi = propose_spi(HOST_SPI_ARENA, tspi & UINT16_MAX);
+	if ( spi == 0 )
+		spi = propose_spi(CLIENT_SPI_ARENA, tspi >> 16);
+	if ( spi == 0 )
+		spi = propose_spi(RESERVE_SPI_ARENA, 0);
+	if ( spi == 0 )
+		goto done;
+
 	packet->set_schedule(packet, token, time(NULL));
-	packet->create_packet1(packet, token, dhkey);
+	packet->create_packet1(packet, token, dhkey, spi);
 
 	software->reset(software);
 	if ( (cfg_item = cfg->get(cfg, "software")) == NULL )
@@ -581,7 +669,8 @@ static _Bool host_mode(CO(Config, cfg))
 	shared_key->print(shared_key);
 	fputc('\n', stdout);
 
-	setup_ipsec(cfg, 1, 0x201, shared_key);
+	spi = packet->get_value(packet, PossumPacket_spi);
+	setup_ipsec(cfg, 1, spi, shared_key);
 
 	retn = true;
 
@@ -650,6 +739,9 @@ static _Bool client_mode(CO(Config, cfg))
 
 	const char *cfg_item;
 
+	uint32_t spi,
+		 tspi;
+
 	FILE *token_file = NULL;
 
 	Duct duct = NULL;
@@ -693,9 +785,13 @@ static _Bool client_mode(CO(Config, cfg))
 
 	INIT(NAAAIM, PossumPacket, packet, goto done);
 	packet->set_schedule(packet, token, time(NULL));
-
 	dhkey->generate(dhkey);
-	packet->create_packet1(packet, token, dhkey);
+	tspi = propose_spi(CLIENT_SPI_ARENA, 0);
+	spi = tspi << 16;
+	tspi = propose_spi(HOST_SPI_ARENA, 0);
+	spi = spi | tspi;
+
+	packet->create_packet1(packet, token, dhkey, spi);
 
 	if ( (cfg_item = cfg->get(cfg, "software")) == NULL )
 		goto done;
@@ -759,7 +855,8 @@ static _Bool client_mode(CO(Config, cfg))
 	shared_key->print(shared_key);
 	fputc('\n', stdout);
 
-	setup_ipsec(cfg, 1, 0x201, shared_key);
+	spi = packet->get_value(packet, PossumPacket_spi);
+	setup_ipsec(cfg, 1, spi, shared_key);
 	retn = true;
 
  done:
