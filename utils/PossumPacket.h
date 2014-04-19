@@ -14,6 +14,12 @@
 #ifndef NAAAIM_PossumPacket_HEADER
 #define NAAAIM_PossumPacket_HEADER
 
+/* Definitions for IPsec parameters types. */
+#define POSSUM_PACKET_TRIPLEDES_CBC	1
+#define POSSUM_PACKET_HMAC_MD5		1
+#define POSSUM_PACKET_EC		1
+#define POSSUM_PACKET_CURVE25519	1
+
 
 /* Object type definitions. */
 typedef struct NAAAIM_PossumPacket * PossumPacket;
@@ -27,7 +33,8 @@ typedef enum {
 } PossumPacket_element;
 
 typedef enum {
-	PossumPacket_spi
+	PossumPacket_spi,
+	PossumPacket_protocol
 } PossumPacket_value;
 
 /**

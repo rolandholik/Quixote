@@ -57,13 +57,10 @@
 #define POSSUMPACKET_MAGIC1 ((NAAAIM_LIBID << 16) | NAAAIM_PossumPacket_OBJID)
 
 /* Protocol definitions. */
-#define TRIPLEDES_CBC	1
-#define HMAC_MD5	1
-#define EC		1
-#define CURVE25519	1
-
-#define POSSUM_PROTOCOL1 (TRIPLEDES_CBC << 24) | (HMAC_MD5 << 16 ) | \
-			 (EC << 8) | CURVE25519
+#define POSSUM_PROTOCOL1 (POSSUM_PACKET_TRIPLEDES_CBC << 24) | \
+			 (POSSUM_PACKET_HMAC_MD5 << 16 )     | \
+			 (POSSUM_PACKET_EC << 8)	     | \
+			 POSSUM_PACKET_CURVE25519
 
 
 /** PossumPacket private state information. */
@@ -856,6 +853,9 @@ static uint32_t get_value(CO(PossumPacket, this), \
 	switch ( value ) {
 		case PossumPacket_spi:
 			return S->spi;
+			break;
+		case PossumPacket_protocol:
+			return S->protocol;
 			break;
 
 		default:

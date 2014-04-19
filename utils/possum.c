@@ -55,6 +55,65 @@
 
 
 /* Variable static to this file. */
+struct ipsec_parameters {
+	uint32_t enc_key_length;
+	uint32_t mac_key_length;
+	const char *enc_type;
+	const char *mac_type;
+};
+
+
+/**
+ * Private function.
+ *
+ * This function is responsible for decoding the POSSUM protocol parameter
+ * code into an encryption and authentication type as well as the
+ * key lengths needed to support these protocols.
+ *
+ * \param protocol	The numeric protocol number defined which is
+ *			requested.
+ *
+ * \param params	A pointer to a structure which encapsulates
+ *			the protocol parameters.
+ *
+ * \return		A true value indicates the protocol parameter
+ *			was successfully decoded, a false value indicate
+ *			an element of the protocol was unknown.
+ */
+
+static _Bool setup_sa_parameters(const uint32_t protocol, \
+				 struct ipsec_parameters *params)
+
+{
+	uint32_t encryption	= protocol >> 24,
+		 authentication = (protocol >> 16) & UINT8_MAX;
+
+	static const char *tripledes = "3des-cbc",
+			  *hmac_md5  = "hmac-md5";
+
+
+	memset(params, '\0', sizeof(struct ipsec_parameters));
+
+	switch ( encryption ) {
+		case POSSUM_PACKET_TRIPLEDES_CBC:
+			params->enc_type       = tripledes;
+			params->enc_key_length = 192 / 8;
+			break;
+	}
+
+	switch ( authentication ) {
+		case POSSUM_PACKET_HMAC_MD5:
+			params->mac_type       = hmac_md5;
+			params->mac_key_length = 128 / 8;
+			break;
+	}
+
+
+	if ( (params->enc_type != NULL) && (params->mac_type != NULL) && \
+	     (params->enc_key_length != 0) && (params->mac_key_length != 0) )
+		return true;
+	return false;
+}
 
 
 /**
@@ -232,6 +291,8 @@ static _Bool setup_ipsec(CO(Config, cfg), const uint32_t protocol, \
 	     *remote_net,
 	     *net_mask;
 
+	struct ipsec_parameters ipsec_params;
+
 	Buffer enc_key = NULL,
 	       mac_key = NULL;
 
@@ -251,10 +312,17 @@ static _Bool setup_ipsec(CO(Config, cfg), const uint32_t protocol, \
 	     (remote_ip == NULL) )
 		goto done;
 
+	/*
+	 * Resolve the security association parameters from the
+	 * protocol specification.
+	 */
+	if ( !setup_sa_parameters(protocol, &ipsec_params) )
+		goto done;
+
 	/* Setup the encryption key. */
 	INIT(HurdLib, Buffer, enc_key, goto done);
 	k = shared_key->get(shared_key);
-	if ( !enc_key->add(enc_key, k, 192 / 8) )
+	if ( !enc_key->add(enc_key, k, ipsec_params.enc_key_length) )
 		goto done;
 	fprintf(stdout, "%s: IPSEC encryption key:\n", __func__);
 	enc_key->hprint(enc_key);
@@ -268,15 +336,16 @@ static _Bool setup_ipsec(CO(Config, cfg), const uint32_t protocol, \
 	sha256->compute(sha256);
 	if ( (k = sha256->get(sha256)) == NULL )
 		goto done;
-	if ( !mac_key->add(mac_key, k, 128 / 8) )
+	if ( !mac_key->add(mac_key, k, ipsec_params.mac_key_length) )
 		goto done;
 	fprintf(stdout, "%s: IPSEC authentication key:\n", __func__);
 	mac_key->hprint(mac_key);
 	fputc('\n', stdout);
 
 	/* Setup the security association. */
-	if ( !ipsec->setup_sa(ipsec, local_ip, remote_ip, spi, \
-			      "3des-cbc", enc_key, "hmac-md5", mac_key) ) {
+	if ( !ipsec->setup_sa(ipsec, local_ip, remote_ip, spi,	\
+			      ipsec_params.enc_type, enc_key,	\
+			      ipsec_params.mac_type, mac_key) ) {
 		fputs("Error setting security association 1.\n", stderr);
 		goto done;
 	}
@@ -540,7 +609,8 @@ static _Bool host_mode(CO(Config, cfg))
 	char *cfg_item;
 
 	uint32_t tspi,
-		 spi;
+		 spi,
+		 protocol;
 
 	FILE *token_file = NULL;
 
@@ -669,8 +739,9 @@ static _Bool host_mode(CO(Config, cfg))
 	shared_key->print(shared_key);
 	fputc('\n', stdout);
 
-	spi = packet->get_value(packet, PossumPacket_spi);
-	setup_ipsec(cfg, 1, spi, shared_key);
+	spi	 = packet->get_value(packet, PossumPacket_spi);
+	protocol = packet->get_value(packet, PossumPacket_protocol);
+	setup_ipsec(cfg, protocol, spi, shared_key);
 
 	retn = true;
 
@@ -740,7 +811,8 @@ static _Bool client_mode(CO(Config, cfg))
 	const char *cfg_item;
 
 	uint32_t spi,
-		 tspi;
+		 tspi,
+		 protocol;
 
 	FILE *token_file = NULL;
 
@@ -855,8 +927,9 @@ static _Bool client_mode(CO(Config, cfg))
 	shared_key->print(shared_key);
 	fputc('\n', stdout);
 
-	spi = packet->get_value(packet, PossumPacket_spi);
-	setup_ipsec(cfg, 1, spi, shared_key);
+	spi	 = packet->get_value(packet, PossumPacket_spi);
+	protocol = packet->get_value(packet, PossumPacket_protocol);
+	setup_ipsec(cfg, protocol, spi, shared_key);
 	retn = true;
 
  done:
