@@ -16,7 +16,11 @@
 
 /* Definitions for IPsec parameters types. */
 #define POSSUM_PACKET_TRIPLEDES_CBC	1
+#define POSSUM_PACKET_AES128_CBC	2
+
 #define POSSUM_PACKET_HMAC_MD5		1
+#define POSSUM_PACKET_HMAC_SHA1		2
+
 #define POSSUM_PACKET_EC		1
 #define POSSUM_PACKET_CURVE25519	1
 

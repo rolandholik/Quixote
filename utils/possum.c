@@ -89,7 +89,9 @@ static _Bool setup_sa_parameters(const uint32_t protocol, \
 		 authentication = (protocol >> 16) & UINT8_MAX;
 
 	static const char *tripledes = "3des-cbc",
-			  *hmac_md5  = "hmac-md5";
+			  *aes_cbc   = "aes-cbc",
+			  *hmac_md5  = "hmac-md5",
+			  *hmac_sha1 = "hmac-sha1";
 
 
 	memset(params, '\0', sizeof(struct ipsec_parameters));
@@ -99,12 +101,20 @@ static _Bool setup_sa_parameters(const uint32_t protocol, \
 			params->enc_type       = tripledes;
 			params->enc_key_length = 192 / 8;
 			break;
+		case POSSUM_PACKET_AES128_CBC:
+			params->enc_type       = aes_cbc;
+			params->enc_key_length = 128 / 8;
+			break;
 	}
 
 	switch ( authentication ) {
 		case POSSUM_PACKET_HMAC_MD5:
 			params->mac_type       = hmac_md5;
 			params->mac_key_length = 128 / 8;
+			break;
+		case POSSUM_PACKET_HMAC_SHA1:
+			params->mac_type       = hmac_sha1;
+			params->mac_key_length = 160 / 8;
 			break;
 	}
 

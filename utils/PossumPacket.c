@@ -62,6 +62,13 @@
 			 (POSSUM_PACKET_EC << 8)	     | \
 			 POSSUM_PACKET_CURVE25519
 
+#define POSSUM_PROTOCOL2 (POSSUM_PACKET_AES128_CBC << 24)    | \
+			 (POSSUM_PACKET_HMAC_SHA1 << 16 )    | \
+			 (POSSUM_PACKET_EC << 8)	     | \
+			 POSSUM_PACKET_CURVE25519
+
+
+
 
 /** PossumPacket private state information. */
 struct NAAAIM_PossumPacket_State
@@ -485,7 +492,7 @@ static _Bool create_authenticator(CO(PossumPacket_State, S), CO(Buffer, bufr))
 	S->magic = POSSUMPACKET_MAGIC1;
 
 	/* Set the packet protocol number. */
-	S->protocol = POSSUM_PROTOCOL1;
+	S->protocol = POSSUM_PROTOCOL2;
 
 	/* ASN1 encode the authenticator. */
 	INIT(HurdLib, Buffer, auth, goto done);
