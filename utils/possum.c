@@ -48,6 +48,7 @@
 #include <SHA256_hmac.h>
 #include <Curve25519.h>
 #include <RandomBuffer.h>
+#include <String.h>
 
 #include "Netconfig.h"
 #include "IPsec.h"
@@ -61,6 +62,66 @@ struct ipsec_parameters {
 	const char *enc_type;
 	const char *mac_type;
 };
+
+
+/**
+ * Private function.
+ *
+ * This function is responsible for setting the active personality in
+ * the configuration object to the identity of the counter-party
+ * which is requesting setup of the session.
+ *
+ * \param config	The configuration object which is to have its
+ *			personality configured.
+ *
+ * \param token	        The identity of the counter-party involved in
+ *			the connection.  The organizational ID of this
+ *			counter-party is used as the personality name
+ *			of the section.
+ *
+ * \return		A false value indicates the personality could
+ *			not be set or did not exist.  A true value
+ *			indicates the personality was successfuly
+ *			set.
+ */
+
+static _Bool set_counter_party_personality(CO(Config, cfg), CO(IDtoken, token))
+
+{
+	_Bool retn = false;
+
+	unsigned char *p;
+
+	char bufr[3];
+
+	size_t lp,
+	       cnt;
+
+	Buffer b;
+
+	String personality = NULL;
+
+
+	INIT(HurdLib, String, personality, goto done);
+	if ( (b = token->get_element(token, IDtoken_id)) == NULL )
+		goto done;
+
+	p   = b->get(b);
+        cnt = b->size(b);
+        for (lp= 0; lp < cnt; ++lp) {
+                snprintf(bufr, sizeof(bufr), "%02x", *p);
+                personality->add(personality, bufr);
+                ++p;
+        }
+
+	if ( cfg->set_section(cfg, personality->get(personality)) )
+		retn = true;
+
+ done:
+	WHACK(personality);
+
+	return retn;
+}
 
 
 /**
@@ -271,6 +332,9 @@ static _Bool setup_tunnel_interface(CO(char *, iface), CO(char *, ip), \
  *
  * \param cfg		The configuration object which specifies the
  *			parameters for the connection.
+ *
+ * \param client	The identity of the client with which the
+ *			connection is to be established.
  *
  * \param protocol	The numeric description of the protocol.
  *
@@ -605,6 +669,9 @@ static _Bool send_host_response(CO(Duct, duct), CO(PossumPacket, packet), \
  * \param cfg		The configuration parameter which is used for
  *			master mode.
  *
+ * \param section	The section of the configuration file to be
+ *			used to configure the host side of the connection.
+ *
  * \return	A boolean value is used to indicate whether or not a
  *		POSSUM connection was successfully processed.  A false
  *		value indicates a connection failure was experienced
@@ -616,7 +683,9 @@ static _Bool host_mode(CO(Config, cfg))
 {
 	_Bool retn = false;
 
-	char *cfg_item;
+	char *cfg_item,
+	     *identity,
+	     *host_software;
 
 	uint32_t tspi,
 		 spi,
@@ -633,7 +702,7 @@ static _Bool host_mode(CO(Config, cfg))
 	       public		= NULL,
 	       shared_key	= NULL;
 
-	IDtoken token = NULL;
+	IDtoken token  = NULL;
 	
 	PossumPacket packet = NULL;
 
@@ -656,21 +725,31 @@ static _Bool host_mode(CO(Config, cfg))
 	netbufr->hprint(netbufr);
 	fputc('\n', stdout);
 
-	/* Find the client identity. */
+	/* Set our identity and lookup the client identity. */
+	if ( (identity = cfg->get(cfg, "identity")) == NULL )
+		goto done;
 	if ( (cfg_item = cfg->get(cfg, "client_list")) == NULL )
+		goto done;
+	if ( (host_software = cfg->get(cfg, "software")) == NULL )
 		goto done;
 
 	INIT(NAAAIM, IDtoken, token, goto done);
-	if ( !find_client(cfg_item, netbufr, token) )
+	if ( !find_client(cfg_item, netbufr, token) ) {
+		fputs("Cannot locate client.\n", stdout);
 		goto done;
+	}
 
-	/* Locate and load the client file. */
+	/* Set the client configuration personality. */
+	if ( !set_counter_party_personality(cfg, token) ) {
+		fputs("Cannot find personality.\n", stdout);
+		goto done;
+	}
 
 	/* Verify and decode packet. */
-	INIT(NAAAIM, PossumPacket, packet, goto done);
-	if ( (cfg_item = cfg->get(cfg, "remote_software")) == NULL )
+	if ( (cfg_item = cfg->get(cfg, "software")) == NULL )
 		goto done;
 	software->add_hexstring(software, cfg_item);
+	INIT(NAAAIM, PossumPacket, packet, goto done);
 	if ( !packet->decode_packet1(packet, token, software, netbufr) )
 		goto done;
 	fprintf(stdout, "%s: Incoming client packet 1:\n", __func__);
@@ -699,9 +778,7 @@ static _Bool host_mode(CO(Config, cfg))
 	dhkey->generate(dhkey);
 
 	/* Compose and send a reply packet. */
-	if ( (cfg_item = cfg->get(cfg, "identity")) == NULL )
-		goto done;
-	if ( (token_file = fopen(cfg_item, "r")) == NULL )
+	if ( (token_file = fopen(identity, "r")) == NULL )
 		goto done;
 	token->reset(token);
 	if ( !token->parse(token, token_file) )
@@ -727,10 +804,9 @@ static _Bool host_mode(CO(Config, cfg))
 	packet->set_schedule(packet, token, time(NULL));
 	packet->create_packet1(packet, token, dhkey, spi);
 
+	/* Reset the section back to the original. */
 	software->reset(software);
-	if ( (cfg_item = cfg->get(cfg, "software")) == NULL )
-		goto done;
-	software->add_hexstring(software, cfg_item);
+	software->add_hexstring(software, host_software);
 	if ( !packet->encode_packet1(packet, software, netbufr) )
 		goto done;
 	if ( !duct->send_Buffer(duct, netbufr) )
@@ -807,6 +883,9 @@ static _Bool host_mode(CO(Config, cfg))
  * \param cfg		The configuration parameter which is used for
  *			master mode.
  *
+ * \param section	The section of the configuration file to be
+ *			used to configure the client side of the tunnel.
+ *
  * \return	A boolean value is used to indicate whether or not a
  *		POSSUM connection was successfully processed.  A false
  *		value indicates a connection failure was experienced
@@ -841,7 +920,7 @@ static _Bool client_mode(CO(Config, cfg))
 
 	PossumPacket packet = NULL;
 
-	
+
 	/* Load identity token. */
 	INIT(NAAAIM, IDtoken, token, goto done);
 	if ( (cfg_item = cfg->get(cfg, "identity")) == NULL )
@@ -872,7 +951,6 @@ static _Bool client_mode(CO(Config, cfg))
 	spi = tspi << 16;
 	tspi = propose_spi(HOST_SPI_ARENA, 0);
 	spi = spi | tspi;
-
 	packet->create_packet1(packet, token, dhkey, spi);
 
 	if ( (cfg_item = cfg->get(cfg, "software")) == NULL )
@@ -910,14 +988,16 @@ static _Bool client_mode(CO(Config, cfg))
 	if ( !find_client(cfg_item, bufr, token) )
 		goto done;
 
+	/* Set the host configuration personality. */
+	if ( !set_counter_party_personality(cfg, token) )
+	     goto done;
+
 	software->reset(software);
-	if ( (cfg_item = cfg->get(cfg, "remote_software")) == NULL )
+	if ( (cfg_item = cfg->get(cfg, "software")) == NULL )
 		goto done;
 	software->add_hexstring(software, cfg_item);
-	if ( !packet->decode_packet1(packet, token, software, bufr) ) {
-		fprintf(stdout, "%s: Failed decode packet.\n", __func__);
+	if ( !packet->decode_packet1(packet, token, software, bufr) )
 		goto done;
-	}
 
 	fprintf(stdout, "%s: Received host packet 1.\n", __func__);
 	packet->print(packet);
