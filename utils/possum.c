@@ -49,6 +49,8 @@
 #include <Curve25519.h>
 #include <RandomBuffer.h>
 #include <String.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include "Netconfig.h"
 #include "IPsec.h"
@@ -358,8 +360,7 @@ static _Bool setup_ipsec(CO(Config, cfg), const uint32_t protocol, \
 	unsigned char *k;
 
 	char *interface,
-	     *local_ip,
-	     *local_mask,
+	     *secure_local_ip,
 	     *remote_ip,
 	     *local_net,
 	     *remote_net,
@@ -367,25 +368,41 @@ static _Bool setup_ipsec(CO(Config, cfg), const uint32_t protocol, \
 
 	struct ipsec_parameters ipsec_params;
 
+	struct in_addr addr,
+		       mask;
+
 	Buffer enc_key = NULL,
 	       mac_key = NULL;
 
+	String local_ip   = NULL,
+	       local_mask = NULL;
+
 	SHA256 sha256 = NULL;
+
+	Netconfig netconfig = NULL;
 
 	IPsec ipsec = NULL;
 
 
-	/* Initialize IPsec configuration object. */
+	/* Initialize IPsec and Network configuration objects. */
 	INIT(NAAAIM, IPsec, ipsec, goto done);
+	INIT(NAAAIM, Netconfig, netconfig, goto done);
 
-	/* Extract IPsec parameters. */
-	local_ip   = cfg->get(cfg, "local_ip");
-	local_mask = cfg->get(cfg, "local_mask");
-	remote_ip  = cfg->get(cfg, "remote_ip");
-	if ( (local_ip == NULL) || (local_mask == NULL) || \
-	     (remote_ip == NULL) )
+	/* Get network parameters. */
+	remote_ip = cfg->get(cfg, "remote_ip");
+	interface = cfg->get(cfg, "iface");
+	if ( (remote_ip == NULL) || (interface == NULL) )
 		goto done;
 
+	if ( !netconfig->get_address(netconfig, interface, &addr, &mask) )
+		goto done;
+	INIT(HurdLib, String, local_ip, goto done);
+	INIT(HurdLib, String, local_mask, goto done);
+	if ( !local_ip->add(local_ip, inet_ntoa(addr)) )
+		goto done;
+	if ( !local_mask->add(local_mask, inet_ntoa(mask)) )
+		goto done;
+	
 	/*
 	 * Resolve the security association parameters from the
 	 * protocol specification.
@@ -417,8 +434,8 @@ static _Bool setup_ipsec(CO(Config, cfg), const uint32_t protocol, \
 	fputc('\n', stdout);
 
 	/* Setup the security association. */
-	if ( !ipsec->setup_sa(ipsec, local_ip, remote_ip, spi,	\
-			      ipsec_params.enc_type, enc_key,	\
+	if ( !ipsec->setup_sa(ipsec, local_ip->get(local_ip), remote_ip, spi, \
+			      ipsec_params.enc_type, enc_key,		      \
 			      ipsec_params.mac_type, mac_key) ) {
 		fputs("Error setting security association 1.\n", stderr);
 		goto done;
@@ -434,7 +451,7 @@ static _Bool setup_ipsec(CO(Config, cfg), const uint32_t protocol, \
 		goto done;
 	}
 
-	if ( !ipsec->setup_spd(ipsec, local_ip, remote_ip, \
+	if ( !ipsec->setup_spd(ipsec, local_ip->get(local_ip), remote_ip, \
 			       local_net, remote_net, net_mask) ) {
 		fputs("Error setting security policy 1.\n", stderr);
 		goto done;
@@ -442,11 +459,12 @@ static _Bool setup_ipsec(CO(Config, cfg), const uint32_t protocol, \
 
 	/* Configure secure network interface and route. */
 	interface = cfg->get(cfg, "interface");
-	local_ip  = cfg->get(cfg, "secure_local_ip");
-	if ( (interface == NULL) || (local_ip == NULL) )
+	secure_local_ip  = cfg->get(cfg, "secure_local_ip");
+	if ( interface == NULL )
 		goto done;
 	
-	if ( !setup_tunnel_interface(interface, local_ip, local_mask, \
+	if ( !setup_tunnel_interface(interface, secure_local_ip,	\
+				     local_mask->get(local_mask),	\
 				     remote_net, net_mask) ) {
 		fputs("Error setting up tunnel interface.\n", stderr);
 		return 1;
@@ -455,9 +473,12 @@ static _Bool setup_ipsec(CO(Config, cfg), const uint32_t protocol, \
 	retn = true;
 
  done:
+	WHACK(local_ip);
+	WHACK(local_mask);
 	WHACK(enc_key);
 	WHACK(mac_key);
 	WHACK(sha256);
+	WHACK(netconfig);
 	WHACK(ipsec);
 
 	return retn;
