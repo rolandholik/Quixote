@@ -26,6 +26,8 @@ struct NAAAIM_Netconfig
 	/* External methods. */
 	_Bool (*set_address)(const Netconfig, char const *, char const *, \
 			     char const *);
+	_Bool (*get_address)(const Netconfig, char const *, struct in_addr *, \
+			     struct in_addr *);
 	_Bool (*set_route)(const Netconfig, char const *, char const *, \
 			   char const *);
 

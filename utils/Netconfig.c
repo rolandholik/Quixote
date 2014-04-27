@@ -87,6 +87,81 @@ static void _init_state(const Netconfig_State const S) {
 /**
  * Internal private method.
  *
+ * This method is responsible for obtaining the IPV4 address which has
+ * been assigned to a network interface.
+ *
+ * \param this	The object whose address is to be queried.
+ *
+ * \param iface	A null-terminated character buffer containing the
+ *		name of the interface whose address is to be
+ *		obtained.
+ *
+ * \param addr	The variable which will be used to store the network
+ *		address.
+ *
+ * \param mask	The variable which will be used to store the network
+ *		mask assigned to the interface.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the interface was successfully interrogated.  A false
+ *		value indicates failure while a true value indicates
+ *		the interface was successfully interrogated.
+ */
+
+static _Bool get_address(CO(Netconfig, this), CO(char *, name), \
+			 struct in_addr *addr, struct in_addr *mask)
+
+{
+	_Bool retn = false;
+
+	int fd = -1;
+
+	struct ifreq request;
+
+	struct sockaddr_in sock_addr;
+
+
+	if ( (fd = socket(AF_INET, SOCK_DGRAM, AF_UNSPEC)) == 1 ) {
+		fprintf(stderr, "%s[%s]: socket error = %s\n", __FILE__, \
+			__func__, strerror(errno));
+		return false;
+	}
+
+	memset(&request, '\0', sizeof(struct ifreq));
+	strncpy(request.ifr_name, name, IFNAMSIZ);
+
+	memset(&sock_addr, '\0', sizeof(struct sockaddr));
+	sock_addr.sin_family	  = AF_INET;
+	sock_addr.sin_port	  = 0;
+
+	if ( ioctl(fd, SIOCGIFADDR, &request) == -1 ) {
+		fprintf(stderr, "%s[%s]: SIOCGIFADDR error = %s\n", \
+			__FILE__, __func__, strerror(errno));
+		goto done;
+	}
+	memcpy(&sock_addr, &request.ifr_addr, sizeof(struct sockaddr));
+	addr->s_addr = sock_addr.sin_addr.s_addr;
+
+	if ( ioctl(fd, SIOCGIFNETMASK, &request) == -1 ) {
+		fprintf(stderr, "%s[%s]: SIOCGIFNETMASK error = %s\n", \
+			__FILE__, __func__, strerror(errno));
+		goto done;
+	}
+	memcpy(&sock_addr, &request.ifr_addr, sizeof(struct sockaddr));
+	mask->s_addr = sock_addr.sin_addr.s_addr;
+
+	retn = true;
+
+ done:
+	if ( fd != -1 )
+		close(fd);
+	return retn;
+}
+
+
+/**
+ * Internal private method.
+ *
  * This method is responsible for configuring a network interface.
  *
  * \param this	The object whose address is to be set.
@@ -300,6 +375,7 @@ extern Netconfig NAAAIM_Netconfig_Init(void)
 
 	/* Method initialization. */
 	this->set_address = set_address;
+	this->get_address = get_address;
 	this->set_route	  = set_route;
 
 	this->whack = whack;
