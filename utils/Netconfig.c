@@ -11,14 +11,6 @@
 
 
 /* Local defines. */
-/* Macro for defining a pointer to a constance object. */
-#define CO(obj, var) const obj const var
-
-/* Macro to extract state state information into the specified variable. */
-#define STATE(var) CO(Netconfig_State, var) = this->state
-
-/* Macro to clear object pointer if not NULL. */
-#define WHACK(obj) if (obj != NULL) {obj->whack(obj); obj = NULL;}
 
 
 /* Include files. */
@@ -36,10 +28,12 @@
 #include <arpa/inet.h>
 
 #include <Origin.h>
+#include <HurdLib.h>
 
 #include "NAAAIM.h"
 #include "Netconfig.h"
 
+#define STATE(var) CO(Netconfig_State, var) = this->state
 
 /* Verify library/object header file inclusions. */
 #if !defined(NAAAIM_LIBID)
