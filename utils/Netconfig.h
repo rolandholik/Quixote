@@ -30,6 +30,7 @@ struct NAAAIM_Netconfig
 			     struct in_addr *);
 	_Bool (*set_route)(const Netconfig, char const *, char const *, \
 			   char const *);
+	int (*get_error)(const Netconfig);
 
 	void (*whack)(const Netconfig);
 

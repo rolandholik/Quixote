@@ -48,16 +48,19 @@
 /** Netconfig private state information. */
 struct NAAAIM_Netconfig_State
 {
-	/* The root object. */
+	/** The root object. */
 	Origin root;
 
-	/* Library identifier. */
+	/** Library identifier. */
 	uint32_t libid;
 
-	/* Object identifier. */
+	/** Object identifier. */
 	uint32_t objid;
 
-	/* Ojbect status. */
+	/** The error code which generated the object poisoning. */
+	int error;
+
+	/* Object status. */
 	_Bool poisoned;
 
 };
@@ -78,6 +81,7 @@ static void _init_state(const Netconfig_State const S) {
 	S->libid = NAAAIM_LIBID;
 	S->objid = NAAAIM_Netconfig_OBJID;
 
+	S->error    = 0;
 	S->poisoned = false;
 
 	return;
@@ -112,6 +116,8 @@ static _Bool get_address(CO(Netconfig, this), CO(char *, name), \
 			 struct in_addr *addr, struct in_addr *mask)
 
 {
+	STATE(S);
+
 	_Bool retn = false;
 
 	int fd = -1;
@@ -121,10 +127,10 @@ static _Bool get_address(CO(Netconfig, this), CO(char *, name), \
 	struct sockaddr_in sock_addr;
 
 
-	if ( (fd = socket(AF_INET, SOCK_DGRAM, AF_UNSPEC)) == 1 ) {
+	if ( (fd = socket(AF_INET, SOCK_DGRAM, AF_UNSPEC)) == -1 ) {
 		fprintf(stderr, "%s[%s]: socket error = %s\n", __FILE__, \
 			__func__, strerror(errno));
-		return false;
+		goto done;
 	}
 
 	memset(&request, '\0', sizeof(struct ifreq));
@@ -153,8 +159,11 @@ static _Bool get_address(CO(Netconfig, this), CO(char *, name), \
 	retn = true;
 
  done:
+	if ( !retn )
+		S->error = errno;
 	if ( fd != -1 )
 		close(fd);
+
 	return retn;
 }
 
@@ -185,6 +194,8 @@ static _Bool set_address(CO(Netconfig, this), CO(char *, name), \
 			 CO(char *, addr), CO(char *, mask))
 
 {
+	STATE(S);
+
 	_Bool retn = false;
 
 	int fd = -1;
@@ -194,10 +205,10 @@ static _Bool set_address(CO(Netconfig, this), CO(char *, name), \
 	struct sockaddr_in sock_addr;
 
 
-	if ( (fd = socket(AF_INET, SOCK_DGRAM, AF_UNSPEC)) == 1 ) {
+	if ( (fd = socket(AF_INET, SOCK_DGRAM, AF_UNSPEC)) == -1 ) {
 		fprintf(stderr, "%s[%s]: socket error = %s\n", __FILE__, \
 			__func__, strerror(errno));
-		return false;
+		goto done;
 	}
 
 	memset(&request, '\0', sizeof(struct ifreq));
@@ -240,8 +251,11 @@ static _Bool set_address(CO(Netconfig, this), CO(char *, name), \
 
 
  done:
+	if ( !retn )
+		S->error = errno;
 	if ( fd != -1 )
 		close(fd);
+
 	return retn;
 }
 
@@ -271,6 +285,8 @@ static _Bool set_route(CO(Netconfig, this), CO(char *, destination), \
 		       CO(char *, gateway), CO(char *, mask))
 
 {
+	STATE(S);
+
 	_Bool retn = false;
 
 	int fd = -1;
@@ -280,10 +296,10 @@ static _Bool set_route(CO(Netconfig, this), CO(char *, destination), \
 	struct sockaddr_in sock_addr;
 
 
-	if ( (fd = socket(AF_INET, SOCK_DGRAM, AF_UNSPEC)) == 1 ) {
+	if ( (fd = socket(AF_INET, SOCK_DGRAM, AF_UNSPEC)) == -1 ) {
 		fprintf(stderr, "%s[%s]: socket error = %s\n", __FILE__, \
 			__func__, strerror(errno));
-		return false;
+		goto done;
 	}
 
 	memset(&sock_addr, '\0', sizeof(struct sockaddr));
@@ -313,9 +329,31 @@ static _Bool set_route(CO(Netconfig, this), CO(char *, destination), \
 
 
  done:
+	if ( !retn )
+		S->error = errno;
 	if ( fd != -1 )
 		close(fd);
+
 	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements an accesor for retrieving the error code
+ * from the object.
+ *
+ * \param this	A pointer to the object whose error is to be
+ *		retrieved.
+ */
+
+static int get_error(CO(Netconfig, this))
+
+{
+	STATE(S);
+
+	return S->error;
 }
 
 
@@ -378,7 +416,8 @@ extern Netconfig NAAAIM_Netconfig_Init(void)
 	this->get_address = get_address;
 	this->set_route	  = set_route;
 
-	this->whack = whack;
+	this->get_error	  = get_error;
+	this->whack	  = whack;
 
 	return this;
 }
