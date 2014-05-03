@@ -127,11 +127,8 @@ static _Bool get_address(CO(Netconfig, this), CO(char *, name), \
 	struct sockaddr_in sock_addr;
 
 
-	if ( (fd = socket(AF_INET, SOCK_DGRAM, AF_UNSPEC)) == -1 ) {
-		fprintf(stderr, "%s[%s]: socket error = %s\n", __FILE__, \
-			__func__, strerror(errno));
+	if ( (fd = socket(AF_INET, SOCK_DGRAM, AF_UNSPEC)) == -1 )
 		goto done;
-	}
 
 	memset(&request, '\0', sizeof(struct ifreq));
 	strncpy(request.ifr_name, name, IFNAMSIZ);
@@ -140,19 +137,13 @@ static _Bool get_address(CO(Netconfig, this), CO(char *, name), \
 	sock_addr.sin_family	  = AF_INET;
 	sock_addr.sin_port	  = 0;
 
-	if ( ioctl(fd, SIOCGIFADDR, &request) == -1 ) {
-		fprintf(stderr, "%s[%s]: SIOCGIFADDR error = %s\n", \
-			__FILE__, __func__, strerror(errno));
+	if ( ioctl(fd, SIOCGIFADDR, &request) == -1 )
 		goto done;
-	}
 	memcpy(&sock_addr, &request.ifr_addr, sizeof(struct sockaddr));
 	addr->s_addr = sock_addr.sin_addr.s_addr;
 
-	if ( ioctl(fd, SIOCGIFNETMASK, &request) == -1 ) {
-		fprintf(stderr, "%s[%s]: SIOCGIFNETMASK error = %s\n", \
-			__FILE__, __func__, strerror(errno));
+	if ( ioctl(fd, SIOCGIFNETMASK, &request) == -1 )
 		goto done;
-	}
 	memcpy(&sock_addr, &request.ifr_addr, sizeof(struct sockaddr));
 	mask->s_addr = sock_addr.sin_addr.s_addr;
 
@@ -205,11 +196,8 @@ static _Bool set_address(CO(Netconfig, this), CO(char *, name), \
 	struct sockaddr_in sock_addr;
 
 
-	if ( (fd = socket(AF_INET, SOCK_DGRAM, AF_UNSPEC)) == -1 ) {
-		fprintf(stderr, "%s[%s]: socket error = %s\n", __FILE__, \
-			__func__, strerror(errno));
+	if ( (fd = socket(AF_INET, SOCK_DGRAM, AF_UNSPEC)) == -1 )
 		goto done;
-	}
 
 	memset(&request, '\0', sizeof(struct ifreq));
 	strncpy(request.ifr_name, name, IFNAMSIZ);
@@ -220,32 +208,20 @@ static _Bool set_address(CO(Netconfig, this), CO(char *, name), \
 
 	sock_addr.sin_addr.s_addr = inet_addr(addr);
 	memcpy(&request.ifr_addr, &sock_addr, sizeof(struct sockaddr));
-	if ( ioctl(fd, SIOCSIFADDR, &request) == -1 ) {
-		fprintf(stderr, "%s[%s]: SIOCSIFADDR error = %s\n", \
-			__FILE__, __func__, strerror(errno));
+	if ( ioctl(fd, SIOCSIFADDR, &request) == -1 )
 		goto done;
-	}
 
 	sock_addr.sin_addr.s_addr = inet_addr(mask);
 	memcpy(&request.ifr_netmask, &sock_addr, sizeof(struct sockaddr));
-	if ( ioctl(fd, SIOCSIFNETMASK, &request) == -1 ) {
-		fprintf(stderr, "%s[%s]: SIOCSIFNETMASK error = %s\n", \
-			__FILE__, __func__, strerror(errno));
+	if ( ioctl(fd, SIOCSIFNETMASK, &request) == -1 )
 		goto done;
-	}
 
-	if ( ioctl(fd, SIOCGIFFLAGS, &request) == -1 ) {
-		fprintf(stderr, "%s[%s]: SIOCGIFFLAGS error = %s\n", \
-			__FILE__, __func__, strerror(errno));
+	if ( ioctl(fd, SIOCGIFFLAGS, &request) == -1 )
 		goto done;
-	}
 
 	request.ifr_flags |= (IFF_UP | IFF_RUNNING);
-	if ( ioctl(fd, SIOCSIFFLAGS, &request) == -1 ) {
-		fprintf(stderr, "%s[%s]: SIOCSIFFLAGS error = %s\n", \
-			__FILE__, __func__, strerror(errno));
+	if ( ioctl(fd, SIOCSIFFLAGS, &request) == -1 )
 		goto done;
-	}
 
 	retn = true;
 
@@ -296,11 +272,8 @@ static _Bool set_route(CO(Netconfig, this), CO(char *, destination), \
 	struct sockaddr_in sock_addr;
 
 
-	if ( (fd = socket(AF_INET, SOCK_DGRAM, AF_UNSPEC)) == -1 ) {
-		fprintf(stderr, "%s[%s]: socket error = %s\n", __FILE__, \
-			__func__, strerror(errno));
+	if ( (fd = socket(AF_INET, SOCK_DGRAM, AF_UNSPEC)) == -1 )
 		goto done;
-	}
 
 	memset(&sock_addr, '\0', sizeof(struct sockaddr));
 	sock_addr.sin_family	  = AF_INET;
@@ -319,11 +292,8 @@ static _Bool set_route(CO(Netconfig, this), CO(char *, destination), \
 
 	route.rt_flags = RTF_UP | RTF_GATEWAY;
 
-	if ( ioctl(fd, SIOCADDRT, &route) == -1 ) {
-		fprintf(stderr, "%s[%s]: SIOCADDRT error = %s\n", \
-			__FILE__, __func__, strerror(errno));
+	if ( ioctl(fd, SIOCADDRT, &route) == -1 )
 		goto done;
-	}
 
 	retn = true;
 
