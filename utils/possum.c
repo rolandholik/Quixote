@@ -304,6 +304,12 @@ static _Bool setup_tunnel_interface(CO(char *, iface), CO(char *, ip), \
 {
 	_Bool retn = false;
 
+	char interface[16];
+
+	uint32_t alias;
+
+	struct in_addr null;
+
 	Netconfig netconfig = NULL;
 
 
@@ -311,9 +317,22 @@ static _Bool setup_tunnel_interface(CO(char *, iface), CO(char *, ip), \
 	fprintf(stderr, "ip: %s/%s\n", ip, ip_mask);
 	fprintf(stderr, "remote: %s/%s\n", net_remote, net_mask);
 
-	if ( (netconfig = NAAAIM_Netconfig_Init()) == NULL )
+	/* Find an available interface */
+	INIT(NAAAIM, Netconfig, netconfig, goto done);
+	for (alias= 0; alias < UINT32_MAX; ++alias) {
+		if ( snprintf(interface, sizeof(interface), "%s:%u", iface, \
+			      alias) == sizeof(interface) )
+			goto done;
+		if ( !netconfig->get_address(netconfig, interface, &null, \
+					     &null) ) {
+			if ( netconfig->get_error(netconfig) == EADDRNOTAVAIL )
+				break;
+		}
+	}
+	if ( alias == UINT32_MAX )
 		goto done;
-	if ( !netconfig->set_address(netconfig, iface, ip, ip_mask) )
+
+	if ( !netconfig->set_address(netconfig, interface, ip, ip_mask) )
 		goto done;
 	if ( !netconfig->set_route(netconfig, net_remote, ip, net_mask) )
 		goto done;
@@ -390,7 +409,7 @@ static _Bool setup_ipsec(CO(Config, cfg), const uint32_t protocol, \
 
 	/* Get network parameters. */
 	remote_ip = cfg->get(cfg, "remote_ip");
-	interface = cfg->get(cfg, "iface");
+	interface = cfg->get(cfg, "interface");
 	if ( (remote_ip == NULL) || (interface == NULL) )
 		goto done;
 
@@ -442,11 +461,12 @@ static _Bool setup_ipsec(CO(Config, cfg), const uint32_t protocol, \
 	}
 
 	/* Setup the security policy database. */
-	local_net  = cfg->get(cfg, "secure_local_net");
-	remote_net = cfg->get(cfg, "secure_remote_net");
-	net_mask   = cfg->get(cfg, "secure_net_mask");
+	local_net 	= cfg->get(cfg, "secure_local_net");
+	remote_net	= cfg->get(cfg, "secure_remote_net");
+	net_mask	= cfg->get(cfg, "secure_net_mask");
+	secure_local_ip = cfg->get(cfg, "secure_local_ip");
 	if ( (local_net == NULL) || (remote_net == NULL) || \
-	     (net_mask == NULL) ) {
+	     (net_mask == NULL)  || (secure_local_ip == NULL) ) {
 		fputs("Error in network parameter specifications.\n", stderr);
 		goto done;
 	}
@@ -458,16 +478,11 @@ static _Bool setup_ipsec(CO(Config, cfg), const uint32_t protocol, \
 	}
 
 	/* Configure secure network interface and route. */
-	interface = cfg->get(cfg, "interface");
-	secure_local_ip  = cfg->get(cfg, "secure_local_ip");
-	if ( interface == NULL )
-		goto done;
-	
 	if ( !setup_tunnel_interface(interface, secure_local_ip,	\
 				     local_mask->get(local_mask),	\
 				     remote_net, net_mask) ) {
 		fputs("Error setting up tunnel interface.\n", stderr);
-		return 1;
+		goto done;
 	}
 
 	retn = true;
