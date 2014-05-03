@@ -370,8 +370,9 @@ static _Bool setup_tunnel_interface(CO(char *, iface), CO(char *, ip), \
  *		a true value.
  */
 
-static _Bool setup_ipsec(CO(Config, cfg), const uint32_t protocol, \
-			 const uint32_t spi, CO(Buffer, shared_key))
+static _Bool setup_ipsec(CO(Config, cfg), CO(char *, remote_ip),      \
+			 const uint32_t protocol, const uint32_t spi, \
+			 CO(Buffer, shared_key))
 
 {
 	_Bool retn = false;
@@ -380,7 +381,6 @@ static _Bool setup_ipsec(CO(Config, cfg), const uint32_t protocol, \
 
 	char *interface,
 	     *secure_local_ip,
-	     *remote_ip,
 	     *local_net,
 	     *remote_net,
 	     *net_mask;
@@ -408,9 +408,7 @@ static _Bool setup_ipsec(CO(Config, cfg), const uint32_t protocol, \
 	INIT(NAAAIM, Netconfig, netconfig, goto done);
 
 	/* Get network parameters. */
-	remote_ip = cfg->get(cfg, "remote_ip");
-	interface = cfg->get(cfg, "interface");
-	if ( (remote_ip == NULL) || (interface == NULL) )
+	if ( (interface = cfg->get(cfg, "interface")) == NULL )
 		goto done;
 
 	if ( !netconfig->get_address(netconfig, interface, &addr, &mask) )
@@ -738,6 +736,8 @@ static _Bool host_mode(CO(Config, cfg))
 	       public		= NULL,
 	       shared_key	= NULL;
 
+	String remote_ip = NULL;
+
 	IDtoken token  = NULL;
 	
 	PossumPacket packet = NULL;
@@ -863,7 +863,11 @@ static _Bool host_mode(CO(Config, cfg))
 
 	spi	 = packet->get_value(packet, PossumPacket_spi);
 	protocol = packet->get_value(packet, PossumPacket_protocol);
-	setup_ipsec(cfg, protocol, spi, shared_key);
+
+	INIT(HurdLib, String, remote_ip, goto done);
+	if ( !remote_ip->add(remote_ip, inet_ntoa(*(duct->get_ipv4(duct)))) )
+		goto done;
+	setup_ipsec(cfg, remote_ip->get(remote_ip), protocol, spi, shared_key);
 
 	retn = true;
 
@@ -882,6 +886,7 @@ static _Bool host_mode(CO(Config, cfg))
 	WHACK(packet);
 	WHACK(dhkey);
 	WHACK(shared_key);
+	WHACK(remote_ip);
 
 	return retn;
 }
@@ -933,7 +938,8 @@ static _Bool client_mode(CO(Config, cfg))
 {
 	_Bool retn = false;
 
-	const char *cfg_item;
+	const char *cfg_item,
+		   *remote_ip;
 
 	uint32_t spi,
 		 tspi,
@@ -967,12 +973,12 @@ static _Bool client_mode(CO(Config, cfg))
 		goto done;
 
 	/* Setup a connection to the remote host. */
-	if ( (cfg_item = cfg->get(cfg, "remote_ip")) == NULL )
+	if ( (remote_ip = cfg->get(cfg, "remote_ip")) == NULL )
 		goto done;
 
 	INIT(NAAAIM, Duct, duct, goto done);
 	duct->init_client(duct);
-	if ( !duct->init_port(duct, cfg_item, POSSUM_PORT) )
+	if ( !duct->init_port(duct, remote_ip, POSSUM_PORT) )
 		goto done;
 
 	/* Send a session initiation packet. */
@@ -1055,7 +1061,7 @@ static _Bool client_mode(CO(Config, cfg))
 
 	spi	 = packet->get_value(packet, PossumPacket_spi);
 	protocol = packet->get_value(packet, PossumPacket_protocol);
-	setup_ipsec(cfg, protocol, spi, shared_key);
+	setup_ipsec(cfg, remote_ip, protocol, spi, shared_key);
 	retn = true;
 
  done:
