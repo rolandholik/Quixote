@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <string.h>
+#include <arpa/inet.h>
 
 #include <HurdLib.h>
 #include <Buffer.h>
@@ -20,6 +21,8 @@ extern int main(int argc, char *argv[])
 {
 	enum {none, client, server} Mode = none;
 
+	char *host;
+
 	int retn;
 
 	Duct duct = NULL;
@@ -28,13 +31,17 @@ extern int main(int argc, char *argv[])
 
 
         /* Get operational mode. */
-        while ( (retn = getopt(argc, argv, "CS")) != EOF )
+        while ( (retn = getopt(argc, argv, "CSh:")) != EOF )
                 switch ( retn ) {
 			case 'C':
 				Mode = client;
 				break;
 			case 'S':
 				Mode = server;
+				break;
+
+			case 'h':
+				host = optarg;
 				break;
 		}
 
@@ -59,6 +66,8 @@ extern int main(int argc, char *argv[])
 
 	/* Server management. */
 	if ( Mode == server ) {
+		struct in_addr *addr;
+
 		fputs("Server mode start:\n", stdout);
 
 		if ( !duct->init_server(duct) ) {
@@ -75,6 +84,11 @@ extern int main(int argc, char *argv[])
 			fputs("Error accepting connection.\n", stderr);
 			goto done;
 		}
+
+		addr = duct->get_ipv4(duct);
+		fprintf(stdout, "Accept connection from: %x/%s\n", \
+			ntohl(addr->s_addr), inet_ntoa(*addr));
+			
 
 		if ( !duct->receive_Buffer(duct, bufr) ) {
 			fputs("Error receiving data.\n", stderr);
@@ -105,6 +119,10 @@ extern int main(int argc, char *argv[])
 
 	/* Client management. */
 	if ( Mode == client ) {
+		if ( host == NULL ) {
+			fputs("No host specified.\n", stdout);
+			goto done;
+		}
 		fputs("Client mode start:\n", stdout);
 
 		if ( !duct->init_client(duct) ) {
@@ -112,7 +130,7 @@ extern int main(int argc, char *argv[])
 			goto done;
 		}
 
-		if ( !duct->init_port(duct, "xesd4.enjellic.com", 11990) ) {
+		if ( !duct->init_port(duct, host, 11990) ) {
 			fputs("Cannot initialize port.\n", stderr);
 			goto done;
 		}

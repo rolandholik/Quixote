@@ -73,7 +73,8 @@ struct NAAAIM_Duct_State
 	/* Server file descriptor. */
 	int fd;
 
-	/* Client hostname .*/
+	/* Client ip and hostname .*/
+	struct in_addr ipv4;
 	Buffer client;
 };
 
@@ -101,6 +102,7 @@ static void _init_state(CO(Duct_State, S)) {
 	S->type		= not_defined;
 	S->sockt	= -1;
 	S->fd		= -1;
+	S->ipv4.s_addr	= 0;
 	S->client       = NULL;
 
 	return;
@@ -347,6 +349,7 @@ static _Bool accept_connection(CO(Duct, this))
 		goto done;
 	}
 
+	S->ipv4.s_addr = client.sin_addr.s_addr;
 	client_hostname = gethostbyaddr(&client.sin_addr, \
 					sizeof(struct in_addr), AF_INET);
 	hp = client_hostname->h_name;
@@ -503,6 +506,27 @@ static _Bool receive_Buffer(CO(Duct, this), CO(Buffer, bf))
 /**
  * External public method.
  *
+ * This method implements returning the IPV4 address of a client
+ * connection.
+ *
+ * \param this	The Duct object whose address is to be returned.
+ *
+ * \return	A pointer to the structure containing the IPV4
+ *		address.
+ */
+
+static struct in_addr * get_ipv4(CO(Duct, this))
+
+{
+	STATE(S);
+
+	return &S->ipv4;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements returning the hostname of the client which
  * initiated a connection to a Server object.
  *
@@ -633,6 +657,7 @@ extern Duct NAAAIM_Duct_Init(void)
 	this->send_Buffer	= send_Buffer;
 	this->receive_Buffer	= receive_Buffer;
 
+	this->get_ipv4		= get_ipv4;
 	this->get_client	= get_client;
 
 	this->reset		= reset;
