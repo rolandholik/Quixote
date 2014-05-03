@@ -67,6 +67,38 @@ struct NAAAIM_Netconfig_State
 
 
 /**
+ * Internal private function.
+ *
+ * This function is responsible for obtaining a file descriptor to
+ * a socket which will be used for network configuration.  It also
+ * initializes sockaddr_in structure to a form which it can be used with
+ * the network interrogation ioctls.
+ *
+ * \param sock	A pointer to the sockaddr_in structure which will be
+ *		initialized.
+ *
+ * \return	The return value from the socket system call is returned
+ *		This will be -1 in the event of an error.
+ */
+
+static int setup_socket(struct sockaddr_in *sock)
+
+{
+	int fd;
+
+
+	if ( (fd = socket(AF_INET, SOCK_DGRAM, AF_UNSPEC)) == -1 )
+		return fd;
+
+	memset(sock, '\0', sizeof(struct sockaddr));
+	sock->sin_family = AF_INET;
+	sock->sin_port	 = 0;
+
+	return fd;
+}
+	
+
+/**
  * Internal private method.
  *
  * This method is responsible for initializing the NAAAIM_Netconfig_State
@@ -127,15 +159,11 @@ static _Bool get_address(CO(Netconfig, this), CO(char *, name), \
 	struct sockaddr_in sock_addr;
 
 
-	if ( (fd = socket(AF_INET, SOCK_DGRAM, AF_UNSPEC)) == -1 )
+	if ( (fd = setup_socket(&sock_addr)) == -1 )
 		goto done;
 
 	memset(&request, '\0', sizeof(struct ifreq));
 	strncpy(request.ifr_name, name, IFNAMSIZ);
-
-	memset(&sock_addr, '\0', sizeof(struct sockaddr));
-	sock_addr.sin_family	  = AF_INET;
-	sock_addr.sin_port	  = 0;
 
 	if ( ioctl(fd, SIOCGIFADDR, &request) == -1 )
 		goto done;
@@ -196,15 +224,11 @@ static _Bool set_address(CO(Netconfig, this), CO(char *, name), \
 	struct sockaddr_in sock_addr;
 
 
-	if ( (fd = socket(AF_INET, SOCK_DGRAM, AF_UNSPEC)) == -1 )
+	if ( (fd = setup_socket(&sock_addr)) == -1 )
 		goto done;
 
 	memset(&request, '\0', sizeof(struct ifreq));
 	strncpy(request.ifr_name, name, IFNAMSIZ);
-
-	memset(&sock_addr, '\0', sizeof(struct sockaddr));
-	sock_addr.sin_family	  = AF_INET;
-	sock_addr.sin_port	  = 0;
 
 	sock_addr.sin_addr.s_addr = inet_addr(addr);
 	memcpy(&request.ifr_addr, &sock_addr, sizeof(struct sockaddr));
@@ -272,12 +296,8 @@ static _Bool set_route(CO(Netconfig, this), CO(char *, destination), \
 	struct sockaddr_in sock_addr;
 
 
-	if ( (fd = socket(AF_INET, SOCK_DGRAM, AF_UNSPEC)) == -1 )
+	if ( (fd = setup_socket(&sock_addr)) == -1 )
 		goto done;
-
-	memset(&sock_addr, '\0', sizeof(struct sockaddr));
-	sock_addr.sin_family	  = AF_INET;
-	sock_addr.sin_port	  = 0;
 
 	memset(&route, '\0', sizeof(struct rtentry));
 
