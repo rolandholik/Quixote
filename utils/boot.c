@@ -13,12 +13,6 @@
 
 
 /* Local defines. */
-/* Macro to clear object pointer if not NULL. */
-#define WHACK(obj) if (obj != NULL) {obj->whack(obj); obj = NULL;}
-
-/* Macro for defining a pointer to a constance object. */
-#define CO(obj, var) const obj const var
-
 /* TPM daemon location. */
 #define TCSD_PATH "/usr/local/musl/sbin/tcsd"
 

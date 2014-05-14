@@ -13,12 +13,6 @@
 
 
 /* Local defines. */
-/* Macro for defining a pointer to a constance object. */
-#define CO(obj, var) const obj const var
-
-/* Macro to clear object pointer if not NULL. */
-#define WHACK(obj) if (obj != NULL) obj->whack(obj)
-
 /* Size of the header/trailer records in bytes. */
 #define HEADER_SIZE	16
 #define CHECKSUM_SIZE	32
