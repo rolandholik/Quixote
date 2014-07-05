@@ -16,6 +16,9 @@
 /* TPM daemon location. */
 #define TCSD_PATH "/usr/local/musl/sbin/tcsd"
 
+/* Location of manifest file. */
+#define MANIFEST "/boot/manifest"
+
 
 /* Include files. */
 #include <stdio.h>
@@ -25,6 +28,7 @@
 #include <string.h>
 #include <errno.h>
 #include <signal.h>
+#include <limits.h>
 #include <sys/mount.h>
 #include <sys/reboot.h>
 
@@ -305,6 +309,53 @@ static _Bool load_root(void)
 /**
  * Private function.
  *
+ * This function is responsible for initializing the Integrity Management
+ * Architecture (IMA) by reading the filesystem manifest list and
+ * reading each file in the manifest in order to have the kernel
+ * initialize an IMA entry for the file.
+ *
+ * No arguements are specified.
+ *			
+ * \return	No return value is specified.
+ */
+
+static void initialize_ima(void)
+
+{
+	char *p,
+	     bufr[PATH_MAX];
+
+	FILE *manifest = NULL;
+
+	File file = NULL;
+
+
+	if ( (manifest = fopen(MANIFEST, "r")) == NULL )
+		return;
+	INIT(HurdLib, File, file, goto done);
+
+	while ( fgets(bufr, sizeof(bufr), manifest) != NULL ) {
+		if ( (p = strchr(bufr, '\n')) != NULL )
+			*p = '\0';
+		file->open_ro(file, bufr);
+		file->reset(file);
+	}
+		
+
+ done:
+	memset(bufr, sizeof(bufr), '\0');
+
+	if ( manifest != NULL )
+		fclose(manifest);
+	WHACK(file);
+	
+	return;
+}
+	
+
+/**
+ * Private function.
+ *
  * This function is responsible for switching execution to the root of
  * the loaded filesystem.
  *
@@ -329,6 +380,10 @@ static void switch_root(void)
 	}
 	if ( chroot(".") == -1 )
 		return;
+
+	do_mounts(true);
+	mount("securityfs", "/sys/kernel/security", "securityfs", 0, NULL);
+	initialize_ima();
 
 	execl("/sbin/init", "/sbin/init", NULL);
 	return;
