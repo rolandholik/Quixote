@@ -41,3 +41,4 @@
 #define NAAAIM_Netconfig_OBJID		20
 #define NAAAIM_IPsec_OBJID		21
 #define NAAAIM_PossumPacket_OBJID	22
+#define NAAAIM_SoftwareStatus_OBJID	23
