@@ -7,7 +7,7 @@
 CSRC = gen-image.c load-image.c boot.c Netconfig.c IPsec.c PossumPacket.c \
 	SoftwareStatus.c
 
-TOOLS = gen-image load-image boot possum gen-id-verifier software-status
+TOOLS = gen-image load-image boot init possum gen-id-verifier software-status
 
 CC = musl-gcc
 
@@ -66,6 +66,9 @@ load-image: load-image.o
 		-ltpm_unseal ${SSL_LIBRARY};
 
 boot: boot.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
+
+init: init.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
 possum: possum.o Netconfig.o IPsec.o PossumPacket.o
