@@ -39,6 +39,7 @@
 
 #include <HurdLib.h>
 #include <Buffer.h>
+#include <String.h>
 #include <File.h>
 
 #include <tpm_tspi.h>
@@ -82,23 +83,33 @@ static unsigned char Iv[] = {
  * \param key		A Buffer object which will be loaded with the
  *			encryption key.
  *
+ * \parm uid		The user identity under which the encrypted
+ *			filesystem image is to be read if it is
+ *			different then the current id.
+ *
  * \return              A boolean return value is used to indicate
  *			whether or not the keys were successfully
  *			loaded.  A true value indicates success while
  *			a false value indicates a failure.
  */
 
-static _Bool load_keys(CO(char *, fname), CO(Buffer, iv), CO(Buffer, key))
+static _Bool load_keys(CO(char *, fname), CO(Buffer, iv), CO(Buffer, key), \
+		       uid_t uid)
 
 {
-	_Bool retn = false;
+	_Bool retn	 = false,
+	      changed_id = false;
 
 	File file;
 
 
-	if ( (file = HurdLib_File_Init()) == NULL )
-		return false;
+	if ( getuid() != uid ) {
+		if ( setreuid(uid, -1) == -1 )
+			goto done;
+		changed_id = true;
+	}
 
+	INIT(HurdLib, File, file, return false);
 	file->open_ro(file, fname);
 	file->read_Buffer(file, iv, HEADER_SIZE);
 	file->read_Buffer(file, key, 0);
@@ -106,6 +117,13 @@ static _Bool load_keys(CO(char *, fname), CO(Buffer, iv), CO(Buffer, key))
 	retn = !file->poisoned(file) && !iv->poisoned(iv) && \
 		!key->poisoned(key);
 
+	if ( changed_id ) {
+		if ( setreuid(geteuid(), -1) == -1 )
+			retn = false;
+	}
+
+
+ done:
 	WHACK(file);
 	return retn;
 }
@@ -128,16 +146,22 @@ static _Bool load_keys(CO(char *, fname), CO(Buffer, iv), CO(Buffer, key))
  * \param key		A Buffer object which will be loaded with the
  *			encryption key.
  *
+ * \parm uid		The user identity under which the encrypted
+ *			filesystem image is to be read if it is
+ *			different then the current id.
+ *
  * \return              A boolean return value is used to indicate
  *			whether or not the keys were successfully
  *			loaded.  A true value indicates success while
  *			a false value indicates a failure.
  */
 
-static _Bool load_tpm_keys(char * fname, CO(Buffer, iv), CO(Buffer, key))
+static _Bool load_tpm_keys(char * fname, CO(Buffer, iv), CO(Buffer, key), \
+			   uid_t uid)
 
 {
-	_Bool retn = false;
+	_Bool retn	 = false,
+	      changed_id = false;
 
 	int tpm_retn,
 	    key_size;
@@ -145,15 +169,26 @@ static _Bool load_tpm_keys(char * fname, CO(Buffer, iv), CO(Buffer, key))
 	unsigned char *key_data;
 
 
+	if ( getuid() != uid ) {
+		if ( setreuid(uid, -1) == -1 )
+			goto done;
+		changed_id = true;
+	}
+
 	tpm_retn = tpmUnsealFile(fname, &key_data, &key_size, true);
 	if ( tpm_retn == 0 ) {
-		fprintf(stderr, "TPM key size: %d\n", key_size);
 		iv->add(iv, key_data, HEADER_SIZE);
 		key->add(key, key_data + HEADER_SIZE, KEY_SIZE);
 		retn = true;
 	}
 
+	if ( changed_id ) {
+		if ( setreuid(geteuid(), -1) == -1 )
+			retn = false;
+	}
 
+
+ done:
 	return retn;
 }
 
@@ -174,6 +209,10 @@ static _Bool load_tpm_keys(char * fname, CO(Buffer, iv), CO(Buffer, key))
  *			be used to authenticated the checksum on
  *			the image.
  *
+ * \parm uid		The user identity under which the encrypted
+ *			filesystem image is to be read if it is
+ *			different then the current id.
+ *
  * \return              A boolean return value is used to indicate
  *			whether or not the image was successfully
  *			loaded and authenticated.  A true value
@@ -182,10 +221,11 @@ static _Bool load_tpm_keys(char * fname, CO(Buffer, iv), CO(Buffer, key))
  */
 
 static _Bool load_image(const char * const fname, CO(Buffer, image), \
-			CO(Buffer, key))
+			CO(Buffer, key), uid_t uid)
 
 {
-	_Bool retn = false;
+	_Bool retn	 = false,
+	      changed_id = false;
 
 	uint32_t size;
 
@@ -199,10 +239,15 @@ static _Bool load_image(const char * const fname, CO(Buffer, image), \
 	SHA256_hmac hmac = NULL;
 
 
-	if ( (file = HurdLib_File_Init()) == NULL )
-		goto done;
-	if ( (checksum = HurdLib_Buffer_Init()) == NULL )
-		goto done;
+	if ( getuid() != uid ) {
+		if ( setreuid(uid, -1) == -1 )
+			goto done;
+		changed_id = true;
+	}
+
+	INIT(HurdLib, File, file, goto done);
+	INIT(HurdLib, Buffer, checksum, goto done);
+
 	if ( (hmac = NAAAIM_SHA256_hmac_Init(key)) == NULL )
 		goto done;
 
@@ -227,9 +272,6 @@ static _Bool load_image(const char * const fname, CO(Buffer, image), \
 	checksum->reset(checksum);
 	file->seek(file, eof - CHECKSUM_SIZE);
 	file->read_Buffer(file, checksum, CHECKSUM_SIZE);
-	fputs("Checksums:\n", stderr);
-	hmac->get_Buffer(hmac)->print(hmac->get_Buffer(hmac));
-	checksum->print(checksum);
 	if ( memcmp(hmac->get(hmac), \
 		    checksum->get(checksum), CHECKSUM_SIZE) != 0 ) {
 		fputs("Failed checksum.\n", stderr);
@@ -240,12 +282,14 @@ static _Bool load_image(const char * const fname, CO(Buffer, image), \
 		retn = true;
 
  done:
-	if ( file != NULL )
-		file->whack(file);
-	if ( checksum != NULL )
-		checksum->whack(checksum);
-	if ( hmac != NULL )
-		hmac->whack(hmac);
+	WHACK(file);
+	WHACK(checksum);
+	WHACK(hmac);
+
+	if ( changed_id ) {
+		if ( setreuid(geteuid(), -1) == -1 )
+			retn = false;
+	}
 
 	return retn;
 }
@@ -277,16 +321,14 @@ static _Bool load_filesystem(CO(char *, fname), CO(Buffer, image))
 	File device = NULL;
 
 
-	if ( (device = HurdLib_File_Init()) == NULL )
-		return false;
+	INIT(HurdLib, File, device, return false);
 
-	if ( strcmp(fname, "/dev/hpd0") == 0 ) {
+	if ( strncmp(fname, "/dev/hpd", 8) == 0 ) {
 		Buffer fs;
 		char cmd[11];
 		size_t block_size;
 
-		if ( (fs = HurdLib_Buffer_Init()) == NULL )
-			goto done;
+		INIT(HurdLib, Buffer, fs, goto done);
 
 		block_size = image->size(image) / (2 * 1024 * 1024);
 		if ( (image->size(image) % (2 * 1024 * 1024)) != 0 )
@@ -333,7 +375,10 @@ extern int main(int argc, char *argv[])
 
 	char *boot_image = NULL,
 	     *key_file	 = NULL,
-	     *output	 = NULL;
+	     *output	 = NULL,
+	     *user	 = NULL;
+
+	uid_t uid = getuid();
 
 	File file = NULL;
 
@@ -346,7 +391,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Get the root image and passwd file name. */
-	while ( (retn = getopt(argc, argv, "k:r:to:")) != EOF )
+	while ( (retn = getopt(argc, argv, "k:r:to:u:")) != EOF )
 		switch ( retn ) {
 			case 'k':
 				key_file = optarg;
@@ -359,6 +404,9 @@ extern int main(int argc, char *argv[])
 				break;
 			case 'o':
 				output = optarg;
+				break;
+			case 'u':
+				user = optarg;
 				break;
 		}
 
@@ -374,34 +422,32 @@ extern int main(int argc, char *argv[])
 		fputs("No output file specified.\n", stderr);
 		return 1;
 	}
-		
-
-	image = HurdLib_Buffer_Init();
-	key   = HurdLib_Buffer_Init();
-	iv    = HurdLib_Buffer_Init();
-	if ( (image == NULL) || (key == NULL) || (iv == NULL) ) {
-		fputs("Cannot initialize buffers.\n", stderr);
-		goto done;
+	if ( user != NULL ) {
+		uid = strtol(user, NULL, 10);
+		if ( errno == ERANGE )
+			goto done;
+		if ( user < 0 )
+			goto done;
 	}
 
+	INIT(HurdLib, Buffer, image, goto done);
+	INIT(HurdLib, Buffer, key, goto done);
+	INIT(HurdLib, Buffer, iv, goto done);
+
 	if ( !tpm_key ) {
-		if ( !load_keys(key_file, iv, key) ) {
+		if ( !load_keys(key_file, iv, key, uid) ) {
 			fputs("Cannot load keys.\n", stderr);
 			goto done;
 		}
 	}
 	else {
-		if ( !load_tpm_keys(key_file, iv, key) ) {
+		if ( !load_tpm_keys(key_file, iv, key, uid) ) {
 			fputs("Cannot load tpm keys.\n", stderr);
 			goto done;
 		}
 	}
-	fputs("IV:  ", stdout);
-	iv->print(iv);
-	fputs("Key: ", stdout);
-	key->print(key);
 
-	if ( !load_image(boot_image, image, key) ) {
+	if ( !load_image(boot_image, image, key, uid) ) {
 		fputs("Cannot load filesystem image.\n", stderr);
 		goto done;
 	}
