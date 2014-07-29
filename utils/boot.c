@@ -37,9 +37,11 @@
 #include <String.h>
 #include <File.h>
 
+#include "SoftwareStatus.h"
+
 
 /* Variable static to this file. */
-static _Bool Debug = true;
+static _Bool Debug = false;
 
 
 /**
@@ -246,8 +248,8 @@ static Buffer find_root(void)
 /**
  * Private function.
  *
- * This function is responsible for loading the root filesystem from
- * the encrypted image.
+ * This function is responsible for loading the root and configuration
+ * filesystems from their encrypted images on the boot device.
  *
  * \param device	No arguements are expected.
  *
@@ -292,6 +294,13 @@ static _Bool load_root(void)
 	if ( system("/sbin/load-image -r /mnt/boot/root " \
 		    "-t -k /mnt/boot/root.seal -o /dev/hpd0") != 0 )
 		goto done;
+
+	if ( system("/sbin/load-image -u 1 -r /mnt/boot/config " \
+		    "-k /mnt/boot/root.pwd -o /dev/hpd1") != 0 ) {
+		fputs("Configuration load failed.\n", stderr);
+		goto done;
+	}
+
 	if ( umount("/mnt") != 0 ) {
 		fprintf(stderr, "umount failed: %s\n", strerror(errno));
 		goto done;
@@ -304,7 +313,7 @@ static _Bool load_root(void)
 
 	return retn;
 }
-	
+
 
 /**
  * Private function.
@@ -325,9 +334,13 @@ static void initialize_ima(void)
 	char *p,
 	     bufr[PATH_MAX];
 
+	Buffer b;
+
 	FILE *manifest = NULL;
 
 	File file = NULL;
+
+	SoftwareStatus software = NULL;
 
 
 	if ( (manifest = fopen(MANIFEST, "r")) == NULL )
@@ -340,14 +353,25 @@ static void initialize_ima(void)
 		file->open_ro(file, bufr);
 		file->reset(file);
 	}
-		
+
+	INIT(NAAAIM, SoftwareStatus, software, goto done);
+	if ( !software->open(software) )
+		goto done;
+	if ( !software->measure(software) )
+		goto done;
+	fputs("Software status:\n", stdout);
+	b = software->get_template_hash(software);
+	b->print(b);
+
 
  done:
 	memset(bufr, sizeof(bufr), '\0');
 
 	if ( manifest != NULL )
 		fclose(manifest);
+
 	WHACK(file);
+	WHACK(software);
 	
 	return;
 }
@@ -383,7 +407,14 @@ static void switch_root(void)
 
 	do_mounts(true);
 	mount("securityfs", "/sys/kernel/security", "securityfs", 0, NULL);
+
 	initialize_ima();
+
+	if ( mount("/dev/hpd1", "/etc/conf", "ext3", 0, NULL) == -1 ) {
+		fprintf(stderr, "Configuration mount failed: %s\n", \
+			strerror(errno));
+		return;
+	}
 
 	execl("/sbin/init", "/sbin/init", NULL);
 	return;
@@ -415,7 +446,7 @@ extern int main(int argc, char *argv[])
 	if ( !tpm_daemon(true) )
 		goto done;
 
-	fputs("Loading root.\n", stderr);
+	fputs("Loading images.\n", stderr);
 	if ( !load_root() )
 		goto done;
 

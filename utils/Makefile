@@ -65,11 +65,11 @@ load-image: load-image.o
 	${CC} ${LDFLAGS} -o $@ $^ ../AES256_cbc.o ../SHA256_hmac.o ${LIBS} \
 		-ltpm_unseal ${SSL_LIBRARY};
 
-boot: boot.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
+boot: boot.o SoftwareStatus.o ../SHA256.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
-init: init.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
+init: init.o Netconfig.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl;
 
 possum: possum.o Netconfig.o IPsec.o PossumPacket.o
 	${CC} ${LDFLAGS} -o $@ $^ ../IDtoken.o ../SHA256_hmac.o ../SHA256.o \
