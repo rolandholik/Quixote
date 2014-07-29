@@ -34,30 +34,13 @@
 
 #include <HurdLib.h>
 #include <Buffer.h>
+#include <String.h>
 #include <File.h>
 
 #include "NAAAIM.h"
 #include "AES256_cbc.h"
 #include "SHA256_hmac.h"
 #include "RandomBuffer.h"
-
-
-/* Module specific static variables. */
-
-/* Password. */
-#if 0
-static unsigned char Pwd[] = {
-	0x59, 0x55, 0xd5, 0xf7, 0xf7, 0x40, 0x62, 0xb3, \
-	0x00, 0xad, 0x3e, 0x16, 0xa3, 0x77, 0x95, 0x98, \
-	0x5f, 0xcf, 0x9e, 0x81, 0x1f, 0x49, 0x6a, 0xb4, \
-	0x77, 0xa4, 0xae, 0xce, 0xa0, 0x41, 0x24, 0xb4
-};
-
-static unsigned char Iv[] = {
-	0x70, 0xa6, 0xba, 0x87, 0xdf, 0x1f, 0x32, 0x9e, \
-	0x1f, 0x69, 0x50, 0xa6, 0x5f, 0x0c, 0x78, 0xf1
-};
-#endif
 
 
 /**
@@ -86,11 +69,10 @@ static _Bool load_keys(CO(char *, fname), CO(Buffer, iv), CO(Buffer, key))
 {
 	_Bool retn = false;
 
-	File file;
+	File file = NULL;
 
 
-	if ( (file = HurdLib_File_Init()) == NULL )
-		return false;
+	INIT(HurdLib, File, file, goto done);
 
 	file->open_ro(file, fname);
 	file->read_Buffer(file, iv, AES_BLOCKSIZE);
@@ -99,6 +81,8 @@ static _Bool load_keys(CO(char *, fname), CO(Buffer, iv), CO(Buffer, key))
 	retn = !file->poisoned(file) && !iv->poisoned(iv) && \
 		!key->poisoned(key);
 
+
+ done:
 	WHACK(file);
 	return retn;
 }
@@ -148,21 +132,20 @@ static _Bool generate_payload(CO(Buffer, payload), CO(Buffer, key), \
 
 	uint32_t size;
 
-	RandomBuffer nonce;
-
-	SHA256_hmac hmac;
-
 	Buffer mac;
+
+	RandomBuffer nonce = NULL;
+
+	SHA256_hmac hmac = NULL;
 
 
 	if ( (hmac = NAAAIM_SHA256_hmac_Init(key)) == NULL )
 		goto done;
 
-	if ( (nonce = NAAAIM_RandomBuffer_Init()) == NULL )
-		goto done;
+	INIT(NAAAIM, RandomBuffer, nonce, goto done);
 	nonce->generate(nonce, AES_BLOCKSIZE);
 	output->add_Buffer(output, nonce->get_Buffer(nonce));
-	nonce->whack(nonce);
+	WHACK(nonce);
 
 	size = htonl(payload->size(payload));
 	field = output->get(output);
@@ -181,8 +164,7 @@ static _Bool generate_payload(CO(Buffer, payload), CO(Buffer, key), \
 	retn = true;
 
  done:
-	if ( hmac != NULL )
-		hmac->whack(hmac);
+	WHACK(hmac);
 	return retn;
 }
 
@@ -200,14 +182,14 @@ extern int main(int argc, char *argv[])
 	     *key_file	 = NULL,
 	     *output	 = NULL;
 
-	File file;
+	File file = NULL;
 
-	Buffer image,
-	       encrypted,
-	       iv,
-	       key;
+	Buffer encrypted,
+	       image = NULL,
+	       iv    = NULL,
+	       key   = NULL;
 
-	AES256_cbc cipher;
+	AES256_cbc cipher = NULL;
 
 
 	while ( (retn = getopt(argc, argv, "k:r:o:")) != EOF )
@@ -236,32 +218,21 @@ extern int main(int argc, char *argv[])
 		return 1;
 	}
 
-	image = HurdLib_Buffer_Init();
-	iv    = HurdLib_Buffer_Init();
-	key   = HurdLib_Buffer_Init();
-	if ( (image == NULL) || (iv == NULL) || (key == NULL) ) {
-		fputs("Cannot initialize buffers.\n", stderr);
-		goto done;
-	}
+	INIT(HurdLib, Buffer, image, goto done);
+	INIT(HurdLib, Buffer, iv, goto done);
+	INIT(HurdLib, Buffer, key, goto done);
 
 	if ( !load_keys(key_file, iv, key) ) {
 		fputs("Cannot load keys.\n", stderr);
 		goto done;
 	}
-	fputs("IV:  ", stdout);
-	iv->print(iv);
-	fputs("Key: ", stdout);
-	key->print(key);
 
 	if ( (cipher = NAAAIM_AES256_cbc_Init_encrypt(key, iv)) == NULL ) {
 		fputs("Cannot initialize cipher.\n", stderr);
 		goto done;
 	}
 
-	if ( (file = HurdLib_File_Init()) == NULL ) {
-		fputs("Cannot initialize file object.\n", stderr);
-		goto done;
-	}
+	INIT(HurdLib, File, file, goto done);
 	file->open_ro(file, root_image);
 	file->slurp(file, image);
 	fprintf(stdout, "File size: %zu\n", image->size(image));
