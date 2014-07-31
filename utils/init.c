@@ -24,6 +24,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 #include <sys/reboot.h>
 #include <sys/mount.h>
 #include <netinet/in.h>
@@ -151,6 +152,46 @@ static _Bool configure_network(void)
 	WHACK(netconfig);
 	return retn;
 }
+
+
+/**
+ * Private function.
+ *
+ * This function is responsible for configuring the internal IPsec tunnel
+ * used to transport commands between the two nodes.  The static Mode
+ * variable is used to specify the personality type for the connection.
+ *
+ * No arguements are expected by this function.
+ *
+ * \return	If an error is encountered while executing the tunnel
+ *		configuration a false value is returned.  A true value
+ *		indicates the tunnel was successfully configured.
+ */
+
+static _Bool configure_internal_tunnel(void)
+
+{
+	_Bool retn = false;
+
+	char *cmd = NULL;
+
+
+	if ( strcmp(Mode, "liu") == 0 ) {
+		sleep(5);
+		cmd = "possum -C -p liu";
+	}
+	if ( strcmp(Mode, "hui") == 0 )
+		cmd = "possum -H -p hui";
+	if ( cmd == NULL )
+		goto done;
+
+	if ( system(cmd) != 0 )
+		goto done;
+	retn = true;
+	
+ done:
+	return retn;
+}
 	
 
 /*
@@ -167,6 +208,9 @@ extern int main(int argc, char *argv[])
 		goto done;
 
 	if ( !configure_network() )
+		goto done;
+
+	if ( !configure_internal_tunnel() )
 		goto done;
 
 	fprintf(stdout, "%s: OK\n", Mode);
