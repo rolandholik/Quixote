@@ -1090,7 +1090,8 @@ extern int main(int argc, char *argv[])
 {
 	int retn = 1;
 
-	char *personality;
+	char *cfg_file	  = NULL,
+	     *personality = NULL;
 
 	int opt;
 
@@ -1100,7 +1101,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Get the root image and passwd file name. */
-	while ( (opt = getopt(argc, argv, "CHp:")) != EOF )
+	while ( (opt = getopt(argc, argv, "CHc:p:")) != EOF )
 		switch ( opt ) {
 			case 'C':
 				mode = client;
@@ -1109,6 +1110,9 @@ extern int main(int argc, char *argv[])
 				mode = host;
 				break;
 
+			case 'c':
+				cfg_file = optarg;
+				break;
 			case 'p':
 				personality = optarg;
 				break;
@@ -1120,12 +1124,14 @@ extern int main(int argc, char *argv[])
 		fputs("No personality specified.\n", stderr);
 		return 1;
 	}
+	if ( cfg_file == NULL )
+		cfg_file = "/etc/conf/possum.conf";
 
         if ( (config = HurdLib_Config_Init()) == NULL ) {
 		fputs("Error initializing configuration.", stderr);;
                 goto done;
         }
-        if ( !config->parse(config, "possum.conf") ) {
+        if ( !config->parse(config, cfg_file) ) {
                 fputs("Error parsing configuration file.", stderr);
                 goto done;
         }
