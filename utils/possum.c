@@ -1158,10 +1158,10 @@ extern int main(int argc, char *argv[])
 			}
 			break;
 	}
-	goto done;
+	retn = 0;
+
 
  done:
 	WHACK(config);
-
 	return retn;
 }
