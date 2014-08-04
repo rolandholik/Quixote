@@ -5,9 +5,10 @@
 
 # Variable declarations.
 CSRC = gen-image.c load-image.c boot.c Netconfig.c IPsec.c PossumPacket.c \
-	SoftwareStatus.c
+	SoftwareStatus.c SoftwareTPM.c
 
-TOOLS = gen-image load-image boot init possum gen-id-verifier software-status
+TOOLS = gen-image load-image boot init possum gen-id-verifier software-status \
+	software-tpm
 
 CC = musl-gcc
 
@@ -81,6 +82,9 @@ gen-id-verifier: gen-id-verifier.o
 
 software-status: software-status.o SoftwareStatus.o
 	${CC} ${LDFLAGS} -o $@ $^ ${SSL_LIBRARY} ../SHA256.o ${LIBS};
+
+software-tpm: software-tpm.o SoftwareTPM.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};
