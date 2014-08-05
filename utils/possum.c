@@ -55,6 +55,7 @@
 #include "Netconfig.h"
 #include "IPsec.h"
 #include "PossumPacket.h"
+#include "SoftwareStatus.h"
 
 
 /* Variable static to this file. */
@@ -718,14 +719,15 @@ static _Bool host_mode(CO(Config, cfg))
 	_Bool retn = false;
 
 	char *cfg_item,
-	     *identity,
-	     *host_software;
+	     *identity;
 
 	uint32_t tspi,
 		 spi,
 		 protocol;
 
 	FILE *token_file = NULL;
+
+	SoftwareStatus software_status = NULL;
 
 	Duct duct = NULL;
 
@@ -744,6 +746,15 @@ static _Bool host_mode(CO(Config, cfg))
 
 	Curve25519 dhkey = NULL;
 
+
+	/* Get current software status. */
+	INIT(NAAAIM, SoftwareStatus, software_status, goto done);
+	software_status->open(software_status);
+	if ( !software_status->measure(software_status) )
+		goto done;
+	fputs("Host software status:\n", stdout);
+	b = software_status->get_template_hash(software_status);
+	b->print(b);
 
 	/* Setup the network port. */
 	INIT(HurdLib, Buffer, netbufr, goto done);
@@ -765,8 +776,6 @@ static _Bool host_mode(CO(Config, cfg))
 	if ( (identity = cfg->get(cfg, "identity")) == NULL )
 		goto done;
 	if ( (cfg_item = cfg->get(cfg, "client_list")) == NULL )
-		goto done;
-	if ( (host_software = cfg->get(cfg, "software")) == NULL )
 		goto done;
 
 	INIT(NAAAIM, IDtoken, token, goto done);
@@ -841,8 +850,11 @@ static _Bool host_mode(CO(Config, cfg))
 	packet->create_packet1(packet, token, dhkey, spi);
 
 	/* Reset the section back to the original. */
+	b = software_status->get_template_hash(software_status);
+	fputs("Software status:\n", stdout);
+	b->print(b);
 	software->reset(software);
-	software->add_hexstring(software, host_software);
+	software->add_Buffer(software, b);
 	if ( !packet->encode_packet1(packet, software, netbufr) )
 		goto done;
 	if ( !duct->send_Buffer(duct, netbufr) )
@@ -877,6 +889,7 @@ static _Bool host_mode(CO(Config, cfg))
 		fclose(token_file);
 
 	sleep(5);
+	WHACK(software_status);
 	WHACK(duct);
 	WHACK(netbufr);
 	WHACK(nonce);
@@ -949,6 +962,8 @@ static _Bool client_mode(CO(Config, cfg))
 
 	Duct duct = NULL;
 
+	SoftwareStatus software_status = NULL;
+
 	Buffer b,
 	       public,
 	       nonce	  = NULL,
@@ -976,6 +991,11 @@ static _Bool client_mode(CO(Config, cfg))
 	if ( (remote_ip = cfg->get(cfg, "remote_ip")) == NULL )
 		goto done;
 
+	INIT(NAAAIM, SoftwareStatus, software_status, goto done);
+	software_status->open(software_status);
+	if ( !software_status->measure(software_status) )
+		goto done;
+
 	INIT(NAAAIM, Duct, duct, goto done);
 	duct->init_client(duct);
 	if ( !duct->init_port(duct, remote_ip, POSSUM_PORT) )
@@ -995,9 +1015,10 @@ static _Bool client_mode(CO(Config, cfg))
 	spi = spi | tspi;
 	packet->create_packet1(packet, token, dhkey, spi);
 
-	if ( (cfg_item = cfg->get(cfg, "software")) == NULL )
-		goto done;
-	software->add_hexstring(software, cfg_item);
+	b = software_status->get_template_hash(software_status);
+	fputs("Software status:\n", stdout);
+	b->print(b);
+	software->add_Buffer(software, b);
 	if ( !packet->encode_packet1(packet, software, bufr) )
 		goto done;
 	if ( !duct->send_Buffer(duct, bufr) )
@@ -1068,6 +1089,7 @@ static _Bool client_mode(CO(Config, cfg))
 	if ( token_file != NULL )
 		fclose(token_file);
 
+	WHACK(software_status);
 	WHACK(duct);
 	WHACK(nonce);
 	WHACK(software);

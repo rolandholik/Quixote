@@ -72,7 +72,7 @@ boot: boot.o SoftwareStatus.o ../SHA256.o
 init: init.o Netconfig.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl;
 
-possum: possum.o Netconfig.o IPsec.o PossumPacket.o
+possum: possum.o Netconfig.o IPsec.o PossumPacket.o SoftwareStatus.o
 	${CC} ${LDFLAGS} -o $@ $^ ../IDtoken.o ../SHA256_hmac.o ../SHA256.o \
 		../RandomBuffer.o ../AES256_cbc.o ${SSL_LIBRARY} ${LIBS} -lfl;
 
