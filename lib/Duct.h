@@ -27,6 +27,7 @@ struct NAAAIM_Duct
 	/* External methods. */
 	_Bool (*init_server)(const Duct);
 	_Bool (*init_client)(const Duct);
+	_Bool (*set_server)(const Duct, const char *);
 	_Bool (*init_port)(const Duct, const char *, int);
 	_Bool (*accept_connection)(const Duct);
 	_Bool (*init_connection)(const Duct);

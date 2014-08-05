@@ -21,7 +21,7 @@ extern int main(int argc, char *argv[])
 {
 	enum {none, client, server} Mode = none;
 
-	char *host;
+	char *host = NULL;
 
 	int retn;
 
@@ -72,6 +72,11 @@ extern int main(int argc, char *argv[])
 
 		if ( !duct->init_server(duct) ) {
 			fputs("Cannot set server mode.\n", stderr);
+			goto done;
+		}
+
+		if ( (host != NULL) && !duct->set_server(duct, host) ) {
+			fputs("Cannot set server address.\n", stderr);
 			goto done;
 		}
 

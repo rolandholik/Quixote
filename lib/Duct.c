@@ -73,6 +73,9 @@ struct NAAAIM_Duct_State
 	/* Server file descriptor. */
 	int fd;
 
+	/* Address for server to listen on. */
+	long server;
+
 	/* Client ip and hostname .*/
 	struct in_addr ipv4;
 	Buffer client;
@@ -102,6 +105,7 @@ static void _init_state(CO(Duct_State, S)) {
 	S->type		= not_defined;
 	S->sockt	= -1;
 	S->fd		= -1;
+	S->server	= INADDR_ANY;
 	S->ipv4.s_addr	= 0;
 	S->client       = NULL;
 
@@ -123,7 +127,8 @@ static void _init_state(CO(Duct_State, S)) {
  *		to indicate success.
  */
 
-static _Bool _init_server_port(CO(Duct_State, S), const int port)
+static _Bool _init_server_port(CO(Duct_State, S), const long server, \
+			       const int port)
 
 {
 	const char *err = NULL;
@@ -134,7 +139,7 @@ static _Bool _init_server_port(CO(Duct_State, S), const int port)
 	memset(&sdef, '\0', sizeof(sdef));
 	sdef.sin_family		= AF_INET;
 	sdef.sin_port		= htons(port);
-	sdef.sin_addr.s_addr	= INADDR_ANY;
+	sdef.sin_addr.s_addr	= server;
 	
 	if ( (S->sockt = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1 ) {
 		err = "Socket creation failed.";
@@ -248,6 +253,41 @@ static _Bool init_server(CO(Duct, this))
 /**
  * External public method.
  *
+ * This method sets the interface address on which a server instance will
+ * listen.  The default is to listen on all available addresses.
+ *
+ * \param this	The object which is to be initialized as a client.
+ *
+ * \param addr	The address on which the server is to listen.
+ *
+ * \return	A boolean value is returned to indicate whether or
+ *		not server initialization was successful.  A true
+ *		value indicates the client was successfully initialized.
+ */
+
+static _Bool set_server(CO(Duct, this), CO(char *, addr))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	struct hostent *hdef;
+
+
+	if ( (hdef = gethostbyname2(addr, AF_INET)) == NULL )
+		goto done;
+	S->server = *((unsigned long *) hdef->h_addr_list[0]);
+	retn = true;
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method initializes the network communications object to
  * initiate client connections.
  *
@@ -297,7 +337,7 @@ static _Bool init_port(CO(Duct, this), CO(char *, host), int const port)
 		return retn;
 		
 	if ( S->type == server )
-		retn = _init_server_port(S, port);
+		retn = _init_server_port(S, S->server, port);
 	else
 		retn = _init_client_port(S, host, port);
 
@@ -650,6 +690,7 @@ extern Duct NAAAIM_Duct_Init(void)
 	/* Method initialization. */
 	this->init_server	= init_server;
 	this->init_client	= init_client;
+	this->set_server	= set_server;
 
 	this->init_port		= init_port;
 	this->accept_connection	= accept_connection;
