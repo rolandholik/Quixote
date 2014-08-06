@@ -69,7 +69,7 @@ load-image: load-image.o
 boot: boot.o SoftwareStatus.o ../SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
-init: init.o Netconfig.o
+init: init.o Netconfig.o SoftwareTPM.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl;
 
 possum: possum.o Netconfig.o IPsec.o PossumPacket.o SoftwareStatus.o

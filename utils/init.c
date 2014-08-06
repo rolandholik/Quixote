@@ -34,12 +34,15 @@
 #include <Config.h>
 
 #include "Netconfig.h"
+#include "SoftwareTPM.h"
 
 
 /* Definitions static to this module. */
 static Config Cfg = NULL;
 
 static char *Mode = NULL;
+
+static SoftwareTPM SWtpm = NULL;
 
 
 /**
@@ -64,6 +67,36 @@ static void do_reboot(void)
 	fputs("Rebooting.\n", stderr);
 	reboot(RB_AUTOBOOT);
 #endif
+}
+
+
+/**
+ * Private function.
+ *
+ * This function is responsible for starting the Trusted Platform Module
+ * system.
+ *
+ * No arguements are expected by this function.
+ *
+ * \return	If an error is encountered while loading the configuration
+ *		a false value is returned.  A true value indicates the
+ *		platform was successfully started.
+ */
+
+static _Bool start_tpm(void)
+
+{
+	_Bool retn = false;
+
+
+	INIT(NAAAIM, SoftwareTPM, SWtpm, goto done);
+	if ( !SWtpm->start(SWtpm) )
+	     goto done;
+
+	retn = true;
+
+ done:
+	return retn;
 }
 
 
@@ -171,11 +204,16 @@ static _Bool configure_network(void)
 static _Bool configure_internal_tunnel(void)
 
 {
-	_Bool retn = false;
+	_Bool changed_uid = false,
+	      retn	  = false;
 
 	char *cmd = NULL;
 
 
+	if ( setreuid(1, -1) == -1 )
+		goto done;
+	changed_uid = true;
+	
 	if ( strcmp(Mode, "liu") == 0 ) {
 		sleep(5);
 		cmd = "possum -C -p liu";
@@ -190,6 +228,8 @@ static _Bool configure_internal_tunnel(void)
 	retn = true;
 	
  done:
+	if ( changed_uid && (setreuid(geteuid(), -1) == -1) )
+		retn = false;
 	return retn;
 }
 	
@@ -203,15 +243,24 @@ extern int main(int argc, char *argv[])
 {
 	int retn = 1;
 
-
+	fputs("Loading configuration.\n", stderr);
 	if ( !load_config() )
 		goto done;
 
+	fputs("Configuring network.\n", stderr);
 	if ( !configure_network() )
 		goto done;
 
+	fputs("Starting TPM.\n", stderr);
+	if ( !start_tpm() )
+		goto done;
+
+	fputs("Starting internal tunnel.\n", stderr);
+	configure_internal_tunnel();
+#if 0
 	if ( !configure_internal_tunnel() )
 		goto done;
+#endif
 
 	fprintf(stdout, "%s: OK\n", Mode);
 	execl("/bin/sh", "/bin/sh", NULL);
@@ -219,6 +268,7 @@ extern int main(int argc, char *argv[])
 
  done:
 	WHACK(Cfg);
+	WHACK(SWtpm);
 	do_reboot();
 	return retn;
 }
