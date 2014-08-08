@@ -90,7 +90,7 @@ static _Bool start_tpm(void)
 
 
 	INIT(NAAAIM, SoftwareTPM, SWtpm, goto done);
-	if ( !SWtpm->start(SWtpm) )
+	if ( !SWtpm->start(SWtpm, 1) )
 	     goto done;
 
 	retn = true;

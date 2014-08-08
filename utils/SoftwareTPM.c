@@ -99,24 +99,36 @@ static void _init_state(const SoftwareTPM_State const S) {
  * TPM state for use.
  *
  * \param this	A pointer to the TPM object which is to be started.
- *
+ * 
+ * \param uid	The uid of the user which the software TPM will
+ *		run under.  This is provided to allow the files which the
+ *		software TPM simulator uses/creates to not come under
+ *		measurement.
+ * 
  * \return	If any type of failure occurs when the software TPM
  *		stack is started a false value is returned.  A true
  *		value indicates the stack was successfully started.
  */
 
-static _Bool start(CO(SoftwareTPM, this))
+static _Bool start(CO(SoftwareTPM, this), const uid_t uid)
 
 {
 	STATE(S);
 
-	_Bool retn = false;
+	_Bool retn	 = false,
+	      changed_id = false;
 
 	int fd,
 	    status;
 
 	pid_t tpmbios;
 
+
+	if ( getuid() != uid ) {
+		if ( setreuid(uid, -1) == -1 )
+			goto done;
+		changed_id = true;
+	}
 
 	if ( setenv("TPM_PORT", "1590", 1) != 0 )
 		goto done;
@@ -193,7 +205,12 @@ static _Bool start(CO(SoftwareTPM, this))
 	sleep(2);
 	if ( kill(S->tcsd_pid, 0) == -1 )
 		goto done;
+
 	retn = true;
+	if ( changed_id ) {
+		if ( setreuid(geteuid(), -1) == -1 )
+			retn = false;
+	}
 
  done:
 	return retn;

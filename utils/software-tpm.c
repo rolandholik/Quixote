@@ -41,7 +41,7 @@ extern int main(int argc, char *argv[])
 
 
 	INIT(NAAAIM, SoftwareTPM, swtpm, goto done);
-	if ( !swtpm->start(swtpm) ) {
+	if ( !swtpm->start(swtpm, getuid()) ) {
 		fputs("Failed software TPM start.\n", stderr);
 		goto done;
 	}

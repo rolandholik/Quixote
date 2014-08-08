@@ -25,7 +25,7 @@ typedef struct NAAAIM_SoftwareTPM_State * SoftwareTPM_State;
 struct NAAAIM_SoftwareTPM
 {
 	/* External methods. */
-	_Bool (*start)(const SoftwareTPM);
+	_Bool (*start)(const SoftwareTPM, uid_t);
 
 	void (*whack)(const SoftwareTPM);
 
