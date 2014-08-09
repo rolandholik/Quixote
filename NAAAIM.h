@@ -43,3 +43,4 @@
 #define NAAAIM_PossumPacket_OBJID	22
 #define NAAAIM_SoftwareStatus_OBJID	23
 #define NAAAIM_SoftwareTPM_OBJID	24
+#define NAAAIM_TPMcmd_OBJID		25

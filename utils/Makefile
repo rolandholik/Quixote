@@ -5,7 +5,7 @@
 
 # Variable declarations.
 CSRC = gen-image.c load-image.c boot.c Netconfig.c IPsec.c PossumPacket.c \
-	SoftwareStatus.c SoftwareTPM.c
+	SoftwareStatus.c SoftwareTPM.c TPMcmd.c
 
 TOOLS = gen-image load-image boot init possum gen-id-verifier software-status \
 	software-tpm
@@ -85,6 +85,9 @@ software-status: software-status.o SoftwareStatus.o
 
 software-tpm: software-tpm.o SoftwareTPM.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
+
+tpm-cmd: tpm-cmd.o TPMcmd.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi;
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};
