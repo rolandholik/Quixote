@@ -41,6 +41,7 @@ extern int main(int argc, char *argv[])
 	INIT(HurdLib, Buffer, bufr, goto done);
 	INIT(NAAAIM, TPMcmd, tpmcmd, goto done);
 
+#if 0
 	if ( !bufr->add_hexstring(bufr, str) )
 		goto done;
 	if ( !tpmcmd->pcr_extend(tpmcmd, 2, bufr) ) {
@@ -53,6 +54,13 @@ extern int main(int argc, char *argv[])
 	bufr->reset(bufr);
 	if ( !tpmcmd->pcr_read(tpmcmd, 2, bufr) ) {
 		fputs("Failed PCR read.\n", stdout);
+		goto done;
+	}
+	bufr->hprint(bufr);
+#endif
+
+	if ( !tpmcmd->nv_read(tpmcmd, 3, bufr) ) {
+		fputs("Failed NVREAM read.\n", stdout);
 		goto done;
 	}
 	bufr->hprint(bufr);

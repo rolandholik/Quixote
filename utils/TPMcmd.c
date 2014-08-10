@@ -1,5 +1,11 @@
 /** \file
+ * This file provides the method implementations for an object which
+ * implements various Trusted Platform Module (TPM) commands.  The
+ * current command set is as follows:
  *
+ *     	Read the value of a platform configuration register.
+ *      Extend the value of a platform configuration register.
+ *	Read the contents of an NVRAM region.
  */
 
 /**************************************************************************
@@ -20,6 +26,7 @@
 #include <Buffer.h>
 
 #include <tss/tspi.h>
+#include <trousers/trousers.h>
 
 #include "NAAAIM.h"
 #include "TPMcmd.h"
@@ -222,6 +229,97 @@ static _Bool pcr_extend(CO(TPMcmd, this), const uint32_t index, \
 /**
  * External public method.
  *
+ * This method implements reading the contents of a specified NVRAM
+ * location.
+ *
+ * \param this	A pointer to the TPM object whose NVRAM region is to
+ *		be read
+ *
+ * \param index	The index number of the NVRAM region to be read
+ *
+ * \param bufr	A Buffer object which the region is to be read into.
+ *
+ * \return	If an error is encountered while reading teh NVRAM
+ *		region a false value is returned.  If the read is
+ *		successful a true value is returned.
+ */
+
+static _Bool nv_read(CO(TPMcmd, this), uint32_t index, CO(Buffer, bufr))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	uint32_t length;
+
+	uint64_t offset = 0;
+
+	unsigned char *output,
+		      *nv_output = NULL;
+
+	TPM_NV_DATA_PUBLIC *nv_public = NULL;
+
+	TSS_HNVSTORE nvram = 0;
+
+
+	if ( Tspi_Context_CreateObject(S->context, TSS_OBJECT_TYPE_NV, 0, \
+				       &nvram) != TSS_SUCCESS )
+		goto done;
+
+	if ( Tspi_TPM_GetCapability(S->tpm, TSS_TPMCAP_NV_INDEX,	     \
+				    sizeof(index), (unsigned char *) &index, \
+				    &length, &output) != TSS_SUCCESS )
+		goto done;
+
+	if ( (nv_public = malloc(sizeof(TPM_NV_DATA_PUBLIC))) == NULL )
+		goto done;
+
+	if ( Trspi_UnloadBlob_NV_DATA_PUBLIC(&offset, output, NULL) != \
+	     TSS_SUCCESS )
+		goto done;
+	if ( offset > length )
+		goto done;
+
+	offset = 0;
+	if ( Trspi_UnloadBlob_NV_DATA_PUBLIC(&offset, output, nv_public) != \
+	     TSS_SUCCESS )
+		goto done;
+
+	if ( Tspi_SetAttribUint32(nvram, TSS_TSPATTRIB_NV_INDEX, 0, index) != \
+	     TSS_SUCCESS )
+		goto done;
+
+	if ( Tspi_NV_ReadValue(nvram, 0, &nv_public->dataSize, &nv_output) != \
+	     TSS_SUCCESS )
+		goto done;
+	if ( !bufr->add(bufr, nv_output, nv_public->dataSize) )
+		goto done;
+
+	if ( Tspi_Context_FreeMemory(S->context, output) != TSS_SUCCESS ) 
+		goto done;
+	if ( Tspi_Context_CloseObject(S->context, nvram) != TSS_SUCCESS )
+		goto done;
+	     
+	retn = true;
+
+
+ done:
+	if ( nv_output != NULL )
+		free(nv_output);
+	if ( nv_public != NULL ) {
+		free(nv_public->pcrInfoRead.pcrSelection.pcrSelect);
+		free(nv_public->pcrInfoWrite.pcrSelection.pcrSelect);
+		free(nv_public);
+	}
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a destructor for a TPMcmd object.
  *
  * \param this	A pointer to the object which is to be destroyed.
@@ -281,6 +379,8 @@ extern TPMcmd NAAAIM_TPMcmd_Init(void)
 	/* Method initialization. */
 	this->pcr_read	 = pcr_read;
 	this->pcr_extend = pcr_extend;
+
+	this->nv_read	 = nv_read;
 
 	this->whack = whack;
 

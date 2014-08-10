@@ -25,8 +25,10 @@ typedef struct NAAAIM_TPMcmd_State * TPMcmd_State;
 struct NAAAIM_TPMcmd
 {
 	/* External methods. */
-	_Bool(*pcr_read)(const TPMcmd, uint32_t, Buffer);
-	_Bool(*pcr_extend)(const TPMcmd, uint32_t, Buffer);
+	_Bool (*pcr_read)(const TPMcmd, uint32_t, Buffer);
+	_Bool (*pcr_extend)(const TPMcmd, uint32_t, Buffer);
+
+	_Bool (*nv_read)(const TPMcmd, uint32_t, Buffer);
 
 	void (*whack)(const TPMcmd);
 
