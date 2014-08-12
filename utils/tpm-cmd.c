@@ -31,9 +31,11 @@ extern int main(int argc, char *argv[])
 {
 	int retn = 1;
 
-	const static char *str = "9cfe5319370fe19207093adcfa6a98eb09e39099";
+	const static char *pwd = "hoot",
+			  *str = "9cfe5319370fe19207093adcfa6a98eb09e39099";
 
-	Buffer bufr;
+	Buffer bufr,
+	       key;
 
 	TPMcmd tpmcmd = NULL;
 
@@ -59,14 +61,25 @@ extern int main(int argc, char *argv[])
 	bufr->hprint(bufr);
 #endif
 
+	INIT(HurdLib, Buffer, key, goto done);
+	if ( !key->add(key, (unsigned char *) pwd, strlen(pwd)) )
+		goto done;
+	if ( !bufr->add(bufr, (unsigned char *) "NVRAM area", 10) )
+		goto done;
+
+	if ( !tpmcmd->nv_write(tpmcmd, 3, bufr, false, key) )
+		goto done;
+
+	bufr->reset(bufr);
 	if ( !tpmcmd->nv_read(tpmcmd, 3, bufr) ) {
 		fputs("Failed NVREAM read.\n", stdout);
 		goto done;
 	}
 	bufr->hprint(bufr);
-
+	
 
  done:
+	WHACK(key);
 	WHACK(bufr);
 	WHACK(tpmcmd);
 

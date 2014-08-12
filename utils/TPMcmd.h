@@ -29,7 +29,7 @@ struct NAAAIM_TPMcmd
 	_Bool (*pcr_extend)(const TPMcmd, uint32_t, Buffer);
 
 	_Bool (*nv_read)(const TPMcmd, uint32_t, Buffer);
-
+	_Bool (*nv_write)(const TPMcmd, uint32_t, Buffer, _Bool, Buffer);
 	void (*whack)(const TPMcmd);
 
 	/* Private state. */

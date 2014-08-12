@@ -229,6 +229,160 @@ static _Bool pcr_extend(CO(TPMcmd, this), const uint32_t index, \
 /**
  * External public method.
  *
+ * This method implements writing the contents of a specified NVRAM
+ * location.
+ *
+ * \param this		A pointer to the TPM object whose NVRAM region is to
+ *			be written
+ *
+ * \param index		The index number of the NVRAM region to be written.
+ *
+ * \param pwd		A String object containing the user password which
+ *			will authenticate the write to the NVram.
+ *
+ * \param bufr		A Buffer object which holds the content which will
+ *			be written to the NVram.
+ *
+ * \param key		A boolean object used to signal whether the contents
+ *			of the key_bufr is a key or a byte sequence which is
+ *			to be hashed to yield the authentication key.
+ *
+ * \param key_bufr	A Buffer object containing the data to be used in
+ *			constructing the authentication key.
+ *
+ * \return	If an error is encountered while reading teh NVRAM
+ *		region a false value is returned.  If the read is
+ *		successful a true value is returned.
+ */
+
+static _Bool nv_write(CO(TPMcmd, this), uint32_t index, CO(Buffer, bufr), \
+		      _Bool key, CO(Buffer, key_bufr))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	uint32_t length;
+
+	uint64_t offset = 0;
+
+	unsigned char *output,
+		      *write_ptr,
+		      *nv_output = NULL;
+
+	size_t write_size,
+	       write_segment;
+
+	TSS_FLAG secret_mode;
+
+	TPM_NV_DATA_PUBLIC *nv_public = NULL;
+
+	TSS_HNVSTORE nvram = 0;
+
+	TSS_HPOLICY tpm_policy,
+		    nvram_policy;
+	
+
+	if ( (bufr == NULL) || bufr->poisoned(bufr) )
+		goto done;
+
+	if ( Tspi_Context_CreateObject(S->context, TSS_OBJECT_TYPE_NV, 0, \
+				       &nvram) != TSS_SUCCESS )
+		goto done;
+
+	secret_mode = key ? TSS_SECRET_MODE_SHA1 : TSS_SECRET_MODE_PLAIN;
+
+	if ( Tspi_GetPolicyObject(S->tpm, TSS_POLICY_USAGE, &tpm_policy) !=
+	     TSS_SUCCESS )
+		goto done;
+	if ( Tspi_Policy_SetSecret(tpm_policy, secret_mode,  \
+				   key_bufr->size(key_bufr), \
+				   key_bufr->get(key_bufr)) != TSS_SUCCESS )
+		goto done;
+
+	if ( Tspi_Context_CreateObject(S->context, TSS_OBJECT_TYPE_POLICY, \
+				       TSS_POLICY_USAGE, &nvram_policy) != \
+	     TSS_SUCCESS )
+		goto done;
+	if ( Tspi_Policy_SetSecret(nvram_policy, secret_mode,  \
+				   key_bufr->size(key_bufr),   \
+				   key_bufr->get(key_bufr)) != TSS_SUCCESS )
+		goto done;
+
+	if ( Tspi_Policy_AssignToObject(nvram_policy, nvram) != TSS_SUCCESS )
+		goto done;
+
+
+	/* Get NVram common area. */
+	if ( Tspi_TPM_GetCapability(S->tpm, TSS_TPMCAP_NV_INDEX,	     \
+				    sizeof(index), (unsigned char *) &index, \
+				    &length, &output) != TSS_SUCCESS )
+		goto done;
+
+	if ( (nv_public = malloc(sizeof(TPM_NV_DATA_PUBLIC))) == NULL )
+		goto done;
+
+	if ( Trspi_UnloadBlob_NV_DATA_PUBLIC(&offset, output, NULL) != \
+	     TSS_SUCCESS )
+		goto done;
+	if ( offset > length )
+		goto done;
+
+	offset = 0;
+	if ( Trspi_UnloadBlob_NV_DATA_PUBLIC(&offset, output, nv_public) != \
+	     TSS_SUCCESS )
+		goto done;
+
+	if ( bufr->size(bufr) > nv_public->dataSize )
+		goto done;
+
+	if ( Tspi_SetAttribUint32(nvram, TSS_TSPATTRIB_NV_INDEX, 0, index) != \
+	     TSS_SUCCESS )
+		goto done;
+
+
+	/* Output to area in 1k chunk sizes at max. */
+	offset	   = 0;
+	write_size = bufr->size(bufr);
+	write_ptr  = bufr->get(bufr);
+
+	while ( write_size > 0 ) {
+		write_segment = (write_size > 1024) ? 1024 : write_size;
+
+		if ( Tspi_NV_WriteValue(nvram, offset, write_segment, \
+					write_ptr) != TSS_SUCCESS )
+			goto done;
+
+		write_size -= write_segment;
+		offset	   += write_segment;
+		write_ptr  += write_segment;
+	}
+
+	if ( Tspi_Context_FreeMemory(S->context, output) != TSS_SUCCESS ) 
+		goto done;
+	if ( Tspi_Context_CloseObject(S->context, nvram) != TSS_SUCCESS )
+		goto done;
+	     
+	retn = true;
+
+
+ done:
+	if ( nv_output != NULL )
+		free(nv_output);
+	if ( nv_public != NULL ) {
+		free(nv_public->pcrInfoRead.pcrSelection.pcrSelect);
+		free(nv_public->pcrInfoWrite.pcrSelection.pcrSelect);
+		free(nv_public);
+	}
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements reading the contents of a specified NVRAM
  * location.
  *
@@ -380,7 +534,8 @@ extern TPMcmd NAAAIM_TPMcmd_Init(void)
 	this->pcr_read	 = pcr_read;
 	this->pcr_extend = pcr_extend;
 
-	this->nv_read	 = nv_read;
+	this->nv_write	= nv_write;
+	this->nv_read	= nv_read;
 
 	this->whack = whack;
 
