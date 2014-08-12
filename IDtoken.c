@@ -34,12 +34,15 @@
 #include <string.h>
 
 #include <Origin.h>
+#include <HurdLib.h>
 #include <Buffer.h>
 
 #include "NAAAIM.h"
 #include "IDtoken.h"
 #include "SHA256_hmac.h"
 
+/* Object state extraction macro. */
+#define STATE(var) CO(IDtoken_State, var) = this->state
 
 /* Verify library/object header file inclusions. */
 #if !defined(NAAAIM_LIBID)
@@ -100,7 +103,7 @@ struct NAAAIM_IDtoken_State
 static _Bool _getline(FILE *input, char * const bufr, const size_t cnt)
 
 {
-	auto char *p;
+	char *p;
 
 
 	if ( fgets(bufr, cnt, input) == NULL )
@@ -127,10 +130,10 @@ static _Bool _getline(FILE *input, char * const bufr, const size_t cnt)
  *		the concordance test.
  */
 
-static _Bool _hex_string(const char * const bufr)
+static _Bool _hex_string(CO(char *, bufr))
 
 {
-	auto const char *p = bufr;
+	const char *p = bufr;
 
 
 	if ( strlen(bufr) != 64 )
@@ -154,7 +157,7 @@ static _Bool _hex_string(const char * const bufr)
  *        is to be initialized.
  */
 
-static void _init_state(const IDtoken_State const S) {
+static void _init_state(CO(IDtoken_State, S)) {
 
 	S->libid = NAAAIM_LIBID;
 	S->objid = NAAAIM_IDtoken_OBJID;
@@ -180,11 +183,10 @@ static void _init_state(const IDtoken_State const S) {
  *			is returned.
  */
 
-static Buffer get_element(const IDtoken const this, \
-			  const IDtoken_element element)
+static Buffer get_element(CO(IDtoken, this), CO(IDtoken_element, element))
 
 {
-	auto const IDtoken_State const S = this->state;
+	STATE(S);
 
 
 	if ( S->poisoned )
@@ -234,14 +236,13 @@ static Buffer get_element(const IDtoken const this, \
  *			any component the object is poisoned.
  */
 
-static _Bool set_element(const IDtoken const this,	\
-			 const IDtoken_element const element, \
-			 const Buffer const bufr)
+static _Bool set_element(CO(IDtoken, this), CO(IDtoken_element, element), \
+			 CO(Buffer, bufr))
 
 {
-	auto const IDtoken_State const S = this->state;
+	STATE(S);
 
-	auto _Bool retn = false;
+	_Bool retn = false;
 
 
 	if ( S->poisoned )
@@ -321,15 +322,15 @@ static _Bool set_element(const IDtoken const this,	\
 static _Bool parse(const IDtoken const this, FILE *input)
 
 {
-	auto const IDtoken_State const S = this->state;
+	STATE(S);
 
-	auto _Bool token_started = false,
+	_Bool token_started = false,
 		   ptid_started  = false,
 		   key_started   = false;
 
-	auto char inbufr[80];
+	char inbufr[80];
 
-	auto unsigned int orgid_cnt = 0;
+	unsigned int orgid_cnt = 0;
 
 
 	while ( _getline(input, inbufr, sizeof(inbufr)) ) {
@@ -432,14 +433,14 @@ static _Bool parse(const IDtoken const this, FILE *input)
  *		value may also be returned if the object is dysfunctional.
  */
 
-static _Bool matches(const IDtoken const this, const Buffer const id)
+static _Bool matches(CO(IDtoken, this), CO(Buffer, id))
 
 {
-	auto const IDtoken_State const S = this->state;
+	STATE(S);
 
-	auto _Bool retn = false;
+	_Bool retn = false;
 
-	auto SHA256_hmac hmac = NULL;
+	SHA256_hmac hmac = NULL;
 
 
 	/* 
@@ -466,8 +467,7 @@ static _Bool matches(const IDtoken const this, const Buffer const id)
 
 
  done:
-	if ( hmac != NULL )
-		hmac->whack(hmac);
+	WHACK(hmac);
 
 	return retn;
 }
@@ -486,15 +486,15 @@ static _Bool matches(const IDtoken const this, const Buffer const id)
 static void print(const IDtoken const this)
 
 {
-	auto const IDtoken_State const S = this->state;
+	STATE(S);
 
-	auto unsigned char *p;
+	unsigned char *p;
 
-	auto unsigned int lp;
+	unsigned int lp;
 
 	
 	/* Sanity check for a dysfunctional object. */
-	if ( this->state->poisoned ) {
+	if ( S->poisoned ) {
 		fputs("* POISONED *\n", stderr);
 		return;
 	}
@@ -538,10 +538,10 @@ static void print(const IDtoken const this)
  * \param this	The object to be reset.
  */
 
-static void reset(const IDtoken const this)
+static void reset(CO(IDtoken, this))
 
 {
-	auto const IDtoken_State const S = this->state;
+	STATE(S);
 
 
 	if ( S->poisoned )
@@ -564,16 +564,16 @@ static void reset(const IDtoken const this)
  * \param this	A pointer to the object which is to be destroyed.
  */
 
-static void whack(const IDtoken const this)
+static void whack(CO(IDtoken, this))
 
 {
-	auto const IDtoken_State const S = this->state;
+	STATE(S);
 
 
-	S->orgkey->whack(S->orgkey);
-	S->orgid->whack(S->orgid);
-	S->ptid->whack(S->ptid);
-	S->idkey->whack(S->idkey);
+	WHACK(S->orgkey);
+	WHACK(S->orgid);
+	WHACK(S->ptid);
+	WHACK(S->idkey);
 
 	S->root->whack(S->root, this, S);
 	return;
@@ -615,18 +615,18 @@ extern IDtoken NAAAIM_IDtoken_Init(void)
 	if ( (this->state->orgkey = HurdLib_Buffer_Init()) == NULL )
 		return NULL;
 	if ( (this->state->orgid = HurdLib_Buffer_Init()) == NULL ) {
-		this->state->orgkey->whack(this->state->orgkey);
+		WHACK(this->state->orgkey);
 		return NULL;
 	}
 	if ( (this->state->ptid = HurdLib_Buffer_Init()) == NULL ) {
-		this->state->orgkey->whack(this->state->orgkey);
-		this->state->orgid->whack(this->state->orgid);
+		WHACK(this->state->orgkey);
+		WHACK(this->state->orgid);
 		return NULL;
 	}
 	if ( (this->state->idkey = HurdLib_Buffer_Init()) == NULL ) {
-		this->state->orgkey->whack(this->state->orgkey);
-		this->state->orgid->whack(this->state->orgid);
-		this->state->ptid->whack(this->state->ptid);
+		WHACK(this->state->orgkey);
+		WHACK(this->state->orgid);
+		WHACK(this->state->ptid);
 		return NULL;
 	}
 
