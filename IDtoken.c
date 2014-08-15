@@ -14,17 +14,17 @@
  **************************************************************************/
 
 /* Token delimiters. */
-#define TOKEN_START "-----BEGIN IDENTITY TOKEN-----"
-#define TOKEN_END   "-----END IDENTITY TOKEN-----"
+#define TOKEN_START		"-----BEGIN IDENTITY TOKEN-----"
+#define TOKEN_END		"-----END IDENTITY TOKEN-----"
 
-#define ORGID_START "-----BEGIN ORGANIZATION IDENTITY-----"
-#define ORGID_END   "-----END ORGANIZATION IDENTITY-----"
+#define ASSERTION_START		"-----BEGIN ASSERTION-----"
+#define ASSERTION_END		"-----END ASSERTION-----"
 
-#define PTID_START  "-----BEGIN PATIENT IDENTITY-----"
-#define PTID_END    "-----END PATIENT IDENTITY-----"
+#define IMPLEMENTATION_START	"-----BEGIN IMPLEMENTATION-----"
+#define IMPLEMENTATION_END	"-----END IMPLEMENTATION-----"
 
-#define KEY_START   "-----BEGIN TOKEN KEY-----"
-#define KEY_END	    "-----END TOKEN KEY-----"
+#define AUTHENTICATION_START	"-----BEGIN AUTHENTICATON-----"
+#define AUTHENTICATION_END	"-----END AUTHETNICATION-----"
 
 
 /* Include files. */
@@ -294,19 +294,19 @@ static _Bool set_element(CO(IDtoken, this), CO(IDtoken_element, element), \
  * organizational identity is delimited by the following pair of
  * delimiters:
  *
- * -----BEGIN ORGANIZATION IDENTITY-----
- * -----END ORGANIZATION IDENTITY-----
+ * -----BEGIN ASSERTION-----
+ * -----END ASSERTION-----
  *
  * The patient identifier is then delimited by the following guard pair:
  *
- * -----BEGIN PATIENT IDENTITY-----
- * -----END PATIENT IDENTITY-----
+ * -----BEGIN IMPLEMENTATION-----
+ * -----END IMPLEMENTATION-----
  *
  * There may also be an optional data element delimited by the following
  * pair:
  *
- * -----BEGIN TOKEN KEY-----
- * -----END TOKEN KEY-----
+ * -----BEGIN AUTHENTICATION-----
+ * -----END AUTHENTICATION-----
  *
  * This latter pairing is designed to be parsed out and retained by
  * the organization issueing the identity.
@@ -347,11 +347,11 @@ static _Bool parse(const IDtoken const this, FILE *input)
 
 
 		/* Parse organizational identity pairs. */
-		if ( strcmp(inbufr, ORGID_START) == 0 ) {
+		if ( strcmp(inbufr, ASSERTION_START) == 0 ) {
 			++orgid_cnt;
 			continue;
 		}
-		if ( strcmp(inbufr, ORGID_END) == 0 ) {
+		if ( strcmp(inbufr, ASSERTION_END) == 0 ) {
 			orgid_cnt = 0;
 			if ( S->orgkey->size(S->orgkey) != 32 )
 				goto err;
@@ -375,11 +375,11 @@ static _Bool parse(const IDtoken const this, FILE *input)
 
 
 		/* Parse patient identity pairs. */
-		if ( strcmp(inbufr, PTID_START) == 0 ) {
+		if ( strcmp(inbufr, IMPLEMENTATION_START) == 0 ) {
 			ptid_started = true;
 			continue;
 		}
-		if ( strcmp(inbufr, PTID_END) == 0 ) {
+		if ( strcmp(inbufr, IMPLEMENTATION_END) == 0 ) {
 			ptid_started = false;
 			if ( (S->ptid->size(S->ptid) != 256) &&
 			     (S->ptid->size(S->ptid) != 32) )
@@ -393,11 +393,11 @@ static _Bool parse(const IDtoken const this, FILE *input)
 
 
 		/* Parse optional key identity pairs. */
-		if ( strcmp(inbufr, KEY_START) == 0 ) {
+		if ( strcmp(inbufr, AUTHENTICATION_START) == 0 ) {
 			key_started = true;
 			continue;
 		}
-		if ( strcmp(inbufr, KEY_END) == 0 ) {
+		if ( strcmp(inbufr, AUTHENTICATION_END) == 0 ) {
 			key_started = false;
 			if ( S->idkey->size(S->idkey) != 32 )
 				goto err;
@@ -501,29 +501,29 @@ static void print(const IDtoken const this)
 
 
 	/* Output the ASCII delimited components of the token. */
-	fputs("-----BEGIN IDENTITY TOKEN-----\n", stdout);
+	fprintf(stdout, "%s\n", TOKEN_START);
 
-	fputs("-----BEGIN ORGANIZATION IDENTITY-----\n", stdout);
+	fprintf(stdout, "%s\n", ASSERTION_START);
 	S->orgkey->print(S->orgkey);
 	S->orgid->print(S->orgid);
-	fputs("-----END ORGANIZATION IDENTITY-----\n", stdout);
+	fprintf(stdout, "%s\n", ASSERTION_END);
 
-	fputs("-----BEGIN PATIENT IDENTITY-----\n", stdout);
+	fprintf(stdout, "%s\n", IMPLEMENTATION_START);
 	p = S->ptid->get(S->ptid);
 	for (lp= 1; lp <= S->ptid->size(S->ptid); ++lp) {
 		fprintf(stdout, "%02x", *(p + lp - 1));
 		if ( ((lp % 32) == 0) )
 			fputc('\n', stdout);
 	}
-	fputs("-----END PATIENT IDENTITY-----\n", stdout);
+	fprintf(stdout, "%s\n", IMPLEMENTATION_END);
 
 	if ( S->idkey->size(S->idkey) > 0 ) {
-		fputs("-----BEGIN TOKEN KEY-----\n", stdout);
+		fprintf(stdout, "%s\n", AUTHENTICATION_START);
 		S->idkey->print(S->idkey);
-		fputs("-----END TOKEN KEY-----\n", stdout);
+		fprintf(stdout, "%s\n", AUTHENTICATION_END);
 	}
 
-	fputs("-----END IDENTITY TOKEN-----\n", stdout);
+	fprintf(stdout, "%s\n", TOKEN_END);
 
 	return;
 }
