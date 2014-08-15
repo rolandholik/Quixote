@@ -122,6 +122,48 @@ static _Bool _init_tpm_state(CO(TPMcmd_State, S)) {
 }
 
 
+
+
+/**
+ * External public method.
+ *
+ * This method implements computation of the SHA160 hash of the
+ * supplied buffer.  The computed hash replaces the contents of the
+ * buffer.
+ *
+ * \param this	A pointer to the object on which a hash is to be
+ *		computed.
+ *
+ * \param bufr	The Buffer object which the hash is to be computed over.
+ *
+ * \return	If an error is encountered while creating the hash a
+ *		a false value is returned.  If the hashing is successful
+ *		a true value is returned.
+ */
+
+static _Bool hash(CO(TPMcmd, this), CO(Buffer, bufr))
+
+{
+	_Bool retn = false;
+
+        unsigned char digest[TCPA_SHA1_160_HASH_LEN];
+
+
+	if ( Trspi_Hash(TSS_HASH_SHA1, bufr->size(bufr), bufr->get(bufr), \
+			digest) != TSS_SUCCESS )
+		goto done;
+
+	bufr->reset(bufr);
+	if ( !bufr->add(bufr, digest, TCPA_SHA1_160_HASH_LEN) )
+		goto done;
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
 /**
  * External public method.
  *
@@ -531,6 +573,8 @@ extern TPMcmd NAAAIM_TPMcmd_Init(void)
 	_init_tpm_state(this->state);
 
 	/* Method initialization. */
+	this->hash = hash;
+
 	this->pcr_read	 = pcr_read;
 	this->pcr_extend = pcr_extend;
 
