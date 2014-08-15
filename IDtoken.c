@@ -23,8 +23,8 @@
 #define IMPLEMENTATION_START	"-----BEGIN IMPLEMENTATION-----"
 #define IMPLEMENTATION_END	"-----END IMPLEMENTATION-----"
 
-#define AUTHENTICATION_START	"-----BEGIN AUTHENTICATON-----"
-#define AUTHENTICATION_END	"-----END AUTHETNICATION-----"
+#define AUTHENTICATION_START	"-----BEGIN AUTHENTICATION-----"
+#define AUTHENTICATION_END	"-----END AUTHENTICATION-----"
 
 
 /* Include files. */
@@ -32,6 +32,9 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
+
+#include <openssl/asn1.h>
+#include <openssl/asn1t.h>
 
 #include <Origin.h>
 #include <HurdLib.h>
@@ -79,6 +82,36 @@ struct NAAAIM_IDtoken_State
 	/* Token key. */
 	Buffer idkey;
 };
+
+
+/**
+ * The following definitions define the ASN1 encoding sequence for
+ * the DER encoding of an identity.
+ * the wire.
+ */
+typedef struct {
+	ASN1_OCTET_STRING *assertion_key;
+	ASN1_OCTET_STRING *assertion_id;
+	ASN1_OCTET_STRING *implementation;
+	ASN1_OCTET_STRING *authentication;
+} asn1_identity;
+
+ASN1_SEQUENCE(asn1_identity) = {
+	ASN1_SIMPLE(asn1_identity, assertion_key,	ASN1_OCTET_STRING),
+	ASN1_SIMPLE(asn1_identity, assertion_id,	ASN1_OCTET_STRING),
+	ASN1_SIMPLE(asn1_identity, implementation,	ASN1_OCTET_STRING),
+	ASN1_SIMPLE(asn1_identity, authentication,	ASN1_OCTET_STRING),
+} ASN1_SEQUENCE_END(asn1_identity)
+
+IMPLEMENT_ASN1_FUNCTIONS(asn1_identity)
+
+#define ASN1_BUFFER_ENCODE(b, e, err) \
+	if ( ASN1_OCTET_STRING_set(e, b->get(b), b->size(b)) != 1 ) \
+		err
+
+#define ASN1_BUFFER_DECODE(b, e, err) \
+	if ( !b->add(b, ASN1_STRING_data(e), ASN1_STRING_length(e)) ) \
+ 		err
 
 
 /**
@@ -277,6 +310,129 @@ static _Bool set_element(CO(IDtoken, this), CO(IDtoken_element, element), \
 	if ( retn == false )
 		S->poisoned = true;
 
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements a method for encoding an identity in
+ * ASN1 format.  The ->decode method reciprocates this operation.
+ *
+ * \param this		The token holding the identity which is to be
+ *			encoded.
+ *
+ * \param output	A Buffer object which holds the encoding of
+ *			the identity.
+ * 
+ * \return		A boolean value is used to indicate the success or
+ *			failure of identity encoding.  A true
+ *			value is used to indicate the identity was
+ *			successfuly encoded.  A failure is indicated by
+ *			a false value.
+ */
+
+static _Bool encode(CO(IDtoken, this), CO(Buffer, bufr))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	int asn_size;
+
+        unsigned char *asn = NULL;
+
+        unsigned char **p = &asn;
+
+	asn1_identity *identity = NULL;
+
+
+	if ( (identity = asn1_identity_new()) == NULL )
+		goto done;
+
+	/* Encode the identity assertion. */
+	ASN1_BUFFER_ENCODE(S->orgkey, identity->assertion_key, goto done);
+	ASN1_BUFFER_ENCODE(S->orgid, identity->assertion_id, goto done);
+
+	/* Encode the identity implementation .*/
+	ASN1_BUFFER_ENCODE(S->ptid, identity->implementation, goto done);
+
+	/* Encode the identity key. */
+	ASN1_BUFFER_ENCODE(S->idkey, identity->authentication, goto done);
+
+	/* Load the ASN1 encoding into the supplied buffer. */
+        asn_size = i2d_asn1_identity(identity, p);
+        if ( asn_size < 0 )
+                goto done;
+	if ( !bufr->add(bufr, asn, asn_size) )
+		goto done;
+
+	retn = true;
+	
+
+ done:
+	if ( identity != NULL )
+		asn1_identity_free(identity);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements a method for decoding an identity which
+ * has been encoded by the ->encode method in ASN1 format.
+ *
+ * \param this		The token which is to be loaded with the decoded
+ *			identity information.
+ *
+ * \param output	A Buffer object which holds the ASN1 encoded
+ *			identity information.
+ * 
+ * \return		A boolean value is used to indicate the success or
+ *			failure of the identity decoding.  A true
+ *			value is used to indicate the identity was
+ *			successfuly decoded.  A failure is indicated by
+ *			a false value.
+ */
+
+static _Bool decode(CO(IDtoken, this), CO(Buffer, bufr))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+        unsigned char *asn = NULL;
+
+        unsigned const char *p = asn;
+
+	asn1_identity *identity = NULL;
+
+
+	p = bufr->get(bufr);
+        if ( !d2i_asn1_identity(&identity, &p, bufr->size(bufr)) )
+                goto done;
+
+	/* Unpack the identity assertion. */
+	ASN1_BUFFER_DECODE(S->orgkey, identity->assertion_key, goto done);
+	ASN1_BUFFER_DECODE(S->orgid, identity->assertion_id, goto done);
+
+	/* Unpack the identity implementation. */
+	ASN1_BUFFER_DECODE(S->ptid, identity->implementation, goto done);
+
+	/* Unpack the identity key. */
+	ASN1_BUFFER_DECODE(S->idkey, identity->authentication, goto done);
+
+	retn = true;
+
+
+ done:
+	if ( identity != NULL )
+		asn1_identity_free(identity);
 	return retn;
 }
 
@@ -636,11 +792,16 @@ extern IDtoken NAAAIM_IDtoken_Init(void)
 	/* Method initialization. */
 	this->get_element = get_element;
 	this->set_element = set_element;
-	this->parse	  = parse;
-	this->matches	  = matches;
-	this->print	  = print;
-	this->reset	  = reset;
-	this->whack	  = whack;
+
+	this->encode = encode;
+	this->decode = decode;
+
+	this->parse	= parse;
+	this->matches	= matches;
+	this->print	= print;
+
+	this->reset = reset;
+	this->whack = whack;
 
 	return this;
 }
