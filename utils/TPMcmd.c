@@ -149,6 +149,9 @@ static _Bool hash(CO(TPMcmd, this), CO(Buffer, bufr))
         unsigned char digest[TCPA_SHA1_160_HASH_LEN];
 
 
+	if ( (bufr == NULL) || bufr->poisoned(bufr) )
+		goto done;
+
 	if ( Trspi_Hash(TSS_HASH_SHA1, bufr->size(bufr), bufr->get(bufr), \
 			digest) != TSS_SUCCESS )
 		goto done;
