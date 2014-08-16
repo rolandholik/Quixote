@@ -8,7 +8,7 @@ CSRC = gen-image.c load-image.c boot.c Netconfig.c IPsec.c PossumPacket.c \
 	SoftwareStatus.c SoftwareTPM.c TPMcmd.c
 
 TOOLS = gen-image load-image boot init possum gen-id-verifier software-status \
-	software-tpm tpm-cmd
+	software-tpm tpm-cmd id-set idmgr
 
 CC = musl-gcc
 
@@ -87,6 +87,12 @@ software-tpm: software-tpm.o SoftwareTPM.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
 tpm-cmd: tpm-cmd.o TPMcmd.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi;
+
+id-set: id-set.o TPMcmd.o ../IDtoken.o ../SHA256_hmac.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi;
+
+idmgr: idmgr.o TPMcmd.o ../IDtoken.o ../SHA256_hmac.o ../SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi;
 
 tags:
