@@ -15,7 +15,9 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 #include <Origin.h>
 #include <HurdLib.h>
@@ -29,10 +31,8 @@
 extern int main(int argc, char *argv[])
 
 {
-	int retn = 1;
-
-	const static char *pwd = "hoot",
-			  *str = "9cfe5319370fe19207093adcfa6a98eb09e39099";
+	int retn = 1,
+	    index;
 
 	Buffer bufr,
 	       key;
@@ -40,43 +40,124 @@ extern int main(int argc, char *argv[])
 	TPMcmd tpmcmd = NULL;
 
 
+	if ( argv[1] == NULL ) {
+		fputs("No TPM command specified.\n", stdout);
+		goto done;
+	}
+
 	INIT(HurdLib, Buffer, bufr, goto done);
+	INIT(HurdLib, Buffer, key, goto done);
 	INIT(NAAAIM, TPMcmd, tpmcmd, goto done);
 
-#if 0
-	if ( !bufr->add_hexstring(bufr, str) )
-		goto done;
-	if ( !tpmcmd->pcr_extend(tpmcmd, 2, bufr) ) {
-		fputs("Failed extend.\n", stderr);
+	if ( strcmp(argv[1], "pcrread") == 0 ) {
+		if ( argv[2] == NULL ) {
+			fputs("No PCR register specified.\n", stderr);
+			goto done;
+		}
+		index = strtol(argv[2], NULL, 10);
+                if ( errno == ERANGE )
+                        goto done;
+                if ( index < 0 )
+                        goto done;
+
+		if ( !tpmcmd->pcr_read(tpmcmd, index, bufr) ) {
+			fputs("Failed PCR read.\n", stderr);
+			goto done;
+		}
+
+		fprintf(stdout, "PCR-%02d: ", index);
+		bufr->print(bufr);
 		goto done;
 	}
-	fputs("Extended PCR:\n", stdout);
-	bufr->hprint(bufr);
 
-	bufr->reset(bufr);
-	if ( !tpmcmd->pcr_read(tpmcmd, 2, bufr) ) {
-		fputs("Failed PCR read.\n", stdout);
-		goto done;
+	if ( strcmp(argv[1], "pcrextend") == 0 ) {
+		if ( argv[2] == NULL ) {
+			fputs("No PCR register specified.\n", stderr);
+			goto done;
+		}
+		index = strtol(argv[2], NULL, 10);
+                if ( errno == ERANGE )
+                        goto done;
+                if ( index < 0 )
+                        goto done;
+
+		if ( argv[3] == NULL ) {
+			fputs("No extension string specified.\n", stderr);
+			goto done;
+		}
+		if ( !bufr->add(bufr, (unsigned char *) argv[3], \
+				strlen(argv[3])) )
+			goto done;
+
+		if ( !tpmcmd->pcr_extend(tpmcmd, index, bufr) ) {
+			fputs("Failed extend.\n", stderr);
+			goto done;
+		}
+		fprintf(stdout, "Extended PCR-%02d: ", index);
+		bufr->print(bufr);
 	}
-	bufr->hprint(bufr);
-#endif
 
-	INIT(HurdLib, Buffer, key, goto done);
-	if ( !key->add(key, (unsigned char *) pwd, strlen(pwd)) )
-		goto done;
-	if ( !bufr->add(bufr, (unsigned char *) "NVRAM area", 10) )
-		goto done;
+	if ( strcmp(argv[1], "nvread") == 0 ) {
+		if ( argv[2] == NULL ) {
+			fputs("No NVram index specified.\n", stderr);
+			goto done;
+		}
+		index = strtol(argv[2], NULL, 0);
+                if ( errno == ERANGE )
+                        goto done;
+                if ( index < 0 )
+                        goto done;
 
-	if ( !tpmcmd->nv_write(tpmcmd, 3, bufr, false, key) )
-		goto done;
-
-	bufr->reset(bufr);
-	if ( !tpmcmd->nv_read(tpmcmd, 3, bufr) ) {
-		fputs("Failed NVREAM read.\n", stdout);
-		goto done;
+		if ( !tpmcmd->nv_read(tpmcmd, index, bufr) ) {
+			fputs("Failed NVREAM read.\n", stdout);
+			goto done;
+		}
+		bufr->hprint(bufr);
 	}
-	bufr->hprint(bufr);
-	
+
+	if ( strcmp(argv[1], "nvwrite") == 0 ) {
+		index = strtol(argv[2], NULL, 0);
+                if ( errno == ERANGE )
+                        goto done;
+                if ( index < 0 )
+                        goto done;
+
+		if ( argv[3] == NULL ) {
+			fputs("No NVram password specified.\n", stderr);
+			goto done;
+		}
+		if ( !key->add(key, (unsigned char *) argv[3], \
+			       strlen(argv[3])) )
+			goto done;
+
+		if ( argv[4] == NULL ) {
+			fputs("No NVram write string specified.\n", stderr);
+			goto done;
+		}
+		if ( !bufr->add(bufr, (unsigned char *) argv[4], \
+				strlen(argv[4])) )
+			goto done;
+
+		if ( !tpmcmd->nv_write(tpmcmd, index, bufr, false, key) ) {
+			fputs("Failed NVram write\n", stderr);
+			goto done;
+		}
+	}
+
+	if ( strcmp(argv[1], "lspcr") == 0 ) {
+		for(index=0; index < 24; ++index) {
+			if ( !tpmcmd->pcr_read(tpmcmd, index, bufr) ) {
+				fputs("Failed PCR read.\n", stderr);
+				goto done;
+			}
+			fprintf(stdout, "PCR-%02d: ", index);
+			bufr->print(bufr);
+			bufr->reset(bufr);
+		}
+	}
+
+	retn = 0;
+
 
  done:
 	WHACK(key);
