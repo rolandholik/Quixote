@@ -247,12 +247,19 @@ static _Bool pcr_extend(CO(TPMcmd, this), const uint32_t index, \
 
 	unsigned char *output;
 
+	Buffer pcr_input = NULL;
+
 
 	if ( (bufr == NULL) || bufr->poisoned(bufr) )
 		goto done;
 
-	if ( Tspi_TPM_PcrExtend(S->tpm, index, bufr->size(bufr), \
-				bufr->get(bufr), NULL, &length,  \
+	INIT(HurdLib, Buffer, pcr_input, goto done);
+	pcr_input->add_Buffer(pcr_input, bufr);
+	if ( !hash(this, pcr_input) )
+		goto done;
+
+	if ( Tspi_TPM_PcrExtend(S->tpm, index, pcr_input->size(pcr_input), \
+				pcr_input->get(pcr_input), NULL, &length,  \
 				&output) != TSS_SUCCESS )
 		goto done;
 
@@ -267,6 +274,8 @@ static _Bool pcr_extend(CO(TPMcmd, this), const uint32_t index, \
  done:
 	if ( !retn )
 		S->poisoned = true;
+	WHACK(pcr_input);
+
 	return retn;
 }
 
