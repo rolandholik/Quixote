@@ -144,11 +144,15 @@ static _Bool _init_tpm_state(CO(TPMcmd_State, S)) {
 static _Bool hash(CO(TPMcmd, this), CO(Buffer, bufr))
 
 {
+	STATE(S);
+
 	_Bool retn = false;
 
         unsigned char digest[TCPA_SHA1_160_HASH_LEN];
 
 
+	if ( S->poisoned )
+		goto done;
 	if ( (bufr == NULL) || bufr->poisoned(bufr) )
 		goto done;
 
@@ -163,6 +167,8 @@ static _Bool hash(CO(TPMcmd, this), CO(Buffer, bufr))
 
 
  done:
+	if ( !retn )
+		S->poisoned = true;
 	return retn;
 }
 
@@ -197,6 +203,8 @@ static _Bool pcr_read(CO(TPMcmd, this), const uint32_t index, CO(Buffer, bufr))
 	unsigned char *output;
 
 
+	if ( S->poisoned )
+		goto done;
 	if ( (bufr == NULL) || bufr->poisoned(bufr) )
 		goto done;
 
@@ -250,6 +258,8 @@ static _Bool pcr_extend(CO(TPMcmd, this), const uint32_t index, \
 	Buffer pcr_input = NULL;
 
 
+	if ( S->poisoned )
+		goto done;
 	if ( (bufr == NULL) || bufr->poisoned(bufr) )
 		goto done;
 
@@ -272,10 +282,10 @@ static _Bool pcr_extend(CO(TPMcmd, this), const uint32_t index, \
 	retn = true;
 
  done:
-	if ( !retn )
-		S->poisoned = true;
 	WHACK(pcr_input);
 
+	if ( !retn )
+		S->poisoned = true;
 	return retn;
 }
 
@@ -338,6 +348,8 @@ static _Bool nv_write(CO(TPMcmd, this), uint32_t index, CO(Buffer, bufr), \
 		    nvram_policy;
 	
 
+	if ( S->poisoned )
+		goto done;
 	if ( (bufr == NULL) || bufr->poisoned(bufr) )
 		goto done;
 
@@ -430,6 +442,8 @@ static _Bool nv_write(CO(TPMcmd, this), uint32_t index, CO(Buffer, bufr), \
 		free(nv_public);
 	}
 
+	if ( !retn )
+		S->poisoned = true;
 	return retn;
 }
 
@@ -470,6 +484,11 @@ static _Bool nv_read(CO(TPMcmd, this), uint32_t index, CO(Buffer, bufr))
 
 	TSS_HNVSTORE nvram = 0;
 
+
+	if ( S->poisoned )
+		goto done;
+	if ( (bufr == NULL) || bufr->poisoned(bufr) )
+		goto done;
 
 	if ( Tspi_Context_CreateObject(S->context, TSS_OBJECT_TYPE_NV, 0, \
 				       &nvram) != TSS_SUCCESS )
@@ -521,6 +540,8 @@ static _Bool nv_read(CO(TPMcmd, this), uint32_t index, CO(Buffer, bufr))
 		free(nv_public);
 	}
 
+	if ( !retn )
+		S->poisoned = true;
 	return retn;
 }
 
