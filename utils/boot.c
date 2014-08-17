@@ -296,7 +296,7 @@ static _Bool load_root(void)
 		goto done;
 
 	if ( system("/sbin/load-image -u 1 -r /mnt/boot/config " \
-		    "-k /mnt/boot/root.pwd -o /dev/hpd1") != 0 ) {
+		    "-t -k /mnt/boot/config.seal -o /dev/hpd1") != 0 ) {
 		fputs("Configuration load failed.\n", stderr);
 		goto done;
 	}
