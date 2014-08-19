@@ -7,8 +7,8 @@
 CSRC = gen-image.c load-image.c boot.c Netconfig.c IPsec.c PossumPacket.c \
 	SoftwareStatus.c SoftwareTPM.c TPMcmd.c
 
-TOOLS = gen-image load-image boot init possum gen-id-verifier software-status \
-	software-tpm tpm-cmd id-set idmgr
+TOOLS = gen-image load-image boot sboot init possum gen-id-verifier \
+	software-status software-tpm tpm-cmd id-set idmgr
 
 CC = musl-gcc
 
@@ -67,6 +67,9 @@ load-image: load-image.o
 		-ltpm_unseal ${SSL_LIBRARY};
 
 boot: boot.o SoftwareStatus.o ../SHA256.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
+
+sboot: sboot.o SoftwareStatus.o Netconfig.o SoftwareTPM.o ../SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
 init: init.o Netconfig.o SoftwareTPM.o
