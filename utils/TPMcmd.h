@@ -32,6 +32,8 @@ struct NAAAIM_TPMcmd
 
 	_Bool (*nv_read)(const TPMcmd, uint32_t, Buffer);
 	_Bool (*nv_write)(const TPMcmd, uint32_t, Buffer, _Bool, Buffer);
+	_Bool (*nv_remove)(const TPMcmd, uint32_t, _Bool, Buffer);
+
 	void (*whack)(const TPMcmd);
 
 	/* Private state. */

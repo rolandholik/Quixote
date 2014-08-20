@@ -549,6 +549,96 @@ static _Bool nv_read(CO(TPMcmd, this), uint32_t index, CO(Buffer, bufr))
 /**
  * External public method.
  *
+ * This method implements the ability to remove an NVram region.
+ *
+ * \param this		A pointer to the TPM object whose NVRAM region is to
+ *			be removed.
+ *
+ * \param index		The index number of the NVRAM region to be removed.
+ *
+ * \param pwd		A String object containing the user password which
+ *			will authenticate the write to the NVram.
+ *
+ * \param key		A boolean object used to signal whether the contents
+ *			of the key_bufr is a key or a byte sequence which is
+ *			to be hashed to yield the authentication key.
+ *
+ * \param key_bufr	A Buffer object containing the data to be used in
+ *			constructing the authentication key.
+ *
+ * \return	If an error is encountered while reading the NVRAM
+ *		region a false value is returned.  If the read is
+ *		successful a true value is returned.
+ */
+
+static _Bool nv_remove(CO(TPMcmd, this), uint32_t index, _Bool key, \
+		       CO(Buffer, key_bufr))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	TSS_FLAG secret_mode;
+
+	TSS_HNVSTORE nvram = 0;
+
+	TSS_HPOLICY tpm_policy,
+		    nvram_policy;
+	
+
+	if ( S->poisoned )
+		goto done;
+	if ( (key_bufr == NULL) || key_bufr->poisoned(key_bufr) )
+		goto done;
+
+	if ( Tspi_Context_CreateObject(S->context, TSS_OBJECT_TYPE_NV, 0, \
+				       &nvram) != TSS_SUCCESS )
+		goto done;
+
+	secret_mode = key ? TSS_SECRET_MODE_SHA1 : TSS_SECRET_MODE_PLAIN;
+
+	if ( Tspi_GetPolicyObject(S->tpm, TSS_POLICY_USAGE, &tpm_policy) !=
+	     TSS_SUCCESS )
+		goto done;
+	if ( Tspi_Policy_SetSecret(tpm_policy, secret_mode,  \
+				   key_bufr->size(key_bufr), \
+				   key_bufr->get(key_bufr)) != TSS_SUCCESS )
+		goto done;
+
+	if ( Tspi_Context_CreateObject(S->context, TSS_OBJECT_TYPE_POLICY, \
+				       TSS_POLICY_USAGE, &nvram_policy) != \
+	     TSS_SUCCESS )
+		goto done;
+	if ( Tspi_Policy_SetSecret(nvram_policy, secret_mode,  \
+				   key_bufr->size(key_bufr),   \
+				   key_bufr->get(key_bufr)) != TSS_SUCCESS )
+		goto done;
+
+	if ( Tspi_Policy_AssignToObject(nvram_policy, nvram) != TSS_SUCCESS )
+		goto done;
+
+
+	if ( Tspi_SetAttribUint32(nvram, TSS_TSPATTRIB_NV_INDEX, 0, index) != \
+	     TSS_SUCCESS )
+		goto done;
+
+	if ( Tspi_NV_ReleaseSpace(nvram) != TSS_SUCCESS )
+		goto done;
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a destructor for a TPMcmd object.
  *
  * \param this	A pointer to the object which is to be destroyed.
@@ -613,6 +703,7 @@ extern TPMcmd NAAAIM_TPMcmd_Init(void)
 
 	this->nv_write	= nv_write;
 	this->nv_read	= nv_read;
+	this->nv_remove	= nv_remove;
 
 	this->whack = whack;
 

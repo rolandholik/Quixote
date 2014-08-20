@@ -144,6 +144,28 @@ extern int main(int argc, char *argv[])
 		}
 	}
 
+	if ( strcmp(argv[1], "nvremove") == 0 ) {
+		index = strtol(argv[2], NULL, 0);
+                if ( errno == ERANGE )
+                        goto done;
+                if ( index < 0 )
+                        goto done;
+
+		if ( argv[3] == NULL ) {
+			fputs("No NVram password specified.\n", stderr);
+			goto done;
+		}
+		if ( !key->add(key, (unsigned char *) argv[3], \
+			       strlen(argv[3])) )
+			goto done;
+
+		if ( !tpmcmd->nv_remove(tpmcmd, index, false, key) ) {
+			fputs("Failed to remove NVram area.\n", stderr);
+			goto done;
+		}
+		fprintf(stdout, "Removed NVram area %0x\n", index);
+	}
+
 	if ( strcmp(argv[1], "lspcr") == 0 ) {
 		for(index=0; index < 24; ++index) {
 			if ( !tpmcmd->pcr_read(tpmcmd, index, bufr) ) {
