@@ -313,7 +313,7 @@ static _Bool load_root(void)
 		fprintf(stderr, "Mount failed: %s\n", strerror(errno));
 		goto done;
 	}
-	if ( system("/sbin/load-image -r /mnt/boot/root " \
+	if ( system("/sbin/load-image -u 1 -r /mnt/boot/root " \
 		    "-t -k /mnt/boot/root.seal -o /dev/hpd0") != 0 )
 		goto done;
 
