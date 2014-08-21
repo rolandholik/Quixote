@@ -338,6 +338,8 @@ static _Bool nv_write(CO(TPMcmd, this), uint32_t index, CO(Buffer, bufr), \
 	size_t write_size,
 	       write_segment;
 
+	TSS_RESULT result;
+
 	TSS_FLAG secret_mode;
 
 	TPM_NV_DATA_PUBLIC *nv_public = NULL;
@@ -416,9 +418,13 @@ static _Bool nv_write(CO(TPMcmd, this), uint32_t index, CO(Buffer, bufr), \
 	while ( write_size > 0 ) {
 		write_segment = (write_size > 1024) ? 1024 : write_size;
 
-		if ( Tspi_NV_WriteValue(nvram, offset, write_segment, \
-					write_ptr) != TSS_SUCCESS )
+		result = Tspi_NV_WriteValue(nvram, offset, write_segment, \
+					    write_ptr);
+		if ( result != TSS_SUCCESS ) {
+			fprintf(stderr, "Failed NVram write: %s\n", \
+				Trspi_Error_String(result));
 			goto done;
+		}
 
 		write_size -= write_segment;
 		offset	   += write_segment;
@@ -480,6 +486,8 @@ static _Bool nv_read(CO(TPMcmd, this), uint32_t index, CO(Buffer, bufr))
 	unsigned char *output,
 		      *nv_output = NULL;
 
+	TSS_RESULT result = TSS_SUCCESS;
+
 	TPM_NV_DATA_PUBLIC *nv_public = NULL;
 
 	TSS_HNVSTORE nvram = 0;
@@ -490,48 +498,61 @@ static _Bool nv_read(CO(TPMcmd, this), uint32_t index, CO(Buffer, bufr))
 	if ( (bufr == NULL) || bufr->poisoned(bufr) )
 		goto done;
 
-	if ( Tspi_Context_CreateObject(S->context, TSS_OBJECT_TYPE_NV, 0, \
-				       &nvram) != TSS_SUCCESS )
+	result = Tspi_Context_CreateObject(S->context, TSS_OBJECT_TYPE_NV, 0, \
+					   &nvram);
+	if ( result != TSS_SUCCESS )
 		goto done;
 
-	if ( Tspi_TPM_GetCapability(S->tpm, TSS_TPMCAP_NV_INDEX,	     \
-				    sizeof(index), (unsigned char *) &index, \
-				    &length, &output) != TSS_SUCCESS )
+	result = Tspi_TPM_GetCapability(S->tpm, TSS_TPMCAP_NV_INDEX,	\
+					sizeof(index),			\
+					(unsigned char *) &index,	\
+					&length, &output);
+	if ( result != TSS_SUCCESS ) {
+		fprintf(stderr, "Failed capability for index: %d\n", index);
 		goto done;
+	}
 
 	if ( (nv_public = malloc(sizeof(TPM_NV_DATA_PUBLIC))) == NULL )
 		goto done;
 
-	if ( Trspi_UnloadBlob_NV_DATA_PUBLIC(&offset, output, NULL) != \
-	     TSS_SUCCESS )
+	result = Trspi_UnloadBlob_NV_DATA_PUBLIC(&offset, output, NULL);
+	if ( result != TSS_SUCCESS )
 		goto done;
 	if ( offset > length )
 		goto done;
 
 	offset = 0;
-	if ( Trspi_UnloadBlob_NV_DATA_PUBLIC(&offset, output, nv_public) != \
-	     TSS_SUCCESS )
+	result = Trspi_UnloadBlob_NV_DATA_PUBLIC(&offset, output, nv_public);
+	if ( result != TSS_SUCCESS )
 		goto done;
 
-	if ( Tspi_SetAttribUint32(nvram, TSS_TSPATTRIB_NV_INDEX, 0, index) != \
-	     TSS_SUCCESS )
+	result = Tspi_SetAttribUint32(nvram, TSS_TSPATTRIB_NV_INDEX, 0, index);
+	if ( result != TSS_SUCCESS ) {
+		fprintf(stdout, "Failed attribute for index: %d\n", index);
 		goto done;
+	}
 
-	if ( Tspi_NV_ReadValue(nvram, 0, &nv_public->dataSize, &nv_output) != \
-	     TSS_SUCCESS )
+	result = Tspi_NV_ReadValue(nvram, 0, &nv_public->dataSize, &nv_output);
+	if ( result != TSS_SUCCESS )
 		goto done;
 	if ( !bufr->add(bufr, nv_output, nv_public->dataSize) )
 		goto done;
 
-	if ( Tspi_Context_FreeMemory(S->context, output) != TSS_SUCCESS ) 
+	result = Tspi_Context_FreeMemory(S->context, output);
+	if ( result != TSS_SUCCESS ) 
 		goto done;
-	if ( Tspi_Context_CloseObject(S->context, nvram) != TSS_SUCCESS )
+	result = Tspi_Context_CloseObject(S->context, nvram);
+	if ( result != TSS_SUCCESS )
 		goto done;
 	     
 	retn = true;
 
 
  done:
+	if ( result != TSS_SUCCESS )
+		fprintf(stderr, "%s[%s] error: %s\n", __FILE__, __func__, \
+			Trspi_Error_String(result));
+
 	if ( nv_output != NULL )
 		free(nv_output);
 	if ( nv_public != NULL ) {

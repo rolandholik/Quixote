@@ -108,10 +108,10 @@ extern int main(int argc, char *argv[])
                 if ( index < 0 )
                         goto done;
 
-		if ( !tpmcmd->nv_read(tpmcmd, index, bufr) ) {
-			fputs("Failed NVREAM read.\n", stdout);
+		if ( !tpmcmd->nv_read(tpmcmd, index, bufr) )
 			goto done;
-		}
+		fprintf(stdout, "Contents of NVram index: 0x%x/%d\n", index, \
+			index);
 		bufr->hprint(bufr);
 	}
 
@@ -138,10 +138,10 @@ extern int main(int argc, char *argv[])
 				strlen(argv[4])) )
 			goto done;
 
-		if ( !tpmcmd->nv_write(tpmcmd, index, bufr, false, key) ) {
-			fputs("Failed NVram write\n", stderr);
+		if ( !tpmcmd->nv_write(tpmcmd, index, bufr, false, key) )
 			goto done;
-		}
+		fprintf(stdout, "Wrote NVram index: 0x%x/%d\n", index, \
+			index);
 	}
 
 	if ( strcmp(argv[1], "nvremove") == 0 ) {
