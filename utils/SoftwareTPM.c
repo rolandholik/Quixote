@@ -134,11 +134,11 @@ static _Bool start(CO(SoftwareTPM, this), const uid_t uid)
 		goto done;
 	if ( setenv("TPM_SERVER_PORT", "1590", 1) != 0 )
 		goto done;
-	if ( setenv("TPM_SERVER_NAME", "localhost", 1) != 0 )
+	if ( setenv("TPM_SERVER_NAME", "127.0.0.1", 1) != 0 )
 		goto done;
 	if ( setenv("TCSD_TCP_DEVICE_PORT", "1590", 1) != 0 )
 		goto done;
-	if ( setenv("TCSD_TCP_DEVICE_HOSTNAME", "localhost", 1) != 0 )
+	if ( setenv("TCSD_TCP_DEVICE_HOSTNAME", "127.0.0.1", 1) != 0 )
 		goto done;
 	if ( setenv("TPM_PATH", "/var/lib/swtpm", 1) != 0 )
 		goto done;
