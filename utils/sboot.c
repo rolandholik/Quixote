@@ -323,11 +323,8 @@ static _Bool load_root(void)
 		goto done;
 	}
 
-	if ( umount("/mnt") != 0 ) {
-		fprintf(stderr, "umount failed: %s\n", strerror(errno));
+	if ( mount("/mnt", "/boot", NULL, MS_MOVE, NULL) == -1 )
 		goto done;
-	}
-
 	retn = true;
 
  done:
@@ -417,6 +414,8 @@ static void switch_root(void)
 {
 	if ( mount("/dev/hpd0", "/mnt", "ext3", 0, NULL) == -1 )
 		return;
+	if ( mount("/boot", "/mnt/mnt", NULL, MS_MOVE, NULL) == -1 )
+		return;
 	if ( chdir("/mnt") == -1 )
 		return;
 
@@ -429,14 +428,10 @@ static void switch_root(void)
 
 	do_mounts(true);
 	mount("securityfs", "/sys/kernel/security", "securityfs", 0, NULL);
+	if ( mount("/dev/hpd1", "/etc/conf", "ext3", 0, NULL) == -1 )
+		return;
 
 	initialize_ima();
-
-	if ( mount("/dev/hpd1", "/etc/conf", "ext3", 0, NULL) == -1 ) {
-		fprintf(stderr, "Configuration mount failed: %s\n", \
-			strerror(errno));
-		return;
-	}
 
 	execl("/sbin/init", "/sbin/init", NULL);
 	return;
