@@ -4,9 +4,9 @@
 
 
 # Variable declarations.
-CSRC = Duct.c OTEDKS.c Curve25519.c
+CSRC = Duct.c OTEDKS.c Curve25519.c IPC.c
 
-TESTS = Duct_test OTEDKS_test Curve25519_test
+TESTS = Duct_test OTEDKS_test Curve25519_test IPC_test
 
 CC = musl-gcc
 
@@ -70,6 +70,9 @@ OTEDKS_test: OTEDKS_test.o OTEDKS.o ../SHA256.o ../IDtoken.o ../SHA256_hmac.o
 
 Curve25519_test: Curve25519_test.o Curve25519.o ../RandomBuffer.o
 	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${SSL_LIBRARY};
+
+IPC_test: IPC_test.o IPC.o
+	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib -lrt;
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};
