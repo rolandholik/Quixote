@@ -17,8 +17,10 @@
 
 
 /* Local defines. */
+#define IDENTITY "/mnt/boot/device.idt"
+
 #define IDENTITY_NV_INDEX 0xbeaf
-#define IDENTITY_PCR 11
+#define IDENTITY_PCR 15
 
 
 /* Include files. */
@@ -28,6 +30,9 @@
 #include <unistd.h>
 #include <string.h>
 #include <signal.h>
+#include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/reboot.h>
 #include <sys/mount.h>
 #include <netinet/in.h>
@@ -47,6 +52,46 @@
 
 /* Static variable definitions. */
 static _Bool Have_SIGUSR1 = false;
+
+
+/**
+ * Private function.
+ *
+ * This function is responsible for checking for the presence of
+ * a device identity on the root filesystem and loading it into
+ * NVram if it is authentic.
+ *
+ * \param identity	The token which contains the implementation of
+ *			the device's identity.
+ *
+ * \return		A false value indicates the identity was not
+ *			properly initialized.  A true value indicates
+ *			the machine identity state is properly initialized.
+ */
+
+static _Bool load_identity(CO(IDtoken, identity))
+
+{
+	_Bool retn = false;
+
+	struct stat idfile;
+
+
+	if ( stat(IDENTITY, &idfile) == -1 ) {
+		if ( errno == ENOENT ) {
+			retn = true;
+			goto done;
+		}
+	}
+
+	if ( system("/sbin/id-set " IDENTITY) != 0 )
+		goto done;
+	retn = true;
+
+
+ done:
+	return retn;
+}
 
 
 /**
@@ -248,8 +293,13 @@ extern int main(int argc, char *argv[])
 
 	INIT(NAAAIM, IDtoken, identity, goto done);
 
+	if ( !load_identity(identity) ) {
+		fputs("Failed identity load.\n", stderr);
+		goto done;
+	}
+
 	if ( !initialize_device_identity(identity) ) {
-		fputs("Failed to initialized identity.\n", stderr);
+		fputs("Failed to initialize identity.\n", stderr);
 		goto done;
 	}
 

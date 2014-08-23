@@ -17,6 +17,8 @@
 
 
 /* Local defines. */
+/* UID of which identity manager is to run under. */
+#define IDMGR_UID 1
 
 
 /* Include files. */
@@ -27,6 +29,8 @@
 #include <string.h>
 #include <sys/reboot.h>
 #include <sys/mount.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
@@ -216,6 +220,63 @@ static _Bool configure_network(void)
 /**
  * Private function.
  *
+ * This function is responsible for starting the identity manager daemon.
+ * The identity manager is run at reduced privilege levels and is
+ * assumed to start, an error is returned if the identity manager
+ * terminates prematurely.
+ *
+ * No arguements are expected by this function.
+ *
+ * \return	If an error is encountered while executing the tunnel
+ *		configuration a false value is returned.  A true value
+ *		indicates the tunnel was successfully configured.
+ */
+
+static _Bool start_identity_manager(void)
+
+{
+	_Bool retn = false;
+
+	int status;
+
+	pid_t idmgr;
+
+
+	if ( (idmgr = fork()) == -1 )
+		goto done;
+
+	/* Child. */
+	if ( idmgr == 0 ) {
+		if ( setuid(IDMGR_UID) == -1 )
+			_exit(1);
+		execl("/sbin/idmgr", "idmgr", NULL);
+		_exit(1);
+	}
+
+	/* Parent, set return status if identity manager is running. */
+	sleep(10);
+	switch ( waitpid(idmgr, &status, WNOHANG) ) {
+		case -1:
+			goto done;
+		case 0:
+			retn = true;
+			break;
+		default:
+			if ( WIFEXITED(status) )
+				fprintf(stdout, "idmgr exit: %d\n", \
+					WEXITSTATUS(status));
+			break;
+	}
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
  * This function is responsible for configuring the internal IPsec tunnel
  * used to transport commands between the two nodes.  The static Mode
  * variable is used to specify the personality type for the connection.
@@ -279,6 +340,10 @@ extern int main(int argc, char *argv[])
 
 	fputs("Starting TPM.\n", stderr);
 	if ( !start_tpm() )
+		goto done;
+
+	fputs("Starting identity manager.\n", stderr);
+	if ( !start_identity_manager() )
 		goto done;
 
 	fputs("Starting internal tunnel.\n", stderr);

@@ -10,6 +10,9 @@
  * for licensing information.
  **************************************************************************/
 
+/* Local defines. */
+#define IDENTITY_NV_INDEX 0xbeaf
+
 
 /* Include files. */
 #include <stdio.h>
@@ -38,6 +41,10 @@
 extern int main(int argc, char *argv[])
 
 {
+	const char * const nvpwd = "hoot";
+
+	const char * const nvcmd = "tpm_nvdefine -z -p OWNERWRITE -s 366 -r 10 -r 15 -i 0xbeaf -o hoot 2>&1 >/dev/null";
+
 	int retn = 1;
 
 	FILE *idt = NULL;
@@ -66,9 +73,27 @@ extern int main(int argc, char *argv[])
 	if ( !token->encode(token, id) )
 		goto done;
 
-	pwd->add(pwd, (unsigned char *) "hoot", 4);
-	if ( !cmd->nv_write(cmd, 0xbeaf, id, false, pwd) )
+	/*
+	 * For now assume that the NVram index has been created but
+	 * needs to be updated for the new identity.
+	 */
+	if ( !pwd->add(pwd, (unsigned char *) nvpwd, strlen(nvpwd)) )
 		goto done;
+
+	if ( !cmd->nv_remove(cmd, IDENTITY_NV_INDEX, false, pwd) ) {
+		fputs("Failed to remove NVram region.\n", stderr);
+		goto done;
+	}
+
+	if ( system(nvcmd) != 0 ) {
+		fputs("Failed to define NVram region.\n", stderr);
+		goto done;
+	}
+
+	if ( !cmd->nv_write(cmd, 0xbeaf, id, false, pwd) ) {
+		fputs("Failed NVram update.\n", stderr);
+		goto done;
+	}
 
 	retn = 0;
 
