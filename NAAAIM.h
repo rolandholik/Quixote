@@ -45,3 +45,4 @@
 #define NAAAIM_SoftwareStatus_OBJID	24
 #define NAAAIM_SoftwareTPM_OBJID	25
 #define NAAAIM_TPMcmd_OBJID		26
+#define NAAAIM_IDmgr_OBJID		27

@@ -5,7 +5,7 @@
 
 # Variable declarations.
 CSRC = gen-image.c load-image.c boot.c Netconfig.c IPsec.c PossumPacket.c \
-	SoftwareStatus.c SoftwareTPM.c TPMcmd.c
+	SoftwareStatus.c SoftwareTPM.c TPMcmd.c IDmgr.c
 
 TOOLS = gen-image load-image boot sboot init possum gen-id-verifier \
 	software-status software-tpm tpm-cmd id-set idmgr
@@ -42,7 +42,7 @@ LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib -L../lib -L../HurdLib
 #
 COBJS = ${CSRC:.c=.o}
 
-LIBS = -lHurdLib -lNAAAIM
+LIBS = -lNAAAIM -lHurdLib 
 
 CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I${SSL_INCLUDE} \
 	-I${MUSL_INCLUDE}/tpm_tools -I${MUSL_INCLUDE}/tss
@@ -95,7 +95,10 @@ tpm-cmd: tpm-cmd.o TPMcmd.o
 id-set: id-set.o TPMcmd.o ../IDtoken.o ../SHA256_hmac.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi;
 
-idmgr: idmgr.o TPMcmd.o ../IDtoken.o ../SHA256_hmac.o ../SHA256.o
+idmgr: idmgr.o TPMcmd.o IDmgr.o ../IDtoken.o ../SHA256_hmac.o ../SHA256.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi;
+
+idtest: idtest.o IDmgr.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi;
 
 tags:
@@ -108,6 +111,7 @@ clean:
 # Source dependencies.
 Netconfig.o: Netconfig.h
 IPsec.o: IPsec.h
+IDmgr.o: IDmgr.h TPMcmd.h ../IDtoken.h ../SHA256.h
 
 possum.o: Netconfig.h IPsec.h PossumPacket.h ../IDtoken.h ../SHA256_hmac.h \
 	../RandomBuffer.h ../AES256_cbc.h ../SHA256.h

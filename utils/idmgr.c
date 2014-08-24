@@ -48,10 +48,14 @@
 #include <SHA256.h>
 
 #include "TPMcmd.h"
+#include "IDmgr.h"
 
 
 /* Static variable definitions. */
-static _Bool Have_SIGUSR1 = false;
+struct {
+	_Bool sigusr1;
+	_Bool sigint;
+} signals;
 
 
 /**
@@ -212,6 +216,7 @@ static _Bool reduce_identity(CO(IDtoken, identity))
 
 
  done:
+	WHACK(sha256);
 	WHACK(orgkey);
 	WHACK(orgid);
 	WHACK(idkey);
@@ -223,16 +228,24 @@ static _Bool reduce_identity(CO(IDtoken, identity))
 /**
  * Private function.
  *
- * This function implements the SIGUSR1 handler for the identity_manager
- * main process.  It simply sets the global Have_SIGUSR1 to true and
- * returns.
+ * This function implements the signal handler for the utility.  It
+ * sets the signal type in the signals structure.
+ *
+ * \param signal	The number of the signal which caused the
+ *			handler to execute.
  */
 
-void sigusr1_handler(int sig)
+void signal_handler(int signal)
 
 {
-	if ( sig == SIGUSR1 )
-		Have_SIGUSR1 = true;
+	switch ( signal ) {
+		case SIGUSR1:
+			signals.sigusr1 = true;
+			break;
+		case SIGINT:
+			signals.sigint = true;
+			break;
+	}
 
 	return;
 }
@@ -259,22 +272,37 @@ static void identity_manager(CO(IDtoken, identity))
 {
 	struct sigaction signal_action;
 
+	IDmgr idmgr = NULL;
 
-	signal_action.sa_handler = sigusr1_handler;
+	Buffer idhash,
+	       idkey;
 
+
+	INIT(NAAAIM, IDmgr, idmgr, goto done);
+	if ( !idmgr->setup(idmgr) )
+		goto done;
+
+	signal_action.sa_handler = signal_handler;
 	if ( sigaction(SIGUSR1, &signal_action, NULL) == -1 )
+		goto done;
+	if ( sigaction(SIGINT, &signal_action, NULL) == -1 )
 		goto done;
 
 	while ( 1 ) {
 		pause();
-		if ( !Have_SIGUSR1 )
-			continue;
-		fputs("\n\nProcessing identity request.\n", stderr);
-		identity->print(identity);
-		Have_SIGUSR1 = false;
+		if ( signals.sigint )
+			goto done;
+
+		idhash = identity->get_element(identity, IDtoken_id);
+		idkey  = identity->get_element(identity, IDtoken_key);
+		if ( !idmgr->set_id_key(idmgr, idhash, idkey) )
+			goto done;
+		signals.sigint = false;
 	}
 
  done:
+	WHACK(idmgr);
+
 	return;
 }
 
