@@ -327,6 +327,7 @@ static _Bool load_root(void)
 		goto done;
 	retn = true;
 
+
  done:
 	WHACK(root);
 
@@ -427,11 +428,22 @@ static void switch_root(void)
 		return;
 
 	do_mounts(true);
-	mount("securityfs", "/sys/kernel/security", "securityfs", 0, NULL);
+
+	if ( mount("securityfs", "/sys/kernel/security", "securityfs", 0, \
+		   NULL) == -1 )
+		return;
+	if ( mount("shm", "/dev/shm", "tmpfs", 0, NULL) == -1 )
+		return;
 	if ( mount("/dev/hpd1", "/etc/conf", "ext3", 0, NULL) == -1 )
 		return;
 
 	initialize_ima();
+
+	if ( mount("/dev/hpd1", "/etc/conf", "ext3", 0, NULL) == -1 ) {
+		fprintf(stderr, "Configuration mount failed: %s\n", \
+			strerror(errno));
+		return;
+	}
 
 	execl("/sbin/init", "/sbin/init", NULL);
 	return;
