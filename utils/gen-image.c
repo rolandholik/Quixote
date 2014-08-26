@@ -111,6 +111,10 @@ static _Bool load_keys(CO(char *, fname), CO(Buffer, iv), CO(Buffer, key))
  * \param payload	A Buffer object containing the encrypted
  *			filesystem image.
  *
+ * \param iv		A Buffer object containing the initialization
+ *			vector which is being used.  This is used
+ *			to shroud the encryption header.
+ *
  * \param key		A Buffer object containing the encryption
  *			key used for the payload.
  *
@@ -123,14 +127,17 @@ static _Bool load_keys(CO(char *, fname), CO(Buffer, iv), CO(Buffer, key))
  *			failure is indicated with a false value.
  */
 
-static _Bool generate_payload(CO(Buffer, payload), CO(Buffer, key), \
-			      CO(Buffer, output))
+static _Bool generate_payload(CO(Buffer, payload), CO(Buffer, iv), \
+			      CO(Buffer, key), CO(Buffer, output))
 {
 	_Bool retn = false;
 
-	unsigned char *field;
+	unsigned char *ivp,
+		      *field;
 
 	uint32_t size;
+
+	size_t lp;
 
 	Buffer mac;
 
@@ -151,7 +158,11 @@ static _Bool generate_payload(CO(Buffer, payload), CO(Buffer, key), \
 	field = output->get(output);
 	*(uint32_t *)(field+FIELD_OFFSET) = size;
 
-	output->add(output, payload->get(payload), payload->size(payload));
+	ivp = iv->get(iv);
+	for(lp= 0; lp < iv->size(iv); ++lp)
+		*(field + lp) ^= *(ivp + lp);
+
+	output->add_Buffer(output, payload);
 
 	fprintf(stderr, "Input to mac: %zu\n", output->size(output));
 	hmac->add_Buffer(hmac, output);
@@ -244,7 +255,7 @@ extern int main(int argc, char *argv[])
 	fprintf(stdout, "Cipher size: %zu\n", encrypted->size(encrypted));
 
 	image->reset(image);
-	generate_payload(encrypted, key, image);
+	generate_payload(encrypted, iv, key, image);
 
 	file->reset(file);
 	file->open_rw(file, output);

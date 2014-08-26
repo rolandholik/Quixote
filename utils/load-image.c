@@ -205,6 +205,10 @@ static _Bool load_tpm_keys(char * fname, CO(Buffer, iv), CO(Buffer, key), \
  * \param image		A Buffer object into which the encrypted
  *			filesystem image is to be loaded.
  *
+ * \param iv		A Buffer object containing the initialization
+ *			vector being used for the encryption.  This
+ *			is used to shroud the image header.
+ *
  * \param key		A Buffer object containing the key which will
  *			be used to authenticated the checksum on
  *			the image.
@@ -221,13 +225,18 @@ static _Bool load_tpm_keys(char * fname, CO(Buffer, iv), CO(Buffer, key), \
  */
 
 static _Bool load_image(const char * const fname, CO(Buffer, image), \
-			CO(Buffer, key), uid_t uid)
+			CO(Buffer, iv), CO(Buffer, key), uid_t uid)
 
 {
 	_Bool retn	 = false,
 	      changed_id = false;
 
+	unsigned char *ivp,
+		      *hp;
+
 	uint32_t size;
+
+	size_t lp;
 
 	off_t eof,
 	      offset;
@@ -255,7 +264,15 @@ static _Bool load_image(const char * const fname, CO(Buffer, image), \
 		goto done;
 
 	file->read_Buffer(file, checksum, HEADER_SIZE);
+
+	hp  = checksum->get(checksum);
+	ivp = iv->get(iv);
+
+	for(lp= 0; lp < iv->size(iv); ++lp)
+		*(hp + lp) ^= *(ivp + lp);
 	size = ntohl(*(uint32_t *)(checksum->get(checksum) + FIELD_OFFSET));
+	for(lp= 0; lp < iv->size(iv); ++lp)
+		*(hp + lp) ^= *(ivp + lp);
 
 	eof = file->seek(file, -1);
 	offset = eof - CHECKSUM_SIZE - size;
@@ -447,7 +464,7 @@ extern int main(int argc, char *argv[])
 		}
 	}
 
-	if ( !load_image(boot_image, image, key, uid) ) {
+	if ( !load_image(boot_image, image, iv, key, uid) ) {
 		fputs("Cannot load filesystem image.\n", stderr);
 		goto done;
 	}
