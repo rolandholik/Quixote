@@ -30,6 +30,9 @@ struct NAAAIM_IDmgr
 	_Bool (*get_id_key)(const IDmgr, const Buffer, const Buffer);
 	_Bool (*set_id_key)(const IDmgr, const Buffer, const Buffer);
 
+	_Bool (*set_idtoken)(const IDmgr, const IDtoken);
+	_Bool (*get_idtoken)(const IDmgr, const IDtoken);
+
 	void (*whack)(const IDmgr);
 
 	/* Private state. */

@@ -15,6 +15,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
@@ -25,6 +26,7 @@
 #include <Buffer.h>
 
 #include "NAAAIM.h"
+#include "IDtoken.h"
 #include "IPC.h"
 #include "IDmgr.h"
 
@@ -67,6 +69,9 @@ struct IDmgr_ipc
 	pid_t pid;
 
 	_Bool valid;
+
+	unsigned char assertion_key[NAAAIM_IDSIZE],
+		      assertion_id[NAAAIM_IDSIZE];
 
 	unsigned char idkey[NAAAIM_IDSIZE];
 
@@ -178,6 +183,146 @@ static _Bool attach(CO(IDmgr, this))
 /**
  * External public method.
  *
+ * This method an accessor method for sending an identity being held
+ * under management.
+ *
+ * \param this		A pointer to the identity manager object which
+ *			is sending the identity
+ *
+ * \param token		The IDtoken object containing the identity
+ *			which is to be sent.
+ *
+ * \return		A true value is returned if the identity was
+ *			successfully conveyed.  A false value
+ *			indicates the identity was conveyed.
+ */
+
+static _Bool set_idtoken(CO(IDmgr, this), CO(IDtoken, token))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	struct IDmgr_ipc *ipc;
+
+	Buffer b;
+
+
+	if ( S->poisoned )
+		goto done;
+	if ( token == NULL )
+		goto done;
+
+	ipc = S->ipc->get(S->ipc);
+
+	b = token->get_element(token, IDtoken_orgkey);
+	memcpy(ipc->assertion_key, b->get(b), b->size(b));
+	b = token->get_element(token, IDtoken_orgid);
+	memcpy(ipc->assertion_id, b->get(b), b->size(b));
+
+	b = token->get_element(token, IDtoken_id);
+	memcpy(ipc->idhash, b->get(b), b->size(b));
+
+	b = token->get_element(token, IDtoken_key);
+	memcpy(ipc->idkey, b->get(b), b->size(b));
+
+	ipc->valid = true;
+	retn = true;
+
+	
+ done:
+	if ( !retn )
+		S->poisoned = true;
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements an accessor method for obtaining an identity
+ * from the identity manager.
+ *
+ * \param this		A pointer to the identity manager object which
+ *			is requesting the identity.
+ *
+ * \param token		The IDtoken object which will be loaded with
+ *			the identity obtained from the broker.
+ *
+ * \return		A true value is returned if the query for the
+ *			identity was successful.  A false value indicated
+ *			the request failed.
+ */
+
+static _Bool get_idtoken(CO(IDmgr, this), CO(IDtoken, token))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	struct IDmgr_ipc *ipc;
+
+	Buffer b = NULL;
+
+
+	if ( S->poisoned )
+		goto done;
+	if ( token == NULL )
+		goto done;
+
+
+	INIT(HurdLib, Buffer, b, goto done);
+
+	ipc = S->ipc->get(S->ipc);
+	if ( !S->ipc->lock(S->ipc) )
+		goto done;
+
+	ipc->valid = false;
+	kill(ipc->pid, SIGUSR1);
+	while ( !ipc->valid )
+		continue;
+
+	b->add(b, ipc->assertion_key, sizeof(ipc->assertion_key));
+	if ( !token->set_element(token, IDtoken_orgkey, b) )
+		goto done;
+	b->reset(b);
+	b->add(b, ipc->assertion_id, sizeof(ipc->assertion_id));
+	if ( !token->set_element(token, IDtoken_orgid, b) )
+		goto done;
+
+	b->reset(b);
+	b->add(b, ipc->idhash, sizeof(ipc->idhash));
+	if ( !token->set_element(token, IDtoken_id, b) )
+		goto done;
+
+	b->reset(b);
+	b->add(b, ipc->idkey, sizeof(ipc->idkey));
+	if ( !token->set_element(token, IDtoken_key, b) )
+		goto done;
+
+	if ( !S->ipc->unlock(S->ipc) )
+		goto done;
+	retn = true;
+	
+
+ done:
+	WHACK(b);
+	memset(ipc->assertion_key, '\0', sizeof(ipc->assertion_key));	
+	memset(ipc->assertion_id, '\0', sizeof(ipc->assertion_id));	
+	memset(ipc->idhash, '\0', sizeof(ipc->idhash));	
+	memset(ipc->idkey, '\0', sizeof(ipc->idkey));	
+
+	if ( !retn )
+		S->poisoned = true;
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method an accessor method for returning the hash of the
  * identity implementation and the identity authentication element.
  * The primary consumer of this is generation of an OTEDKS key.
@@ -223,18 +368,19 @@ static _Bool get_id_key(CO(IDmgr, this), CO(Buffer, idhash), CO(Buffer, idkey))
 	while ( !ipc->valid )
 		continue;
 
-	if ( !S->ipc->unlock(S->ipc) )
-		goto done;
-
 	if ( !idhash->add(idhash, ipc->idhash, sizeof(ipc->idhash)) )
 		goto done;
 	if ( !idkey->add(idkey, ipc->idkey, sizeof(ipc->idkey)) )
 		goto done;
 
+	if ( !S->ipc->unlock(S->ipc) )
+		goto done;
 	retn = true;
 	
 
  done:
+	memset(ipc, '\0', sizeof(struct IDmgr_ipc));	
+
 	if ( !retn )
 		S->poisoned = true;
 	return retn;
@@ -355,6 +501,9 @@ extern IDmgr NAAAIM_IDmgr_Init(void)
 	/* Method initialization. */
 	this->setup  = setup;
 	this->attach = attach;
+
+	this->set_idtoken = set_idtoken;
+	this->get_idtoken = get_idtoken;
 
 	this->get_id_key = get_id_key;
 	this->set_id_key = set_id_key;

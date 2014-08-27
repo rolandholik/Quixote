@@ -274,9 +274,6 @@ static void identity_manager(CO(IDtoken, identity))
 
 	IDmgr idmgr = NULL;
 
-	Buffer idhash,
-	       idkey;
-
 
 	INIT(NAAAIM, IDmgr, idmgr, goto done);
 	if ( !idmgr->setup(idmgr) )
@@ -293,9 +290,7 @@ static void identity_manager(CO(IDtoken, identity))
 		if ( signals.sigint )
 			goto done;
 
-		idhash = identity->get_element(identity, IDtoken_id);
-		idkey  = identity->get_element(identity, IDtoken_key);
-		if ( !idmgr->set_id_key(idmgr, idhash, idkey) )
+		if ( !idmgr->set_idtoken(idmgr, identity) )
 			goto done;
 		signals.sigint = false;
 	}
