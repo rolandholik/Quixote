@@ -98,7 +98,7 @@ id-set: id-set.o TPMcmd.o ../IDtoken.o ../SHA256_hmac.o
 idmgr: idmgr.o TPMcmd.o IDmgr.o ../IDtoken.o ../SHA256_hmac.o ../SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi;
 
-idtest: idtest.o IDmgr.o
+idtest: idtest.o IDmgr.o ../IDtoken.o ../SHA256_hmac.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi;
 
 tags:
