@@ -75,7 +75,7 @@ sboot: sboot.o SoftwareStatus.o Netconfig.o SoftwareTPM.o ../SHA256.o
 init: init.o Netconfig.o SoftwareTPM.o SoftwareStatus.o TPMcmd.o ../SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl -ltspi;
 
-possum: possum.o Netconfig.o IPsec.o PossumPacket.o SoftwareStatus.o
+possum: possum.o Netconfig.o IPsec.o PossumPacket.o SoftwareStatus.o IDmgr.o
 	${CC} ${LDFLAGS} -o $@ $^ ../IDtoken.o ../SHA256_hmac.o ../SHA256.o \
 		../RandomBuffer.o ../AES256_cbc.o ${SSL_LIBRARY} ${LIBS} -lfl;
 

@@ -53,6 +53,8 @@
 #include <arpa/inet.h>
 
 #include "Netconfig.h"
+#include "IDtoken.h"
+#include "IDmgr.h"
 #include "IPsec.h"
 #include "PossumPacket.h"
 #include "SoftwareStatus.h"
@@ -718,8 +720,7 @@ static _Bool host_mode(CO(Config, cfg))
 {
 	_Bool retn = false;
 
-	char *cfg_item,
-	     *identity;
+	char *cfg_item;
 
 	uint32_t tspi,
 		 spi,
@@ -745,6 +746,8 @@ static _Bool host_mode(CO(Config, cfg))
 	PossumPacket packet = NULL;
 
 	Curve25519 dhkey = NULL;
+
+	IDmgr idmgr = NULL;
 
 
 	/* Get current software status. */
@@ -772,9 +775,7 @@ static _Bool host_mode(CO(Config, cfg))
 	netbufr->hprint(netbufr);
 	fputc('\n', stdout);
 
-	/* Set our identity and lookup the client identity. */
-	if ( (identity = cfg->get(cfg, "identity")) == NULL )
-		goto done;
+	/* Lookup the client identity. */
 	if ( (cfg_item = cfg->get(cfg, "client_list")) == NULL )
 		goto done;
 
@@ -794,6 +795,7 @@ static _Bool host_mode(CO(Config, cfg))
 	if ( (cfg_item = cfg->get(cfg, "software")) == NULL )
 		goto done;
 	software->add_hexstring(software, cfg_item);
+
 	INIT(NAAAIM, PossumPacket, packet, goto done);
 	if ( !packet->decode_packet1(packet, token, software, netbufr) )
 		goto done;
@@ -823,10 +825,10 @@ static _Bool host_mode(CO(Config, cfg))
 	dhkey->generate(dhkey);
 
 	/* Compose and send a reply packet. */
-	if ( (token_file = fopen(identity, "r")) == NULL )
-		goto done;
 	token->reset(token);
-	if ( !token->parse(token, token_file) )
+	INIT(NAAAIM, IDmgr, idmgr, goto done);
+	idmgr->attach(idmgr);
+	if ( !idmgr->get_idtoken(idmgr, token) )
 		goto done;
 	
 	packet->reset(packet);
@@ -900,6 +902,7 @@ static _Bool host_mode(CO(Config, cfg))
 	WHACK(dhkey);
 	WHACK(shared_key);
 	WHACK(remote_ip);
+	WHACK(idmgr);
 
 	return retn;
 }
@@ -971,6 +974,8 @@ static _Bool client_mode(CO(Config, cfg))
 	       bufr	  = NULL,
 	       shared_key = NULL;
 
+	IDmgr idmgr = NULL;
+
 	IDtoken token = NULL;
 
 	Curve25519 dhkey = NULL;
@@ -980,12 +985,13 @@ static _Bool client_mode(CO(Config, cfg))
 
 	/* Load identity token. */
 	INIT(NAAAIM, IDtoken, token, goto done);
-	if ( (cfg_item = cfg->get(cfg, "identity")) == NULL )
+	INIT(NAAAIM, IDmgr, idmgr, goto done);
+
+	idmgr->attach(idmgr);
+	if ( !idmgr->get_idtoken(idmgr, token) ) {
+		fputs("Failed to obtain identity token.\n", stderr);
 		goto done;
-	if ( (token_file = fopen(cfg_item, "r")) == NULL )
-		goto done;
-	if ( !token->parse(token, token_file) )
-		goto done;
+	}
 
 	/* Setup a connection to the remote host. */
 	if ( (remote_ip = cfg->get(cfg, "remote_ip")) == NULL )
@@ -1094,6 +1100,7 @@ static _Bool client_mode(CO(Config, cfg))
 	WHACK(nonce);
 	WHACK(software);
 	WHACK(bufr);
+	WHACK(idmgr);
 	WHACK(token);
 	WHACK(dhkey);
 	WHACK(packet);

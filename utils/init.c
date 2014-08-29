@@ -27,10 +27,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <errno.h>
 #include <sys/reboot.h>
 #include <sys/mount.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
@@ -235,11 +237,15 @@ static _Bool configure_network(void)
 static _Bool start_identity_manager(void)
 
 {
-	_Bool retn = false;
+	_Bool waiting = true,
+	      retn    = false;
 
-	int status;
+	int status,
+	    tries = 0;
 
 	pid_t idmgr;
+
+	struct stat idmgr_stat;
 
 
 	if ( (idmgr = fork()) == -1 )
@@ -254,7 +260,13 @@ static _Bool start_identity_manager(void)
 	}
 
 	/* Parent, set return status if identity manager is running. */
-	sleep(10);
+	while ( waiting && (tries++ < 10) ) {
+		if ( stat("/dev/shm/IDmgr", &idmgr_stat) == 0 )
+			waiting = false;
+		else if ( errno == ENOENT )
+			sleep(2);
+	}
+
 	switch ( waitpid(idmgr, &status, WNOHANG) ) {
 		case -1:
 			goto done;
