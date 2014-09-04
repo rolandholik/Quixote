@@ -26,6 +26,9 @@
 #define HOST_SPI_ARENA		0x20000
 #define RESERVE_SPI_ARENA	0x30000
 
+#define REPLAY_NONCE	32
+#define QUOTE_NONCE	20
+
 
 /* Include files. */
 #include <stdint.h>
@@ -735,6 +738,7 @@ static _Bool host_mode(CO(Config, cfg))
 	Buffer b,
 	       netbufr		= NULL,
 	       nonce		= NULL,
+	       quote_nonce	= NULL,
 	       software		= NULL,
 	       public		= NULL,
 	       shared_key	= NULL;
@@ -803,16 +807,20 @@ static _Bool host_mode(CO(Config, cfg))
 	packet->print(packet);
 	fputc('\n', stdout);
 
+	/* Extract the replay and quote nonces. */
+	INIT(HurdLib, Buffer, nonce, goto done);
+	INIT(HurdLib, BUffer, quote_none, goto done);
+	if ( (b = packet->get_element(packet, PossumPacket_nonce)) == NULL )
+		goto done;
+	if ( !nonce->add(nonce, b->get(b), REPLAY_NONCE) )
+		goto done;
+	if ( !quote_nonce->add(quote_nonce, b->get(b) + REPLAY_NONCE, \
+			       QUOTE_NONCE) )
+		goto done;
+
 	/* Verify hardware quote. */
 
 	/* Verify protocol. */
-
-	/* Save the client provided nonce and public key. */
-	INIT(HurdLib, Buffer, nonce, goto done);
-	if ( (b = packet->get_element(packet, PossumPacket_nonce)) == NULL )
-		goto done;
-	if ( !nonce->add_Buffer(nonce, b) )
-		goto done;
 
 	INIT(HurdLib, Buffer, public, goto done);
 	if ( (b = packet->get_element(packet, PossumPacket_public)) == NULL )
@@ -895,6 +903,7 @@ static _Bool host_mode(CO(Config, cfg))
 	WHACK(duct);
 	WHACK(netbufr);
 	WHACK(nonce);
+	WHACK(quote_nonce);
 	WHACK(software);
 	WHACK(public);
 	WHACK(token);

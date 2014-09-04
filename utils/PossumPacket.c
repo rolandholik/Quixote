@@ -13,6 +13,9 @@
 /* Local defines. */
 #define BIRTHDATE 1396167420
 
+#define REPLAY_NONCE	32
+#define QUOTE_NONCE	20
+
 
 /* Include files. */
 #include <stdint.h>
@@ -113,8 +116,8 @@ struct NAAAIM_PossumPacket_State
 	/**
 	 * The object holding the nonce's which will be used.  A total
 	 * of 64 bytes will be generated, 32 bytes will be used to
-	 * protect against a reply and 32 will be used for the hardware
-	 * quote.
+	 * protect against a replay and 20 will be used for the device
+	 * status quote.
 	 */
 	Buffer nonce;
 
@@ -327,8 +330,8 @@ static _Bool create_packet1(CO(PossumPacket, this), CO(IDtoken, token),
 	if ( !S->identity->add_Buffer(S->identity, hmac->get_Buffer(hmac)) )
 		goto done;
 
-	/* Add 32 bytes for the replay nonce. */
-	rnd->generate(rnd, 32);
+	/* Add 32 + 20 bytes for the replay and quote nonce. */
+	rnd->generate(rnd, REPLAY_NONCE + QUOTE_NONCE);
 	if ( !S->nonce->add_Buffer(S->nonce, rnd->get_Buffer(rnd)) )
 		goto done;
 
