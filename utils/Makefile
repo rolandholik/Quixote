@@ -89,7 +89,7 @@ software-status: software-status.o SoftwareStatus.o
 software-tpm: software-tpm.o SoftwareTPM.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
-tpm-cmd: tpm-cmd.o TPMcmd.o
+tpm-cmd: tpm-cmd.o TPMcmd.o ../RandomBuffer.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi;
 
 id-set: id-set.o TPMcmd.o ../IDtoken.o ../SHA256_hmac.o

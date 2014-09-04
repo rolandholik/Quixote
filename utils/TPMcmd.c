@@ -660,6 +660,135 @@ static _Bool nv_remove(CO(TPMcmd, this), uint32_t index, _Bool key, \
 /**
  * External public method.
  *
+ * This method implements the generation of a machine status quote
+ * based on a nonce provided by the validating system.
+ *
+ * \param this	A pointer to the TPM object which will generate the
+ *		nonce.
+ *
+ * \param uuid	A Buffer object containing the UUID of the attestation
+ *		identity key.
+ *
+ * \param quote	A Buffer object which serves dual purposes.  When
+ *		called this method expects the Buffer object to
+ *		contain the nonce which will be used to generate the
+ *		quote.  If generation of the quote is successful the
+ *		object is reset and loaded with the generated quote.
+ *
+ * \return	If an error is encountered while generating the quote
+ *		a false value is returned.  If the quote Buffer contains
+ *		a valid quote a true value is returned.
+ */
+
+static _Bool quote(CO(TPMcmd, this), CO(Buffer, key_uuid), CO(Buffer, quote))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	char *locn = NULL;
+
+	unsigned char *version_info,
+		       all_zeros[] = TSS_WELL_KNOWN_SECRET;
+
+	UINT32 version_length;
+
+	TSS_RESULT result = TSS_SUCCESS;
+
+	TSS_VALIDATION nonce;
+
+	TSS_UUID *aik_uuid,
+		 srk_uuid = {0, 0, 0, 0, 0, {0, 0, 0, 0, 0, 1}};
+
+	TSS_HKEY srk,
+		 quote_key;
+
+	TSS_HPOLICY srk_policy;
+
+	TSS_HPCRS pcr_set;
+
+
+	nonce.ulExternalDataLength  = quote->size(quote);
+	nonce.rgbExternalData = quote->get(quote);
+
+	/* Load the attestation identity key via the storage root key. */
+	result = Tspi_Context_LoadKeyByUUID(S->context, TSS_PS_TYPE_SYSTEM, \
+					    srk_uuid, &srk);
+	if ( result != TSS_SUCCESS ) {
+		locn = "SRK keyload";
+		goto done;
+	}
+
+	result = Tspi_GetPolicyObject(srk, TSS_POLICY_USAGE, &srk_policy);
+	if ( result != TSS_SUCCESS ) {
+		locn = "SRK policy creation";
+		goto done;
+	}
+
+	result = Tspi_Policy_SetSecret(srk_policy, TSS_SECRET_MODE_SHA1, \
+				       sizeof(all_zeros), all_zeros);
+	if ( result != TSS_SUCCESS ) {
+		locn = "SRK password set";
+		goto done;
+	}
+
+	aik_uuid = (TSS_UUID *) key_uuid->get(key_uuid);
+	result = Tspi_Context_LoadKeyByUUID(S->context, TSS_PS_TYPE_SYSTEM, \
+					    *aik_uuid, &quote_key);
+	if ( result != TSS_SUCCESS ) {
+		locn = "Loading AIK key";
+		goto done;
+	}
+
+
+	/* Compute the platform configuration register status. */
+	result =  Tspi_Context_CreateObject(S->context, TSS_OBJECT_TYPE_PCRS, \
+					    TSS_PCRS_STRUCT_INFO_SHORT,       \
+					    &pcr_set);
+	if ( result != TSS_SUCCESS ) {
+		locn = "Creating PCR object.";
+		goto done;
+	}
+
+	locn = "Creating PCR";
+	result = Tspi_PcrComposite_SelectPcrIndexEx(pcr_set, 10, \
+						   TSS_PCRS_DIRECTION_RELEASE);
+	if ( result != TSS_SUCCESS )
+		goto done;
+	result = Tspi_PcrComposite_SelectPcrIndexEx(pcr_set, 11, \
+						   TSS_PCRS_DIRECTION_RELEASE);
+	if ( result != TSS_SUCCESS )
+		goto done;
+
+
+	/* Obtain the quote. */
+	result = Tspi_TPM_Quote2(S->tpm, quote_key, false, pcr_set, &nonce, \
+				 &version_length, &version_info);
+	if ( result != TSS_SUCCESS ) {
+		locn = "Obtaining quote";
+		goto done;
+	}
+		
+	fprintf(stderr, "quote length: %d\n", nonce.ulValidationDataLength);
+	quote->reset(quote);
+	if ( quote->add(quote, nonce.rgbValidationData, \
+			nonce.ulValidationDataLength) )
+		retn = true;
+
+
+ done:
+	if ( result != TSS_SUCCESS )
+		fprintf(stderr, "%s[%s] %s: %s\n", __FILE__, __func__, locn, \
+			Trspi_Error_String(result));
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a destructor for a TPMcmd object.
  *
  * \param this	A pointer to the object which is to be destroyed.
@@ -725,6 +854,8 @@ extern TPMcmd NAAAIM_TPMcmd_Init(void)
 	this->nv_write	= nv_write;
 	this->nv_read	= nv_read;
 	this->nv_remove	= nv_remove;
+
+	this->quote  = quote;
 
 	this->whack = whack;
 

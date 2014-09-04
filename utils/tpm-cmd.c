@@ -22,9 +22,11 @@
 #include <Origin.h>
 #include <HurdLib.h>
 #include <Buffer.h>
+#include <String.h>
+#include <File.h>
 
 #include <NAAAIM.h>
-
+#include <RandomBuffer.h>
 #include "TPMcmd.h"
 
 
@@ -38,6 +40,10 @@ extern int main(int argc, char *argv[])
 	       key;
 
 	TPMcmd tpmcmd = NULL;
+
+	File quote = NULL;
+
+	RandomBuffer rbufr = NULL;
 
 
 	if ( argv[1] == NULL ) {
@@ -178,13 +184,42 @@ extern int main(int argc, char *argv[])
 		}
 	}
 
-	retn = 0;
+	if ( strcmp(argv[1], "quote") == 0 ) {
+		INIT(NAAAIM, RandomBuffer, rbufr, goto done);
+
+		INIT(HurdLib, File, quote, goto done);
+		if ( argv[2] == NULL ) {
+			fputs("No aik file specified.\n", stderr);
+			goto done;
+		}
+		quote->open_ro(quote, argv[2]);
+		if ( !quote->slurp(quote, key) ) {
+			fputs("Error reading aid uuid.\n", stderr);
+			goto done;
+		}
+
+		rbufr->generate(rbufr, 20);
+		if ( !bufr->add_Buffer(bufr, rbufr->get_Buffer(rbufr)) ) {
+			fputs("Unable to generate nonce.\n", stderr);
+			goto done;
+		}
+			
+		if ( !tpmcmd->quote(tpmcmd, key, bufr) ) {
+			fputs("Quote failed.\n", stderr);
+			goto done;
+		}
+		fputs("Quote:\n", stderr);
+		bufr->hprint(bufr);
+		retn = 0;
+	}
 
 
  done:
 	WHACK(key);
 	WHACK(bufr);
 	WHACK(tpmcmd);
+	WHACK(quote);
+	WHACK(rbufr);
 
 	return retn;
 }
