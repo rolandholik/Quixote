@@ -809,7 +809,7 @@ static _Bool host_mode(CO(Config, cfg))
 
 	/* Extract the replay and quote nonces. */
 	INIT(HurdLib, Buffer, nonce, goto done);
-	INIT(HurdLib, BUffer, quote_none, goto done);
+	INIT(HurdLib, Buffer, quote_nonce, goto done);
 	if ( (b = packet->get_element(packet, PossumPacket_nonce)) == NULL )
 		goto done;
 	if ( !nonce->add(nonce, b->get(b), REPLAY_NONCE) )
