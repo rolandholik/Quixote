@@ -36,8 +36,10 @@ extern int main(int argc, char *argv[])
 	int retn = 1,
 	    index;
 
-	Buffer bufr,
-	       key;
+	Buffer bufr   = NULL,
+	       key    = NULL,
+	       pcrref = NULL,
+	       nonce  = NULL;
 
 	TPMcmd tpmcmd = NULL;
 
@@ -185,10 +187,11 @@ extern int main(int argc, char *argv[])
 	}
 
 	if ( strcmp(argv[1], "quote") == 0 ) {
+		fprintf(stderr, "Arg count: %d\n", argc);
 		INIT(NAAAIM, RandomBuffer, rbufr, goto done);
 
 		INIT(HurdLib, File, quote, goto done);
-		if ( argv[2] == NULL ) {
+		if ( argc < 3 ) {
 			fputs("No aik file specified.\n", stderr);
 			goto done;
 		}
@@ -210,13 +213,140 @@ extern int main(int argc, char *argv[])
 		}
 		fputs("Quote:\n", stderr);
 		bufr->hprint(bufr);
+
+		if ( argc >= 4 ) {
+			quote->reset(quote);
+			if ( !quote->open_rw(quote, argv[3] ) ) {
+				fputs("Cannot open quote output file.\n", \
+				      stderr);
+				goto done;
+			}
+			if ( !quote->write_Buffer(quote, bufr) ) {
+				fputs("Error writing reference quote.\n", \
+				      stderr);
+				goto done;
+			}
+			fprintf(stdout, "Written to file: %s\n", argv[3]);
+		}
+
+		if ( argc >= 5 ) {
+			quote->reset(quote);
+			if ( !quote->open_rw(quote, argv[4] ) ) {
+				fputs("Cannot open quote nonce file.\n", \
+				      stderr);
+				goto done;
+			}
+			if ( !quote->write_Buffer(quote, \
+						  rbufr->get_Buffer(rbufr)) ) {
+				fputs("Error writing quote nonce.\n", \
+				      stderr);
+				goto done;
+			}
+			fprintf(stdout, "Quote nonce written to file: %s\n", \
+				argv[4]);
+		}
+		retn = 0;
+	}
+
+	if ( strcmp(argv[1], "verify") == 0 ) {
+		INIT(HurdLib, File, quote, goto done);
+
+		if ( argc != 6 ) {
+			fputs("Insufficient number of argements.\n", stderr);
+			goto done;
+		}
+
+		quote->open_ro(quote, argv[2]);
+		if ( !quote->slurp(quote, key) ) {
+			fputs("Error reading public key.\n", stderr);
+			goto done;
+		}
+
+		INIT(HurdLib, Buffer, pcrref, goto done);
+		quote->reset(quote);
+		quote->open_ro(quote, argv[3]);
+		if ( !quote->slurp(quote, pcrref) ) {
+			fputs("Error reading PCR reference.\n", stderr);
+			goto done;
+		}
+
+		INIT(HurdLib, Buffer, nonce, goto done);
+		quote->reset(quote);
+		quote->open_ro(quote, argv[4]);
+		if ( !quote->slurp(quote, nonce) ) {
+			fputs("Error reading quote nonce.\n", stderr);
+			goto done;
+		}
+
+		quote->reset(quote);
+		quote->open_ro(quote, argv[5]);
+		if ( !quote->slurp(quote, bufr) ) {
+			fputs("Error reading quote.\n", stderr);
+			goto done;
+		}
+
+		if ( !tpmcmd->verify(tpmcmd, key, pcrref, nonce,
+				     bufr) ) {
+			fputs("Quote verification failed.\n", \
+			      stderr);
+			goto done;
+		}
+		else
+			fputs("Machine status quote is valid.\n", stdout);
+		retn = 0;
+	}
+
+	if ( strcmp(argv[1], "generate-quote") == 0 ) {
+		INIT(NAAAIM, RandomBuffer, rbufr, goto done);
+
+		INIT(HurdLib, File, quote, goto done);
+		if ( argc < 3 ) {
+			fputs("No aik uuid file specified.\n", stderr);
+			goto done;
+		}
+		quote->open_ro(quote, argv[2]);
+		if ( !quote->slurp(quote, key) ) {
+			fputs("Error reading aid uuid.\n", stderr);
+			goto done;
+		}
+
+		rbufr->generate(rbufr, 20);
+		if ( !bufr->add_Buffer(bufr, rbufr->get_Buffer(rbufr)) ) {
+			fputs("Unable to generate nonce.\n", stderr);
+			goto done;
+		}
+			
+		if ( !tpmcmd->generate_quote(tpmcmd, key, bufr) ) {
+			fputs("Generation of reference quote failed.\n", \
+			      stderr);
+			goto done;
+		}
+		fputs("Reference quote:\n", stderr);
+		bufr->hprint(bufr);
+
+		if ( argc >= 4 ) {
+			quote->reset(quote);
+			if ( !quote->open_rw(quote, argv[3] ) ) {
+				fputs("Cannot open quote output file.\n", \
+				      stderr);
+				goto done;
+			}
+			if ( !quote->write_Buffer(quote, bufr) ) {
+				fputs("Error writing reference quote.\n", \
+				      stderr);
+				goto done;
+			}
+			fprintf(stdout, "Written to file: %s\n", argv[3]);
+		}
 		retn = 0;
 	}
 
 
  done:
-	WHACK(key);
 	WHACK(bufr);
+	WHACK(key);
+	WHACK(pcrref);
+	WHACK(nonce);
 	WHACK(tpmcmd);
 	WHACK(quote);
 	WHACK(rbufr);

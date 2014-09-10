@@ -35,6 +35,9 @@ struct NAAAIM_TPMcmd
 	_Bool (*nv_remove)(const TPMcmd, uint32_t, _Bool, Buffer);
 
 	_Bool (*quote)(const TPMcmd, const Buffer, const Buffer);
+	_Bool (*verify)(const TPMcmd, const Buffer, const Buffer, \
+			const Buffer, const Buffer);
+	_Bool (*generate_quote)(const TPMcmd, const Buffer, const Buffer);
 
 	void (*whack)(const TPMcmd);
 
