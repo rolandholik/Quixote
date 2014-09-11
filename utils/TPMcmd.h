@@ -39,6 +39,9 @@ struct NAAAIM_TPMcmd
 			const Buffer, const Buffer);
 	_Bool (*generate_quote)(const TPMcmd, const Buffer, const Buffer);
 
+	_Bool (*generate_identity)(const TPMcmd, _Bool, const Buffer, \
+				   const Buffer, const Buffer, const Buffer);
+
 	void (*whack)(const TPMcmd);
 
 	/* Private state. */

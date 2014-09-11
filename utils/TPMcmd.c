@@ -1050,6 +1050,196 @@ static _Bool generate_quote(CO(TPMcmd, this), CO(Buffer, key_uuid), \
 /**
  * External public method.
  *
+ * This method implements creation of an attestation identity key.
+ *
+ * \param this		A pointer to the TPM object which will be used to
+ *			generate the identity key.
+ *
+ * \param key		A boolean value which specifies whether or not
+ *			the pwd arguement which follows contains a
+ *			raw password to be hashed or a key.
+ *
+ * \param key_bufr	A Buffer object containing either a secret key
+ *			or a password to be hashed to yield the key.
+ *
+ * \param keycert	A Buffer object which on input will hold the
+ *			public key used to encrypt the identity
+ *			key certificate.  If this Buffer has a size of
+ *			zero a 'throwaway' key is generated.  On return
+ *			this Buffer object will contain the identity
+ *			attestation certificate.
+ *
+ * \param uuid		A Buffer object which will be loaded with the UUID
+ *			which is generated to index the key.
+ *
+ * \param aikpub	A Buffer object containing the public version of
+ *			the identity key which is used to verify
+ *			attestations make with this key.
+ *
+ * \return	If an error is encountered in generating the key a
+ *		false value is returned.  If  the generation of the
+ *		reference quote is successful a true value is returned.
+ */
+
+static _Bool generate_identity(CO(TPMcmd, this), _Bool key,		  \
+			       CO(Buffer, key_bufr), CO(Buffer, keycert), \
+			       CO(Buffer, uuid), CO(Buffer, aikpub))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	char *err = NULL;
+
+	unsigned char *bufr,
+		      der_bufr[1024],
+		      aik_label[] = {},
+		      all_zeros[] = TSS_WELL_KNOWN_SECRET;
+
+	uint32_t length,
+		 der_length = sizeof(der_bufr);
+
+	TSS_RESULT result = TSS_SUCCESS;
+
+	TSS_FLAG secret_mode;
+
+	TSS_HKEY srk,
+		 cak,
+		 aik;
+
+	TSS_UUID *aik_uuid,
+		 srk_uuid = TSS_UUID_SRK;
+
+	TSS_HPOLICY srk_policy,
+		    tpm_policy;
+
+
+	/* Activate the storage root key. */
+	result = Tspi_Context_LoadKeyByUUID(S->context, TSS_PS_TYPE_SYSTEM, \
+					    srk_uuid, &srk);
+	if ( result != TSS_SUCCESS ) {
+		err = "SRK keyload";
+		goto done;
+	}
+
+	result = Tspi_GetPolicyObject(srk, TSS_POLICY_USAGE, &srk_policy);
+	if ( result != TSS_SUCCESS ) {
+		err = "SRK policy creation";
+		goto done;
+	}
+
+	result = Tspi_Policy_SetSecret(srk_policy, TSS_SECRET_MODE_SHA1, \
+				       sizeof(all_zeros), all_zeros);
+	if ( result != TSS_SUCCESS ) {
+		err = "SRK password set";
+		goto done;
+	}
+
+	result = Tspi_GetPolicyObject(S->tpm, TSS_POLICY_USAGE, &tpm_policy);
+	if ( result != TSS_SUCCESS ) {
+		err = "Obtaining tpm policy";
+		goto done;
+	}
+
+	secret_mode = key ? TSS_SECRET_MODE_SHA1 : TSS_SECRET_MODE_PLAIN;
+	result = Tspi_Policy_SetSecret(tpm_policy, secret_mode,  \
+				       key_bufr->size(key_bufr), \
+				       key_bufr->get(key_bufr));
+	if ( result != TSS_SUCCESS ) {
+		err = "Setting TPM secret";
+		goto done;
+	}
+
+
+	/* Create CA key */
+	if ( keycert->size(keycert) == 0 ) {
+		result = Tspi_Context_CreateObject(S->context,		   \
+						   TSS_OBJECT_TYPE_RSAKEY, \
+						   TSS_KEY_TYPE_LEGACY |   \
+						   TSS_KEY_SIZE_2048, &cak);
+		if ( result != TSS_SUCCESS ) {
+			err = "Initializing CA key object.";
+			goto done;
+		}
+
+		result = Tspi_Key_CreateKey(cak, srk, 0);
+		if ( result != TSS_SUCCESS ) {
+			err = "Creating CA key";
+			goto done;
+		}
+	}
+
+
+	/* Create the identity attestation key. */
+	result = Tspi_Context_CreateObject(S->context,		   \
+					   TSS_OBJECT_TYPE_RSAKEY, \
+					   TSS_KEY_TYPE_IDENTITY | \
+					   TSS_KEY_SIZE_2048, &aik);
+	if ( result != TSS_SUCCESS ) {
+		err = "Create AIK key object";
+		goto done;
+	}
+
+	result = Tspi_TPM_CollateIdentityRequest(S->tpm, srk, cak, 0,	      \
+						 aik_label, aik, TSS_ALG_AES, \
+						 &length, &bufr);
+	if ( result != TSS_SUCCESS ) {
+		err = "Creating AIK key";
+		goto done;
+	}
+
+	err = NULL;
+	keycert->reset(keycert);
+	if ( !keycert->add(keycert, bufr, length) )
+		err = "Loading AIK cert request";
+
+	result = Tspi_Context_FreeMemory(S->context, bufr);
+	if ( err != NULL )
+		goto done;
+	if ( result != TSS_SUCCESS ) {
+		err = "Freeing AIK key memory";
+		goto done;
+	}
+
+	result = Tspi_GetAttribData(aik, TSS_TSPATTRIB_KEY_BLOB,      \
+				    TSS_TSPATTRIB_KEYBLOB_PUBLIC_KEY, \
+				    &length, &bufr);
+	if ( result != TSS_SUCCESS ) {
+		err = "Extracting AIK private key";
+		goto done;
+	}
+
+	result = Tspi_EncodeDER_TssBlob(length, bufr, TSS_BLOB_TYPE_PUBKEY, \
+					&der_length, der_bufr);
+	if ( Tspi_Context_FreeMemory(S->context, bufr) != TSS_SUCCESS ) {
+		err = "Freeing public key memory";
+		goto done;
+	}
+	if ( result != TSS_SUCCESS ) {
+		err = "Encoding AIK public key";
+		goto done;
+	}
+
+	if ( !aikpub->add(aikpub, der_bufr, der_length) ) {
+		err = "Loading AIK public key";
+		goto done;
+	}
+
+	retn = true;
+
+
+ done:
+	if ( result != TSS_SUCCESS )
+		fprintf(stderr, "%s[%s] %s: %s\n", __FILE__, __func__, err, \
+			Trspi_Error_String(result));
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a destructor for a TPMcmd object.
  *
  * \param this	A pointer to the object which is to be destroyed.
@@ -1119,6 +1309,8 @@ extern TPMcmd NAAAIM_TPMcmd_Init(void)
 	this->quote	     = quote;
 	this->verify	     = verify;
 	this->generate_quote = generate_quote;
+
+	this->generate_identity = generate_identity;
 
 	this->whack = whack;
 

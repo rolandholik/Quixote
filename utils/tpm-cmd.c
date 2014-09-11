@@ -38,6 +38,7 @@ extern int main(int argc, char *argv[])
 
 	Buffer bufr   = NULL,
 	       key    = NULL,
+	       uuid   = NULL,
 	       pcrref = NULL,
 	       nonce  = NULL;
 
@@ -341,11 +342,40 @@ extern int main(int argc, char *argv[])
 		retn = 0;
 	}
 
+	if ( strcmp(argv[1], "generate-aik") == 0 ) {
+		fprintf(stderr, "argc: %d\n", argc);
+		INIT(HurdLib, Buffer, pcrref, goto done);
+		INIT(HurdLib, Buffer, uuid, goto done);
+
+		if ( argc < 3 ) {
+			fputs("No NVram password specified.\n", stderr);
+			goto done;
+		}
+		if ( !key->add(key, (unsigned char *) argv[2], \
+			       strlen(argv[2])) )
+			goto done;
+
+		fputs("Calling identity generator\n", stderr);
+		if ( !tpmcmd->generate_identity(tpmcmd, false, key, pcrref, \
+						uuid, bufr) )
+			goto done;
+
+		fputs("certificate:\n", stdout);
+		pcrref->hprint(pcrref);
+
+		fputs("\nkey:\n", stdout);
+		bufr->hprint(bufr);
+		goto done;
+	}
+
+	fprintf(stderr, "Unknown command: %s\n", argv[1]);
+		
 
  done:
 	WHACK(bufr);
 	WHACK(key);
 	WHACK(pcrref);
+	WHACK(uuid);
 	WHACK(nonce);
 	WHACK(tpmcmd);
 	WHACK(quote);
