@@ -76,6 +76,8 @@ extern int main(int argc, char *argv[])
 
 		fprintf(stdout, "PCR-%02d: ", index);
 		bufr->print(bufr);
+
+		retn = 0;
 		goto done;
 	}
 
@@ -104,6 +106,9 @@ extern int main(int argc, char *argv[])
 		}
 		fprintf(stdout, "Extended PCR-%02d: ", index);
 		bufr->print(bufr);
+
+		retn = 0;
+		goto done;
 	}
 
 	if ( strcmp(argv[1], "nvread") == 0 ) {
@@ -122,6 +127,9 @@ extern int main(int argc, char *argv[])
 		fprintf(stdout, "Contents of NVram index: 0x%x/%d\n", index, \
 			index);
 		bufr->hprint(bufr);
+
+		retn = 0;
+		goto done;
 	}
 
 	if ( strcmp(argv[1], "nvwrite") == 0 ) {
@@ -151,6 +159,9 @@ extern int main(int argc, char *argv[])
 			goto done;
 		fprintf(stdout, "Wrote NVram index: 0x%x/%d\n", index, \
 			index);
+
+		retn = 0;
+		goto done;
 	}
 
 	if ( strcmp(argv[1], "nvremove") == 0 ) {
@@ -173,6 +184,9 @@ extern int main(int argc, char *argv[])
 			goto done;
 		}
 		fprintf(stdout, "Removed NVram area %0x\n", index);
+
+		retn = 0;
+		goto done;
 	}
 
 	if ( strcmp(argv[1], "lspcr") == 0 ) {
@@ -185,15 +199,19 @@ extern int main(int argc, char *argv[])
 			bufr->print(bufr);
 			bufr->reset(bufr);
 		}
+
+		retn = 0;
+		goto done;
 	}
 
 	if ( strcmp(argv[1], "quote") == 0 ) {
-		fprintf(stderr, "Arg count: %d\n", argc);
 		INIT(NAAAIM, RandomBuffer, rbufr, goto done);
 
 		INIT(HurdLib, File, quote, goto done);
 		if ( argc < 3 ) {
-			fputs("No aik file specified.\n", stderr);
+			fputs("No aik uuid specified.\n", stderr);
+			fputs("Usage: tpm-cmd quote uuid [quote] [nonce]\n", \
+			      stderr);
 			goto done;
 		}
 		quote->open_ro(quote, argv[2]);
@@ -212,9 +230,9 @@ extern int main(int argc, char *argv[])
 			fputs("Quote failed.\n", stderr);
 			goto done;
 		}
+
 		fputs("Quote:\n", stderr);
 		bufr->hprint(bufr);
-
 		if ( argc >= 4 ) {
 			quote->reset(quote);
 			if ( !quote->open_rw(quote, argv[3] ) ) {
@@ -230,6 +248,8 @@ extern int main(int argc, char *argv[])
 			fprintf(stdout, "Written to file: %s\n", argv[3]);
 		}
 
+		fputs("\nQuote nonce:\n", stderr);
+		rbufr->get_Buffer(rbufr)->hprint(rbufr->get_Buffer(rbufr));
 		if ( argc >= 5 ) {
 			quote->reset(quote);
 			if ( !quote->open_rw(quote, argv[4] ) ) {
@@ -246,7 +266,9 @@ extern int main(int argc, char *argv[])
 			fprintf(stdout, "Quote nonce written to file: %s\n", \
 				argv[4]);
 		}
+
 		retn = 0;
+		goto done;
 	}
 
 	if ( strcmp(argv[1], "verify") == 0 ) {
@@ -254,6 +276,8 @@ extern int main(int argc, char *argv[])
 
 		if ( argc != 6 ) {
 			fputs("Insufficient number of argements.\n", stderr);
+			fputs("Usage: tpm-cmd pubkey pcrref nonce quote\n", \
+			      stderr);
 			goto done;
 		}
 
@@ -294,6 +318,8 @@ extern int main(int argc, char *argv[])
 		}
 		else
 			fputs("Machine status quote is valid.\n", stdout);
+
+		goto done;
 		retn = 0;
 	}
 
@@ -303,6 +329,8 @@ extern int main(int argc, char *argv[])
 		INIT(HurdLib, File, quote, goto done);
 		if ( argc < 3 ) {
 			fputs("No aik uuid file specified.\n", stderr);
+			fputs("Usage: tpm-cmd generate-quote uuid " \
+			      "[refquote]\n", stderr);
 			goto done;
 		}
 		quote->open_ro(quote, argv[2]);
@@ -322,12 +350,12 @@ extern int main(int argc, char *argv[])
 			      stderr);
 			goto done;
 		}
+
 		fputs("Reference quote:\n", stderr);
 		bufr->hprint(bufr);
-
 		if ( argc >= 4 ) {
 			quote->reset(quote);
-			if ( !quote->open_rw(quote, argv[3] ) ) {
+			if ( !quote->open_rw(quote, argv[3]) ) {
 				fputs("Cannot open quote output file.\n", \
 				      stderr);
 				goto done;
@@ -339,32 +367,68 @@ extern int main(int argc, char *argv[])
 			}
 			fprintf(stdout, "Written to file: %s\n", argv[3]);
 		}
+
 		retn = 0;
+		goto done;
 	}
 
-	if ( strcmp(argv[1], "generate-aik") == 0 ) {
-		fprintf(stderr, "argc: %d\n", argc);
+	if ( strcmp(argv[1], "generate-identity") == 0 ) {
 		INIT(HurdLib, Buffer, pcrref, goto done);
 		INIT(HurdLib, Buffer, uuid, goto done);
+		INIT(HurdLib, File, quote, goto done);
 
 		if ( argc < 3 ) {
-			fputs("No NVram password specified.\n", stderr);
+			fputs("No password specified.\n", stderr);
+			fputs("Usage: tpm-cmd pwd [pubkey] [idcert] " \
+			      "[uuid]\n", stderr);
 			goto done;
 		}
 		if ( !key->add(key, (unsigned char *) argv[2], \
 			       strlen(argv[2])) )
 			goto done;
 
-		fputs("Calling identity generator\n", stderr);
 		if ( !tpmcmd->generate_identity(tpmcmd, false, key, pcrref, \
 						uuid, bufr) )
 			goto done;
 
-		fputs("certificate:\n", stdout);
-		pcrref->hprint(pcrref);
-
-		fputs("\nkey:\n", stdout);
+		fputs("key:\n", stdout);
 		bufr->hprint(bufr);
+		if ( argc >= 4 ) {
+			quote->open_rw(quote, argv[3]);
+			if ( !quote->write_Buffer(quote, bufr) ) {
+				fputs("Unable to write public key file.\n", \
+				      stderr);
+				goto done;
+			}
+			fprintf(stdout, "Written to file: %s\n", argv[3]);
+		}
+
+		fputs("\ncertificate:\n", stdout);
+		pcrref->hprint(pcrref);
+		if ( argc >= 5 ) {
+			quote->reset(quote);
+			quote->open_rw(quote, argv[4]);
+			if ( !quote->write_Buffer(quote, pcrref) ) {
+				fputs("Unable to write certificate file.\n", \
+				      stderr);
+				goto done;
+			}
+			fprintf(stdout, "Written to file: %s\n", argv[4]);
+		}
+
+		fputs("\nuuid:\n", stdout);
+		uuid->hprint(uuid);
+		if ( argc >= 6 ) {
+			quote->reset(quote);
+			quote->open_rw(quote, argv[5]);
+			if ( !quote->write_Buffer(quote, uuid) ) {
+				fputs("Unable to write UUID.\n", stderr);
+				goto done;
+			}
+			fprintf(stdout, "Written to file: %s\n", argv[5]);
+		}
+
+		retn = 0;
 		goto done;
 	}
 

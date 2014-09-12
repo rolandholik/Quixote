@@ -771,7 +771,6 @@ static _Bool quote(CO(TPMcmd, this), CO(Buffer, key_uuid), CO(Buffer, quote))
 		goto done;
 	}
 		
-	fprintf(stderr, "quote length: %d\n", nonce.ulValidationDataLength);
 	quote->reset(quote);
 	retn = quote->add(quote, nonce.rgbValidationData, \
 			  nonce.ulValidationDataLength);
@@ -1026,7 +1025,6 @@ static _Bool generate_quote(CO(TPMcmd, this), CO(Buffer, key_uuid), \
 		goto done;
 	}
 		
-	fprintf(stderr, "quote length: %d\n", nonce.ulDataLength);
 	quote->reset(quote);
 	retn = quote->add(quote, nonce.rgbData, nonce.ulDataLength);
 
@@ -1206,7 +1204,7 @@ static _Bool generate_identity(CO(TPMcmd, this), _Bool key,		  \
 				    TSS_TSPATTRIB_KEYBLOB_PUBLIC_KEY, \
 				    &length, &bufr);
 	if ( result != TSS_SUCCESS ) {
-		err = "Extracting AIK private key";
+		err = "Extracting AIK public key";
 		goto done;
 	}
 
@@ -1223,6 +1221,60 @@ static _Bool generate_identity(CO(TPMcmd, this), _Bool key,		  \
 
 	if ( !aikpub->add(aikpub, der_bufr, der_length) ) {
 		err = "Loading AIK public key";
+		goto done;
+	}
+
+
+	/* Create a UUID to index the identity. */
+	result = Tspi_TPM_GetRandom(S->tpm, sizeof(TSS_UUID), \
+				    (unsigned char **) &aik_uuid);
+	if ( result != TSS_SUCCESS ) {
+		err = "Getting random UUID";
+		goto done;
+	}
+
+	aik_uuid->usTimeHigh &= 0x0fff;
+	aik_uuid->usTimeHigh |= (4 << 12);
+	aik_uuid->bClockSeqHigh &= 0x3f;
+	aik_uuid->bClockSeqHigh |= 0x80;
+
+	uuid->add(uuid, (unsigned char *) aik_uuid, sizeof(TSS_UUID));
+	result = Tspi_Context_FreeMemory(S->context, \
+					 (unsigned char *) aik_uuid);
+	if ( result != TSS_SUCCESS ) {
+		err = "Freeing UUID memory";
+		goto done;
+	}
+	if ( uuid->poisoned(uuid) ) {
+		err = "Loading UUID";
+		goto done;
+	}
+
+	result = Tspi_GetAttribData(aik, TSS_TSPATTRIB_KEY_BLOB, \
+				    TSS_TSPATTRIB_KEYBLOB_BLOB,  \
+				    &length, &bufr);
+	if ( result != TSS_SUCCESS ) {
+		err = "Extracting AIK private key";
+		goto done;
+	}
+
+	result = Tspi_Context_LoadKeyByBlob(S->context, srk, length, bufr, \
+					    &aik);
+	if ( Tspi_Context_FreeMemory(S->context, bufr) != TSS_SUCCESS ) {
+		err = "Freeing public key memory";
+		goto done;
+	}
+	if ( result != TSS_SUCCESS ) {
+		err = "Loading private key";
+		goto done;
+	}
+
+	aik_uuid = (TSS_UUID *) uuid->get(uuid);
+	result = Tspi_Context_RegisterKey(S->context, aik,		 \
+					  TSS_PS_TYPE_SYSTEM, *aik_uuid, \
+					  TSS_PS_TYPE_SYSTEM, srk_uuid);
+	if ( result != TSS_SUCCESS ) {
+		err = "Registering AIK";
 		goto done;
 	}
 
