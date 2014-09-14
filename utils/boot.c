@@ -291,7 +291,7 @@ static _Bool load_root(void)
 		fprintf(stderr, "Mount failed: %s\n", strerror(errno));
 		goto done;
 	}
-	if ( system("/sbin/load-image -r /mnt/boot/root " \
+	if ( system("/sbin/load-image -u 1 -r /mnt/boot/root " \
 		    "-t -k /mnt/boot/root.seal -o /dev/hpd0") != 0 )
 		goto done;
 
@@ -391,8 +391,42 @@ static void initialize_ima(void)
 static void switch_root(void)
 
 {
+	_Bool changed_uid = false;
+
+	Buffer state = NULL;
+
+	File tpm_state = NULL;
+
+
 	if ( mount("/dev/hpd0", "/mnt", "ext3", 0, NULL) == -1 )
 		return;
+	if ( mount("/dev/hpd1", "/mnt/etc/conf", "ext3", 0, NULL) == -1 )
+		return;
+
+	INIT(HurdLib, Buffer, state, goto done);
+	INIT(HurdLib, File, tpm_state, goto done);
+
+	if ( setreuid(27, -1) == -1 )
+		goto done;
+	changed_uid = true;
+
+	tpm_state->open_ro(tpm_state, "/mnt/etc/conf/system.data");
+	if ( !tpm_state->slurp(tpm_state, state) )
+		goto done;
+
+	tpm_state->reset(tpm_state);
+	tpm_state->open_rw(tpm_state, "/mnt/var/lib/tpm/system.data");
+	if ( !tpm_state->write_Buffer(tpm_state, state) )
+		goto done;
+			   
+	if ( setreuid(geteuid(), -1) == -1 )
+		goto done;
+	changed_uid = false;
+
+	WHACK(state);
+	WHACK(tpm_state);
+
+
 	if ( mount("/boot", "/mnt/mnt", NULL, MS_MOVE, NULL) == -1 )
 		return;
 	if ( chdir("/mnt") == -1 )
@@ -412,18 +446,19 @@ static void switch_root(void)
 		return;
 	if ( mount("shm", "/dev/shm", "tmpfs", 0, NULL) == -1 )
 		return;
-	if ( mount("/dev/hpd1", "/etc/conf", "ext3", 0, NULL) == -1 )
-		return;
 
 	initialize_ima();
 
-	if ( mount("/dev/hpd1", "/etc/conf", "ext3", 0, NULL) == -1 ) {
-		fprintf(stderr, "Configuration mount failed: %s\n", \
-			strerror(errno));
-		return;
-	}
-
 	execl("/sbin/init", "/sbin/init", NULL);
+	return;
+
+ done:
+	if ( changed_uid )
+		setreuid(geteuid(), -1);
+
+	WHACK(state);
+	WHACK(tpm_state);
+
 	return;
 }
      
