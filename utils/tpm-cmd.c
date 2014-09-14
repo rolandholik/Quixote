@@ -432,6 +432,14 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
+	if ( strcmp(argv[1], "list-keys") == 0 ) {
+		tpmcmd->list_keys(tpmcmd);
+
+		retn = 0;
+		goto done;
+	}
+		
+
 	fprintf(stderr, "Unknown command: %s\n", argv[1]);
 		
 

@@ -1292,6 +1292,75 @@ static _Bool generate_identity(CO(TPMcmd, this), _Bool key,		  \
 /**
  * External public method.
  *
+ * This method implements the display of keys which are registered in
+ * system persistent storage
+ *
+ * \param this	A pointer to the TPM object whose keys are to be
+ *		displayed.
+ *
+ * \return	No return value is defined.
+ */
+
+static void list_keys(CO(TPMcmd, this))
+
+{
+	STATE(S);
+
+	TSS_RESULT result;
+
+	uint32_t lp,
+		 num_keys;
+
+	Buffer key_uuid = NULL;
+
+	TSS_KM_KEYINFO2 *keys;
+
+
+	INIT(HurdLib, Buffer, key_uuid, goto done);
+
+	result = Tspi_Context_GetRegisteredKeysByUUID2(S->context,	   \
+						       TSS_PS_TYPE_SYSTEM, \
+						       NULL, &num_keys, &keys);
+	if ( result != TSS_SUCCESS) {
+		fputs("Error requesting keys.\n", stderr);
+		return;
+	}
+
+	for (lp= 0; lp < num_keys; ++lp) {
+		if ( !key_uuid->add(key_uuid,				 \
+				    (unsigned char *) &keys[lp].keyUUID, \
+				    sizeof(TSS_UUID)) )
+			goto done;
+		fprintf(stdout, "Key %u: ",lp);
+		key_uuid->print(key_uuid);
+		key_uuid->reset(key_uuid);
+
+		if ( !key_uuid->add(key_uuid,				      \
+				    (unsigned char *) &keys[lp].parentKeyUUID,\
+				    sizeof(TSS_UUID)) )
+			goto done;
+		fputs("\tParent: ", stdout);
+		key_uuid->print(key_uuid);
+		key_uuid->reset(key_uuid);
+
+		fprintf(stdout, "\tAuthorization%sneeded.\n", \
+			keys[lp].bAuthDataUsage ? " " : " not ");
+		fputc('\n', stdout);
+	}
+		
+
+ done:
+	Tspi_Context_FreeMemory(S->context, (unsigned char *) keys);
+
+	WHACK(key_uuid);
+	
+	return;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a destructor for a TPMcmd object.
  *
  * \param this	A pointer to the object which is to be destroyed.
@@ -1363,6 +1432,8 @@ extern TPMcmd NAAAIM_TPMcmd_Init(void)
 	this->generate_quote = generate_quote;
 
 	this->generate_identity = generate_identity;
+
+	this->list_keys = list_keys;
 
 	this->whack = whack;
 
