@@ -5,7 +5,7 @@
 
 # Variable declarations.
 CSRC = gen-image.c load-image.c boot.c Netconfig.c IPsec.c PossumPacket.c \
-	SoftwareStatus.c SoftwareTPM.c TPMcmd.c IDmgr.c
+	SoftwareStatus.c SoftwareTPM.c TPMcmd.c IDmgr.c Ivy.c
 
 TOOLS = gen-image load-image boot sboot init possum gen-id-verifier \
 	software-status software-tpm tpm-cmd id-set idmgr
