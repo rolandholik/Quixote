@@ -712,8 +712,11 @@ static _Bool quote(CO(TPMcmd, this), CO(Buffer, key_uuid), CO(Buffer, quote))
 
 	TSS_HPOLICY srk_policy;
 
-	TSS_HPCRS pcr_set;
 
+	if ( S->pcr == 0 ) {
+		err = "No PCR mask set.";
+		goto done;
+	}
 
 	nonce.ulExternalDataLength  = quote->size(quote);
 	nonce.rgbExternalData = quote->get(quote);
@@ -748,28 +751,8 @@ static _Bool quote(CO(TPMcmd, this), CO(Buffer, key_uuid), CO(Buffer, quote))
 	}
 
 
-	/* Compute the platform configuration register status. */
-	result =  Tspi_Context_CreateObject(S->context, TSS_OBJECT_TYPE_PCRS, \
-					    TSS_PCRS_STRUCT_INFO_SHORT,       \
-					    &pcr_set);
-	if ( result != TSS_SUCCESS ) {
-		err = "Creating PCR object.";
-		goto done;
-	}
-
-	err = "Creating PCR";
-	result = Tspi_PcrComposite_SelectPcrIndexEx(pcr_set, 10, \
-						   TSS_PCRS_DIRECTION_RELEASE);
-	if ( result != TSS_SUCCESS )
-		goto done;
-	result = Tspi_PcrComposite_SelectPcrIndexEx(pcr_set, 11, \
-						   TSS_PCRS_DIRECTION_RELEASE);
-	if ( result != TSS_SUCCESS )
-		goto done;
-
-
 	/* Obtain the quote. */
-	result = Tspi_TPM_Quote2(S->tpm, quote_key, false, pcr_set, &nonce, \
+	result = Tspi_TPM_Quote2(S->tpm, quote_key, false, S->pcr, &nonce, \
 				 &version_length, &version_info);
 	if ( result != TSS_SUCCESS ) {
 		err = "Obtaining quote";
@@ -966,8 +949,11 @@ static _Bool generate_quote(CO(TPMcmd, this), CO(Buffer, key_uuid), \
 
 	TSS_HPOLICY srk_policy;
 
-	TSS_HPCRS pcr_set;
 
+	if ( S->pcr == 0 ) {
+		err = "No PCR mask set.";
+		goto done;
+	}
 
 	nonce.ulExternalDataLength  = quote->size(quote);
 	nonce.rgbExternalData = quote->get(quote);
@@ -1002,28 +988,8 @@ static _Bool generate_quote(CO(TPMcmd, this), CO(Buffer, key_uuid), \
 	}
 
 
-	/* Compute the platform configuration register status. */
-	result =  Tspi_Context_CreateObject(S->context, TSS_OBJECT_TYPE_PCRS, \
-					    TSS_PCRS_STRUCT_INFO_SHORT,       \
-					    &pcr_set);
-	if ( result != TSS_SUCCESS ) {
-		err = "Creating PCR object.";
-		goto done;
-	}
-
-	err = "Creating PCR";
-	result = Tspi_PcrComposite_SelectPcrIndexEx(pcr_set, 10, \
-						   TSS_PCRS_DIRECTION_RELEASE);
-	if ( result != TSS_SUCCESS )
-		goto done;
-	result = Tspi_PcrComposite_SelectPcrIndexEx(pcr_set, 11, \
-						   TSS_PCRS_DIRECTION_RELEASE);
-	if ( result != TSS_SUCCESS )
-		goto done;
-
-
 	/* Obtain the quote. */
-	result = Tspi_TPM_Quote2(S->tpm, quote_key, false, pcr_set, &nonce, \
+	result = Tspi_TPM_Quote2(S->tpm, quote_key, false, S->pcr, &nonce, \
 				 &version_length, &version_info);
 	if ( result != TSS_SUCCESS ) {
 		err = "Obtaining quote";
@@ -1351,7 +1317,6 @@ static _Bool pcrmask(CO(TPMcmd, this), ...)
 	do {
 		pcr = va_arg(ap, int);
 		if ( (pcr >= 0) && (pcr < 24) ) {
-			fprintf(stderr, "Setting PCR-%02d\n", pcr);
 			rc = Tspi_PcrComposite_SelectPcrIndexEx(S->pcr, pcr, \
 						   TSS_PCRS_DIRECTION_RELEASE);
 			if ( rc != TSS_SUCCESS )
@@ -1518,8 +1483,7 @@ extern TPMcmd NAAAIM_TPMcmd_Init(void)
 
 	this->generate_identity = generate_identity;
 
-	this->pcrmask	  = pcrmask;
-	this->get_pcrmask = get_pcrmask;
+	this->pcrmask = pcrmask;
 
 	this->list_keys = list_keys;
 

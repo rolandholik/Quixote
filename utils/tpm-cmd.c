@@ -225,6 +225,11 @@ extern int main(int argc, char *argv[])
 			fputs("Unable to generate nonce.\n", stderr);
 			goto done;
 		}
+
+		if ( !tpmcmd->pcrmask(tpmcmd, 10, 17, -1) ) {
+			fputs("PCR masking failed.\n", stderr);
+			goto done;
+		}
 			
 		if ( !tpmcmd->quote(tpmcmd, key, bufr) ) {
 			fputs("Quote failed.\n", stderr);
@@ -319,8 +324,8 @@ extern int main(int argc, char *argv[])
 		else
 			fputs("Machine status quote is valid.\n", stdout);
 
-		goto done;
 		retn = 0;
+		goto done;
 	}
 
 	if ( strcmp(argv[1], "generate-quote") == 0 ) {
@@ -342,6 +347,11 @@ extern int main(int argc, char *argv[])
 		rbufr->generate(rbufr, 20);
 		if ( !bufr->add_Buffer(bufr, rbufr->get_Buffer(rbufr)) ) {
 			fputs("Unable to generate nonce.\n", stderr);
+			goto done;
+		}
+
+		if ( !tpmcmd->pcrmask(tpmcmd, 10, 17, -1) ) {
+			fputs("PCR masking failed.\n", stderr);
 			goto done;
 		}
 			
