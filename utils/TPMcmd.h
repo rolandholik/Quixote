@@ -42,6 +42,8 @@ struct NAAAIM_TPMcmd
 	_Bool (*generate_identity)(const TPMcmd, _Bool, const Buffer, \
 				   const Buffer, const Buffer, const Buffer);
 
+	_Bool (*pcrmask)(const TPMcmd, ...);
+
 	void (*list_keys)(const TPMcmd);
 
 	void (*whack)(const TPMcmd);

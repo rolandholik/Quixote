@@ -21,6 +21,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdarg.h>
 
 #include <Origin.h>
 #include <HurdLib.h>
@@ -65,6 +66,9 @@ struct NAAAIM_TPMcmd_State
 
 	/* TPM context. */
 	TSS_HTPM tpm;
+
+	/* PCR composite. */
+	TSS_HPCRS pcr;
 };
 
 
@@ -87,6 +91,7 @@ static void _init_state(CO(TPMcmd_State, S)) {
 
 	S->context  = 0;
 	S->tpm	    = 0;
+	S->pcr	    = 0;
 
 	return;
 }
@@ -1292,6 +1297,82 @@ static _Bool generate_identity(CO(TPMcmd, this), _Bool key,		  \
 /**
  * External public method.
  *
+ * This method implements the creation of a composite PCR index object.
+ * A composite PCR index value is used to specify machine state for
+ * operations such as quoting the status of a machine or sealing an
+ * encryption key to the machine state.
+ *
+ * \param this		A pointer to the TPM object which the PCR
+ *			composite will be generated against.
+ *
+ * \param PCR ...	This function is variadic and takes a list
+ *			of signed integers.  The list is terminated
+ *			with a negative integer value.
+ *
+ * \return	If an error is encountered in generating the composite
+ *		index a false value is returned.  If the composite
+ *		was successfully created a true value is returned.
+ */
+
+static _Bool pcrmask(CO(TPMcmd, this), ...)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	int pcr;
+
+	va_list ap;
+
+	TSS_RESULT rc;
+
+
+	if ( S->poisoned )
+		goto done;
+
+
+	/* Acquire a fress PCR object. */
+	if ( S->pcr != 0 ) {
+		rc = Tspi_Context_CloseObject(S->context, S->pcr);
+		if ( rc != TSS_SUCCESS )
+			goto done;
+	}
+	rc = Tspi_Context_CreateObject(S->context,		   \
+				       TSS_OBJECT_TYPE_PCRS,	   \
+				       TSS_PCRS_STRUCT_INFO_SHORT, \
+				       &S->pcr);
+	if ( rc != TSS_SUCCESS )
+		goto done;
+		
+
+	/* Create a composite mask over the specified registers. */
+	va_start(ap, this);
+	do {
+		pcr = va_arg(ap, int);
+		if ( (pcr >= 0) && (pcr < 24) ) {
+			fprintf(stderr, "Setting PCR-%02d\n", pcr);
+			rc = Tspi_PcrComposite_SelectPcrIndexEx(S->pcr, pcr, \
+						   TSS_PCRS_DIRECTION_RELEASE);
+			if ( rc != TSS_SUCCESS )
+				goto done;
+		}
+	} while ( pcr >= 0 );
+	va_end(ap);
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements the display of keys which are registered in
  * system persistent storage
  *
@@ -1371,6 +1452,10 @@ static void whack(CO(TPMcmd, this))
 {
 	STATE(S);
 
+
+	if ( S->pcr != 0 )
+		Tspi_Context_CloseObject(S->context, S->pcr);
+
 	Tspi_Context_FreeMemory(S->context, NULL);
 	if ( S->context != 0 )
 		Tspi_Context_Close(S->context);
@@ -1432,6 +1517,9 @@ extern TPMcmd NAAAIM_TPMcmd_Init(void)
 	this->generate_quote = generate_quote;
 
 	this->generate_identity = generate_identity;
+
+	this->pcrmask	  = pcrmask;
+	this->get_pcrmask = get_pcrmask;
 
 	this->list_keys = list_keys;
 
