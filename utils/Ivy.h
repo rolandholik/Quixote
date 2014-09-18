@@ -38,6 +38,8 @@ struct NAAAIM_Ivy
 	Buffer (*get_element)(const Ivy, Ivy_element);
 	_Bool (*set_element)(const Ivy, Ivy_element, const Buffer);
 
+	void (*print)(const Ivy);
+
 	/* Private state. */
 	Ivy_State state;
 };

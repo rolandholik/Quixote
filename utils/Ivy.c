@@ -26,6 +26,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 #include <Origin.h>
 #include <HurdLib.h>
@@ -219,6 +220,43 @@ static void _init_state(CO(Ivy_State, S)) {
 /**
  * External public method.
  *
+ * This method implements printing out the various elements in the
+ * identity verification file.
+ *
+ * \param this	A pointer to the object whose contents are to be
+ *		printed.
+ */
+
+static void print(CO(Ivy, this))
+
+{
+	STATE(S);
+
+
+	if ( S->poisoned ) {
+		fputs("* POISONED *\n", stdout);
+		return;
+	}
+
+	fputs("Identity token:\n", stdout);
+	S->id->print(S->id);
+
+	fputs("\nAttestation key:\n", stdout);
+	S->pubkey->print(S->pubkey);
+
+	fputs("\nSoftware status:\n", stdout);
+	S->software->print(S->software);
+
+	fputs("\nMachine reference:\n", stdout);
+	S->reference->print(S->reference);
+
+	return;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a destructor for a Ivy object.
  *
  * \param this	A pointer to the object which is to be destroyed.
@@ -285,6 +323,8 @@ extern Ivy NAAAIM_Ivy_Init(void)
 
 	this->get_element = get_element;
 	this->set_element = set_element;
+
+	this->print = print;
 
 	return this;
 
