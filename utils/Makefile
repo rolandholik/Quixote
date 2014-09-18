@@ -79,9 +79,8 @@ possum: possum.o Netconfig.o IPsec.o PossumPacket.o SoftwareStatus.o IDmgr.o
 	${CC} ${LDFLAGS} -o $@ $^ ../IDtoken.o ../SHA256_hmac.o ../SHA256.o \
 		../RandomBuffer.o ../AES256_cbc.o ${SSL_LIBRARY} ${LIBS} -lfl;
 
-gen-id-verifier: gen-id-verifier.o
-	${CC} ${LDFLAGS} -o $@ $^ ../IDtoken.o ../SHA256_hmac.o ../SHA256.o \
-		${SSL_LIBRARY} ${LIBS}
+gen-id-verifier: gen-id-verifier.o ../IDtoken.o ../SHA256_hmac.o ../SHA256.o
+	${CC} ${LDFLAGS} -o $@ $^ ${SSL_LIBRARY} ${LIBS}
 
 software-status: software-status.o SoftwareStatus.o
 	${CC} ${LDFLAGS} -o $@ $^ ${SSL_LIBRARY} ../SHA256.o ${LIBS};
@@ -92,7 +91,7 @@ software-tpm: software-tpm.o SoftwareTPM.o
 tpm-cmd: tpm-cmd.o TPMcmd.o ../RandomBuffer.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi;
 
-id-set: id-set.o TPMcmd.o ../IDtoken.o ../SHA256_hmac.o
+id-set: id-set.o TPMcmd.o ../IDtoken.o ../SHA256_hmac.o ../SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi;
 
 idmgr: idmgr.o TPMcmd.o IDmgr.o ../IDtoken.o ../SHA256_hmac.o ../SHA256.o

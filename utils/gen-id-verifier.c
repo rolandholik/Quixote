@@ -29,7 +29,6 @@
 
 #include <NAAAIM.h>
 #include <IDtoken.h>
-#include <SHA256.h>
 
 
 extern int main(int argc, char *argv[])
@@ -41,14 +40,7 @@ extern int main(int argc, char *argv[])
 
 	FILE *file = NULL;
 
-	Buffer b,
-	       orgkey	= NULL,
-	       orgid	= NULL,
-	       idkey	= NULL;
-
 	IDtoken token = NULL;
-
-	SHA256 mac = NULL;
 
 
 	/* Get the organizational identifier and SSN. */
@@ -77,48 +69,18 @@ extern int main(int argc, char *argv[])
 	}
 
 
-	/* Get the token identity and hash it. */
-	if ( (b = token->get_element(token, IDtoken_id)) == NULL ) {
-		fputs("Cannot get token identity.\n", stderr);
+	/* Reduce the identity token to its verifier form and print it. */
+	if ( !token->to_verifier(token) )
 		goto done;
-	}
-
-	INIT(NAAAIM, SHA256, mac, goto done);
-	mac->add(mac, b);
-	if ( !mac->compute(mac) ) {
-		fputs("Error computing hash.\n", stdout);
-		goto done;
-	}
-
-	/* Reset and reload the elements. */
-	INIT(HurdLib, Buffer, orgkey, goto done);
-	INIT(HurdLib, Buffer, orgid,  goto done);
-	INIT(HurdLib, Buffer, idkey,  goto done);
-	orgkey->add_Buffer(orgkey, token->get_element(token, IDtoken_orgkey));
-	orgid->add_Buffer(orgid, token->get_element(token, IDtoken_orgid));
-	idkey->add_Buffer(idkey, token->get_element(token, IDtoken_key));
-
-	token->reset(token);
-	token->set_element(token, IDtoken_orgkey, orgkey);
-	token->set_element(token, IDtoken_orgid, orgid);
-	token->set_element(token, IDtoken_id, mac->get_Buffer(mac));
-	if ( !token->set_element(token, IDtoken_key, idkey) ) {
-		fputs("Error setting token elements.\n", stderr);
-		goto done;
-	}
 
 	token->print(token);
 	retn = 0;
+
 		
  done:
 	if ( file != NULL )
 		fclose(file);
-
-	WHACK(orgkey);
-	WHACK(orgid);
-	WHACK(idkey);
 	WHACK(token);
-	WHACK(mac);
 
 	return retn;
 }

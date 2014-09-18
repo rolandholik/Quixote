@@ -42,6 +42,7 @@
 
 #include "NAAAIM.h"
 #include "IDtoken.h"
+#include "SHA256.h"
 #include "SHA256_hmac.h"
 
 /* Object state extraction macro. */
@@ -440,6 +441,59 @@ static _Bool decode(CO(IDtoken, this), CO(Buffer, bufr))
 /**
  * External public method.
  *
+ * This method implements the conversion of the identity token into
+ * identity verified format.  This conversion involves hashing the
+ * identity implementation into a 256 bit representation of that
+ * identity.
+ *
+ * \param this		The token which is to be loaded with the decoded
+ *			identity information.
+ *
+ * \return		A boolean value is used to indicate the success
+ *			or ailure of the converion.  A true value is used
+ *			value is used to indicate the identity was
+ *			successfuly converted.  A failure is indicated by
+ *			a false value.
+ */
+
+static _Bool to_verifier(CO(IDtoken, this))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	SHA256 mac = NULL;
+
+
+	if ( S->poisoned )
+		goto done;
+	if ( S->ptid->size(S->ptid) != 256 )
+		goto done;
+
+	INIT(NAAAIM, SHA256, mac, goto done);
+	mac->add(mac, S->ptid);
+	if ( !mac->compute(mac) )
+		goto done;
+
+	S->ptid->reset(S->ptid);
+	if ( !S->ptid->add_Buffer(S->ptid, mac->get_Buffer(mac)) )
+		goto done;
+
+	retn = true;
+
+ done:
+	WHACK(mac);
+
+	if ( !retn )
+		S->poisoned = true;
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements parsing of an ASCII encoded identity token.  The
  * token consists of a guard pair of delimiters of the following form:
  *
@@ -795,6 +849,8 @@ extern IDtoken NAAAIM_IDtoken_Init(void)
 
 	this->encode = encode;
 	this->decode = decode;
+
+	this->to_verifier = to_verifier;
 
 	this->parse	= parse;
 	this->matches	= matches;

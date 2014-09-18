@@ -38,6 +38,8 @@ struct NAAAIM_IDtoken
 	_Bool (*encode)(const IDtoken, const Buffer);
 	_Bool (*decode)(const IDtoken, const Buffer);
 
+	_Bool (*to_verifier)(const IDtoken);
+
 	_Bool (*parse)(const IDtoken, FILE *);
 	_Bool (*matches)(const IDtoken, const Buffer);
 	void (*print)(const IDtoken);
