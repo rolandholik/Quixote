@@ -35,8 +35,12 @@ struct NAAAIM_Ivy
 	/* External methods. */
 	void (*whack)(const Ivy);
 
-	Buffer (*get_element)(const Ivy, Ivy_element);
+	Buffer (*get_element)(const Ivy, const Ivy_element);
 	_Bool (*set_element)(const Ivy, Ivy_element, const Buffer);
+	_Bool (*set_identity)(const Ivy, const IDtoken);
+
+	_Bool (*encode)(const Ivy, const Buffer);
+	_Bool (*decode)(const Ivy, const Buffer);
 
 	void (*print)(const Ivy);
 

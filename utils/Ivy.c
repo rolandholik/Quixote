@@ -28,11 +28,15 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+#include <openssl/asn1.h>
+#include <openssl/asn1t.h>
+
 #include <Origin.h>
 #include <HurdLib.h>
 #include <Buffer.h>
 
 #include "NAAAIM.h"
+#include "IDtoken.h"
 #include "Ivy.h"
 
 /* Object state extraction macro. */
@@ -76,6 +80,36 @@ struct NAAAIM_Ivy_State
 	/* Machine status reference. */
 	Buffer reference;
 };
+
+
+/**
+ * The following definitions define the ASN1 encoding sequence for
+ * the DER encoding of an identity.
+ * the wire.
+ */
+typedef struct {
+	ASN1_OCTET_STRING *id;
+	ASN1_OCTET_STRING *pubkey;
+	ASN1_OCTET_STRING *software;
+	ASN1_OCTET_STRING *reference;
+} asn1_ivy;
+
+ASN1_SEQUENCE(asn1_ivy) = {
+	ASN1_SIMPLE(asn1_ivy, id,		ASN1_OCTET_STRING),
+	ASN1_SIMPLE(asn1_ivy, pubkey,		ASN1_OCTET_STRING),
+	ASN1_SIMPLE(asn1_ivy, software,		ASN1_OCTET_STRING),
+	ASN1_SIMPLE(asn1_ivy, reference,	ASN1_OCTET_STRING),
+} ASN1_SEQUENCE_END(asn1_ivy)
+
+IMPLEMENT_ASN1_FUNCTIONS(asn1_ivy)
+
+#define ASN1_BUFFER_ENCODE(b, e, err) \
+	if ( ASN1_OCTET_STRING_set(e, b->get(b), b->size(b)) != 1 ) \
+		err
+
+#define ASN1_BUFFER_DECODE(b, e, err) \
+	if ( !b->add(b, ASN1_STRING_data(e), ASN1_STRING_length(e)) ) \
+ 		err
 
 
 /**
@@ -157,6 +191,8 @@ static _Bool set_element(CO(Ivy, this), CO(Ivy_element, element), \
 
 	if ( S->poisoned )
 		goto done;
+	if ( (bufr == NULL) || bufr->poisoned(bufr) )
+		goto done;
 
 	switch ( element ) {
 		case Ivy_id:
@@ -187,6 +223,180 @@ static _Bool set_element(CO(Ivy, this), CO(Ivy_element, element), \
 	if ( retn == false )
 		S->poisoned = true;
 
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements adding an identity to the verification object.
+ *
+ * \param this		The verifier whose identity is to be set.
+ *
+ * \param identity	The identity token containg the device identity.
+ *
+ * \return		A boolean value is used to indicate the success or
+ *			failure of setting the identity.  A true
+ *			value indicates the identity was set.  A failure
+ *			is indicated by returning a false value which
+ *			also poisons the object.
+ */
+
+static _Bool set_identity(CO(Ivy, this), CO(IDtoken, identity))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	Buffer b;
+
+
+	if ( S->poisoned )
+		goto done;
+	if ( identity == NULL )
+		goto done;
+
+
+	/* Convert identity and add the reduced identity to this object. */
+	if ( !identity->to_verifier(identity) )
+		goto done;
+	if ( (b = identity->get_element(identity, IDtoken_id)) == NULL )
+		goto done;
+	if ( !set_element(this, Ivy_id, b) )
+		goto done;
+
+	retn = true;
+	
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements the encoding of an identity verification object
+ * into ASN1 format.
+ *
+ * \param this		The verifier which is to be encoded.
+ *
+ * \param output	A Buffer object which holds the encoding of
+ *			the verifier.
+ * 
+ * \return		A boolean value is used to indicate the success or
+ *			failure of verifier encoding.  A true
+ *			value is used to indicate the identity was
+ *			successfuly encoded.  A failure is indicated by
+ *			a false value.
+ */
+
+static _Bool encode(CO(Ivy, this), CO(Buffer, bufr))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	int asn_size;
+
+        unsigned char *asn = NULL;
+
+        unsigned char **p = &asn;
+
+	asn1_ivy *verifier = NULL;
+
+
+	if ( (verifier = asn1_ivy_new()) == NULL )
+		goto done;
+
+	/* Encode the identity. */
+	ASN1_BUFFER_ENCODE(S->id, verifier->id, goto done);
+
+	/* Encode the public key .*/
+	ASN1_BUFFER_ENCODE(S->pubkey, verifier->pubkey, goto done);
+
+	/* Encode the software status. */
+	ASN1_BUFFER_ENCODE(S->software, verifier->software, goto done);
+
+	/* Encode the machine reference. */
+	ASN1_BUFFER_ENCODE(S->reference, verifier->reference, goto done);
+
+	/* Load the ASN1 encoding into the supplied buffer. */
+        asn_size = i2d_asn1_ivy(verifier, p);
+        if ( asn_size < 0 )
+                goto done;
+	if ( !bufr->add(bufr, asn, asn_size) )
+		goto done;
+
+	retn = true;
+	
+
+ done:
+	if ( verifier != NULL )
+		asn1_ivy_free(verifier);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements a method for decoding an ientity verifier
+ * which has been encoded by the ->encode method in ASN1 format.
+ *
+ * \param this		The token which is to be loaded with the decoded
+ *			verifier components.
+ *
+ * \param output	A Buffer object which holds the ASN1 encoded
+ *			verifier information.
+ * 
+ * \return		A boolean value is used to indicate the success or
+ *			failure of the verifier decoding.  A true
+ *			value is used to indicate the verifier was
+ *			successfuly decoded.  A failure is indicated by
+ *			a false value.
+ */
+
+static _Bool decode(CO(Ivy, this), CO(Buffer, bufr))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+        unsigned char *asn = NULL;
+
+        unsigned const char *p = asn;
+
+	asn1_ivy *verifier = NULL;
+
+
+	p = bufr->get(bufr);
+        if ( !d2i_asn1_ivy(&verifier, &p, bufr->size(bufr)) )
+                goto done;
+
+	/* Unpack the identity token. */
+	ASN1_BUFFER_DECODE(S->id, verifier->id, goto done);
+
+	/* Unpack the attestation identity key. */
+	ASN1_BUFFER_DECODE(S->pubkey, verifier->pubkey, goto done);
+
+	/* Unpack the software reference. */
+	ASN1_BUFFER_DECODE(S->software, verifier->software, goto done);
+
+	/* Unpack the software reference. */
+	ASN1_BUFFER_DECODE(S->reference, verifier->reference, goto done);
+
+	retn = true;
+
+
+ done:
+	if ( verifier != NULL )
+		asn1_ivy_free(verifier);
 	return retn;
 }
 
@@ -321,8 +531,12 @@ extern Ivy NAAAIM_Ivy_Init(void)
 	/* Method initialization. */
 	this->whack = whack;
 
-	this->get_element = get_element;
-	this->set_element = set_element;
+	this->get_element  = get_element;
+	this->set_element  = set_element;
+	this->set_identity = set_identity;
+
+	this->encode = encode;
+	this->decode = decode;
 
 	this->print = print;
 
