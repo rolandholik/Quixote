@@ -135,13 +135,17 @@ static _Bool write_identity(CO(Buffer, asn), CO(IDtoken, token), \
 	return retn;
 }
 
+#define ERR(action) {err = __LINE__; action;}
 
 extern int main(int argc, char *argv[])
 
 {
 	_Bool out_file = false;
 
-	int retn = 1;
+	int opt,
+	    retn = 1;
+
+	uint32_t err = 0;
 
 	char *token_file = NULL,
 	     *key_file	 = NULL,
@@ -167,8 +171,8 @@ extern int main(int argc, char *argv[])
 
 
 	/* Get the organizational identifier and SSN. */
-	while ( (retn = getopt(argc, argv, "fk:l:t:u:")) != EOF )
-		switch ( retn ) {
+	while ( (opt = getopt(argc, argv, "fk:l:t:u:")) != EOF )
+		switch ( opt ) {
 			case 'f':
 				out_file = true;
 				break;
@@ -189,15 +193,15 @@ extern int main(int argc, char *argv[])
 
 	if ( token_file == NULL ) {
 		fputs("No token specified.\n", stderr);
-		goto done;
+		ERR(goto done);
 	}
 	if ( key_file == NULL ) {
 		fputs("No aik public key specified.\n", stderr);
-		goto done;
+		ERR(goto done);
 	}
 	if ( uuid_file == NULL ) {
 		fputs("No uuid specified.\n", stderr);
-		goto done;
+		ERR(goto done);
 	}
 
 
@@ -206,11 +210,11 @@ extern int main(int argc, char *argv[])
 
 	INIT(NAAAIM, IDtoken, token, goto done);
 	if ( (id_file = fopen(token_file, "r")) == NULL )
-		goto done;
+		ERR(goto done);
 	if ( !token->parse(token, id_file) )
-		goto done;
+		ERR(goto done);
 	if ( !ivy->set_identity(ivy, token) )
-		goto done;
+		ERR(goto done);
 
 
 	/* Add the attestation identity key. */
@@ -218,22 +222,22 @@ extern int main(int argc, char *argv[])
 
 	INIT(HurdLib, File, file, goto done);
 	if ( !file->open_ro(file, key_file) )
-		goto done;
+		ERR(goto done);
 	if ( !file->slurp(file, bufr) )
-		goto done;
+		ERR(goto done);
 	if ( !ivy->set_element(ivy, Ivy_pubkey, bufr) )
-		goto done;
+		ERR(goto done);
 
 
 	/* Add the software measurement. */
 	INIT(NAAAIM, SoftwareStatus, software, goto done);
         if ( !software->open(software) )
-                goto done;
+                ERR(goto done);
         if ( !software->measure(software) )
-                goto done;
+                ERR(goto done);
 	if ( !ivy->set_element(ivy, Ivy_software, \
 			       software->get_template_hash(software)) )
-		goto done;
+		ERR(goto done);
 
 
 	/* Add the machine quote. */
@@ -244,22 +248,22 @@ extern int main(int argc, char *argv[])
 	file->reset(file);
 	file->open_ro(file, uuid_file);
 	if ( !file->slurp(file, uuid) )
-		goto done;
+		ERR(goto done);
 
 	bufr->reset(bufr);
 	rbufr->generate(rbufr, 20);
 	if ( !bufr->add_Buffer(bufr, rbufr->get_Buffer(rbufr)) )
-		goto done;
+		ERR(goto done);
 	if ( !tpmcmd->pcrmask(tpmcmd, 10, 15, 17, 18, -1) )
-		goto done;
+		ERR(goto done);
 	if ( !tpmcmd->generate_quote(tpmcmd, uuid, bufr) )
-		goto done;
+		ERR(goto done);
 	if ( !ivy->set_element(ivy, Ivy_reference, bufr) )
-		goto done;
+		ERR(goto done);
 
 	bufr->reset(bufr);
 	if ( !ivy->encode(ivy, bufr) )
-		goto done;
+		ERR(goto done);
 
 	/* Output the quote. */
 	ivy->print(ivy);
@@ -272,6 +276,8 @@ extern int main(int argc, char *argv[])
 
 		
  done:
+	if ( err != 0 )
+		fprintf(stderr, "Error: %u\n", err);
 	if ( id_file != NULL )
 		fclose(id_file);
 
