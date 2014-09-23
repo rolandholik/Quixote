@@ -75,7 +75,8 @@ sboot: sboot.o SoftwareStatus.o Netconfig.o SoftwareTPM.o ../SHA256.o
 init: init.o Netconfig.o SoftwareTPM.o SoftwareStatus.o TPMcmd.o ../SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl -ltspi;
 
-possum: possum.o Netconfig.o IPsec.o PossumPacket.o SoftwareStatus.o IDmgr.o
+possum: possum.o Netconfig.o IPsec.o PossumPacket.o SoftwareStatus.o IDmgr.o \
+	Ivy.o
 	${CC} ${LDFLAGS} -o $@ $^ ../IDtoken.o ../SHA256_hmac.o ../SHA256.o \
 		../RandomBuffer.o ../AES256_cbc.o ${SSL_LIBRARY} ${LIBS} -lfl;
 
@@ -113,7 +114,7 @@ Netconfig.o: Netconfig.h
 IPsec.o: IPsec.h
 IDmgr.o: IDmgr.h TPMcmd.h ../IDtoken.h ../SHA256.h
 
-possum.o: Netconfig.h IPsec.h PossumPacket.h ../IDtoken.h ../SHA256_hmac.h \
-	../RandomBuffer.h ../AES256_cbc.h ../SHA256.h
+possum.o: Netconfig.h IPsec.h PossumPacket.h Ivy.h ../IDtoken.h \
+	../SHA256_hmac.h ../RandomBuffer.h ../AES256_cbc.h ../SHA256.h
 
 Ivy.o: Ivy.h ../NAAAIM.h ../IDtoken.h

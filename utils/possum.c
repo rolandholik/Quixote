@@ -39,10 +39,13 @@
 #include <string.h>
 #include <time.h>
 #include <errno.h>
+#include <glob.h>
 
 #include <HurdLib.h>
 #include <Buffer.h>
 #include <Config.h>
+#include <String.h>
+#include <File.h>
 
 #include <NAAAIM.h>
 #include <Duct.h>
@@ -61,6 +64,7 @@
 #include "IPsec.h"
 #include "PossumPacket.h"
 #include "SoftwareStatus.h"
+#include "Ivy.h"
 
 
 /* Variable static to this file. */
@@ -582,8 +586,13 @@ static uint32_t propose_spi(CO(uint32_t, base), uint32_t use_spi)
  * \param packet	The Buffer object containing the type 1 POSSUM
  *			packet which was received.
  *
- * \param token		An identity token populated with the identity
- *			of the client.
+ * \param token		The IDtoken object which will be loaded with
+ *			the identity token which identifies the
+ *			client.
+ *
+ * \param ivy		The identify verifier object which will be
+ *			loaded with the verifier which matches the
+ *			client.
  *
  * \return		A true value is used to indicate the search
  *			for the client was successful.  A false value
@@ -591,41 +600,63 @@ static uint32_t propose_spi(CO(uint32_t, base), uint32_t use_spi)
  */
 
 static _Bool find_client(CO(char *, clients), CO(Buffer, packet), \
-			 CO(IDtoken, token))
+			 CO(IDtoken, token), CO(Ivy, ivy))
 
 {
 	_Bool retn = false;
 
-	FILE *client_file = NULL;
+	size_t lp;
+
+	glob_t identities;
 
 	Buffer b,
+	       asn	= NULL,
 	       idkey	= NULL,
 	       identity = NULL;
 
-	SHA256_hmac idf;
+	File file = NULL;
+
+	SHA256_hmac idf = NULL;
 
 
-	if ( (client_file = fopen(clients, "r")) == NULL )
-		goto done;
+	/* Loop over the available identities. */
+	INIT(HurdLib, Buffer, asn, goto done);
+	INIT(HurdLib, Buffer, idkey, goto done);
+	INIT(HurdLib, Buffer, identity, goto done);
+	INIT(HurdLib, File, file, goto done);
 
 	/* Load the identity key/salt and the asserted client identity. */
-	INIT(HurdLib, Buffer, idkey, goto done);
 	if ( !idkey->add(idkey, packet->get(packet), NAAAIM_IDSIZE) )
 		goto done;
-
-	INIT(HurdLib, Buffer, identity, goto done);
 	if ( !identity->add(identity, packet->get(packet) + NAAAIM_IDSIZE, \
 			    NAAAIM_IDSIZE) )
 		goto done;
-
 	if ( (idf = NAAAIM_SHA256_hmac_Init(idkey)) == NULL )
 		goto done;
+	
 
 	/*
 	 * Extract each available identity and compute its identity
 	 * assertion against the value provided by the caller.
 	 */
-	while ( token->parse(token, client_file) ) {
+	if ( glob("/etc/conf/*.ivy", 0, NULL, &identities) != 0 )
+		goto done;
+
+	for (lp= 0; lp < identities.gl_pathc; ++lp) {
+		token->reset(token);
+
+		file->open_ro(file, identities.gl_pathv[lp]);
+		if ( !file->slurp(file, asn) ) 
+			goto done;
+		if ( !ivy->decode(ivy, asn) )
+			goto done;
+
+		/* Extract identity token. */
+		if ( (b = ivy->get_element(ivy, Ivy_id)) == NULL )
+			goto done;
+		if ( !token->decode(token, b) )
+			goto done;
+
 		if ( (b = token->get_element(token, IDtoken_orgkey)) == NULL )
 			goto done;
 		idf->add_Buffer(idf, b);
@@ -645,9 +676,12 @@ static _Bool find_client(CO(char *, clients), CO(Buffer, packet), \
 		idf->reset(idf);
 	}
 
+
  done:
+	WHACK(asn);
 	WHACK(idkey);
 	WHACK(identity);
+	WHACK(file);
 	WHACK(idf);
 
 	return retn;
@@ -753,6 +787,8 @@ static _Bool host_mode(CO(Config, cfg))
 
 	IDmgr idmgr = NULL;
 
+	Ivy ivy = NULL;
+
 
 	/* Get current software status. */
 	INIT(NAAAIM, SoftwareStatus, software_status, goto done);
@@ -784,7 +820,9 @@ static _Bool host_mode(CO(Config, cfg))
 		goto done;
 
 	INIT(NAAAIM, IDtoken, token, goto done);
-	if ( !find_client(cfg_item, netbufr, token) ) {
+	INIT(NAAAIM, Ivy, ivy, goto done);
+	fputs("Calling find_client.\n", stderr);
+	if ( !find_client(cfg_item, netbufr, token, ivy) ) {
 		fputs("Cannot locate client.\n", stdout);
 		goto done;
 	}
@@ -796,9 +834,12 @@ static _Bool host_mode(CO(Config, cfg))
 	}
 
 	/* Verify and decode packet. */
-	if ( (cfg_item = cfg->get(cfg, "software")) == NULL )
+	if ( (b = ivy->get_element(ivy, Ivy_software)) == NULL )
 		goto done;
-	software->add_hexstring(software, cfg_item);
+	software->add_Buffer(software, b);
+	fputs("Client software:\n", stdout);
+	software->print(software);
+	fputc('\n', stdout);
 
 	INIT(NAAAIM, PossumPacket, packet, goto done);
 	if ( !packet->decode_packet1(packet, token, software, netbufr) )
@@ -861,10 +902,12 @@ static _Bool host_mode(CO(Config, cfg))
 
 	/* Reset the section back to the original. */
 	b = software_status->get_template_hash(software_status);
-	fputs("Software status:\n", stdout);
-	b->print(b);
 	software->reset(software);
 	software->add_Buffer(software, b);
+	fputs("Local software status:\n", stdout);
+	software->print(software);
+	fputc('\n', stdout);
+
 	if ( !packet->encode_packet1(packet, software, netbufr) )
 		goto done;
 	if ( !duct->send_Buffer(duct, netbufr) )
@@ -876,8 +919,12 @@ static _Bool host_mode(CO(Config, cfg))
 	INIT(HurdLib, Buffer, shared_key, goto done);
 	if ( (b = packet->get_element(packet, PossumPacket_nonce)) == NULL )
 		goto done;
+	quote_nonce->reset(quote_nonce);
+	if ( !quote_nonce->add(quote_nonce, b->get(b), REPLAY_NONCE) )
+		goto done;
 
-	if ( !generate_shared_key(b, nonce, dhkey, public, shared_key) )
+	if ( !generate_shared_key(quote_nonce, nonce, dhkey, public, \
+				  shared_key) )
 		goto done;
 	fprintf(stdout, "%s: shared key:\n", __func__);
 	shared_key->print(shared_key);
@@ -912,6 +959,7 @@ static _Bool host_mode(CO(Config, cfg))
 	WHACK(shared_key);
 	WHACK(remote_ip);
 	WHACK(idmgr);
+	WHACK(ivy);
 
 	return retn;
 }
@@ -991,6 +1039,8 @@ static _Bool client_mode(CO(Config, cfg))
 
 	PossumPacket packet = NULL;
 
+	Ivy ivy = NULL;
+
 
 	/* Load identity token. */
 	INIT(NAAAIM, IDtoken, token, goto done);
@@ -1047,7 +1097,8 @@ static _Bool client_mode(CO(Config, cfg))
 	INIT(HurdLib, Buffer, nonce, goto done);
 	if ( (b = packet->get_element(packet, PossumPacket_nonce)) == NULL )
 		goto done;
-	nonce->add_Buffer(nonce, b);
+	if ( !nonce->add(nonce, b->get(b), REPLAY_NONCE) )
+		goto done;
 
 	/* Wait for a packet to arrive. */
 	packet->reset(packet);
@@ -1059,11 +1110,12 @@ static _Bool client_mode(CO(Config, cfg))
 	fputc('\n', stdout);
 
 	/* Find the host identity. */
+	INIT(NAAAIM, Ivy, ivy, goto done);
 	if ( (cfg_item = cfg->get(cfg, "client_list")) == NULL )
 		goto done;
 
 	token->reset(token);
-	if ( !find_client(cfg_item, bufr, token) )
+	if ( !find_client(cfg_item, bufr, token, ivy) )
 		goto done;
 
 	/* Set the host configuration personality. */
@@ -1071,9 +1123,9 @@ static _Bool client_mode(CO(Config, cfg))
 	     goto done;
 
 	software->reset(software);
-	if ( (cfg_item = cfg->get(cfg, "software")) == NULL )
+	if ( (b = ivy->get_element(ivy, Ivy_software)) == NULL )
 		goto done;
-	software->add_hexstring(software, cfg_item);
+	software->add_Buffer(software, b);
 	if ( !packet->decode_packet1(packet, token, software, bufr) )
 		goto done;
 
@@ -1087,9 +1139,12 @@ static _Bool client_mode(CO(Config, cfg))
 
 	if ( (b = packet->get_element(packet, PossumPacket_nonce)) == NULL )
 		goto done;
+	bufr->reset(bufr);
+	if ( !bufr->add(bufr, b->get(b), REPLAY_NONCE) )
+		goto done;
 
 	INIT(HurdLib, Buffer, shared_key, goto done);
-	if ( !generate_shared_key(b, nonce, dhkey, public, shared_key) )
+	if ( !generate_shared_key(bufr, nonce, dhkey, public, shared_key) )
 		goto done;
 	fprintf(stdout, "%s: shared key:\n", __func__);
 	shared_key->print(shared_key);
@@ -1114,6 +1169,7 @@ static _Bool client_mode(CO(Config, cfg))
 	WHACK(dhkey);
 	WHACK(packet);
 	WHACK(shared_key);
+	WHACK(ivy);
 
 	return retn;
 }
