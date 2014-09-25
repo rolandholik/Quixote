@@ -114,12 +114,16 @@ struct NAAAIM_PossumPacket_State
 	time_t auth_time;
 
 	/**
-	 * The object holding the nonce's which will be used.  A total
-	 * of 64 bytes will be generated, 32 bytes will be used to
-	 * protect against a replay and 20 will be used for the device
-	 * status quote.
+	 * Buffer objects holding the protocol nonces.
+	 *
+	 * The replay_nonce is a 32 byte nonce used to prevent replay
+	 * attacks with the packet.
+	 *
+	 * The quote_nonce is a 20 byte nonce which will be used by
+	 * the counter-party to generate a machine status quote.
 	 */
-	Buffer nonce;
+	Buffer replay_nonce;
+	Buffer quote_nonce;
 
 	/**
 	 * The object holding the DH public key to be used for the
@@ -149,18 +153,20 @@ typedef struct {
 	ASN1_INTEGER *magic;
 	ASN1_INTEGER *protocol;
 	ASN1_INTEGER *spi;
-	ASN1_OCTET_STRING *nonce;
+	ASN1_OCTET_STRING *replay_nonce;
+	ASN1_OCTET_STRING *quote_nonce;
 	ASN1_OCTET_STRING *public;
         ASN1_OCTET_STRING *hardware;
 } packet1_payload;
 
 ASN1_SEQUENCE(packet1_payload) = {
-	ASN1_SIMPLE(packet1_payload, magic,	ASN1_INTEGER),
-	ASN1_SIMPLE(packet1_payload, protocol,	ASN1_INTEGER),
-	ASN1_SIMPLE(packet1_payload, spi,	ASN1_INTEGER),
-	ASN1_SIMPLE(packet1_payload, nonce,	ASN1_OCTET_STRING),
-	ASN1_SIMPLE(packet1_payload, public,	ASN1_OCTET_STRING),
-	ASN1_SIMPLE(packet1_payload, hardware,	ASN1_OCTET_STRING),
+	ASN1_SIMPLE(packet1_payload, magic,		ASN1_INTEGER),
+	ASN1_SIMPLE(packet1_payload, protocol,		ASN1_INTEGER),
+	ASN1_SIMPLE(packet1_payload, spi,		ASN1_INTEGER),
+	ASN1_SIMPLE(packet1_payload, replay_nonce,	ASN1_OCTET_STRING),
+	ASN1_SIMPLE(packet1_payload, quote_nonce,	ASN1_OCTET_STRING),
+	ASN1_SIMPLE(packet1_payload, public,		ASN1_OCTET_STRING),
+	ASN1_SIMPLE(packet1_payload, hardware,		ASN1_OCTET_STRING),
 } ASN1_SEQUENCE_END(packet1_payload)
 
 IMPLEMENT_ASN1_FUNCTIONS(packet1_payload)
@@ -188,7 +194,8 @@ static void _init_state(CO(PossumPacket_State, S)) {
 	S->auth_time	 = 0;
 
 	S->otedks	 = NULL;
-	S->nonce	 = NULL;
+	S->replay_nonce	 = NULL;
+	S->quote_nonce	 = NULL;
 	S->public	 = NULL;
 	S->hardware	 = NULL;
 	S->identity	 = NULL;
@@ -330,9 +337,14 @@ static _Bool create_packet1(CO(PossumPacket, this), CO(IDtoken, token),
 	if ( !S->identity->add_Buffer(S->identity, hmac->get_Buffer(hmac)) )
 		goto done;
 
-	/* Add 32 + 20 bytes for the replay and quote nonce. */
-	rnd->generate(rnd, REPLAY_NONCE + QUOTE_NONCE);
-	if ( !S->nonce->add_Buffer(S->nonce, rnd->get_Buffer(rnd)) )
+	/* Add replay and quote nonces. */
+	rnd->generate(rnd, REPLAY_NONCE);
+	if ( !S->replay_nonce->add_Buffer(S->replay_nonce, \
+					  rnd->get_Buffer(rnd)) )
+		goto done;
+	rnd->generate(rnd, QUOTE_NONCE);
+	if ( !S->quote_nonce->add_Buffer(S->quote_nonce, \
+					 rnd->get_Buffer(rnd)) )
 		goto done;
 
 	/* Add the Diffie-Hellman key. */
@@ -512,8 +524,14 @@ static _Bool create_authenticator(CO(PossumPacket_State, S), CO(Buffer, bufr))
 	if ( ASN1_INTEGER_set(packet1->spi, S->spi) != 1 )
 		goto done;
 
-	if ( ASN1_OCTET_STRING_set(packet1->nonce, S->nonce->get(S->nonce), \
-				   S->nonce->size(S->nonce)) != 1 )
+	if ( ASN1_OCTET_STRING_set(packet1->replay_nonce,		  \
+				   S->replay_nonce->get(S->replay_nonce), \
+				   S->replay_nonce->size(S->replay_nonce)) != 1 )
+		goto done;
+
+	if ( ASN1_OCTET_STRING_set(packet1->quote_nonce,		  \
+				   S->quote_nonce->get(S->quote_nonce), \
+				   S->quote_nonce->size(S->quote_nonce)) != 1 )
 		goto done;
 
 	if ( ASN1_OCTET_STRING_set(packet1->public,	      \
@@ -742,8 +760,12 @@ static _Bool decode_packet1(CO(PossumPacket, this), CO(IDtoken, token),
 	S->protocol = ASN1_INTEGER_get(packet1->protocol);
 	S->spi	    = ASN1_INTEGER_get(packet1->spi);
 
-	S->nonce->add(S->nonce, ASN1_STRING_data(packet1->nonce), \
-		      ASN1_STRING_length(packet1->nonce));
+	S->replay_nonce->add(S->replay_nonce,			      \
+			     ASN1_STRING_data(packet1->replay_nonce), \
+			     ASN1_STRING_length(packet1->replay_nonce));
+	S->quote_nonce->add(S->quote_nonce,			     \
+			     ASN1_STRING_data(packet1->quote_nonce), \
+			     ASN1_STRING_length(packet1->quote_nonce));
 	S->public->add(S->public, ASN1_STRING_data(packet1->public), \
 		       ASN1_STRING_length(packet1->public));
 	S->hardware->add(S->hardware, ASN1_STRING_data(packet1->hardware), \
@@ -904,8 +926,11 @@ static Buffer get_element(CO(PossumPacket, this), \
 		return NULL;
 
 	switch ( element ) {
-		case PossumPacket_nonce:
-			return S->nonce;
+		case PossumPacket_replay_nonce:
+			return S->replay_nonce;
+			break;
+		case PossumPacket_quote_nonce:
+			return S->quote_nonce;
 			break;
 		case PossumPacket_public:
 			return S->public;
@@ -947,8 +972,11 @@ static void print(CO(PossumPacket, this))
 	fprintf(stdout, "time: %d\n", (int) S->auth_time);
 	fprintf(stdout, "spi: %08x\n", S->spi);
 
-	fputs("nonce:\n", stdout);
-	S->nonce->print(S->nonce);
+	fputs("replay nonce:\n", stdout);
+	S->replay_nonce->print(S->replay_nonce);
+
+	fputs("quote nonce:\n", stdout);
+	S->quote_nonce->print(S->quote_nonce);
 
 	fputs("public:\n", stdout);
 	S->public->print(S->public);
@@ -987,7 +1015,8 @@ static void reset(CO(PossumPacket, this))
 	S->auth_time	= 0;
 
 	S->otedks->reset(S->otedks);
-	S->nonce->reset(S->nonce);
+	S->replay_nonce->reset(S->replay_nonce);
+	S->quote_nonce->reset(S->quote_nonce);
 	S->public->reset(S->public);
 	S->hardware->reset(S->hardware);
 	S->identity->reset(S->identity);
@@ -1012,7 +1041,8 @@ static void whack(CO(PossumPacket, this))
 
 	/* Release Buffer elements. */
 	WHACK(S->otedks);
-	WHACK(S->nonce);
+	WHACK(S->replay_nonce);
+	WHACK(S->quote_nonce);
 	WHACK(S->public);
 	WHACK(S->hardware);
 	WHACK(S->identity);
@@ -1060,7 +1090,8 @@ extern PossumPacket NAAAIM_PossumPacket_Init(void)
 	/* Initialize aggregate objects. */
 	if ( (this->state->otedks = NAAAIM_OTEDKS_Init(BIRTHDATE)) == NULL )
 		goto err;
-	INIT(HurdLib, Buffer, this->state->nonce, goto err);
+	INIT(HurdLib, Buffer, this->state->replay_nonce, goto err);
+	INIT(HurdLib, Buffer, this->state->quote_nonce, goto err);
 	INIT(HurdLib, Buffer, this->state->public, goto err);
 	INIT(HurdLib, Buffer, this->state->hardware, goto err);
 	INIT(HurdLib, Buffer, this->state->identity, goto err);
@@ -1083,7 +1114,8 @@ extern PossumPacket NAAAIM_PossumPacket_Init(void)
 
  err:
 	WHACK(this->state->otedks);
-	WHACK(this->state->nonce);
+	WHACK(this->state->replay_nonce);
+	WHACK(this->state->quote_nonce);
 	WHACK(this->state->public);
 	WHACK(this->state->hardware);
 	WHACK(this->state->identity);

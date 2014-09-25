@@ -821,7 +821,6 @@ static _Bool host_mode(CO(Config, cfg))
 
 	INIT(NAAAIM, IDtoken, token, goto done);
 	INIT(NAAAIM, Ivy, ivy, goto done);
-	fputs("Calling find_client.\n", stderr);
 	if ( !find_client(cfg_item, netbufr, token, ivy) ) {
 		fputs("Cannot locate client.\n", stdout);
 		goto done;
@@ -851,12 +850,16 @@ static _Bool host_mode(CO(Config, cfg))
 	/* Extract the replay and quote nonces. */
 	INIT(HurdLib, Buffer, nonce, goto done);
 	INIT(HurdLib, Buffer, quote_nonce, goto done);
-	if ( (b = packet->get_element(packet, PossumPacket_nonce)) == NULL )
+	if ( (b = packet->get_element(packet, PossumPacket_replay_nonce)) \
+	     == NULL )
 		goto done;
-	if ( !nonce->add(nonce, b->get(b), REPLAY_NONCE) )
+	if ( !nonce->add_Buffer(nonce, b) )
 		goto done;
-	if ( !quote_nonce->add(quote_nonce, b->get(b) + REPLAY_NONCE, \
-			       QUOTE_NONCE) )
+	if ( (b = packet->get_element(packet, PossumPacket_quote_nonce)) \
+	     == NULL )
+		goto done;
+
+	if ( !quote_nonce->add_Buffer(quote_nonce, b) )
 		goto done;
 
 	/* Verify hardware quote. */
@@ -917,10 +920,11 @@ static _Bool host_mode(CO(Config, cfg))
 	fputc('\n', stdout);
 
 	INIT(HurdLib, Buffer, shared_key, goto done);
-	if ( (b = packet->get_element(packet, PossumPacket_nonce)) == NULL )
+	if ( (b = packet->get_element(packet, PossumPacket_replay_nonce)) \
+	     == NULL )
 		goto done;
 	quote_nonce->reset(quote_nonce);
-	if ( !quote_nonce->add(quote_nonce, b->get(b), REPLAY_NONCE) )
+	if ( !quote_nonce->add_Buffer(quote_nonce, b) )
 		goto done;
 
 	if ( !generate_shared_key(quote_nonce, nonce, dhkey, public, \
@@ -1095,9 +1099,10 @@ static _Bool client_mode(CO(Config, cfg))
 
 	/* Extract nonce and public key. */
 	INIT(HurdLib, Buffer, nonce, goto done);
-	if ( (b = packet->get_element(packet, PossumPacket_nonce)) == NULL )
+	if ( (b = packet->get_element(packet, PossumPacket_replay_nonce)) \
+	     == NULL )
 		goto done;
-	if ( !nonce->add(nonce, b->get(b), REPLAY_NONCE) )
+	if ( !nonce->add_Buffer(nonce, b) )
 		goto done;
 
 	/* Wait for a packet to arrive. */
@@ -1137,10 +1142,11 @@ static _Bool client_mode(CO(Config, cfg))
 		goto done;
 	public = b;
 
-	if ( (b = packet->get_element(packet, PossumPacket_nonce)) == NULL )
+	if ( (b = packet->get_element(packet, PossumPacket_replay_nonce)) \
+	     == NULL )
 		goto done;
 	bufr->reset(bufr);
-	if ( !bufr->add(bufr, b->get(b), REPLAY_NONCE) )
+	if ( !bufr->add_Buffer(bufr, b) )
 		goto done;
 
 	INIT(HurdLib, Buffer, shared_key, goto done);

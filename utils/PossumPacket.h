@@ -31,7 +31,8 @@ typedef struct NAAAIM_PossumPacket * PossumPacket;
 typedef struct NAAAIM_PossumPacket_State * PossumPacket_State;
 
 typedef enum {
-	PossumPacket_nonce,
+	PossumPacket_replay_nonce,
+	PossumPacket_quote_nonce,
 	PossumPacket_public,
 	PossumPacket_hardware
 } PossumPacket_element;
