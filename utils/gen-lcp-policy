@@ -22,8 +22,8 @@ declare Policy_list="pconf.lst"
 declare LCPpolicy="lcp.policy";
 declare LCPdata="lcp.data";
 
-declare -r Public_key="/etc/Stirfry/lcpkey-pub.pem";
-declare -r Private_key="/etc/Stirfry/lcpkey.pem";
+declare -r Public_key="/usr/local/etc/Stirfry/lcpkey-pub.pem";
+declare -r Private_key="/usr/local/etc/Stirfry/lcpkey.pem";
 
 
 #
