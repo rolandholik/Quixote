@@ -1,0 +1,154 @@
+#! /bin/bash
+
+#
+# This is a utility program for carrying out all the steps needed to
+# generate the Launch Control Policy (LCP) in an Intel Trusted Execution
+# Technology (TXT) environment.
+#
+
+# Location of boot configuration file.
+declare -r Boot_Menu="/boot/grub/menu.lst";
+
+# Variable to hold command lines.
+declare Cmdline="";
+
+declare MLEhash="mle.hash";
+declare MLEelement="mle.elt";
+
+declare Pcrs="pcrs";
+declare Policy_element="pconf.elt";
+declare Policy_list="pconf.lst"
+
+declare LCPpolicy="lcp.policy";
+declare LCPdata="lcp.data";
+
+declare -r Public_key="lcpkey-pub.pem";
+declare -r Private_key="lcpkey.pem";
+
+
+#
+# This function is responsible for removing any and all files used
+# in the creation of the policy.
+#
+function Cleanup_Files() {
+    
+	rm -f $MLEhash $MLEelement;
+	rm -f $Pcrs $Policy_element $Policy_list;
+	rm -f $LCPpolicy $LCPdata;
+
+	return;
+}
+
+
+#
+# Main program starts here.
+#
+
+echo "Measured Launch Environment:";
+Cmdline=`sed -ne '/kernel \/boot\/tboot\.gz/ s/^.*tboot\.gz \(.*\)$/\1/p' \
+	$Boot_Menu`;
+echo -e "\tCreating hash of tboot cmdline: '$Cmdline'";
+lcp_mlehash -c "$Cmdline" /boot/tboot.gz > $MLEhash;
+if [ $? -ne 0 ]; then
+	echo "Failed to create MLE.".
+	Cleanup_Files;
+	exit 1;
+fi
+
+echo -e "\tCreating policy element.";
+lcp_crtpolelt --create --type mle --ctrl 0x00 --minver 67 --out $MLEelement \
+	$MLEhash;
+if [ $? -ne 0 ]; then
+	echo "Failed to create MLE policy element.";
+	Cleanup_Files;
+	exit 1;
+fi;
+
+
+# Create the policy element representing the PCR state of the hardware:
+echo;
+echo "Platform Configuration Register state:";
+echo -e "\tCreating PCR list.";
+tpm-cmd lspcr | grep "^PCR-0[0-7]" > $Pcrs;
+if [ $? -ne 0 ]; then
+	echo "Failed to obtain PCR register list.";
+	Cleanup_Files;
+	exit 1;
+fi;
+
+echo -e "\tCreating policy element.";
+lcp_crtpolelt --create --type pconf --out $Policy_element $Pcrs;
+if [ $? -ne 0 ]; then
+	echo "Failed to create PCR policy element.";
+	Cleanup_Files;
+	exit 1;
+fi;
+
+
+# Create the signed policy list.
+echo;
+echo "Policy list:";
+
+echo -e "\tCreating.";
+lcp_crtpollist --create --out $Policy_list $MLEelement $Policy_element;
+if [ $? -ne 0 ]; then
+	echo "Cannot create policy list.";
+	Cleanup_Files;
+	exit 1;
+fi;
+
+echo -e "\tSigning.";
+lcp_crtpollist --sign --pub $Public_key --priv $Private_key --out $Policy_list;
+if [ $? -ne 0 ]; then
+	echoh "Cannot sign policy list.";
+	Cleanup_Files;
+	exit 1;
+fi;
+
+
+# Create the LCP policy and data files.
+echo;
+echo "Creating LCP policy and data files.";
+lcp_crtpol2 --create --type list --pol $LCPpolicy --data $LCPdata $Policy_list;
+if [ $? -ne 0 ]; then
+	echo "Unable to create LCP output file.";
+	Cleanup_Files;
+	exit 1;
+fi;
+
+
+#
+# Write LCP policy to NVram and place data in boot location. 
+#
+read -e -p "Update boot configuration: y=yes, n=no: n>" Answer;
+if [ "$Answer" != "y" ]; then
+	Cleanup_Files;
+	exit 1;
+fi;
+
+read -se -p "NVram password: >" Answer;
+if [ -z "$Answer" ]; then
+	Cleanup_Files;
+	exit 1;
+fi;
+
+echo cp $LCPdata /boot;
+if [ $? -ne 0 ]; then
+	echo "Unable to copy LCP policy data.";
+	Cleanup_Files;
+	exit 1;
+fi;
+
+lcp_writepol -i owner -f $LCPpolicy -p "$Answer";
+if [ $? -ne 0 ]; then
+	Cleanup_Files;
+	echo "Failed to write LCP policy to TPM NVram.";
+	exit 1;
+fi;
+
+
+#
+# Done.
+#
+Cleanup_Files;
+exit 0;

@@ -1,0 +1,80 @@
+#! /bin/bash
+
+#
+# This is a utility program for carrying out all the steps needed to
+# generate a Trusted Boot Policy (TBP) for a measured launch in an Intel
+# Trusted Execution Technology environment.
+#
+
+# Location of boot configuration file.
+declare -r Boot_Menu="/boot/grub/menu.lst";
+
+# Location of kernel image.
+declare -r Kernel="/boot/stirfry.trusted";
+
+# Variable to hold command lines.
+declare Cmdline="";
+
+# NVram password.
+declare Pwd="";
+
+# File to hold trusted boot policy.
+declare TBpolicy="tb.policy";
+
+
+#
+# This function is responsible for removing any and all files used
+# in the creation of the policy.
+#
+function Cleanup_Files() {
+    
+	rm -f $TBpolicy;
+
+	return;
+}
+
+
+#
+# Main program starts here.
+#
+
+tb_polgen --create --type nonfatal $TBpolicy;
+if [ $? -ne 0 ]; then
+	echo "Failed to create policy.";
+	exit 1;
+fi;
+
+Cmdline=`sed -ne "\,module $Kernel, s,^.*module $Kernel \(.*\)$,\1,p" \
+	$Boot_Menu`;
+echo "Creating policy for kernel: '$Cmdline'";
+tb_polgen --add --num 0  --pcr none  --hash image --image $Kernel \
+	--cmdline "$Cmdline" $TBpolicy;
+if [ $? -ne 0 ]; then
+	echo "Failed to add kernel image hash to policy.";
+	Cleanup_Files;
+	exit 1;
+fi;
+
+
+#
+# Write policy to TPM NVRAM index.
+#
+read -se -p "NVram password: >" Pwd;
+if [ -z "$Pwd" ]; then
+	Cleanup_Files;
+	exit 1;
+fi;
+
+lcp_writepol -i 0x20000001 -f $TBpolicy -p $Pwd;
+if [ $? -ne 0 ]; then
+	echo "Failed to write trusted boot policy to TPM.";
+	Cleanup_Files;
+	exit 1;
+fi;
+
+
+#
+# Done.
+#
+Cleanup_Files;
+exit 0;
