@@ -40,6 +40,8 @@
 #include <time.h>
 #include <errno.h>
 #include <glob.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include <HurdLib.h>
 #include <Buffer.h>
@@ -54,9 +56,7 @@
 #include <SHA256_hmac.h>
 #include <Curve25519.h>
 #include <RandomBuffer.h>
-#include <String.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+#include <AES256_cbc.h>
 
 #include "Netconfig.h"
 #include "IDtoken.h"
@@ -65,6 +65,7 @@
 #include "PossumPacket.h"
 #include "SoftwareStatus.h"
 #include "Ivy.h"
+#include "TPMcmd.h"
 
 
 /* Variable static to this file. */
@@ -722,6 +723,210 @@ static _Bool send_host_response(CO(Duct, duct), CO(PossumPacket, packet), \
 /**
  * Private function.
  *
+ * This function creates and sends a platform reference quote.
+ *
+ * \param duct		The network object which the reference quote is
+ *			to be sent on on.
+ *
+ * \param bufr		The Buffer object which is to be used to transmit
+ *			the platform quote.
+ *
+ * \param key		The shared key to be used to encrypt the reference
+ *			quote.
+ *
+ * \param nonce		The nonce to be used to generate the quote.
+ *
+ * \return		If the quote is received and verified a true
+ *			value is returned.  If an error is encountered a
+ *			false value is returned.
+ */
+
+static _Bool send_platform_quote(CO(Duct, duct), CO(Buffer, bufr), \
+				 CO(Buffer, key), CO(Buffer, nonce))
+
+{
+	_Bool retn = false;
+
+	Buffer b,
+	       uuid  = NULL,
+	       quote = NULL;
+
+	File aik_file = NULL;
+
+	TPMcmd tpmcmd = NULL;
+
+	AES256_cbc cipher = NULL;
+
+	RandomBuffer iv = NULL;
+
+	SHA256_hmac hmac = NULL;
+
+
+	INIT(HurdLib, File, aik_file, goto done);
+	INIT(HurdLib, Buffer, uuid, goto done);
+	aik_file->open_ro(aik_file, "/etc/conf/aik");
+	if ( !aik_file->slurp(aik_file, uuid) )
+		goto done;
+
+	INIT(NAAAIM, TPMcmd, tpmcmd, goto done);
+	INIT(HurdLib, Buffer, quote, goto done);
+	INIT(NAAAIM, RandomBuffer, iv, goto done);
+
+	if ( !tpmcmd->pcrmask(tpmcmd, 10, 15, 17, 18, -1) )
+		goto done;
+	if ( !quote->add_Buffer(quote, nonce) )
+		goto done;
+
+	if ( !tpmcmd->quote(tpmcmd, uuid, quote) )
+		goto done;
+
+	if ( !iv->generate(iv, 16) )
+		goto done;
+	b= iv->get_Buffer(iv);
+	bufr->add_Buffer(bufr, b);
+
+	if ( (cipher = NAAAIM_AES256_cbc_Init_encrypt(key, b)) == NULL )
+		goto done;
+	if ( !cipher->encrypt(cipher, quote) )
+		goto done;
+	if ( !bufr->add_Buffer(bufr, cipher->get_Buffer(cipher)) )
+		goto done;
+
+	if ( (hmac = NAAAIM_SHA256_hmac_Init(key)) == NULL )
+		goto done;
+	hmac->add_Buffer(hmac, bufr);
+	if ( !hmac->compute(hmac) )
+		goto done;
+	if ( !bufr->add_Buffer(bufr, hmac->get_Buffer(hmac)) )
+		goto done;
+
+	if ( !duct->send_Buffer(duct, bufr) )
+		goto done;
+	retn = true;
+
+
+ done:
+	WHACK(uuid);
+	WHACK(quote);
+	WHACK(aik_file);
+	WHACK(tpmcmd);
+	WHACK(iv);
+	WHACK(cipher);
+	WHACK(hmac);
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function waits to receive a hardware reference quote.
+ *
+ * \param duct		The network object which the reference quote is
+ *			to be received on.
+ *
+ * \param bufr		The Buffer object which is to be used to receive
+ *			the platform quote.
+ *
+ * \param ivy		The identify reference which is to be used to
+ *			verify the platform reference quote.
+ *
+ * \param nonce		The nonce which was used to create the reference.
+ *
+ * \param key		The shared key to be used to decrypt the reference
+ *			quote.
+ *
+ * \return		If the quote is received and verified a true
+ *			value is returned.  If an error is encountered a
+ *			false value is returned.
+ */
+
+static _Bool receive_platform_quote(CO(Duct, duct), CO(Buffer, bufr), \
+				    CO(Ivy, ivy), CO(Buffer, nonce),  \
+				    CO(Buffer, key))
+
+{
+	_Bool retn = false;
+
+	size_t payload;
+
+	Buffer pubkey,
+	       ref,
+	       cksum = NULL,
+	       iv    = NULL,
+	       quote = NULL;
+
+	TPMcmd tpmcmd = NULL;
+
+	AES256_cbc cipher = NULL;
+
+	SHA256_hmac hmac = NULL;
+
+
+	if ( !duct->receive_Buffer(duct, bufr) )
+		goto done;
+
+
+	INIT(HurdLib, Buffer, cksum, goto done);
+	payload = bufr->size(bufr) - 32;
+	cksum->add(cksum, bufr->get(bufr) + payload, 32);
+	
+
+	if ( (hmac = NAAAIM_SHA256_hmac_Init(key)) == NULL )
+		goto done;
+	bufr->shrink(bufr, 32);
+	hmac->add_Buffer(hmac, bufr);
+	if ( !hmac->compute(hmac) )
+		goto done;
+	if ( !cksum->equal(cksum, hmac->get_Buffer(hmac)) )
+		goto done;
+
+
+	INIT(HurdLib, Buffer, iv, goto done);
+	if ( !iv->add(iv, bufr->get(bufr), 16) )
+		goto done;
+
+	if ( (cipher = NAAAIM_AES256_cbc_Init_decrypt(key, iv)) == NULL )
+		goto done;
+
+	INIT(HurdLib, Buffer, quote, goto done);
+	cksum->reset(cksum);
+	if ( !cksum->add(cksum, bufr->get(bufr) + 16, bufr->size(bufr) - 16) )
+		goto done;
+	if ( !cipher->decrypt(cipher, cksum) )
+		goto done;
+	if ( !quote->add_Buffer(quote, cipher->get_Buffer(cipher)) )
+		goto done;
+
+
+	INIT(NAAAIM, TPMcmd, tpmcmd, goto done);
+
+	if ( (pubkey = ivy->get_element(ivy, Ivy_pubkey)) == NULL )
+		goto done;
+	if ( (ref = ivy->get_element(ivy, Ivy_reference)) == NULL )
+		goto done;
+	if ( !tpmcmd->verify(tpmcmd, pubkey, ref, nonce, quote) )
+		goto done;
+
+	retn = true;
+
+
+ done:
+	WHACK(cksum);
+	WHACK(iv);
+	WHACK(quote);
+	WHACK(tpmcmd);
+	WHACK(cipher);
+	WHACK(hmac);
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
  * This function implements POSSUM host mode.  In this mode a
  * connection is listened for on the default POSSUM port for a tunnel
  * request.  Upon receipt of a connection the authentication challenge
@@ -811,7 +1016,7 @@ static _Bool host_mode(CO(Config, cfg))
 	/* Wait for a packet to arrive. */
 	if ( !duct->receive_Buffer(duct, netbufr) )
 		goto done;
-	fprintf(stdout, "%s: Raw receive packet:\n", __func__);
+	fprintf(stdout, "\n%s: Raw receive packet:\n", __func__);
 	netbufr->hprint(netbufr);
 	fputc('\n', stdout);
 
@@ -847,7 +1052,7 @@ static _Bool host_mode(CO(Config, cfg))
 	packet->print(packet);
 	fputc('\n', stdout);
 
-	/* Extract the replay and quote nonces. */
+	/* Extract the replay and quote nonces supplied by client. */
 	INIT(HurdLib, Buffer, nonce, goto done);
 	INIT(HurdLib, Buffer, quote_nonce, goto done);
 	if ( (b = packet->get_element(packet, PossumPacket_replay_nonce)) \
@@ -923,24 +1128,34 @@ static _Bool host_mode(CO(Config, cfg))
 	if ( (b = packet->get_element(packet, PossumPacket_replay_nonce)) \
 	     == NULL )
 		goto done;
-	quote_nonce->reset(quote_nonce);
-	if ( !quote_nonce->add_Buffer(quote_nonce, b) )
-		goto done;
-
-	if ( !generate_shared_key(quote_nonce, nonce, dhkey, public, \
-				  shared_key) )
+	if ( !generate_shared_key(b, nonce, dhkey, public, shared_key) )
 		goto done;
 	fprintf(stdout, "%s: shared key:\n", __func__);
 	shared_key->print(shared_key);
 	fputc('\n', stdout);
 
+	/* Wait for platform verification reference quote. */
+	netbufr->reset(netbufr);
+	if ( (b = packet->get_element(packet, PossumPacket_quote_nonce)) == \
+	     NULL )
+		goto done;
+	if ( !receive_platform_quote(duct, netbufr, ivy, b, shared_key ) )
+		goto done;
+	fputs("\nVerified secure counter-party:\n", stdout);
+	ivy->print(ivy);
+	fputc('\n', stdout);
+	
+
+	/* Create IPsec endpoint. */
 	spi	 = packet->get_value(packet, PossumPacket_spi);
 	protocol = packet->get_value(packet, PossumPacket_protocol);
 
 	INIT(HurdLib, String, remote_ip, goto done);
 	if ( !remote_ip->add(remote_ip, inet_ntoa(*(duct->get_ipv4(duct)))) )
 		goto done;
-	setup_ipsec(cfg, remote_ip->get(remote_ip), protocol, spi, shared_key);
+	if ( !setup_ipsec(cfg, remote_ip->get(remote_ip), protocol, spi, \
+			  shared_key) )
+		goto done;
 
 	retn = true;
 
@@ -1030,10 +1245,11 @@ static _Bool client_mode(CO(Config, cfg))
 
 	Buffer b,
 	       public,
-	       nonce	  = NULL,
-	       software	  = NULL,
-	       bufr	  = NULL,
-	       shared_key = NULL;
+	       nonce	   = NULL,
+	       quote_nonce = NULL,
+	       software	   = NULL,
+	       bufr	   = NULL,
+	       shared_key  = NULL;
 
 	IDmgr idmgr = NULL;
 
@@ -1093,12 +1309,19 @@ static _Bool client_mode(CO(Config, cfg))
 	if ( !duct->send_Buffer(duct, bufr) )
 		goto done;
 
-	fprintf(stdout, "%s: Sent client packet 1:\n", __func__);
+	fprintf(stdout, "\n%s: Sent client packet 1:\n", __func__);
 	packet->print(packet);
 	fputc('\n', stdout);
 
-	/* Extract nonce and public key. */
+	/* Save transmitted nonces for subsequent use. */
 	INIT(HurdLib, Buffer, nonce, goto done);
+	INIT(HurdLib, Buffer, quote_nonce, goto done);
+	if ( (b = packet->get_element(packet, PossumPacket_quote_nonce)) == \
+	     NULL )
+		goto done;
+	if ( !quote_nonce->add_Buffer(quote_nonce, b) )
+		goto done;
+
 	if ( (b = packet->get_element(packet, PossumPacket_replay_nonce)) \
 	     == NULL )
 		goto done;
@@ -1156,18 +1379,29 @@ static _Bool client_mode(CO(Config, cfg))
 	shared_key->print(shared_key);
 	fputc('\n', stdout);
 
+	/* Send platform reference. */
+	if ( (b = packet->get_element(packet, PossumPacket_quote_nonce)) \
+	     == NULL )
+		goto done;
+	bufr->reset(bufr);
+	if ( !send_platform_quote(duct, bufr, shared_key, b) )
+		goto done;
+
 	spi	 = packet->get_value(packet, PossumPacket_spi);
 	protocol = packet->get_value(packet, PossumPacket_protocol);
-	setup_ipsec(cfg, remote_ip, protocol, spi, shared_key);
+	if ( ! setup_ipsec(cfg, remote_ip, protocol, spi, shared_key) )
+		goto done;
+
 	retn = true;
 
  done:
 	if ( token_file != NULL )
 		fclose(token_file);
 
-	WHACK(software_status);
 	WHACK(duct);
+	WHACK(software_status);
 	WHACK(nonce);
+	WHACK(quote_nonce);
 	WHACK(software);
 	WHACK(bufr);
 	WHACK(idmgr);
@@ -1251,6 +1485,7 @@ extern int main(int argc, char *argv[])
 			}
 			break;
 		case client:
+			fputs("Calling client mode\n", stderr);
 			if ( !client_mode(config) ) {
 				fputs("Error initiating client mode.\n", \
 				      stderr);

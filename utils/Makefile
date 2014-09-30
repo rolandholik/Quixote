@@ -76,9 +76,10 @@ init: init.o Netconfig.o SoftwareTPM.o SoftwareStatus.o TPMcmd.o ../SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl -ltspi;
 
 possum: possum.o Netconfig.o IPsec.o PossumPacket.o SoftwareStatus.o IDmgr.o \
-	Ivy.o
+	Ivy.o TPMcmd.o
 	${CC} ${LDFLAGS} -o $@ $^ ../IDtoken.o ../SHA256_hmac.o ../SHA256.o \
-		../RandomBuffer.o ../AES256_cbc.o ${SSL_LIBRARY} ${LIBS} -lfl;
+		../RandomBuffer.o ../AES256_cbc.o ${SSL_LIBRARY} ${LIBS}    \
+		-ltspi -lfl;
 
 gen-id-verifier: gen-id-verifier.o ../IDtoken.o ../SHA256_hmac.o ../SHA256.o \
 	../RandomBuffer.o Ivy.o SoftwareStatus.o TPMcmd.o
