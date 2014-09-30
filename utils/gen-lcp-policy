@@ -22,8 +22,8 @@ declare Policy_list="pconf.lst"
 declare LCPpolicy="lcp.policy";
 declare LCPdata="lcp.data";
 
-declare -r Public_key="lcpkey-pub.pem";
-declare -r Private_key="lcpkey.pem";
+declare -r Public_key="/etc/Stirfry/lcpkey-pub.pem";
+declare -r Private_key="/etc/Stirfry/lcpkey.pem";
 
 
 #
@@ -100,7 +100,7 @@ fi;
 echo -e "\tSigning.";
 lcp_crtpollist --sign --pub $Public_key --priv $Private_key --out $Policy_list;
 if [ $? -ne 0 ]; then
-	echoh "Cannot sign policy list.";
+	echo "Cannot sign policy list.";
 	Cleanup_Files;
 	exit 1;
 fi;
@@ -132,7 +132,7 @@ if [ -z "$Answer" ]; then
 	exit 1;
 fi;
 
-echo cp $LCPdata /boot;
+cp $LCPdata /boot;
 if [ $? -ne 0 ]; then
 	echo "Unable to copy LCP policy data.";
 	Cleanup_Files;
