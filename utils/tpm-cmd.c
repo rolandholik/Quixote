@@ -200,14 +200,10 @@ extern int main(int argc, char *argv[])
 			}
 
 			fprintf(stdout, "PCR-%02d: ", index);
-			for (lp= 0; lp < bufr->size(bufr); ++lp) {
-				fprintf(stdout, "%02X", \
+			for (lp= 0; lp < bufr->size(bufr); ++lp)
+				fprintf(stdout, "%02X ", \
 					*(bufr->get(bufr) + lp));
-				if ( lp == (bufr->size(bufr) - 1) )
-					fputc('\n', stdout);
-				else
-					fputc(' ', stdout);
-			}
+			fputc('\n', stdout);
 			bufr->reset(bufr);
 		}
 
