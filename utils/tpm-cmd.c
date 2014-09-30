@@ -190,13 +190,24 @@ extern int main(int argc, char *argv[])
 	}
 
 	if ( strcmp(argv[1], "lspcr") == 0 ) {
+		size_t lp;
+
+
 		for(index=0; index < 24; ++index) {
 			if ( !tpmcmd->pcr_read(tpmcmd, index, bufr) ) {
 				fputs("Failed PCR read.\n", stderr);
 				goto done;
 			}
+
 			fprintf(stdout, "PCR-%02d: ", index);
-			bufr->print(bufr);
+			for (lp= 0; lp < bufr->size(bufr); ++lp) {
+				fprintf(stdout, "%02X", \
+					*(bufr->get(bufr) + lp));
+				if ( lp == (bufr->size(bufr) - 1) )
+					fputc('\n', stdout);
+				else
+					fputc(' ', stdout);
+			}
 			bufr->reset(bufr);
 		}
 
