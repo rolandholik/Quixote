@@ -871,7 +871,7 @@ static _Bool receive_platform_quote(CO(Duct, duct), CO(Buffer, bufr), \
 	INIT(HurdLib, Buffer, cksum, goto done);
 	payload = bufr->size(bufr) - 32;
 	cksum->add(cksum, bufr->get(bufr) + payload, 32);
-	
+
 
 	if ( (hmac = NAAAIM_SHA256_hmac_Init(key)) == NULL )
 		goto done;
@@ -901,7 +901,7 @@ static _Bool receive_platform_quote(CO(Duct, duct), CO(Buffer, bufr), \
 
 
 	INIT(NAAAIM, TPMcmd, tpmcmd, goto done);
-
+	
 	if ( (pubkey = ivy->get_element(ivy, Ivy_pubkey)) == NULL )
 		goto done;
 	if ( (ref = ivy->get_element(ivy, Ivy_reference)) == NULL )
@@ -921,6 +921,188 @@ static _Bool receive_platform_quote(CO(Duct, duct), CO(Buffer, bufr), \
 	WHACK(hmac);
 
 	return retn;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function transmits confirmation for the host to move forward
+ * with the secured connection.  The confirmation consists of
+ * the SHA256 hash of the negotiated secret.
+ *
+ * \param duct		The network object which the reference quote is
+ *			to be received on.
+ *
+ * \param bufr		The Buffer object which is to be used to send the
+ *			confirmation message.
+ *
+ * \param key		The shared key used in the connextion.
+ *
+ *
+ * \return		If an error is encountered in composing or
+ *			sending the confirmation a false value is
+ *			returned.  Success is indicated by returning
+ *			true.
+ */
+
+static _Bool send_connection_start(CO(Duct, duct), CO(Buffer, bufr), \
+				   CO(Buffer, key))
+
+{
+	_Bool retn = false;
+
+	Buffer b;
+
+	AES256_cbc cipher = NULL;
+
+	RandomBuffer iv = NULL;
+
+	SHA256 sha256 = NULL;
+
+	SHA256_hmac hmac = NULL;
+
+
+	/* Generate the initialization vector. */
+	INIT(NAAAIM, RandomBuffer, iv, goto done);
+	if ( !iv->generate(iv, 16) )
+		goto done;
+	if ( !bufr->add_Buffer(bufr, iv->get_Buffer(iv)) )
+		goto done;
+
+	/* Generate the connection authenticator. */
+	INIT(NAAAIM, SHA256, sha256, goto done);
+	sha256->add(sha256, key);
+	if ( !sha256->compute(sha256) )
+		goto done;
+
+	/* Encrypt the authenticator. */
+	b = iv->get_Buffer(iv);
+	if ( (cipher = NAAAIM_AES256_cbc_Init_encrypt(key, b)) == NULL )
+		goto done;
+	if ( !cipher->encrypt(cipher, sha256->get_Buffer(sha256)) )
+		goto done;
+	if ( !bufr->add_Buffer(bufr, cipher->get_Buffer(cipher)) )
+		goto done;
+
+	/* Add the authenticator checksum. */
+	if ( (hmac = NAAAIM_SHA256_hmac_Init(key)) == NULL )
+		goto done;
+	hmac->add_Buffer(hmac, bufr);
+	if ( !hmac->compute(hmac) )
+		goto done;
+	if ( !bufr->add_Buffer(bufr, hmac->get_Buffer(hmac)) )
+		goto done;
+
+	/* Send the authenticator. */
+	if ( !duct->send_Buffer(duct, bufr) )
+		goto done;
+	retn = true;
+
+
+ done:
+	WHACK(iv);
+	WHACK(cipher);
+	WHACK(sha256);
+	WHACK(hmac);
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function receives and confirms a request to initiate a
+ * connection from the client.
+ *
+ * \param duct		The network object which the reference quote is
+ *			to be received on.
+ *
+ * \param bufr		The Buffer object which is to be used to receive
+ *			the initiation request.
+ *
+ * \param key		The shared key used to authenticated the request.
+ *
+ * \return		If a confirmation quote is received without
+ *			error and validated a true value is returned.  A
+ *			false value indicates the confirmation failed.
+ */
+
+static _Bool receive_connection_start(CO(Duct, duct), CO(Buffer, bufr), \
+				      CO(Buffer, key))
+
+{
+	_Bool retn = false;
+
+	size_t payload;
+
+	Buffer b,
+	       cksum = NULL,
+	       iv    = NULL;
+
+	AES256_cbc cipher = NULL;
+
+	SHA256 sha256 = NULL;
+
+	SHA256_hmac hmac = NULL;
+
+
+	/* Receive the confirmation message. */
+	if ( !duct->receive_Buffer(duct, bufr) )
+		goto done;
+
+
+	/* Validate the confirmation checksum. */
+	INIT(HurdLib, Buffer, cksum, goto done);
+	payload = bufr->size(bufr) - 32;
+	cksum->add(cksum, bufr->get(bufr) + payload, 32);
+
+	if ( (hmac = NAAAIM_SHA256_hmac_Init(key)) == NULL )
+		goto done;
+	bufr->shrink(bufr, 32);
+	hmac->add_Buffer(hmac, bufr);
+	if ( !hmac->compute(hmac) )
+		goto done;
+	if ( !cksum->equal(cksum, hmac->get_Buffer(hmac)) )
+		goto done;
+
+
+	/* Decrypt the authenticator. */
+	INIT(HurdLib, Buffer, iv, goto done);
+	if ( !iv->add(iv, bufr->get(bufr), 16) )
+		goto done;
+
+	if ( (cipher = NAAAIM_AES256_cbc_Init_decrypt(key, iv)) == NULL )
+		goto done;
+	cksum->reset(cksum);
+	if ( !cksum->add(cksum, bufr->get(bufr) + 16, bufr->size(bufr) - 16) )
+		goto done;
+	if ( !cipher->decrypt(cipher, cksum) )
+		goto done;
+
+
+	/* Confirm the authenticator. */
+	INIT(NAAAIM, SHA256, sha256, goto done);
+	sha256->add(sha256, key);
+	if ( !sha256->compute(sha256) )
+		goto done;
+	b = sha256->get_Buffer(sha256);
+	if ( !b->equal(b, cipher->get_Buffer(cipher)) )
+		goto done;
+
+	retn = true;
+
+
+ done:
+	WHACK(cksum);
+	WHACK(iv);
+	WHACK(cipher);
+	WHACK(sha256);
+	WHACK(hmac);
+
+	return retn;
+
 }
 
 
@@ -1144,7 +1326,19 @@ static _Bool host_mode(CO(Config, cfg))
 	fputs("\nVerified secure counter-party:\n", stdout);
 	ivy->print(ivy);
 	fputc('\n', stdout);
-	
+
+	/* Send platform verification quote. */
+	netbufr->reset(netbufr);
+	if ( !send_platform_quote(duct, netbufr, shared_key, quote_nonce) )
+		goto done;
+
+	/* Get connection confirmation start. */
+	netbufr->reset(netbufr);
+	if ( !receive_connection_start(duct, netbufr, shared_key) ) {
+		fputs("Failed connection start.\n", stderr);
+		goto done;
+	}
+	fputs("Have connection start.\n", stderr);
 
 	/* Create IPsec endpoint. */
 	spi	 = packet->get_value(packet, PossumPacket_spi);
@@ -1387,9 +1581,24 @@ static _Bool client_mode(CO(Config, cfg))
 	if ( !send_platform_quote(duct, bufr, shared_key, b) )
 		goto done;
 
+	/* Receive platform reference. */
+	bufr->reset(bufr);
+	if ( !receive_platform_quote(duct, bufr, ivy, quote_nonce, \
+				     shared_key) )
+		goto done;
+	fputs("\nVerified secure host:\n", stderr);
+	ivy->print(ivy);
+	fputc('\n', stdout);
+
+	/* Send initiation packet. */
+	bufr->reset(bufr);
+	if ( !send_connection_start(duct, bufr, shared_key) )
+		goto done;
+
+	/* Initiate IPsec link. */
 	spi	 = packet->get_value(packet, PossumPacket_spi);
 	protocol = packet->get_value(packet, PossumPacket_protocol);
-	if ( ! setup_ipsec(cfg, remote_ip, protocol, spi, shared_key) )
+	if ( !setup_ipsec(cfg, remote_ip, protocol, spi, shared_key) )
 		goto done;
 
 	retn = true;
