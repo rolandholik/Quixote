@@ -14,7 +14,7 @@ CSRC = 	SHA256.c SHA256_hmac.c RSAkey.c OrgID.c PatientID.c RandomBuffer.c \
 # 	provider-server
 SERVERS = root-referral device-broker user-broker
 
-SUBDIRS = lib utils # client
+SUBDIRS = lib idgine utils # client
 
 # CC = gcc
 CC = musl-gcc
@@ -140,6 +140,9 @@ DBduct.o: DBduct.c
 # Subdirectory targets.
 #
 client:
+	${MAKE} -C $@;
+
+idgine:
 	${MAKE} -C $@;
 
 lib:
