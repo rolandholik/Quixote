@@ -47,3 +47,4 @@
 #define NAAAIM_TPMcmd_OBJID		26
 #define NAAAIM_IDmgr_OBJID		27
 #define NAAAIM_Ivy_OBJID		28
+#define NAAAIM_IDengine_OBJID		29

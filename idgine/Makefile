@@ -4,9 +4,9 @@
 
 
 # Variable declarations.
-CSRC = idgine.c
+CSRC = idgine.c IDengine.c
 
-BINARIES = idgine
+BINARIES = idgine gen-id
 
 CC = musl-gcc
 
@@ -40,7 +40,7 @@ LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib -L../lib -L../HurdLib
 #
 COBJS = ${CSRC:.c=.o}
 
-LIBS = -lNAAAIM -lHurdLib 
+LIBS = -lNAAAIM -lHurdLib
 
 CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I${SSL_INCLUDE} \
 	-I${MUSL_INCLUDE}/tss
@@ -56,8 +56,11 @@ all: ${COBJS} binaries
 
 binaries: ${BINARIES}
 
-idgined: idgined.o
-	${CC} ${LDFLAGS} -o $@ $^;
+idgine: idgine.o IDengine.o 
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
+
+gen-id: gen-id.o IDengine.o 
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
 clean:
 	rm -f *.o *~ TAGS;
@@ -65,3 +68,6 @@ clean:
 
 
 # Source dependencies.
+idgine.o: IDengine.h
+
+IDengine.o: IDengine.h

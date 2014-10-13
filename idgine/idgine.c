@@ -33,7 +33,11 @@
 
 #include <Origin.h>
 #include <HurdLib.h>
+#include <Buffer.h>
 #include <Config.h>
+#include <String.h>
+
+#include "IDengine.h"
 
 
 /* Static variable definitions. */
@@ -128,14 +132,21 @@ static void identity_generator(void)
 {
 	struct sigaction signal_action;
 
-#if 0
-	IDmgr idmgr = NULL;
+	Buffer id;
+
+	String identifier;
+
+	IDengine_identity idtype;
+
+	IDengine idengine = NULL;
 
 
-	INIT(NAAAIM, IDmgr, idmgr, goto done);
-	if ( !idmgr->setup(idmgr) )
+	INIT(HurdLib, Buffer, id, goto done);
+	INIT(HurdLib, String, identifier, goto done);
+
+	INIT(NAAAIM, IDengine, idengine, goto done);
+	if ( !idengine->setup(idengine) )
 		goto done;
-#endif
 
 	signal_action.sa_handler = signal_handler;
 	if ( sigaction(SIGUSR1, &signal_action, NULL) == -1 )
@@ -147,19 +158,26 @@ static void identity_generator(void)
 		pause();
 		if ( signals.sigint )
 			goto done;
-		fputs("Processing identity request.\n", stderr);
 
-#if 0
-		if ( !idmgr->set_idtoken(idmgr, identity) )
-			goto done;
-#endif
+		if ( !idengine->get_id_info(idengine, &idtype, identifier) )
+			continue;
+
+		fputs("Processing identity request.\n", stderr);
+		fprintf(stdout, "type=%d, type=", idtype);
+		identifier->print(identifier);
+		if ( id->add_hexstring(id, "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff") ) {
+			if ( !idengine->set_identity(idengine, id) )
+				goto done;
+		}
+
+		id->reset(id);
 		signals.sigint = false;
 	}
 
+
  done:
-#if 0
-	WHACK(idmgr);
-#endif
+	WHACK(idengine);
+	WHACK(identifier);
 
 	return;
 }
@@ -185,9 +203,5 @@ extern int main(int argc, char *argv[])
 
 
  done:
-#if 0
-	WHACK(identity);
-#endif
-
 	return retn;
 }
