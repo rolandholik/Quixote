@@ -56,10 +56,10 @@ all: ${COBJS} binaries
 
 binaries: ${BINARIES}
 
-idgine: idgine.o IDengine.o 
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
+idgine: idgine.o IDengine.o ../OrgID.o ../SHA256.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY} -lfl;
 
-gen-id: gen-id.o IDengine.o 
+gen-id: gen-id.o IDengine.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
 clean:

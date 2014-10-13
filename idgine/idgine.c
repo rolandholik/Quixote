@@ -37,17 +37,25 @@
 #include <Config.h>
 #include <String.h>
 
+#include <SHA256.h>
+#include <OrgID.h>
+
 #include "IDengine.h"
 
 
 /* Static variable definitions. */
 
+/* The organizational identity. */
+static OrgID OrganizationID = NULL;
+
+/* The organizational identity configuration. */
+static Config IDconfig = NULL;
+
 /* Structure to hold indicators as to which signal was generated. */
 struct {
 	_Bool sigusr1;
 	_Bool sigint;
-} signals;
-
+} Signals;
 
 
 /**
@@ -65,10 +73,10 @@ void signal_handler(int signal)
 {
 	switch ( signal ) {
 		case SIGUSR1:
-			signals.sigusr1 = true;
+			Signals.sigusr1 = true;
 			break;
 		case SIGINT:
-			signals.sigint = true;
+			Signals.sigint = true;
 			break;
 	}
 
@@ -94,15 +102,20 @@ static _Bool load_identity_root(void)
 {
 	_Bool retn = false;
 
-	struct stat idfile;
+	char *anonymizer,
+	     *identifier;
 
 
-	if ( stat(IDENTITY_ROOT, &idfile) == -1 ) {
-		if ( errno == ENOENT ) {
-			retn = true;
-			goto done;
-		}
-	}
+	if ( !IDconfig->parse(IDconfig, IDENTITY_ROOT) )
+		goto done;
+
+	IDconfig->set_section(IDconfig, "Default");
+	if ( (identifier = IDconfig->get(IDconfig, "identifier")) == NULL )
+		goto done;
+	if ( (anonymizer = IDconfig->get(IDconfig, "anonymizer")) == NULL )
+		goto done;
+	if ( !OrganizationID->create(OrganizationID, anonymizer, identifier) )
+		goto done;
 
 	retn = true;
 
@@ -156,7 +169,7 @@ static void identity_generator(void)
 
 	while ( 1 ) {
 		pause();
-		if ( signals.sigint )
+		if ( Signals.sigint )
 			goto done;
 
 		if ( !idengine->get_id_info(idengine, &idtype, identifier) )
@@ -171,11 +184,12 @@ static void identity_generator(void)
 		}
 
 		id->reset(id);
-		signals.sigint = false;
+		Signals.sigint = false;
 	}
 
 
  done:
+	WHACK(id);
 	WHACK(idengine);
 	WHACK(identifier);
 
@@ -193,15 +207,26 @@ extern int main(int argc, char *argv[])
 	int retn = 1;
 
 
+	/* Initialize static objects and load the identity root. */
+	INIT(HurdLib, Config, IDconfig, goto done);
+	INIT(NAAAIM, OrgID, OrganizationID, goto done);
+
 	if ( !load_identity_root() ) {
-		fputs("Failed to load identity root.\n", stderr);
+		fputs("Error initializing identity root.\n", stderr);
 		goto done;
 	}
+	fputs("Organization ID:\n", stdout);
+	OrganizationID->print(OrganizationID);
 
+
+	/* Run the identity generator loop. */
 	identity_generator();
 	retn = 0;
 
 
  done:
+	WHACK(IDconfig);
+	WHACK(OrganizationID);
+
 	return retn;
 }
