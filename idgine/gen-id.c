@@ -33,6 +33,8 @@
 #include <Buffer.h>
 #include <String.h>
 
+#include "OrgID.h"
+#include "Identity.h"
 #include "IDengine.h"
 
 
