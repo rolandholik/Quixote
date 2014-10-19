@@ -4,7 +4,7 @@
 
 
 # Variable declarations.
-CSRC = idgine.c IDengine.c
+CSRC = idgine.c Identity.c IDengine.c
 
 BINARIES = idgine gen-id
 
@@ -56,7 +56,7 @@ all: ${COBJS} binaries
 
 binaries: ${BINARIES}
 
-idgine: idgine.o IDengine.o ../OrgID.o ../SHA256.o
+idgine: idgine.o IDengine.o Identity.o ../OrgID.o ../SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY} -lfl;
 
 gen-id: gen-id.o IDengine.o
@@ -71,3 +71,4 @@ clean:
 idgine.o: IDengine.h
 
 IDengine.o: IDengine.h
+Identity.o: Identity.h

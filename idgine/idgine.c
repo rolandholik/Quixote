@@ -40,6 +40,7 @@
 #include <SHA256.h>
 #include <OrgID.h>
 
+#include "Identity.h"
 #include "IDengine.h"
 
 
@@ -123,19 +124,84 @@ static _Bool load_identity_root(void)
  done:
 	return retn;
 }
+
+
+/**
+ * Private function.
+ *
+ * This funciton is responsible for creation of the identity with
+ * parameters provided by the caller.
+ *
+ * \param type		The type of the identity, ie. user, service
+ *			or device which is to be created.
+ *
+ * \param name		The name of the identity which is to be
+ *			created.
+ *
+ * \param identifier	The identifier which is to be used to generate
+ *			the identity.
+ *
+ * \param identity	The Identity object containing the generated
+ *			identity.
+ *
+ * \return		A false value is used to indicated that an
+ *			error was encountered while generating the
+ *			identity.  A true value indicates the identity
+ *			is valied.
+ */
+
+static _Bool create_identity(const IDengine_identity type, CO(String, name), \
+			     CO(String, identifier), CO(Identity, identity))
+
+{
+	_Bool retn = false;
+
+	char *anon;
+
+	String anonymizer = NULL;
+
+
+	/*
+	 * Set the section based on the name of the identity and
+	 * then fetch the anonymizer for that identity.
+	 */
+	if ( !IDconfig->set_section(IDconfig, name->get(name)) )
+		goto done;
+	if ( (anon = IDconfig->get(IDconfig, "anonymizer")) == NULL )
+		goto done;
+
+	INIT(HurdLib, String, anonymizer, goto done);
+	if ( !anonymizer->add(anonymizer, anon) )
+		goto done;
+
+	/* Call the identity generation. */
+	if ( !identity->create(identity, OrganizationID, anonymizer, \
+			       identifier) )
+		goto done;
+
+	retn = true;
+
+
+ done:
+	WHACK(anonymizer);
+
+	return retn;
+}
 		
 
 /**
  * Private function.
  *
- * This function is responsible for implementing the identity gneration
+ * This function is responsible for implementing the identity generation
  * processing loop.  This function pauses waiting for a SIGUSR1 signal.
  * When it receives a signal it reads the identity request structure
- * for the type of identity to be generated and the value to be
- * used for generating the identity.
+ * for the type of identity to be generated, the name of the identity
+ * to be created and the identifier which is to be used for generating
+ * the identity.
  *
- * \param identity	The token which the identity manager is
- *			implementing identity services for.
+ * These parameters are used to generate the identity rooted within
+ * the identity heirarchy of the organization.  This value is returned
+ * via IPC to the client.
  *
  * \return		No return value is specified.
  */
@@ -145,8 +211,6 @@ static void identity_generator(void)
 {
 	struct sigaction signal_action;
 
-	Buffer id = NULL;
-
 	String name = NULL,
 	       identifier = NULL;
 
@@ -154,10 +218,12 @@ static void identity_generator(void)
 
 	IDengine idengine = NULL;
 
+	Identity identity = NULL;
 
-	INIT(HurdLib, Buffer, id, goto done);
+
 	INIT(HurdLib, String, name, goto done);
 	INIT(HurdLib, String, identifier, goto done);
+	INIT(NAAAIM, Identity, identity, goto done);
 
 	INIT(NAAAIM, IDengine, idengine, goto done);
 	if ( !idengine->setup(idengine) )
@@ -185,25 +251,22 @@ static void identity_generator(void)
 		fputs("identifier=", stderr);
 		identifier->print(identifier);
 
-		if ( !id->add_Buffer(id, OrganizationID->get_Buffer(OrganizationID)) )
-			continue;
+		if ( create_identity(idtype, name, identifier, identity) )
+		     idengine->set_identity(idengine, identity);
 
-		if ( !idengine->set_identity(idengine, id) ) {
-			goto done;
-		}
-
-		id->reset(id);
 		name->reset(name);
 		identifier->reset(identifier);
+		identity->reset(identity);
+
 		Signals.sigint = false;
 	}
 
 
  done:
-	WHACK(id);
 	WHACK(name);
 	WHACK(identifier);
 	WHACK(idengine);
+	WHACK(identity);
 
 	return;
 }

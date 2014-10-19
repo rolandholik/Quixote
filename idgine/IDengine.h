@@ -40,7 +40,7 @@ struct NAAAIM_IDengine
 
 	_Bool (*get_identity)(const IDengine, const IDengine_identity, \
 			      const String, const String, const Buffer);
-	_Bool (*set_identity)(const IDengine, const Buffer);
+	_Bool (*set_identity)(const IDengine, const Identity);
 
 	void (*whack)(const IDengine);
 

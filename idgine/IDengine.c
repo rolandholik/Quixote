@@ -28,6 +28,8 @@
 
 #include "NAAAIM.h"
 #include "IPC.h"
+#include "OrgID.h"
+#include "Identity.h"
 #include "IDengine.h"
 
 
@@ -291,7 +293,7 @@ static _Bool get_identity(CO(IDengine, this), const IDengine_identity type, \
  *			setting the identity failed.
  */
 
-static _Bool set_identity(CO(IDengine, this), CO(Buffer, id))
+static _Bool set_identity(CO(IDengine, this), CO(Identity, identity))
 
 {
 
@@ -300,6 +302,8 @@ static _Bool set_identity(CO(IDengine, this), CO(Buffer, id))
 	_Bool retn = false;
 
 	struct IDengine_ipc *ipc;
+
+	Buffer id = identity->get_identity(identity);
 
 
 	if ( S->poisoned )
