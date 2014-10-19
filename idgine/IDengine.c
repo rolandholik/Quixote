@@ -73,6 +73,8 @@ struct IDengine_ipc
 
 	IDengine_identity idtype;
 
+	char name[80];
+
 	char identifier[80];
 
 	unsigned char identity[NAAAIM_IDSIZE];
@@ -189,7 +191,15 @@ static _Bool attach(CO(IDengine, this))
  * \param this		A pointer to the identity generation object which
  *			is requesting the identity.
  *
- * \param id		A Buffer object which will be loaded with the
+ * \param type		The type of identity which is being requested.
+ *
+ * \param name		A String object containing the identifier which
+ *			will be used to create the identity.
+ *
+ * \param identifier	A String object containing the identifier which
+ *			will be used to create the identity.
+ *
+ * \param identity	A Buffer object which will be loaded with the
  *			identity which has been retrieved from the IPC
  *			object.
  *
@@ -198,7 +208,9 @@ static _Bool attach(CO(IDengine, this))
  *			the request failed.
  */
 
-static _Bool get_identity(CO(IDengine, this), CO(Buffer, id))
+static _Bool get_identity(CO(IDengine, this), const IDengine_identity type, \
+			  CO(String, name), CO(String, identifier),	    \
+			  CO(Buffer, identity))
 
 {
 	STATE(S);
@@ -220,8 +232,18 @@ static _Bool get_identity(CO(IDengine, this), CO(Buffer, id))
 
 	/* Set the identity request parameters. */
 	ipc->idtype = IDengine_device;
+
+	if ( name->size(name) > sizeof(ipc->name) )
+		goto done;
+
+	memset(ipc->name, '\0', sizeof(ipc->name));
+	memcpy(ipc->name, name->get(name), name->size(name));
+
 	memset(ipc->identifier, '\0', sizeof(ipc->identifier));
-	memset(ipc->identity,   '\0', sizeof(ipc->identity));
+	memcpy(ipc->identifier, identifier->get(identifier), \
+	       identifier->size(identifier));
+
+	memset(ipc->identity, '\0', sizeof(ipc->identity));
 
 	/* Request processing of the structure. */
 	ipc->valid = false;
@@ -234,12 +256,13 @@ static _Bool get_identity(CO(IDengine, this), CO(Buffer, id))
 		goto done;
 
 	/* Return the identity. */
-	if ( !id->add(id, ipc->identity, sizeof(ipc->identity)) )
+	if ( !identity->add(identity, ipc->identity, sizeof(ipc->identity)) )
 		goto done;
 	retn = true;
 	
 
  done:
+	memset(ipc->name,	'\0', sizeof(ipc->name));
 	memset(ipc->identifier, '\0', sizeof(ipc->identifier));
 	memset(ipc->identity,   '\0', sizeof(ipc->identity));
 
@@ -306,13 +329,22 @@ static _Bool set_identity(CO(IDengine, this), CO(Buffer, id))
  * \param this		A pointer to the identity generation object which
  *			is setting the identity
  *
+ * \param type		A pointer to the enumerated type which will be
+ *			loaded with the type of identity being requested.
+ *
+ * \param name		A String object containing the name of the identity
+ *			within the selected identity class type.
+ *
+ * \param identifier	A String object containing the identifier which
+ *			will be used to generate the identity.
+ *
  * \return		A true value is returned if the identity was
  *			successfully set.  A false value indicates that
  *			setting the identity failed.
  */
 
 static _Bool get_id_info(CO(IDengine, this), IDengine_identity *type, \
-			 CO(String, identifier))
+			 CO(String, name), CO(String, identifier))
 
 {
 	STATE(S);
@@ -323,6 +355,10 @@ static _Bool get_id_info(CO(IDengine, this), IDengine_identity *type, \
 
 
 	*type = ipc->idtype;
+
+	if ( !name->add(name, ipc->name) )
+		goto done;
+
 	if ( !identifier->add(identifier, ipc->identifier) )
 		goto done;
 

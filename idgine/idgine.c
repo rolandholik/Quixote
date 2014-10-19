@@ -145,9 +145,10 @@ static void identity_generator(void)
 {
 	struct sigaction signal_action;
 
-	Buffer id;
+	Buffer id = NULL;
 
-	String identifier;
+	String name = NULL,
+	       identifier = NULL;
 
 	IDengine_identity idtype;
 
@@ -155,6 +156,7 @@ static void identity_generator(void)
 
 
 	INIT(HurdLib, Buffer, id, goto done);
+	INIT(HurdLib, String, name, goto done);
 	INIT(HurdLib, String, identifier, goto done);
 
 	INIT(NAAAIM, IDengine, idengine, goto done);
@@ -172,26 +174,36 @@ static void identity_generator(void)
 		if ( Signals.sigint )
 			goto done;
 
-		if ( !idengine->get_id_info(idengine, &idtype, identifier) )
+		if ( !idengine->get_id_info(idengine, &idtype, name, \
+					    identifier) )
 			continue;
 
 		fputs("Processing identity request.\n", stderr);
-		fprintf(stdout, "type=%d, type=", idtype);
+		fprintf(stdout, "type=%d\n", idtype);
+		fputs("name=", stderr);
+		name->print(name);
+		fputs("identifier=", stderr);
 		identifier->print(identifier);
-		if ( id->add_hexstring(id, "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff") ) {
-			if ( !idengine->set_identity(idengine, id) )
-				goto done;
+
+		if ( !id->add_Buffer(id, OrganizationID->get_Buffer(OrganizationID)) )
+			continue;
+
+		if ( !idengine->set_identity(idengine, id) ) {
+			goto done;
 		}
 
 		id->reset(id);
+		name->reset(name);
+		identifier->reset(identifier);
 		Signals.sigint = false;
 	}
 
 
  done:
 	WHACK(id);
-	WHACK(idengine);
+	WHACK(name);
 	WHACK(identifier);
+	WHACK(idengine);
 
 	return;
 }

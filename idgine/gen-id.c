@@ -45,12 +45,17 @@ extern int main(int argc, char *argv[])
 {
 	int retn = 1;
 
-	Buffer id = NULL;
+	Buffer identity = NULL;
+
+	String name	  = NULL,
+	       identifier = NULL;
 
 	IDengine idengine = NULL;
 
 
-	INIT(HurdLib, Buffer, id, goto done);
+	INIT(HurdLib, Buffer, identity, goto done);
+	INIT(HurdLib, String, name, goto done);
+	INIT(HurdLib, String, identifier, goto done);
 
 	INIT(NAAAIM, IDengine, idengine, goto done);
 	if ( !idengine->attach(idengine) ) {
@@ -59,15 +64,21 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
-	if ( !idengine->get_identity(idengine, id) )
+	name->add(name, "device1");
+	identifier->add(identifier, "140330001");
+	if ( !idengine->get_identity(idengine, IDengine_device, name, \
+				     identifier, identity) )
 		goto done;
 	fputs("identity:\n", stdout);
-	id->print(id);
+	identity->print(identity);
 		
 
  done:
+	WHACK(identity);
+	WHACK(name);
+	WHACK(identifier);
 	WHACK(idengine);
-	WHACK(id);
+	WHACK(identity);
 
 	return retn;
 }
