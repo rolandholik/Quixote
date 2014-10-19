@@ -25,7 +25,8 @@ typedef struct NAAAIM_Identity_State * Identity_State;
 struct NAAAIM_Identity
 {
 	/* External methods. */
-	_Bool (*create)(const Identity, const OrgID, const String);
+	_Bool (*create)(const Identity, const OrgID, const String, \
+			const String);
 
 	Buffer (*get_identity)(const Identity);
 

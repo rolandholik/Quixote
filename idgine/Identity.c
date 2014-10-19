@@ -111,7 +111,7 @@ static void _init_state(CO(Identity_State, S))
  */
 
 static _Bool create(CO(Identity, this), CO(OrgID, orgid), \
-		    CO(String, identifier))
+		    CO(String, anonymizer), CO(String, identifier))
 
 {
 	STATE(S);
@@ -142,11 +142,27 @@ static _Bool create(CO(Identity, this), CO(OrgID, orgid), \
 	if ( !sha256->compute(sha256) ) 
 		goto done;
 
+	/*
+	 * Add the anonymizer for this identifier and extend the
+	 * anonymizer with the hash of the identifier.
+	 */
+	id->reset(id);
+	if ( !id->add_hexstring(id, anonymizer->get(anonymizer)) )
+		goto done;
+
+	if ( !id->add_Buffer(id, sha256->get_Buffer(sha256)) )
+		goto done;
+
+	sha256->reset(sha256);
+	sha256->add(sha256, id);
+	if ( !sha256->compute(sha256) )
+		goto done;
+
+	/* Extend the organizational identity with the identity entity hash. */
 	id->reset(id);
 	if ( !id->add_Buffer(id, sha256->get_Buffer(sha256)) )
 		goto done;
 
-	/* Extend the organizational identity with the identity entity hash. */
 	sha256->reset(sha256);
 	sha256->add(sha256, orgid->get_Buffer(orgid));
 	sha256->add(sha256, id);
