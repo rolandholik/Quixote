@@ -21,6 +21,7 @@ typedef struct NAAAIM_IDengine_State * IDengine_State;
 
 /* Types of identities. */
 typedef enum {
+	IDengine_none,
         IDengine_user,
 	IDengine_device,
 	IDengine_service
