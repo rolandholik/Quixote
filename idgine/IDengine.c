@@ -73,6 +73,8 @@ struct IDengine_ipc
 
 	_Bool valid;
 
+	_Bool error;
+
 	IDengine_identity idtype;
 
 	char name[80];
@@ -249,6 +251,8 @@ static _Bool get_identity(CO(IDengine, this), const IDengine_identity type, \
 
 	/* Request processing of the structure. */
 	ipc->valid = false;
+	ipc->error = false;
+
 	kill(ipc->pid, SIGUSR1);
 	while ( !ipc->valid )
 		continue;
@@ -257,7 +261,10 @@ static _Bool get_identity(CO(IDengine, this), const IDengine_identity type, \
 	if ( !S->ipc->unlock(S->ipc) )
 		goto done;
 
-	/* Return the identity. */
+	/* Return the identity if it is valid. */
+	if ( ipc->error )
+		goto done;
+
 	if ( !identity->add(identity, ipc->identity, sizeof(ipc->identity)) )
 		goto done;
 	retn = true;
@@ -313,6 +320,48 @@ static _Bool set_identity(CO(IDengine, this), CO(Identity, identity))
 
 	memcpy(ipc->identity, id->get(id), sizeof(ipc->identity));
 	ipc->valid = true;
+
+	retn = true;
+
+	
+ done:
+	if ( !retn )
+		S->poisoned = true;
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements setting an indication that an error occurred
+ * while generating the requested identity.
+ *
+ * \param this		A pointer to the identity generation object which
+ *			is setting the identity
+ *
+ * \return		A true value is returned if the identity was
+ *			successfully set.  A false value indicates that
+ *			setting the identity failed.
+ */
+
+static _Bool set_error(CO(IDengine, this))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	struct IDengine_ipc *ipc;
+
+
+	if ( S->poisoned )
+		goto done;
+
+	ipc = S->ipc->get(S->ipc);
+
+	ipc->valid = true;
+	ipc->error = true;
 
 	retn = true;
 
@@ -440,6 +489,7 @@ extern IDengine NAAAIM_IDengine_Init(void)
 
 	this->get_identity = get_identity;
 	this->set_identity = set_identity;
+	this->set_error	   = set_error;
 
 	this->whack = whack;
 

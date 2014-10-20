@@ -42,6 +42,8 @@ struct NAAAIM_IDengine
 			      const String, const String, const Buffer);
 	_Bool (*set_identity)(const IDengine, const Identity);
 
+	_Bool (*set_error)(const IDengine);
+
 	void (*whack)(const IDengine);
 
 	/* Private state. */

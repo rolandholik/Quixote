@@ -252,7 +252,9 @@ static void identity_generator(void)
 		identifier->print(identifier);
 
 		if ( create_identity(idtype, name, identifier, identity) )
-		     idengine->set_identity(idengine, identity);
+			idengine->set_identity(idengine, identity);
+		else 
+			idengine->set_error(idengine);
 
 		name->reset(name);
 		identifier->reset(identifier);

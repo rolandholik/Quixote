@@ -68,11 +68,13 @@ extern int main(int argc, char *argv[])
 
 	name->add(name, "device1");
 	identifier->add(identifier, "140330001");
-	if ( !idengine->get_identity(idengine, IDengine_device, name, \
-				     identifier, identity) )
-		goto done;
-	fputs("identity:\n", stdout);
-	identity->print(identity);
+	if ( idengine->get_identity(idengine, IDengine_device, name, \
+				    identifier, identity) ) {
+		fputs("identity:\n", stdout);
+		identity->print(identity);
+	}
+	else
+		fputs("Error generating identity.\n", stderr);
 		
 
  done:
