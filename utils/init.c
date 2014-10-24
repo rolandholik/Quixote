@@ -97,7 +97,8 @@ static void do_reboot(void)
 static _Bool start_tpm(void)
 
 {
-	_Bool retn = false;
+	_Bool software_tpm = false,
+	      retn = false;
 
 	Buffer b;
 
@@ -106,9 +107,14 @@ static _Bool start_tpm(void)
 	SoftwareStatus software = NULL;
 
 
-	INIT(NAAAIM, SoftwareTPM, SWtpm, goto done);
-	if ( !SWtpm->start(SWtpm, 1) )
-	     goto done;
+	software_tpm = (Cfg->get(Cfg, "tpm") != NULL);
+	if ( software_tpm )
+		software_tpm = (strcmp(Cfg->get(Cfg, "tpm"), "software") == 0);
+	if ( software_tpm ) {
+		INIT(NAAAIM, SoftwareTPM, SWtpm, goto done);
+		if ( !SWtpm->start(SWtpm, 1) )
+			goto done;
+	}
 
 	INIT(NAAAIM, TPMcmd, tpm, goto done);
 	INIT(NAAAIM, SoftwareStatus, software, goto done);
@@ -117,10 +123,12 @@ static _Bool start_tpm(void)
 	if ( !software->measure(software) )
 		goto done;
 
-	b = software->get_template_hash(software);
-	tpm->pcr_extend(tpm, 10, b);
-	fputs("Extended software status: ", stdout);
-	b->print(b);
+	if ( software_tpm ) {
+		b = software->get_template_hash(software);
+		tpm->pcr_extend(tpm, 10, b);
+		fputs("software tpm: Extended software status: ", stdout);
+		b->print(b);
+	}
 
 	retn = true;
 
