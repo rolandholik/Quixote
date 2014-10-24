@@ -21,6 +21,9 @@
 #include <signal.h>
 #include <sys/types.h>
 
+#include <openssl/asn1.h>
+#include <openssl/asn1t.h>
+
 #include <Origin.h>
 #include <HurdLib.h>
 #include <Buffer.h>
@@ -86,6 +89,38 @@ struct IDengine_ipc
 
 
 /**
+ * The following definitions define the ASN1 encoding sequence for
+ * the DER encoding of an identity.
+ * the wire.
+ */
+typedef struct {
+	ASN1_INTEGER *error;
+	ASN1_ENUMERATED *idtype;
+	ASN1_OCTET_STRING *name;
+	ASN1_OCTET_STRING *identifier;
+	ASN1_OCTET_STRING *identity;
+} asn1_ipc;
+
+ASN1_SEQUENCE(asn1_ipc) = {
+	ASN1_SIMPLE(asn1_ipc, error,		ASN1_INTEGER),
+	ASN1_SIMPLE(asn1_ipc, idtype,		ASN1_ENUMERATED),
+	ASN1_SIMPLE(asn1_ipc, name,		ASN1_OCTET_STRING),
+	ASN1_SIMPLE(asn1_ipc, identifier,	ASN1_OCTET_STRING),
+	ASN1_SIMPLE(asn1_ipc, identity,		ASN1_OCTET_STRING),
+} ASN1_SEQUENCE_END(asn1_ipc)
+
+IMPLEMENT_ASN1_FUNCTIONS(asn1_ipc)
+
+#define ASN1_BUFFER_ENCODE(b, e, err) \
+	if ( ASN1_OCTET_STRING_set(e, b->get(b), b->size(b)) != 1 ) \
+		err
+
+#define ASN1_BUFFER_DECODE(b, e, err) \
+	if ( !b->add(b, ASN1_STRING_data(e), ASN1_STRING_length(e)) ) \
+ 		err
+
+
+/**
  * Internal private method.
  *
  * This method is responsible for initializing the NAAAIM_IDengine_State
@@ -102,6 +137,8 @@ static void _init_state(CO(IDengine_State, S))
 	S->objid = NAAAIM_IDengine_OBJID;
 
 	S->poisoned = false;
+
+	S->ipc	    = NULL;
 
 	return;
 }
@@ -424,6 +461,354 @@ static _Bool get_id_info(CO(IDengine, this), IDengine_identity *type, \
 
 
 /**
+ * Internal private function.
+ *
+ * This functions encodes the structure used for IPC communications
+ * with the identity generation into ASN1 format.
+ *
+ * \param ipc		The pointer to the IPC structure to be
+ *			encoded.
+ *
+ * \param bufr		The Buffer object which the encoded output is
+ *			to be placed in.
+ *
+ * \return		A true value is returned if the encoding was
+ *			successful.  A fale value indicated the
+ *			encoding failed.
+ */
+
+static _Bool _encode_ipc(CO(struct IDengine_ipc *, ipc), CO(Buffer, bufr))
+
+{
+	_Bool retn = false;
+
+	int error,
+	    asn_size;
+
+        unsigned char *asn = NULL;
+
+        unsigned char **p = &asn;
+
+	asn1_ipc *idreq = NULL;
+
+
+	/* Arguement validation. */
+	if ( (bufr == NULL) || bufr->poisoned(bufr) )
+		goto done;
+
+	/* Encode the request. */
+	if ( (idreq = asn1_ipc_new()) == NULL )
+		goto done;
+
+	error = ipc->error ? 1 : 0;
+	if ( ASN1_INTEGER_set(idreq->error, error) != 1 )
+		goto done;
+
+	if ( ASN1_ENUMERATED_set(idreq->idtype, ipc->idtype) != 1 )
+		goto done;
+
+	if ( ASN1_OCTET_STRING_set(idreq->name, (unsigned char *) ipc->name, \
+				   sizeof(ipc->name)) != 1 )
+		goto done;
+
+	if ( ASN1_OCTET_STRING_set(idreq->identifier,		     \
+				   (unsigned char * )ipc->identifier, \
+				   sizeof(ipc->identifier)) != 1 )
+		goto done;
+
+	if ( ASN1_OCTET_STRING_set(idreq->identity, ipc->identity, \
+				   sizeof(ipc->identity)) != 1 )
+		goto done;
+
+
+	/* Load the ASN1 encoding into the supplied buffer. */
+        asn_size = i2d_asn1_ipc(idreq, p);
+        if ( asn_size < 0 )
+                goto done;
+	if ( !bufr->add(bufr, asn, asn_size) )
+		goto done;
+
+	retn = true;
+
+
+ done:
+	if ( idreq == NULL )
+		asn1_ipc_free(idreq);
+
+	return retn;
+}
+
+
+/**
+ * Internal private function.
+ *
+ * This functions decodes the structure used for IPC generation which
+ * has been previously encoded in ASN1 format.
+ *
+ * \param ipc		The pointer to the IPC structure which will
+ *			hold the decoded information
+ *
+ * \param bufr		The Buffer object which holds the encoded
+ *			structure.
+ *
+ * \return		A true value is returned if the decoding was
+ *			successful.  A fale value indicated the
+ *			decoding failed.
+ */
+
+static _Bool _decode_ipc(struct IDengine_ipc * const ipc, CO(Buffer, bufr))
+
+{
+	_Bool retn = false;
+
+	int error;
+
+        unsigned char *asn = NULL;
+
+        unsigned const char *p = asn;
+
+	asn1_ipc *idreq = NULL;
+
+
+	/* Arguement validation. */
+	if ( (bufr == NULL) || bufr->poisoned(bufr) )
+		goto done;
+
+	p = bufr->get(bufr);
+        if ( !d2i_asn1_ipc(&idreq, &p, bufr->size(bufr)) )
+                goto done;
+
+	/* Lock the IPC area and get the shared structure. */
+	error = ASN1_INTEGER_get(idreq->error);
+	ipc->error = (error == 0) ? false : true;
+
+	ipc->idtype = ASN1_ENUMERATED_get(idreq->idtype);
+
+	memset(ipc->name, '\0', sizeof(ipc->name));
+	memcpy(ipc->name, ASN1_STRING_data(idreq->name), \
+	       ASN1_STRING_length(idreq->name));
+
+	memset(ipc->identifier, '\0', sizeof(ipc->identifier));
+	memcpy(ipc->identifier, ASN1_STRING_data(idreq->identifier), \
+	       ASN1_STRING_length(idreq->identifier));
+
+	memset(ipc->identity, '\0', sizeof(ipc->identity));
+	memcpy(ipc->identity, ASN1_STRING_data(idreq->identity), \
+	       ASN1_STRING_length(idreq->identity));
+
+	retn = true;
+
+
+ done:
+	if ( idreq != NULL )
+		asn1_ipc_free(idreq);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method encodes an identity generation request in ASN1
+ * format for transmission to a remote identity generator.
+ *
+ * \param this		A pointer to the identity generation object which
+ *			is requesting the identity.
+ *
+ * \param type		The type of identity which is being requested.
+ *
+ * \param name		A String object containing the identifier which
+ *			will be used to create the identity.
+ *
+ * \param identifier	A String object containing the identifier which
+ *			will be used to create the identity.
+ *
+ * \param bufr		A Buffer object which will be loaded with the
+ *			encoded identity request.
+ *
+ * \return		A true value is returned if the encoding was
+ *			successful.  A fale value indicated the
+ *			encoding failed.
+ */
+
+static _Bool encode_get_identity(CO(IDengine, this),			     \
+			     const IDengine_identity type, CO(String, name), \
+			     CO(String, identifier), CO(Buffer, bufr))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	struct IDengine_ipc ipc;
+
+
+	/* Object and arguement verification. */
+	if ( S->poisoned )
+		goto done;
+	if ( (name == NULL) || name->poisoned(name) )
+		goto done;
+	if ( (identifier == NULL) || identifier->poisoned(identifier) )
+		goto done;
+	if ( (bufr == NULL) || bufr->poisoned(bufr) )
+		goto done;
+
+	/* Set the identity request parameters. */
+	ipc.error  = false;
+	ipc.idtype = IDengine_device;
+
+	if ( name->size(name) > sizeof(ipc.name) )
+		goto done;
+	memset(ipc.name, '\0', sizeof(ipc.name));
+	memcpy(ipc.name, name->get(name), name->size(name));
+
+	if ( identifier->size(identifier) > sizeof(ipc.identifier) )
+		goto done;
+	memset(ipc.identifier, '\0', sizeof(ipc.identifier));
+	memcpy(ipc.identifier, identifier->get(identifier), \
+	       identifier->size(identifier));
+
+	memset(ipc.identity, '\0', sizeof(ipc.identity));
+
+	if ( !_encode_ipc(&ipc, bufr) )
+		goto done;
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method decodes an identity generation request which was encoded
+ * in ASN1 format by a client requesting identity generation.  The
+ * decoded request is submitted to the identity generator for processing.
+ *
+ * \param this		A pointer to the identity generation object which
+ *			is requesting the identity.
+ *
+ * \param identity	A Buffer object which contains the encoded
+ *			identity request.  On return this buffer will be
+ *			loaded with the generated identity.
+ *
+ * \return		A true value is returned if the decoding was
+ *			successful.  A fale value indicated the
+ *			decoding failed.
+ */
+
+static _Bool decode_get_identity(CO(IDengine, this), CO(Buffer, identity))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	struct IDengine_ipc *ipcp,
+			    ipc;
+
+
+	/* Object and arguement verification. */
+	if ( S->poisoned )
+		goto done;
+	if ( (identity == NULL) || identity->poisoned(identity) )
+		goto done;
+
+	/* Setup for the identity decode. */
+	memset(&ipc, '\0', sizeof(struct IDengine_ipc));
+	if ( !_decode_ipc(&ipc, identity) )
+		goto done;
+
+	memset(ipc.identity, '\0', sizeof(ipc.identity));
+
+	/* Request processing of the structure. */
+	if ( !S->ipc->lock(S->ipc) )
+		goto done;
+	ipcp = S->ipc->get(S->ipc);
+
+	ipc.pid = ipcp->pid;
+	*ipcp = ipc;
+	ipcp->valid = false;
+
+	kill(ipcp->pid, SIGUSR1);
+	while ( !ipcp->valid )
+		continue;
+
+	/* Clone and unlock the processing area. */
+	ipc = *ipcp;
+
+	memset(ipcp->name,	 '\0', sizeof(ipcp->name));
+	memset(ipcp->identifier, '\0', sizeof(ipcp->identifier));
+	memset(ipcp->identity,	 '\0', sizeof(ipcp->identity));
+
+	if ( !S->ipc->unlock(S->ipc) )
+		goto done;
+
+	/* Return the identity if the request completed without error. */
+	identity->reset(identity);
+	if ( !_encode_ipc(&ipc, identity) )
+		goto done;
+
+	retn = true;
+
+
+ done:
+	memset(ipc.name,	'\0', sizeof(ipc.name));
+	memset(ipc.identifier,	'\0', sizeof(ipc.identifier));
+	memset(ipc.identity,	'\0', sizeof(ipc.identity));
+
+	if ( !retn ) 
+		S->poisoned = true;
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method decodes an identity generation request response in
+ * ASN1 format.  It is designed to process the output of the
+ * ->decode_get_identity method.
+ *
+ * \param this		A pointer to the identity generation object which
+ *			is requesting decoding of the identity.
+ *
+ * \param identity	A Buffer object which contains the encoded
+ *			identity request.  On return this buffer will be
+ *			loaded with the generated identity.
+ *
+ * \return		A true value is returned if the decoding was
+ *			successful.  A fale value indicated the
+ *			decoding failed.
+ */
+
+static _Bool decode_identity(CO(IDengine, this), CO(Buffer, identity))
+
+{
+	_Bool retn = false;
+
+	struct IDengine_ipc ipc;
+
+
+	if ( !_decode_ipc(&ipc, identity) )
+		goto done;
+
+	identity->reset(identity);
+	if ( !identity->add(identity, ipc.identity, sizeof(ipc.identity)) )
+		goto done;
+
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
  * External public method.
  *
  * This method implements a destructor for a IDengine object.
@@ -490,6 +875,10 @@ extern IDengine NAAAIM_IDengine_Init(void)
 	this->get_identity = get_identity;
 	this->set_identity = set_identity;
 	this->set_error	   = set_error;
+
+	this->encode_get_identity = encode_get_identity;
+	this->decode_get_identity = decode_get_identity;
+	this->decode_identity	  = decode_identity;
 
 	this->whack = whack;
 

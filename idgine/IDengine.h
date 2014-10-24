@@ -43,6 +43,11 @@ struct NAAAIM_IDengine
 			      const String, const String, const Buffer);
 	_Bool (*set_identity)(const IDengine, const Identity);
 
+	_Bool (*encode_get_identity)(const IDengine, const IDengine_identity, \
+				 const String, const String, const Buffer);
+	_Bool (*decode_get_identity)(const IDengine, const Buffer);
+	_Bool (*decode_identity)(const IDengine, const Buffer);
+
 	_Bool (*set_error)(const IDengine);
 
 	void (*whack)(const IDengine);

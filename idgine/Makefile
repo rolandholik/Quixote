@@ -6,7 +6,7 @@
 # Variable declarations.
 CSRC = idgine.c Identity.c IDengine.c
 
-BINARIES = idgine gen-id
+BINARIES = idgine gen-id idsvr fetch-id
 
 CC = musl-gcc
 
@@ -60,7 +60,13 @@ idgine: idgine.o IDengine.o Identity.o ../OrgID.o ../SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY} -lfl;
 
 gen-id: gen-id.o IDengine.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
+
+idsvr: idsvr.o IDengine.o Identity.o ../SHA256.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
+
+fetch-id: fetch-id.o IDengine.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
 clean:
 	rm -f *.o *~ TAGS;
