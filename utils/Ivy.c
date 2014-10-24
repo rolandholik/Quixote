@@ -250,7 +250,8 @@ static _Bool set_identity(CO(Ivy, this), CO(IDtoken, identity))
 
 	_Bool retn = false;
 
-	Buffer bufr = NULL;
+	Buffer b,
+	       bufr = NULL;
 
 
 	if ( S->poisoned )
@@ -262,7 +263,11 @@ static _Bool set_identity(CO(Ivy, this), CO(IDtoken, identity))
 	/* Convert identity and add the reduced identity to this object. */
 	INIT(HurdLib, Buffer, bufr, goto done);
 
-	identity->to_verifier(identity);
+	if ( (b = identity->get_element(identity, IDtoken_id)) == NULL )
+		goto done;
+	if ( b->size(b) != NAAAIM_IDSIZE )
+		identity->to_verifier(identity);
+
 	if ( !identity->encode(identity, bufr) )
 		goto done;
 	if ( !set_element(this, Ivy_id, bufr) )
