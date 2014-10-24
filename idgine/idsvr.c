@@ -11,6 +11,9 @@
  * for licensing information.
  **************************************************************************/
 
+/* Local defines. */
+#define IDSVR_PORT 10903
+
 
 /* Include files. */
 #include <stdio.h>
@@ -104,10 +107,10 @@ static void update_process_table(void)
 				process_table[lp] = 0;
 				fprintf(stdout, "%d terminated", pid);
 				if ( !WIFEXITED(status) ) {
-					fputs(" abnormally\n", stdout);
+					fputs(" abnormally.\n", stdout);
 					continue;
 				}
-				fprintf(stdout, ", status = %d\n", \
+				fprintf(stdout, ", status=%d\n", \
 					WEXITSTATUS(status));
 			}
 	return;
@@ -129,8 +132,6 @@ static void update_process_table(void)
 static void handle_connection(CO(Duct,duct))
 
 {
-	pid_t pid;
-
 	Buffer bufr = NULL;
 
 	IDengine idengine = NULL;
@@ -142,8 +143,8 @@ static void handle_connection(CO(Duct,duct))
 	if ( !idengine->attach(idengine) )
 		goto done;
 
-	fprintf(stdout, "\n.Processing identity request from %s.\n", \
-		duct->get_client(duct));
+	fprintf(stdout, "\n.%d: Processing identity request from %s.\n", \
+		getpid(), duct->get_client(duct));
 
 	if ( !duct->receive_Buffer(duct, bufr) )
 		goto done;
@@ -159,13 +160,6 @@ static void handle_connection(CO(Duct,duct))
 	WHACK(bufr);
 	WHACK(idengine);
 
-	/* Child process exits. */
-	if ( pid == 0 ) {
-		fputs("child process exiting.\n", stderr);
-		duct->whack(duct);
-		exit(0);
-	}
-
 	return;
 }
 
@@ -177,9 +171,11 @@ static void handle_connection(CO(Duct,duct))
 extern int main(int argc, char *argv[])
 
 {
-	char *err = NULL;
+	char *host = NULL,
+	     *err  = NULL;
 
-	int retn = 1;
+	int opt,
+	    retn = 1;
 
 	pid_t pid = 0;
 
@@ -188,6 +184,19 @@ extern int main(int argc, char *argv[])
  
 	fputs("idsvr started.\n", stdout);
 	fflush(stdout);
+
+	while ( (opt = getopt(argc, argv, "h:")) != EOF )
+		switch ( opt ) {
+			case 'h':
+				host = optarg;
+				break;
+		}
+
+	/* Arguement verification. */
+	if ( host == NULL ) {
+		fputs("No hostname specified.\n", stderr);
+		goto done;
+	}
 
 	/* Initialize process table. */
 	init_process_table();
@@ -200,12 +209,12 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
-	if ( !duct->set_server(duct, "127.0.0.1") ) {
+	if ( !duct->set_server(duct, host) ) {
 		err = "Cannot set server name.";
 		goto done;
 	}
 	
-	if ( !duct->init_port(duct, NULL, 10200) ) {
+	if ( !duct->init_port(duct, NULL, IDSVR_PORT) ) {
 		fputs("Cannot initialize port.\n", stderr);
 		goto done;
 	}
@@ -223,7 +232,7 @@ extern int main(int argc, char *argv[])
 		}
 		if ( pid == 0 ) {
 			handle_connection(duct);
-			goto done;
+			_exit(0);
 		}
 
 		add_process(pid);

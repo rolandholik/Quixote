@@ -76,5 +76,8 @@ clean:
 # Source dependencies.
 idgine.o: IDengine.h
 
+idsvr.o: Identity.h IDengine.h
+fetch-id.o: Identity.h IDengine.h 
+
 IDengine.o: IDengine.h
 Identity.o: Identity.h

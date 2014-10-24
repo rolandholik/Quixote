@@ -11,6 +11,10 @@
  * for licensing information.
  **************************************************************************/
 
+/* Local defines. */
+#define IDSVR_PORT 10903
+
+
 /* Include files. */
 #include <stdio.h>
 #include <stdbool.h>
@@ -130,7 +134,7 @@ extern int main(int argc, char *argv[])
 		fputs("Cannot initialize network client.\n", stderr);
 		goto done;
 	}
-	if ( !duct->init_port(duct, host->get(host), 10200) ) {
+	if ( !duct->init_port(duct, host->get(host), IDSVR_PORT) ) {
 		fputs("Cannot initiate connection.\n", stderr);
 		goto done;
 	}
