@@ -14,7 +14,7 @@
 
 
 /* Local defines. */
-#if 0
+#if 1
 #define IDENTITY_ROOT "/etc/conf/idroot.conf"
 #else
 #define IDENTITY_ROOT "./idroot.conf"
@@ -250,6 +250,7 @@ static void identity_generator(void)
 		name->print(name);
 		fputs("identifier=", stderr);
 		identifier->print(identifier);
+		fputc('\n', stderr);
 
 		if ( create_identity(idtype, name, identifier, identity) )
 			idengine->set_identity(idengine, identity);
