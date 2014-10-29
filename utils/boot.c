@@ -14,7 +14,7 @@
 
 /* Local defines. */
 /* TPM daemon location. */
-#define TCSD_PATH "/usr/local/musl/sbin/tcsd"
+#define TCSD_PATH "/usr/local/sbin/tcsd"
 
 /* Location of manifest file. */
 #define MANIFEST "/boot/manifest"
@@ -31,6 +31,8 @@
 #include <limits.h>
 #include <sys/mount.h>
 #include <sys/reboot.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include <HurdLib.h>
 #include <Buffer.h>
@@ -38,6 +40,7 @@
 #include <File.h>
 
 #include "SoftwareStatus.h"
+#include "Netconfig.h"
 
 
 /* Variable static to this file. */
@@ -94,16 +97,25 @@ static _Bool tpm_daemon(const _Bool start)
 {
 	static pid_t tpm_pid = 0;
 
+	Netconfig netconfig = NULL;
+
 
 	/* Shutdown daemon. */
-	fputs("Shutting down daemon.\n", stderr);
 	if ( !start ) {
+		fputs("Shutting down daemon.\n", stderr);
 		if ( kill(tpm_pid, SIGTERM) == -1 )
 			return false;
 		return true;
 	}
 		
 	/* Startup daemon. */
+	fputs("Configuring loopback.\n", stderr);
+	INIT(NAAAIM, Netconfig, netconfig, return false);
+	if ( !netconfig->set_address(netconfig, "lo", "127.0.0.1", \
+				     "255.0.0.0") )
+		return false;
+	WHACK(netconfig);
+
 	fputs("Starting daemon.\n", stderr);
 	tpm_pid = fork();
 	if ( tpm_pid == -1 )
@@ -218,7 +230,6 @@ static Buffer find_root(void)
 	if ( !cmdbufr->add(cmdbufr, (unsigned char *) "\0", 1) )
 		goto done;
 
-
 	rp = (char *) cmdbufr->get(cmdbufr);
 	while ( *rp != '\0' ) {
 		if ( strncmp(rp, tag, strlen(tag)) == 0 ) {
@@ -288,9 +299,11 @@ static _Bool load_root(void)
 	}
 
 	if ( mount(rootdev, "/mnt", fs, mountflags, NULL) == -1 ) {
-		fprintf(stderr, "Mount failed: %s\n", strerror(errno));
+		fprintf(stderr, "Mount failed for root=%s: %s\n", rootdev, \
+			strerror(errno));
 		goto done;
 	}
+#if 0
 	if ( system("/sbin/load-image -u 1 -r /mnt/boot/root " \
 		    "-t -k /mnt/boot/root.seal -o /dev/hpd0") != 0 )
 		goto done;
@@ -300,6 +313,18 @@ static _Bool load_root(void)
 		fputs("Configuration load failed.\n", stderr);
 		goto done;
 	}
+#else
+	if ( system("/sbin/load-image -u 1 -r /mnt/boot/root " \
+		    "-k /mnt/boot/root.pwd -o /dev/hpd0") != 0 )
+		goto done;
+
+	if ( system("/sbin/load-image -u 1 -r /mnt/boot/config " \
+		    "-k /mnt/boot/config.pwd -o /dev/hpd1") != 0 ) {
+		fputs("Configuration load failed.\n", stderr);
+		goto done;
+	}
+
+#endif
 
 	if ( mount("/mnt", "/boot", NULL, MS_MOVE, NULL) == -1 )
 		goto done;
