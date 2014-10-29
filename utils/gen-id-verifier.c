@@ -38,10 +38,14 @@
 #include <RandomBuffer.h>
 #include <SHA256.h>
 
+#include "IDmgr.h"
 #include "Ivy.h"
 #include "SoftwareStatus.h"
 #include "TPMcmd.h"
 
+
+/* Macro for setting error location. */
+#define ERR(action) {err = __LINE__; action;}
 
 
 /**
@@ -75,6 +79,8 @@ static _Bool write_identity(CO(Buffer, asn), CO(IDtoken, token), \
 
 	uint8_t lp;
 
+	uint32_t err = 0;
+
 	Buffer b;
 
 	SHA256 sha256;
@@ -88,15 +94,15 @@ static _Bool write_identity(CO(Buffer, asn), CO(IDtoken, token), \
 	INIT(HurdLib, String, filename, goto done);
 
 	if ( (b = token->get_element(token, IDtoken_orgkey)) == NULL )
-		goto done;
+		ERR(goto done);
 	sha256->add(sha256, b);
 
 	if ( (b = token->get_element(token, IDtoken_orgid)) == NULL )
-		goto done;
+		ERR(goto done);
 	sha256->add(sha256, b);
 
 	if ( !sha256->compute(sha256) )
-		goto done;
+		ERR(goto done);
 
 	b = sha256->get_Buffer(sha256);
 	p = b->get(b);
@@ -113,7 +119,7 @@ static _Bool write_identity(CO(Buffer, asn), CO(IDtoken, token), \
 		filename->add(filename, label);
 	}
 	if ( filename->poisoned(filename) )
-		goto done;
+		ERR(goto done);
 
 
 	/* Output file. */
@@ -121,13 +127,16 @@ static _Bool write_identity(CO(Buffer, asn), CO(IDtoken, token), \
 
 	output->open_rw(output, filename->get(filename));
 	if ( !output->write_Buffer(output, asn) )
-		goto done;
+		ERR(goto done);
 
 	fputs("ASN output to:\n", stdout);
 	filename->print(filename);
+	retn = true;
 
 	
  done:
+	if ( err )
+		fprintf(stderr, "Error: %s[%u]\n", __func__, err);
 	WHACK(sha256);
 	WHACK(filename);
 	WHACK(output);
@@ -135,12 +144,12 @@ static _Bool write_identity(CO(Buffer, asn), CO(IDtoken, token), \
 	return retn;
 }
 
-#define ERR(action) {err = __LINE__; action;}
 
 extern int main(int argc, char *argv[])
 
 {
-	_Bool out_file = false;
+	_Bool out_file	= false,
+	      use_idmgr = false;
 
 	int opt,
 	    retn = 1;
@@ -163,6 +172,8 @@ extern int main(int argc, char *argv[])
 
 	IDtoken token = NULL;
 
+	IDmgr idmgr = NULL;
+
 	SoftwareStatus software = NULL;
 
 	TPMcmd tpmcmd = NULL;
@@ -171,27 +182,30 @@ extern int main(int argc, char *argv[])
 
 
 	/* Get the organizational identifier and SSN. */
-	while ( (opt = getopt(argc, argv, "fk:l:t:u:")) != EOF )
+	while ( (opt = getopt(argc, argv, "fmk:l:t:u:")) != EOF )
 		switch ( opt ) {
 			case 'f':
 				out_file = true;
 				break;
-
-			case 't':
-				token_file = optarg;
+			case 'm':
+				use_idmgr = true;
 				break;
+
 			case 'k':
 				key_file = optarg;
 				break;
 			case 'l':
 				label_name = optarg;
 				break;
+			case 't':
+				token_file = optarg;
+				break;
 			case 'u':
 				uuid_file = optarg;
 				break;
 		}
 
-	if ( token_file == NULL ) {
+	if ( !use_idmgr && token_file == NULL ) {
 		fputs("No token specified.\n", stderr);
 		ERR(goto done);
 	}
@@ -209,10 +223,20 @@ extern int main(int argc, char *argv[])
 	INIT(NAAAIM, Ivy, ivy, goto done);
 
 	INIT(NAAAIM, IDtoken, token, goto done);
-	if ( (id_file = fopen(token_file, "r")) == NULL )
-		ERR(goto done);
-	if ( !token->parse(token, id_file) )
-		ERR(goto done);
+	if ( !use_idmgr ) {
+		if ( (id_file = fopen(token_file, "r")) == NULL )
+			ERR(goto done);
+		if ( !token->parse(token, id_file) )
+			ERR(goto done);
+	} else {
+		INIT(NAAAIM, IDmgr, idmgr, goto done);
+
+		if ( !idmgr->attach(idmgr) )
+			ERR(goto done);
+		if ( !idmgr->get_idtoken(idmgr, token) )
+			ERR(goto done);
+	}
+
 	if ( !ivy->set_identity(ivy, token) )
 		ERR(goto done);
 
@@ -276,8 +300,8 @@ extern int main(int argc, char *argv[])
 
 		
  done:
-	if ( err != 0 )
-		fprintf(stderr, "Error: %u\n", err);
+	if ( err )
+		fprintf(stderr, "Error: %s[%u]\n", __func__, err);
 	if ( id_file != NULL )
 		fclose(id_file);
 
@@ -286,6 +310,7 @@ extern int main(int argc, char *argv[])
 	WHACK(uuid);
 	WHACK(file);
 	WHACK(token);
+	WHACK(idmgr);
 	WHACK(software);
 	WHACK(tpmcmd);
 	WHACK(rbufr);
