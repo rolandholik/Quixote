@@ -129,7 +129,6 @@ static _Bool write_identity(CO(Buffer, asn), CO(IDtoken, token), \
 	if ( !output->write_Buffer(output, asn) )
 		ERR(goto done);
 
-	fputs("ASN output to:\n", stdout);
 	filename->print(filename);
 	retn = true;
 
@@ -209,10 +208,6 @@ extern int main(int argc, char *argv[])
 		fputs("No token specified.\n", stderr);
 		ERR(goto done);
 	}
-	if ( key_file == NULL ) {
-		fputs("No aik public key specified.\n", stderr);
-		ERR(goto done);
-	}
 	if ( uuid_file == NULL ) {
 		fputs("No uuid specified.\n", stderr);
 		ERR(goto done);
@@ -241,13 +236,30 @@ extern int main(int argc, char *argv[])
 		ERR(goto done);
 
 
-	/* Add the attestation identity key. */
-	INIT(HurdLib, Buffer, bufr, goto done);
-
+	/* Get the UUID to use. */
 	INIT(HurdLib, File, file, goto done);
-	if ( !file->open_ro(file, key_file) )
+	INIT(HurdLib, Buffer, uuid, goto done);
+
+	file->open_ro(file, uuid_file);
+	if ( !file->slurp(file, uuid) )
 		ERR(goto done);
-	if ( !file->slurp(file, bufr) )
+	file->reset(file);
+	
+
+	/* Add the attestation identity key. */
+	INIT(NAAAIM, TPMcmd, tpmcmd, goto done);
+	INIT(HurdLib, Buffer, bufr, goto done);
+	if ( key_file == NULL ) {
+		if ( !tpmcmd->get_pubkey(tpmcmd, uuid, bufr) )
+			ERR(goto done);
+	} else {
+		file->open_ro(file, key_file);
+		if ( !file->slurp(file, bufr) )
+			goto done;
+		file->reset(file);
+	}
+
+	if ( bufr->size(bufr) == 0 )
 		ERR(goto done);
 	if ( !ivy->set_element(ivy, Ivy_pubkey, bufr) )
 		ERR(goto done);
@@ -265,14 +277,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Add the machine quote. */
-	INIT(NAAAIM, TPMcmd, tpmcmd, goto done);
-	INIT(HurdLib, Buffer, uuid, goto done);
 	INIT(NAAAIM, RandomBuffer, rbufr, goto done);
-
-	file->reset(file);
-	file->open_ro(file, uuid_file);
-	if ( !file->slurp(file, uuid) )
-		ERR(goto done);
 
 	bufr->reset(bufr);
 	rbufr->generate(rbufr, 20);
@@ -291,10 +296,11 @@ extern int main(int argc, char *argv[])
 
 	/* Output the quote. */
 	ivy->print(ivy);
+	fputs("\nASN output:\n", stdout);
 	if ( out_file )
 		retn = write_identity(bufr, token, label_name);
 	else {
-		bufr->hprint(bufr);
+		bufr->print(bufr);
 		retn = 0;
 	}
 
