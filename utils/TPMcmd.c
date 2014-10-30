@@ -1338,6 +1338,119 @@ static _Bool pcrmask(CO(TPMcmd, this), ...)
 /**
  * External public method.
  *
+ * This method implements the ability to extract the public portion of
+ * a key which is stored in system persistent storage.
+ *
+ * \param this	A pointer to the TPM object whose key is to be extracted.
+ *
+ * \param uuid	A Buffer object which will be loaded with the UUID of
+ *		the key which is to be extracted.
+ *
+ * \param key	A Buffer object which will be loaded with the public
+ *		portion of the key.
+ *
+ * \return	A false value is returned if extraction of the public
+ *		key failed.  If the Buffer object contains a valid
+ *		public key a true value is returned.
+ */
+
+static _Bool get_pubkey(CO(TPMcmd, this), CO(Buffer, uuid), CO(Buffer, key))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	char *err = NULL;
+
+	unsigned char *bufr,
+		      der_bufr[1024],
+		      all_zeros[] = TSS_WELL_KNOWN_SECRET;
+
+	uint32_t length,
+		 der_length = sizeof(der_bufr);
+
+	TSS_RESULT result = TSS_SUCCESS;
+
+	TSS_UUID *key_uuid,
+		 srk_uuid = {0, 0, 0, 0, 0, {0, 0, 0, 0, 0, 1}};
+
+	TSS_HKEY srk,
+		 pubkey;
+
+	TSS_HPOLICY srk_policy;
+
+
+	/* Load the desired key via the storage root key. */
+	result = Tspi_Context_LoadKeyByUUID(S->context, TSS_PS_TYPE_SYSTEM, \
+					    srk_uuid, &srk);
+	if ( result != TSS_SUCCESS ) {
+		err = "SRK keyload";
+		goto done;
+	}
+
+	result = Tspi_GetPolicyObject(srk, TSS_POLICY_USAGE, &srk_policy);
+	if ( result != TSS_SUCCESS ) {
+		err = "SRK policy creation";
+		goto done;
+	}
+
+	result = Tspi_Policy_SetSecret(srk_policy, TSS_SECRET_MODE_SHA1, \
+				       sizeof(all_zeros), all_zeros);
+	if ( result != TSS_SUCCESS ) {
+		err = "SRK password set";
+		goto done;
+	}
+
+	key_uuid = (TSS_UUID *) uuid->get(uuid);
+	result = Tspi_Context_LoadKeyByUUID(S->context, TSS_PS_TYPE_SYSTEM, \
+					    *key_uuid, &pubkey);
+	if ( result != TSS_SUCCESS ) {
+		err = "Loading key";
+		goto done;
+	}
+
+
+	/* Extract the public portion of the key and ASN1 encode it. */
+	result = Tspi_GetAttribData(pubkey, TSS_TSPATTRIB_KEY_BLOB,   \
+				    TSS_TSPATTRIB_KEYBLOB_PUBLIC_KEY, \
+				    &length, &bufr);
+	if ( result != TSS_SUCCESS ) {
+		err = "Extracting public key";
+		goto done;
+	}
+
+	result = Tspi_EncodeDER_TssBlob(length, bufr, TSS_BLOB_TYPE_PUBKEY, \
+					&der_length, der_bufr);
+	if ( Tspi_Context_FreeMemory(S->context, bufr) != TSS_SUCCESS ) {
+		err = "Freeing public key memory";
+		goto done;
+	}
+	if ( result != TSS_SUCCESS ) {
+		err = "Encoding public key";
+		goto done;
+	}
+
+	if ( !key->add(key, der_bufr, der_length) ) {
+		err = "Loading public key";
+		goto done;
+	}
+
+	retn = true;
+
+
+ done:
+	if ( result != TSS_SUCCESS )
+		fprintf(stderr, "%s[%s] %s: %s\n", __FILE__, __func__, err, \
+			Trspi_Error_String(result));
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements the display of keys which are registered in
  * system persistent storage
  *
@@ -1485,7 +1598,8 @@ extern TPMcmd NAAAIM_TPMcmd_Init(void)
 
 	this->pcrmask = pcrmask;
 
-	this->list_keys = list_keys;
+	this->get_pubkey = get_pubkey;
+	this->list_keys  = list_keys;
 
 	this->whack = whack;
 

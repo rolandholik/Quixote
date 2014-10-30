@@ -44,6 +44,7 @@ struct NAAAIM_TPMcmd
 
 	_Bool (*pcrmask)(const TPMcmd, ...);
 
+	_Bool (*get_pubkey)(const TPMcmd, const Buffer, const Buffer);
 	void (*list_keys)(const TPMcmd);
 
 	void (*whack)(const TPMcmd);

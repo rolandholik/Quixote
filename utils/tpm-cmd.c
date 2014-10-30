@@ -455,7 +455,30 @@ extern int main(int argc, char *argv[])
 		retn = 0;
 		goto done;
 	}
-		
+
+	if ( strcmp(argv[1], "get-pubkey") == 0 ) {
+		if ( argc != 3 ) {
+			fputs("No key uuid specified.\n", stderr);
+			goto done;
+		}
+
+		INIT(HurdLib, Buffer, uuid, goto done);
+		if ( !uuid->add_hexstring(uuid, argv[2]) ) {
+			fputs("Cannot set uuid.\n", stderr);
+			goto done;
+		}
+
+		if ( !tpmcmd->get_pubkey(tpmcmd, uuid, key) ) {
+			fputs("Unable to load public key.\n", stderr);
+			goto done;
+		}
+		fputs("Public key for uuid: ", stdout);
+		uuid->print(uuid);
+		key->print(key);
+
+		retn = 0;
+		goto done;
+	}
 
 	fprintf(stderr, "Unknown command: %s\n", argv[1]);
 		
