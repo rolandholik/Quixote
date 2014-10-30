@@ -66,7 +66,7 @@ load-image: load-image.o
 	${CC} ${LDFLAGS} -o $@ $^ ../AES256_cbc.o ../SHA256_hmac.o ${LIBS} \
 		-ltpm_unseal ${SSL_LIBRARY};
 
-boot: boot.o SoftwareStatus.o ../SHA256.o
+boot: boot.o SoftwareStatus.o Netconfig.o ../SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
 sboot: sboot.o SoftwareStatus.o Netconfig.o SoftwareTPM.o ../SHA256.o
