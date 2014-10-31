@@ -78,9 +78,34 @@ static _Bool load_identity(CO(IDtoken, identity))
 {
 	_Bool retn = false;
 
+	char *err = NULL;
+
 	struct stat idfile;
 
+	Buffer bufr = NULL;
 
+	TPMcmd tpm = NULL;
+
+
+	INIT(HurdLib, Buffer, bufr, goto done);
+	INIT(NAAAIM, TPMcmd, tpm, goto done);
+
+	tpm->pcr_read(tpm, 10, bufr);
+	tpm->pcr_extend(tpm, IDENTITY_PCR, bufr);
+
+	bufr->reset(bufr);
+	tpm->pcr_read(tpm, 17, bufr);
+	tpm->pcr_extend(tpm, IDENTITY_PCR, bufr);
+
+	bufr->reset(bufr);
+	tpm->pcr_read(tpm, 18, bufr);
+	if ( !tpm->pcr_extend(tpm, IDENTITY_PCR, bufr) ) {
+		err = "Cannot pre-extend PCR identity register.";
+		goto done;
+	}
+
+
+	/* Check to see if the load of an identity has been requested. */
 	if ( stat(IDENTITY, &idfile) == -1 ) {
 		if ( errno == ENOENT ) {
 			retn = true;
@@ -94,6 +119,14 @@ static _Bool load_identity(CO(IDtoken, identity))
 
 
  done:
+	WHACK(bufr);
+	WHACK(tpm);
+
+	if ( err != NULL ) {
+		fprintf(stderr, "%s\n", err);
+		return false;
+	}
+
 	return retn;
 }
 
@@ -138,12 +171,7 @@ static _Bool initialize_device_identity(CO(IDtoken, identity))
 		goto done;
 	}
 
-	bufr->reset(bufr);
-	tpm->pcr_read(tpm, 10, bufr);
-	tpm->pcr_read(tpm, 17, bufr);
-	tpm->pcr_read(tpm, 18, bufr);
 	bufr->add_Buffer(bufr, identity->get_element(identity, IDtoken_id));
-
 	if ( !tpm->pcr_extend(tpm, IDENTITY_PCR, bufr) ) {
 		err = "Cannot extend PCR identity register.";
 		goto done;

@@ -300,7 +300,7 @@ static _Bool start_identity_manager(void)
 	}
 
 	/* Parent, set return status if identity manager is running. */
-	while ( waiting && (tries++ < 10) ) {
+	while ( waiting && (tries++ < 30) ) {
 		if ( stat("/dev/shm/IDmgr", &idmgr_stat) == 0 )
 			waiting = false;
 		else if ( errno == ENOENT )

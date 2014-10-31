@@ -43,7 +43,8 @@ extern int main(int argc, char *argv[])
 {
 	const char * const nvpwd = "hoot";
 
-	const char * const nvcmd = "tpm_nvdefine -z -p OWNERWRITE -s 366 -r 10 -r 15 -i 0xbeaf -o hoot 2>&1 >/dev/null";
+	const char * const nvcmd = "tpm_nvdefine -z -p OWNERWRITE -s 366 " \
+		"-r 15 -i 0xbeaf -o hoot 2>&1 >/dev/null";
 
 	int retn = 1;
 
