@@ -132,7 +132,7 @@ static _Bool tpm_daemon(const _Bool start)
 		return false;
 	/* Child. */
 	if ( tpm_pid == 0 ) {
-		execl(TCSD_PATH, TCSD_PATH, "-f", NULL);
+		execl(TCSD_PATH, TCSD_PATH, "-f", "-n", NULL);
 		return false;
 	}
 

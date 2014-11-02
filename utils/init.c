@@ -130,7 +130,7 @@ static _Bool start_tpm(void)
 			goto done;
 		/* Child. */
 		if ( tpm_pid == 0 ) {
-			execl(TCSD_PATH, TCSD_PATH, "-f", NULL);
+			execl(TCSD_PATH, TCSD_PATH, "-f", "-n", NULL);
 			goto done;
 		}
 

@@ -197,7 +197,7 @@ static _Bool start(CO(SoftwareTPM, this), const uid_t uid)
 			_exit(1);
 
 		execl("/usr/local/sbin/tcsd", \
-		      "/usr/local/sbin/tcsd", "-e", "-f", NULL);
+		      "/usr/local/sbin/tcsd", "-e", "-f", "-n", NULL);
 
 		_exit(1);
 	}
