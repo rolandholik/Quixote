@@ -19,6 +19,8 @@
 extern int main(int argc, char *argv[])
 
 {
+	_Bool do_reverse = false;
+
 	enum {none, client, server} Mode = none;
 
 	char *host = NULL;
@@ -31,7 +33,7 @@ extern int main(int argc, char *argv[])
 
 
         /* Get operational mode. */
-        while ( (retn = getopt(argc, argv, "CSh:")) != EOF )
+        while ( (retn = getopt(argc, argv, "CSrh:")) != EOF )
                 switch ( retn ) {
 			case 'C':
 				Mode = client;
@@ -42,6 +44,10 @@ extern int main(int argc, char *argv[])
 
 			case 'h':
 				host = optarg;
+				break;
+
+			case 'r':
+				do_reverse = true;
 				break;
 		}
 
@@ -85,14 +91,17 @@ extern int main(int argc, char *argv[])
 			goto done;
 		}
 
+		duct->do_reverse(duct, do_reverse);
+
 		if ( !duct->accept_connection(duct) ) {
 			fputs("Error accepting connection.\n", stderr);
 			goto done;
 		}
 
 		addr = duct->get_ipv4(duct);
-		fprintf(stdout, "Accept connection from: %x/%s\n", \
-			ntohl(addr->s_addr), inet_ntoa(*addr));
+		fprintf(stdout, "Accept connection from: %x / %s / %s\n", \
+			ntohl(addr->s_addr), inet_ntoa(*addr),		  \
+			duct->get_client(duct));
 			
 
 		if ( !duct->receive_Buffer(duct, bufr) ) {

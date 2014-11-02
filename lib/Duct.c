@@ -76,6 +76,9 @@ struct NAAAIM_Duct_State
 	/* Address for server to listen on. */
 	long server;
 
+	/* Flag to indicate whether or not reverse DNS lookup is done. */
+	_Bool do_reverse;
+
 	/* Client ip and hostname .*/
 	struct in_addr ipv4;
 	Buffer client;
@@ -106,6 +109,7 @@ static void _init_state(CO(Duct_State, S)) {
 	S->sockt	= -1;
 	S->fd		= -1;
 	S->server	= INADDR_ANY;
+	S->do_reverse	= false;
 	S->ipv4.s_addr	= 0;
 	S->client       = NULL;
 
@@ -364,11 +368,10 @@ static _Bool accept_connection(CO(Duct, this))
 
 	const char *err = NULL;
 
-	char *hp;
+	char host[256];
+	static const char * const reverse = " [reverse disabled]";
 
 	int client_size;
-
-	struct hostent *client_hostname;
 
 	struct sockaddr_in client;
 
@@ -390,9 +393,12 @@ static _Bool accept_connection(CO(Duct, this))
 	}
 
 	S->ipv4.s_addr = client.sin_addr.s_addr;
-	client_hostname = gethostbyaddr(&client.sin_addr, \
-					sizeof(struct in_addr), AF_INET);
-	hp = client_hostname->h_name;
+	if ( getnameinfo((struct sockaddr *) &client,			    \
+			 sizeof(struct sockaddr), host, sizeof(host), NULL, \
+			 0, S->do_reverse ? 0 : NI_NUMERICHOST) != 0 ) {
+		err = "Name lookup failed.";
+		goto done;
+	}
 	if ( S->client == NULL ) {
 		S->client = HurdLib_Buffer_Init();
 		if ( S->client == NULL ) {
@@ -403,7 +409,10 @@ static _Bool accept_connection(CO(Duct, this))
 	else
 		S->client->reset(S->client);
 
-	S->client->add(S->client, (unsigned char *) hp, strlen(hp));
+	S->client->add(S->client, (unsigned char *) host, strlen(host));
+	if ( !S->do_reverse )
+		S->client->add(S->client, (unsigned char *) reverse, \
+			       strlen(reverse));
 	if ( !S->client->add(S->client, (unsigned char *) "\0", 1) ) {
 		err = "Store of client named failed.";
 		goto done;
@@ -596,6 +605,37 @@ static char * get_client(CO(Duct, this))
 /**
  * External public method.
  *
+ * This method implements setting of the flag which determines whether
+ * or not reverse DNS lookups are done on the address of clients.
+ *
+ * \param this		The Duct object whose reverse DNS status is to
+ *			be set.
+ *
+ * \param mode		The boolean value which indictes whether or
+ *			not reverse lookups are to be done.  A true
+ *			value, the default on object initialization,
+ *			specifies that lookups are to be done.
+ *
+ * \return		No return value is defined.
+ */
+
+static void do_reverse(CO(Duct, this), const _Bool mode)
+
+{
+	STATE(S);
+
+
+	if ( S->poisoned )
+		return;
+	S->do_reverse = mode;
+
+	return;
+}
+	
+
+/**
+ * External public method.
+ *
  * This method implements resetting of a duct object.  Its primary use
  * is in a server object to reset the accepted file descriptor.
  *
@@ -701,6 +741,7 @@ extern Duct NAAAIM_Duct_Init(void)
 	this->get_ipv4		= get_ipv4;
 	this->get_client	= get_client;
 
+	this->do_reverse	= do_reverse;
 	this->reset		= reset;
 	this->whack		= whack;
 

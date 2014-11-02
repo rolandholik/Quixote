@@ -35,6 +35,7 @@ struct NAAAIM_Duct
 	_Bool (*receive_Buffer)(const Duct, const Buffer);
 	struct in_addr * (*get_ipv4)(const Duct);
 	char * (*get_client)(const Duct);
+	void (*do_reverse)(const Duct, const _Bool);
 	void (*reset)(const Duct);
 	_Bool (*whack_connection)(const Duct);
 	void (*whack)(const Duct);
