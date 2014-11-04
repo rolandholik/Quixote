@@ -369,8 +369,7 @@ static _Bool measure_system(void)
 	if ( pid == 0 ) {
 		if ( chdir(measurement) != 0 )
 			goto done;
-		execl(verifier, verifier, "-m", "-f", "-k",	 \
-		      "/etc/conf/pubkey", "-u", "/etc/conf/aik", \
+		execl(verifier, verifier, "-m", "-f", "-u", "/etc/conf/aik", \
 		      (char *) NULL);
 		goto done;
 	}
