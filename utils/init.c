@@ -26,6 +26,9 @@
 /* TPM daemon location. */
 #define TCSD_PATH "/usr/local/sbin/tcsd"
 
+/* System initialization file. */
+#define SYSINIT "/etc/conf/rc.sysinit"
+
 
 /* Include files. */
 #include <stdio.h>
@@ -45,6 +48,7 @@
 #include <HurdLib.h>
 #include <Config.h>
 #include <Buffer.h>
+#include <String.h>
 
 #include <SHA256.h>
 
@@ -63,6 +67,45 @@ static SoftwareTPM SWtpm = NULL;
 
 
 /**
+ * Internal private function.
+ *
+ * This function is used to read a single line from the specified
+ * input stream.  The input stream is read until a linefeed is
+ * encountered.
+ *
+ * \param input		A pointer to the input stream to be read.
+ *
+ * \param line		The String object which the input is loaded
+ *			into.
+ *
+ * \return		A boolean value is used to indicate the status
+ *			of the read.  A true value indicates the
+ *			supplied String object contains valid data.  A
+ *			false value indicates an error or an end of
+ *			file condition.
+ */
+
+static _Bool _getline(FILE *input, CO(String, line))
+
+{
+	char inbufr[2] = {0, 0};
+
+	int inchar;
+
+
+	while ( (inchar = fgetc(input)) != EOF ) {
+		inbufr[0] = (char) inchar;
+		if ( inbufr[0] == '\n' )
+			return true;
+		if ( !line->add(line, inbufr) )
+			return false;
+	}
+
+	return false;
+}
+
+
+/**
  * Private function.
  *
  * This function is responsible for terminating the boot process.  It
@@ -76,12 +119,11 @@ static SoftwareTPM SWtpm = NULL;
 static void do_reboot(void)
 
 {
-	fputs("Reboot requested.\n", stderr);
+#if 1
+	fputs("Halting system.\n", stderr);
 	reboot(RB_HALT_SYSTEM);
-	return;
-
-#if 0
-	fputs("Rebooting.\n", stderr);
+#else
+	fputs("Rebooting system.\n", stderr);
 	reboot(RB_AUTOBOOT);
 #endif
 }
@@ -388,53 +430,54 @@ static _Bool measure_system(void)
 	return retn;
 }
 
-	
+
 /**
  * Private function.
  *
- * This function is responsible for configuring the internal IPsec tunnel
- * used to transport commands between the two nodes.  The static Mode
- * variable is used to specify the personality type for the connection.
+ * This function is responsible for running the set of commands needed
+ * to configure the system.  These commands are stored in the
+ * /etc/conf/rc.sysinit file.  A non-zero return code from any command
+ * in this file is considered an error.
  *
  * No arguements are expected by this function.
  *
- * \return	If an error is encountered while executing the tunnel
- *		configuration a false value is returned.  A true value
- *		indicates the tunnel was successfully configured.
+ * \return	If an error is encountered while executing on of the
+ *		commands needed for system configuration a false value
+ *		is returned.  A true value indicates the system was
+ *		successfully configured.
  */
 
-static _Bool configure_internal_tunnel(void)
+static _Bool run_sysinit(void)
 
 {
-	_Bool changed_uid = false,
-	      retn	  = false;
+	_Bool retn = false;
 
-	char *cmd = NULL;
+	FILE *infile;
+
+	String line = NULL;
 
 
-	if ( setreuid(1, -1) == -1 )
+	INIT(HurdLib, String, line, goto done);
+
+	if ( (infile = fopen(SYSINIT, "r")) == NULL )
 		goto done;
-	changed_uid = true;
-	
-	if ( strcmp(Mode, "liu") == 0 ) {
-		sleep(5);
-		cmd = "possum -C -p liu";
+
+	while ( !feof(infile) ) {
+		if ( !_getline(infile, line) )
+			goto done;
+		fprintf(stderr, "\t%s\n", line->get(line));
+		if ( system(line->get(line)) != 0 )
+			goto done;
+		line->reset(line);
 	}
-	if ( strcmp(Mode, "hui") == 0 )
-		cmd = "possum -H -p hui";
-	if ( cmd == NULL )
-		goto done;
+	if ( feof(infile) )
+		retn = true;
 
-	if ( system(cmd) != 0 )
-		goto done;
-	retn = true;
-	
+
  done:
-	if ( changed_uid && (setreuid(geteuid(), -1) == -1) )
-		retn = false;
 	return retn;
 }
-	
+
 
 /*
  * Program entry point begins here.
@@ -465,21 +508,9 @@ extern int main(int argc, char *argv[])
 	if ( !measure_system() )
 		goto done;
 
-	fputs("Starting internal tunnel.\n", stderr);
-	if ( !configure_internal_tunnel() )
+	fputs("Running system initialization.\n", stderr);
+	if ( !run_sysinit() )
 		goto done;
-
-	if ( strcmp(Mode, "hui") == 0 ) {
-		fputs("Starting identity engine.\n", stderr);
-		system("/usr/local/sbin/idgine &");
-		sleep(5);
-		fputs("Starting identity server.\n", stderr);
-		execl("/usr/local/sbin/idsvr", "/usr/local/sbin/idsvr", \
-		      "-h", "10.0.2.1", NULL);
-	} else {
-		fprintf(stdout, "%s: OK\n", Mode);
-		execl("/bin/sh", "/bin/sh", NULL);
-	}
 
 
  done:
