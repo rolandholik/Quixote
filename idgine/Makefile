@@ -6,7 +6,7 @@
 # Variable declarations.
 CSRC = idgine.c Identity.c IDengine.c
 
-BINARIES = idgine gen-id idsvr fetch-id
+BINARIES = idgine gen-id idsvr fetch-id recip-svr fwd-id
 
 CC = musl-gcc
 
@@ -66,6 +66,12 @@ idsvr: idsvr.o IDengine.o Identity.o ../SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
 fetch-id: fetch-id.o IDengine.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
+
+recip-svr: recip-svr.o IDengine.o Identity.o ../SHA256.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
+
+fwd-id: fwd-id.o IDengine.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
 clean:
