@@ -33,8 +33,6 @@ typedef enum {
 struct NAAAIM_Ivy
 {
 	/* External methods. */
-	void (*whack)(const Ivy);
-
 	Buffer (*get_element)(const Ivy, const Ivy_element);
 	_Bool (*set_element)(const Ivy, Ivy_element, const Buffer);
 	_Bool (*set_identity)(const Ivy, const IDtoken);
@@ -43,6 +41,8 @@ struct NAAAIM_Ivy
 	_Bool (*decode)(const Ivy, const Buffer);
 
 	void (*print)(const Ivy);
+	void (*reset)(const Ivy);
+	void (*whack)(const Ivy);
 
 	/* Private state. */
 	Ivy_State state;

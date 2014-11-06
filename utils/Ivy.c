@@ -475,6 +475,37 @@ static void print(CO(Ivy, this))
 /**
  * External public method.
  *
+ * This method implements the reset of an identity verification object.
+ * It encapsulates the issuance of ->reset calls to the underlying
+ * Buffer objects which contain the various identity verification
+ * elements.
+ *
+ * \param this	A pointer to the object which is to be reset.
+ *
+ * \return	No return value is defined.
+ */
+
+static void reset(CO(Ivy, this))
+
+{
+	STATE(S);
+
+
+	if ( S->poisoned )
+		return;
+
+	S->id->reset(S->id);
+	S->pubkey->reset(S->pubkey);
+	S->software->reset(S->software);
+	S->reference->reset(S->reference);
+
+	return;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a destructor for a Ivy object.
  *
  * \param this	A pointer to the object which is to be destroyed.
@@ -537,8 +568,6 @@ extern Ivy NAAAIM_Ivy_Init(void)
 	INIT(HurdLib, Buffer, this->state->reference, goto fail);
 
 	/* Method initialization. */
-	this->whack = whack;
-
 	this->get_element  = get_element;
 	this->set_element  = set_element;
 	this->set_identity = set_identity;
@@ -547,6 +576,8 @@ extern Ivy NAAAIM_Ivy_Init(void)
 	this->decode = decode;
 
 	this->print = print;
+	this->reset = reset;
+	this->whack = whack;
 
 	return this;
 

@@ -645,12 +645,16 @@ static _Bool find_client(CO(char *, clients), CO(Buffer, packet), \
 
 	for (lp= 0; lp < identities.gl_pathc; ++lp) {
 		token->reset(token);
+		ivy->reset(ivy);
 
 		file->open_ro(file, identities.gl_pathv[lp]);
 		if ( !file->slurp(file, asn) ) 
 			goto done;
+		file->reset(file);
+
 		if ( !ivy->decode(ivy, asn) )
 			goto done;
+		asn->reset(asn);
 
 		/* Extract identity token. */
 		if ( (b = ivy->get_element(ivy, Ivy_id)) == NULL )
