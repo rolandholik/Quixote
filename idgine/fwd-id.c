@@ -12,7 +12,9 @@
  **************************************************************************/
 
 /* Local defines. */
+#define IDSVR_HOST   "10.0.2.1"
 #define IDSVR_PORT   10903
+
 #define IDRECIP_PORT 10904
 
 
@@ -136,7 +138,7 @@ extern int main(int argc, char *argv[])
 		fputs("Cannot initialize network client.\n", stderr);
 		goto done;
 	}
-	if ( !duct->init_port(duct, host->get(host), IDSVR_PORT) ) {
+	if ( !duct->init_port(duct, IDSVR_HOST, IDSVR_PORT) ) {
 		fputs("Cannot initiate connection.\n", stderr);
 		goto done;
 	}
@@ -156,8 +158,16 @@ extern int main(int argc, char *argv[])
 		fputs("Error decoding identity\n", stderr);
 		goto done;
 	}
+#if 0
+	if ( idengine->query_failed(idengine) ) {
+		fputs("Local identity generation failed.\n", stderr);
+		goto done;
+	}
+#endif
 
-	fputs("Fowarding identity: ", stdout);
+
+	/* Forward the identity for reciprocation. */
+	fputs("Fowarding local identity:\n", stdout);
 	identity->print(identity);
 
 	INIT(NAAAIM, Duct, fwd, goto done);
@@ -174,6 +184,15 @@ extern int main(int argc, char *argv[])
 		fputs("Error sending buffer.\n", stderr);
 		goto done;
 	}
+
+	identity->reset(identity);
+	if ( !duct->receive_Buffer(duct, identity) ) {
+		fputs("Error receiving buffer.\n", stderr);
+		goto done;
+	}
+	fputs("Reciprocated identity:\n", stdout);
+	identity->print(identity);
+	fputc('\n', stdout);
 
 	retn = 0;
 		

@@ -14,6 +14,9 @@
 /* Local defines. */
 #define IDRECIP_PORT 10904
 
+#define IDSVR_HOST "10.0.2.1"
+#define IDSVR_PORT 10903
+
 
 /* Include files. */
 #include <stdio.h>
@@ -40,6 +43,9 @@
 
 /* Variables static to this module. */
 static pid_t process_table[100];
+
+/* Number of reciprocation requests. */
+static uint32_t Recip_Count = 0;
 
 
 /**
@@ -110,9 +116,48 @@ static void update_process_table(void)
 					fputs(" abnormally.\n", stdout);
 					continue;
 				}
-				fprintf(stdout, ", status=%d\n", \
+				fprintf(stdout, ", status=%d", \
 					WEXITSTATUS(status));
+				if ( status == 0 )
+					fprintf(stdout, ", Reciprocation " \
+						"count: %u\n", ++Recip_Count);
+				else
+					fputc('\n', stdout);
 			}
+	return;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function converts an identity in binary form into its 
+ * hexadecimal equivalent.
+ *
+ * \param identifier	The String object which will hold the
+ *			ASCII ersion of the identity.
+ *
+ * \param identity	The Buffer object containing the identity to
+ *			be encoded.
+ *
+ * \return		No return value is defined.
+ */
+
+static void add_identity(CO(String, identifier), CO(Buffer, identity))
+
+{
+	uint16_t lp,
+		 idsize;
+
+	char bufr[3];
+
+
+	idsize = identity->size(identity);
+        for (lp= 0; lp < idsize; ++lp) {
+                snprintf(bufr, sizeof(bufr), "%02x", lp);
+                identifier->add(identifier, bufr);
+        }
+
 	return;
 }
 
@@ -132,33 +177,88 @@ static void update_process_table(void)
 static void handle_connection(CO(Duct,duct))
 
 {
-	Buffer bufr = NULL;
+	IDengine_identity idtype = IDengine_none;
+
+	Buffer identity = NULL;
+
+	String name	  = NULL,
+	       identifier = NULL;
 
 	IDengine idengine = NULL;
 
+	Duct idsvr_duct = NULL;
 
-	INIT(HurdLib, Buffer, bufr, goto done);
 
-	INIT(NAAAIM, IDengine, idengine, goto done);
-	if ( !idengine->attach(idengine) )
+	/* Receive the identity request. */
+	INIT(HurdLib, Buffer, identity, goto done);
+	if ( !duct->receive_Buffer(duct, identity) )
 		goto done;
 
 	fprintf(stdout, "\n.%d: Identity reciprocation request from %s.\n", \
 		getpid(), duct->get_client(duct));
+	identity->print(identity);
 
-	if ( !duct->receive_Buffer(duct, bufr) )
-		goto done;
 
-	if ( !idengine->decode_get_identity(idengine, bufr) )
-		goto done;
+	/* Issue a reciprocation request to the local identity generator. */
+	INIT(NAAAIM, IDengine, idengine, goto done);
+	INIT(NAAAIM, Duct, idsvr_duct, goto done);
+	INIT(HurdLib, String, name, goto done);
+	INIT(HurdLib, String, identifier, goto done);
 
-	if ( !duct->send_Buffer(duct, bufr) )
+	if ( !idsvr_duct->init_client(idsvr_duct) ) {
+		fputs("Cannot initialize network client.\n", stderr);
 		goto done;
+	}
+	if ( !idsvr_duct->init_port(idsvr_duct, IDSVR_HOST, IDSVR_PORT) ) {
+		fputs("Cannot initiate connection.\n", stderr);
+		goto done;
+	}
+
+
+	/* Setup the identity reciprocation request. */
+	idtype = IDengine_service;
+	if ( !name->add(name, "service1") )
+		goto done;
+	add_identity(identifier, identity);
+
+	identity->reset(identity);
+	if ( !idengine->encode_get_identity(idengine, idtype, name, \
+					    identifier, identity) ) {
+		fputs("Identity encoding failed.\n", stderr);
+		goto done;
+	}
+
+
+	/* Send and receive the identity reciprocation request. */
+	if ( !idsvr_duct->send_Buffer(idsvr_duct, identity) ) {
+		fputs("Error sending buffer.\n", stderr);
+		goto done;
+	}
+
+	identity->reset(identity);
+	if ( !idsvr_duct->receive_Buffer(idsvr_duct, identity) ) {
+		fputs("Error receiving buffer.\n", stderr);
+		goto done;
+	}
+
+	if ( !idengine->decode_identity(idengine, identity) ) {
+		fputs("Error decoding identity.\n", stderr);
+		goto done;
+	}
+
+	fputs("Reciprocated identity:\n", stdout);
+	identity->print(identity);
+
+	if ( !duct->send_Buffer(duct, identity) ) {
+		fputs("Error returning reciprocated identity.\n", stderr);
+		goto done;
+	}
 
 
  done:
-	WHACK(bufr);
+	WHACK(identity);
 	WHACK(idengine);
+	WHACK(idsvr_duct);
 
 	return;
 }

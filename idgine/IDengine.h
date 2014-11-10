@@ -49,6 +49,7 @@ struct NAAAIM_IDengine
 	_Bool (*decode_identity)(const IDengine, const Buffer);
 
 	_Bool (*set_error)(const IDengine);
+	_Bool (*query_failed)(const IDengine);
 
 	void (*whack)(const IDengine);
 

@@ -154,10 +154,15 @@ extern int main(int argc, char *argv[])
 		fputs("Error decoding identity\n", stderr);
 		goto done;
 	}
+#if 0
+	if ( idengine->query_failed ) {
+		fputs("Identity generation failed.\n", stdout);
+		goto done;
+	}
+#endif
 
 	fputs("identity: ", stdout);
 	identity->print(identity);
-
 	retn = 0;
 		
 

@@ -64,6 +64,9 @@ struct NAAAIM_IDengine_State
 	/* Object status. */
 	_Bool poisoned;
 
+	/* Query status. */
+	_Bool query_failed;
+
 	/* Identity manager IPC object.*/
 	IPC ipc;
 };
@@ -136,9 +139,10 @@ static void _init_state(CO(IDengine_State, S))
 	S->libid = NAAAIM_LIBID;
 	S->objid = NAAAIM_IDengine_OBJID;
 
-	S->poisoned = false;
+	S->poisoned	= false;
+	S->query_failed = false;
 
-	S->ipc	    = NULL;
+	S->ipc = NULL;
 
 	return;
 }
@@ -299,11 +303,15 @@ static _Bool get_identity(CO(IDengine, this), const IDengine_identity type, \
 		goto done;
 
 	/* Return the identity if it is valid. */
-	if ( ipc->error )
+	if ( ipc->error ) {
+		S->query_failed = true;
+		retn = true;
 		goto done;
+	}
 
 	if ( !identity->add(identity, ipc->identity, sizeof(ipc->identity)) )
 		goto done;
+	S->query_failed = false;
 	retn = true;
 	
 
@@ -748,10 +756,17 @@ static _Bool decode_get_identity(CO(IDengine, this), CO(Buffer, identity))
 		goto done;
 
 	/* Return the identity if the request completed without error. */
+	if ( ipc.error ) {
+		S->query_failed = true;
+		retn = true;
+		goto done;
+	}
+
 	identity->reset(identity);
 	if ( !_encode_ipc(&ipc, identity) )
 		goto done;
 
+	S->query_failed = false;
 	retn = true;
 
 
@@ -788,6 +803,8 @@ static _Bool decode_get_identity(CO(IDengine, this), CO(Buffer, identity))
 static _Bool decode_identity(CO(IDengine, this), CO(Buffer, identity))
 
 {
+	STATE(S);
+
 	_Bool retn = false;
 
 	struct IDengine_ipc ipc;
@@ -795,16 +812,44 @@ static _Bool decode_identity(CO(IDengine, this), CO(Buffer, identity))
 
 	if ( !_decode_ipc(&ipc, identity) )
 		goto done;
+	if ( ipc.error ) {
+		S->query_failed = true;
+		retn = true;
+		goto done;
+	}
 
 	identity->reset(identity);
 	if ( !identity->add(identity, ipc.identity, sizeof(ipc.identity)) )
 		goto done;
 
+	S->query_failed = false;
 	retn = true;
 
 
  done:
 	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements an accessor for checking the status of
+ * the flag which indicates if the identity generation failed.
+ *
+ * \param this	A pointer to the object whose generation status is 
+ *		to be quered
+ *
+ * \return	A boolean value is returned which provides an
+ *		indication of the status of the query.
+ */
+
+static _Bool query_failed(CO(IDengine, this))
+
+{
+	STATE(S);
+
+	return S->query_failed;
 }
 
 
@@ -880,6 +925,7 @@ extern IDengine NAAAIM_IDengine_Init(void)
 	this->decode_get_identity = decode_get_identity;
 	this->decode_identity	  = decode_identity;
 
+	this->query_failed = query_failed;
 	this->whack = whack;
 
 	return this;
