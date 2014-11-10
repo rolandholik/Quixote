@@ -581,9 +581,6 @@ static uint32_t propose_spi(CO(uint32_t, base), uint32_t use_spi)
  * This function is responsible for searching the list of attestable
  * clients based on the identification challenge.
  *
- * \param clients	A character string containing the name of
- *			the file which holds the list of clients.
- *
  * \param packet	The Buffer object containing the type 1 POSSUM
  *			packet which was received.
  *
@@ -600,11 +597,11 @@ static uint32_t propose_spi(CO(uint32_t, base), uint32_t use_spi)
  *			is returned if the search was unsuccessful.
  */
 
-static _Bool find_client(CO(char *, clients), CO(Buffer, packet), \
-			 CO(IDtoken, token), CO(Ivy, ivy))
+static _Bool find_client(CO(Buffer, packet), CO(IDtoken, token), CO(Ivy, ivy))
 
 {
-	_Bool retn = false;
+	_Bool retn	 = false,
+	      changed_id = false;
 
 	size_t lp;
 
@@ -639,7 +636,15 @@ static _Bool find_client(CO(char *, clients), CO(Buffer, packet), \
 	/*
 	 * Extract each available identity and compute its identity
 	 * assertion against the value provided by the caller.
+	 *
+	 * The call to the glob() function is done with non-root
+	 * privileges in order to prevent the device identification
+	 * files from being incorporated in the system measurement.
 	 */
+	if ( setreuid(1, -1) == -1 )
+		goto done;
+	changed_id = true;
+
 	if ( glob("/etc/conf/*.ivy", 0, NULL, &identities) != 0 )
 		goto done;
 
@@ -683,6 +688,11 @@ static _Bool find_client(CO(char *, clients), CO(Buffer, packet), \
 
 
  done:
+	if ( changed_id ) {
+		if ( setreuid(geteuid(), -1) == -1 )
+			retn = false;
+	}
+
 	WHACK(asn);
 	WHACK(idkey);
 	WHACK(identity);
@@ -1148,8 +1158,6 @@ static _Bool host_mode(CO(Config, cfg))
 {
 	_Bool retn = false;
 
-	char *cfg_item;
-
 	uint32_t tspi,
 		 spi,
 		 protocol;
@@ -1207,12 +1215,9 @@ static _Bool host_mode(CO(Config, cfg))
 	fputc('\n', stdout);
 
 	/* Lookup the client identity. */
-	if ( (cfg_item = cfg->get(cfg, "client_list")) == NULL )
-		goto done;
-
 	INIT(NAAAIM, IDtoken, token, goto done);
 	INIT(NAAAIM, Ivy, ivy, goto done);
-	if ( !find_client(cfg_item, netbufr, token, ivy) ) {
+	if ( !find_client(netbufr, token, ivy) ) {
 		fputs("Cannot locate client.\n", stdout);
 		goto done;
 	}
@@ -1428,8 +1433,7 @@ static _Bool client_mode(CO(Config, cfg))
 {
 	_Bool retn = false;
 
-	const char *cfg_item,
-		   *remote_ip;
+	const char *remote_ip;
 
 	uint32_t spi,
 		 tspi,
@@ -1537,11 +1541,8 @@ static _Bool client_mode(CO(Config, cfg))
 
 	/* Find the host identity. */
 	INIT(NAAAIM, Ivy, ivy, goto done);
-	if ( (cfg_item = cfg->get(cfg, "client_list")) == NULL )
-		goto done;
-
 	token->reset(token);
-	if ( !find_client(cfg_item, bufr, token, ivy) )
+	if ( !find_client(bufr, token, ivy) )
 		goto done;
 
 	/* Set the host configuration personality. */
