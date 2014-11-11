@@ -8,7 +8,7 @@ CSRC = gen-image.c load-image.c boot.c Netconfig.c IPsec.c PossumPacket.c \
 	SoftwareStatus.c SoftwareTPM.c TPMcmd.c IDmgr.c Ivy.c
 
 TOOLS = gen-image load-image boot sboot init possum gen-id-verifier \
-	software-status software-tpm tpm-cmd id-set idmgr
+	software-status software-tpm tpm-cmd id-set idmgr net-config
 
 CC = musl-gcc
 
@@ -99,6 +99,9 @@ id-set: id-set.o TPMcmd.o ../IDtoken.o ../SHA256_hmac.o ../SHA256.o
 
 idmgr: idmgr.o TPMcmd.o IDmgr.o ../IDtoken.o ../SHA256_hmac.o ../SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi;
+
+net-config: net-config.o Netconfig.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
 idtest: idtest.o IDmgr.o ../IDtoken.o ../SHA256_hmac.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi;
