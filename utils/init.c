@@ -254,15 +254,14 @@ static _Bool load_config(void)
 /**
  * Private function.
  *
- * This function is responsible for setting up the base network
- * configuration for the platform.  The network configuration is
- * obtained from the global Cfg variable.
+ * This function is responsible for setting up the loopback interface
+ * for the device.
  *
  * No arguements are expected by this function.
  *
  * \return	If an error is encountered while configuring the
- *		network a false value is returned.  A true value indicates
- *		the network was successfully configured.
+ *		loopback address a false value is returned.  A true
+ *		value indicates the network was successfully configured.
  */
 
 static _Bool configure_network(void)
@@ -270,27 +269,12 @@ static _Bool configure_network(void)
 {
 	_Bool retn = false;
 
-	char *iface,
-	     *address,
-	     *mask;
-
 	Netconfig netconfig = NULL;
 
 
 	INIT(NAAAIM, Netconfig, netconfig, goto done);
 	if ( !netconfig->set_address(netconfig, "lo", "127.0.0.1", \
 				     "255.0.0.0") )
-		goto done;
-	WHACK(netconfig);
-
-	iface   = Cfg->get(Cfg, "interface");
-	address = Cfg->get(Cfg, "address");
-	mask	= Cfg->get(Cfg, "mask");
-	if ( (iface == NULL) || (address == NULL) || (mask == NULL) )
-		goto done;
-
-	INIT(NAAAIM, Netconfig, netconfig, goto done);
-	if ( !netconfig->set_address(netconfig, iface, address, mask) )
 		goto done;
 	retn = true;
 
