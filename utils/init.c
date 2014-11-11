@@ -106,24 +106,42 @@ static _Bool _getline(FILE *input, CO(String, line))
 /**
  * Private function.
  *
- * This function is responsible for terminating the boot process.  It
- * requests a reboot of the system.
+ * This function is responsible for terminating the init process.  By
+ * default the system will reboot on exit of init.  This can be selected
+ * by the 'on_exit' variable in the init configuration file.  Setting the
+ * value to 'halt' will cause the system to halt.
  *
  * No arguements are expected by this function.
  *
  * This function does not return.
  */
 
-static void do_reboot(void)
+static void do_exit(void)
 
 {
-#if 1
-	fputs("Halting system.\n", stderr);
-	reboot(RB_HALT_SYSTEM);
-#else
-	fputs("Rebooting system.\n", stderr);
-	reboot(RB_AUTOBOOT);
-#endif
+	_Bool do_reboot = true,
+	      do_halt	= false;
+
+	char *option;
+
+
+	if ( (option = Cfg->get(Cfg, "on_exit")) != NULL )
+		do_halt = (strcmp(option, "halt") == 0);
+
+	WHACK(Cfg);
+	WHACK(SWtpm);
+
+	if ( do_halt ) {
+		fputs("Halting system.\n", stderr);
+		reboot(RB_HALT_SYSTEM);
+	}
+
+	if ( do_reboot ) {
+		fputs("Rebooting system.\n", stderr);
+		reboot(RB_AUTOBOOT);
+	}
+
+	return;
 }
 
 
@@ -494,9 +512,6 @@ extern int main(int argc, char *argv[])
 
 
  done:
-	WHACK(Cfg);
-	WHACK(SWtpm);
-
-	do_reboot();
+	do_exit();
 	return retn;
 }
