@@ -151,13 +151,19 @@ static void add_identity(CO(String, identifier), CO(Buffer, identity))
 
 	char bufr[3];
 
+	unsigned char *p;
 
+
+	p      = identity->get(identity);
 	idsize = identity->size(identity);
+
         for (lp= 0; lp < idsize; ++lp) {
-                snprintf(bufr, sizeof(bufr), "%02x", lp);
+                snprintf(bufr, sizeof(bufr), "%02x", *p);
                 identifier->add(identifier, bufr);
+		++p;
         }
 
+	memset(bufr, '\0', sizeof(bufr));
 	return;
 }
 
