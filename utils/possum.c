@@ -1433,7 +1433,8 @@ static _Bool client_mode(CO(Config, cfg))
 {
 	_Bool retn = false;
 
-	const char *remote_ip;
+	const char *retry,
+		   *remote_ip;
 
 	uint32_t spi,
 		 tspi,
@@ -1474,19 +1475,36 @@ static _Bool client_mode(CO(Config, cfg))
 		goto done;
 	}
 
-	/* Setup a connection to the remote host. */
-	if ( (remote_ip = cfg->get(cfg, "remote_ip")) == NULL )
-		goto done;
-
+	/* Measure the current software state. */
 	INIT(NAAAIM, SoftwareStatus, software_status, goto done);
 	software_status->open(software_status);
 	if ( !software_status->measure(software_status) )
 		goto done;
 
-	INIT(NAAAIM, Duct, duct, goto done);
-	duct->init_client(duct);
-	if ( !duct->init_port(duct, remote_ip, POSSUM_PORT) )
+	/* Setup a connection to the remote host. */
+	if ( (remote_ip = cfg->get(cfg, "remote_ip")) == NULL )
 		goto done;
+	retry = cfg->get(cfg, "retry");
+
+	if ( retry != NULL ) {
+		while ( retry != NULL ) {
+			INIT(NAAAIM, Duct, duct, goto done);
+			duct->init_client(duct);
+			if ( !duct->init_port(duct, remote_ip, POSSUM_PORT) ) {
+				fputs("Retrying possum connection in " \
+				      "five seconds.\n", stderr);
+				sleep(5);
+				WHACK(duct);
+			}
+			else
+				retry = NULL;
+		}
+	} else {
+		INIT(NAAAIM, Duct, duct, goto done);
+		duct->init_client(duct);
+		if ( duct->init_port(duct, remote_ip, POSSUM_PORT) )
+			goto done;
+	}
 
 	/* Send a session initiation packet. */
 	INIT(HurdLib, Buffer, bufr, goto done);
