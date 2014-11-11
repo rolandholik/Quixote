@@ -61,8 +61,6 @@
 /* Definitions static to this module. */
 static Config Cfg = NULL;
 
-static char *Mode = NULL;
-
 static SoftwareTPM SWtpm = NULL;
 
 
@@ -242,8 +240,6 @@ static _Bool load_config(void)
 	if ( setreuid(geteuid(), -1) == -1 )
 		goto done;
 
-	if ( (Mode = Cfg->get(Cfg, "mode")) == NULL )
-		goto done;
 	retn = true;
 
  done:
