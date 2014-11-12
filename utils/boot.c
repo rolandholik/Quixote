@@ -19,6 +19,11 @@
 /* Location of manifest file. */
 #define MANIFEST "/boot/manifest"
 
+/* Locations of root password and seal files. */
+#define ROOT_PWD    "/mnt/boot/root.pwd"
+#define ROOT_SEAL   "/mnt/boot/root.seal"
+#define CONFIG_SEAL "/mnt/boot/config.seal"
+
 
 /* Include files. */
 #include <stdio.h>
@@ -33,6 +38,8 @@
 #include <sys/reboot.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include <HurdLib.h>
 #include <Buffer.h>
@@ -259,6 +266,97 @@ static Buffer find_root(void)
 /**
  * Private function.
  *
+ * This function is responsible for sealing the root and configuration
+ * system passwords if a root password was located and verified on
+ * the /boot system partition.
+ *
+ * \return              A boolean value is used to indicate if an
+ *			error occurred during sealing of the passwords.
+ *			A true value indicates the password was sealed
+ *			and is available.
+ */
+
+static _Bool seal_pwd(void)
+
+{
+	_Bool retn	  = false,
+	      have_pwd	  = false,
+	      have_sealed = false;
+	
+	struct stat seal_stat;
+
+	const char * const seal_root_cmd = "tpm_sealdata -z -i " ROOT_PWD    \
+		" -o " ROOT_SEAL " -p 0 -p 1 -p 2 -p 3 -p 4 -p 5 -p 6 -p 7 " \
+		"-p 17 -p 18 2>&1 >/dev/null";
+	const char * const seal_config_cmd = "tpm_sealdata -z -i " ROOT_PWD  \
+		" -o " CONFIG_SEAL " -p 0 -p 1 -p 2 -p 3 -p 4 -p 5 -p 6 "    \
+		"-p 7 -p 17 -p 18 2>&1 >/dev/null";
+
+
+	/*
+	 * Check for the presence of root and password files.  If
+	 * a password file is not present we simply return and proceed.
+	 * If a seal file is present the existing sealed file is unlinked
+	 * and a new seal file is generated using the current password.
+	 *
+	 * Note that in order to provide a secure system the root and
+	 * configuration images need to be encrypted outside of this
+	 * platform.  The following will cause the existing images to
+	 * be lost if an alternate password file is placed into
+	 * position.
+	 */
+	if ( stat(ROOT_SEAL, &seal_stat) == 0 )
+		have_sealed = true;
+
+	if ( stat(ROOT_PWD, &seal_stat) == 0 )
+		have_pwd = true;
+
+	if ( !have_pwd ) {
+		retn = true;
+		goto done;
+	}
+
+	if ( have_sealed ) {
+		if ( unlink(ROOT_SEAL) != 0 )
+			goto done;
+		if ( unlink(CONFIG_SEAL) != 0 )
+			goto done;
+	}
+
+
+	/* Drop to a non-privileged user and seal the provided password. */
+	if ( setreuid(1, -1) == -1 )
+		goto done;
+
+	if ( system(seal_root_cmd) != 0 ) {
+		fputs("Failed to seal root password.\n", stderr);
+		setreuid(geteuid(), -1);
+		goto done;
+	}
+
+	if ( system(seal_config_cmd) != 0 ) {
+		fputs("Failed to seal config password.\n", stderr);
+		setreuid(geteuid(), -1);
+		goto done;
+	}
+
+	if ( setreuid(geteuid(), -1) == -1 )
+		goto done;
+
+	if ( unlink(ROOT_PWD) == 0 )
+		retn = true;
+	if ( retn )
+		fputs("Sealed root and config passwords.\n", stderr);
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
  * This function is responsible for loading the root and configuration
  * filesystems from their encrypted images on the boot device.
  *
@@ -303,7 +401,13 @@ static _Bool load_root(void)
 			strerror(errno));
 		goto done;
 	}
-#if 0
+
+
+	/* Check to see if password systems needs sealing. */
+	if ( !seal_pwd() )
+		goto done;
+
+	/* Load the system and configuration images with sealed passwords. */
 	if ( system("/sbin/load-image -u 1 -r /mnt/boot/root " \
 		    "-t -k /mnt/boot/root.seal -o /dev/hpd0") != 0 )
 		goto done;
@@ -313,18 +417,6 @@ static _Bool load_root(void)
 		fputs("Configuration load failed.\n", stderr);
 		goto done;
 	}
-#else
-	if ( system("/sbin/load-image -u 1 -r /mnt/boot/root " \
-		    "-k /mnt/boot/root.pwd -o /dev/hpd0") != 0 )
-		goto done;
-
-	if ( system("/sbin/load-image -u 1 -r /mnt/boot/config " \
-		    "-k /mnt/boot/config.pwd -o /dev/hpd1") != 0 ) {
-		fputs("Configuration load failed.\n", stderr);
-		goto done;
-	}
-
-#endif
 
 	if ( mount("/mnt", "/boot", NULL, MS_MOVE, NULL) == -1 )
 		goto done;
