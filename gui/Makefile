@@ -1,40 +1,78 @@
 # ***************************************************************************
-# (C)Copyright 2010, Enjellic Systems Development, LLC. All rights reserved.
+# (C)Copyright 2014, IDfusion, LLC. All rights reserved.
 # ***************************************************************************
 
+#
+# Java definitions.
+#
+JSRC =	naaaim.java idclient.java Duct.java
 
-#
-# Java compiler.
-#
 JAVAC = javac
+CLASSES = ${JSRC:java=class}
+%.class: %.java
+	${JAVAC} $<;
 
+# Variable declarations.
+CSRC = id-client-server.c SSLduct.c
+
+BINARIES = id-client-server
+
+CC = musl-gcc
+
+MUSL_INCLUDE = /usr/local/musl/include
 
 #
-# Source definitions and automatic definitions of classes.
+# Locations of SSL include files and libraries
 #
-SRCS =	naaaim.java
+SSL_INCLUDE = /usr/local/musl/ssl/include
+SSL_LIBRARY = -L /usr/local/musl/ssl/lib -l ssl
 
-CLASSES = ${SRCS:java=class}
+
+CDEBUG = -O2 -fomit-frame-pointer -march=core2
+CDEBUG = -g ${DMALLOC}
+
+CFLAGS = -Wall ${CDEBUG}
+
+# LDFLAGS = -s -L/usr/local/krb5/lib 
+LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib -L../lib -L../HurdLib
 
 
 #
 # Compilation directives.
 #
-%.class: %.java
-	${JAVAC} $<;
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@;
 
 
 #
-# Targets.
+# Automatic definition of classes and objects.
 #
+COBJS = ${CSRC:.c=.o}
+
+LIBS = -lNAAAIM -lHurdLib
+
+CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I${SSL_INCLUDE} \
+	-I${MUSL_INCLUDE}/tss
+
+
+#
+# Target directives.
+#
+.PHONY: all binaries classes
+
+# Targets
+all: ${COBJS} binaries classes
+
+binaries: ${BINARIES}
+
 classes: ${CLASSES}
 
-docs:
-	javadoc ${SRCS}
-
-clean-docs:
-	rm -f *.html *.css package-list
-	rm -rf com
+id-client-server: id-client-server.o SSLduct.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY} -lfl;
 
 clean:
-	/bin/rm -f *.class *~ debug.out
+	rm -f *.o *~ TAGS;
+	rm -f ${BINARIES};
+
+
+# Source dependencies.
