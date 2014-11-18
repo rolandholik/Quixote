@@ -3,6 +3,7 @@ import java.awt.EventQueue;
 import java.awt.Container;
 import java.awt.FlowLayout;
 import java.awt.BorderLayout;
+import java.awt.Font;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -31,9 +32,12 @@ public class idclient
 
 
     private javax.swing.JButton jButton1;
-    private javax.swing.JLabel jLabel1;
-    private javax.swing.JTextField userpin;
-    private javax.swing.JTextField ssnTextField;
+    private JLabel jLabel1;
+    private JLabel jLabel2;
+    private JLabel jLabel3;
+    private javax.swing.JTextField IDtype;
+    private javax.swing.JTextField IDname;
+    private javax.swing.JTextField Identifier;
     private JTextArea query_output;
     private JTextArea log_output;
     private BufferedReader ac;
@@ -48,7 +52,7 @@ public class idclient
     /**
      *
      * This method is called from within the constructor to initialize
-     *  the form.
+     * the form.
      *
      * This code should not be modified if the Form Editor is used.
      * We are currently abandoning this in favor of EMACS...
@@ -56,11 +60,21 @@ public class idclient
 
     private void initComponents() {
 
-        userpin = new javax.swing.JTextField();
+        IDtype = new javax.swing.JTextField();
+        IDname = new javax.swing.JTextField();
+	Identifier = new javax.swing.JTextField();
         jButton1 = new javax.swing.JButton();
+
         jLabel1 = new javax.swing.JLabel();
-        ssnTextField = new javax.swing.JTextField();
+	jLabel2 = new javax.swing.JLabel();
+	jLabel3 = new javax.swing.JLabel();
+
+
 	query_output = new JTextArea();
+ 	query_output.setEditable(false);
+ 	query_output.setColumns(50);
+ 	query_output.setRows(50);
+	query_output.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         setTitle("IDfusion Identity Generator Client");
@@ -72,13 +86,15 @@ public class idclient
 		}
 	    });
 
-        jLabel1.setText("User identifier:");
+        jLabel1.setText("Type:");
+	jLabel2.setText("Name:");
+	jLabel3.setText("Identifier:");
 
-        ssnTextField.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                ssnTextFieldActionPerformed(evt);
-            }
-        });
+        IDname.addActionListener(new java.awt.event.ActionListener() {
+		public void actionPerformed(java.awt.event.ActionEvent evt) {
+		    ssnTextFieldActionPerformed(evt);
+		}
+	    });
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
@@ -87,31 +103,43 @@ public class idclient
             .addGroup(layout.createSequentialGroup()
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(layout.createSequentialGroup()
-                        .addContainerGap()
-                        .addComponent(jLabel1)
-                        .addGap(11, 11, 11)
-                        .addComponent(userpin, javax.swing.GroupLayout.PREFERRED_SIZE, 136, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(37, 37, 37)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(ssnTextField, javax.swing.GroupLayout.PREFERRED_SIZE, 151, javax.swing.GroupLayout.PREFERRED_SIZE))
-                    .addGroup(layout.createSequentialGroup()
-                        .addGap(121, 121, 121)
-                        .addComponent(jButton1, javax.swing.GroupLayout.PREFERRED_SIZE, 211, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                .addContainerGap(45, Short.MAX_VALUE))
-        );
-        layout.setVerticalGroup(
-            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(layout.createSequentialGroup()
-                .addContainerGap()
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(userpin, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(jLabel1)
-                    .addComponent(ssnTextField, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addComponent(jButton1)
-                .addContainerGap())
+			      .addContainerGap()
+			      .addComponent(jLabel1)
+			      .addGap(11, 11, 11)
+			      .addComponent(IDtype, javax.swing.GroupLayout.PREFERRED_SIZE, 136, javax.swing.GroupLayout.PREFERRED_SIZE)
+			      .addGap(37, 37, 37)
+			      .addComponent(jLabel2)
+			      .addGap(11, 11, 11)
+			      .addComponent(IDname, javax.swing.GroupLayout.PREFERRED_SIZE, 151, javax.swing.GroupLayout.PREFERRED_SIZE)
+			      .addGap(37, 37, 37)
+			      .addComponent(jLabel3)
+			      .addGap(11, 11, 11)
+			      .addComponent(Identifier, javax.swing.GroupLayout.PREFERRED_SIZE, 151, javax.swing.GroupLayout.PREFERRED_SIZE)
+			      .addContainerGap())
 
-        );
+		      .addGroup(layout.createSequentialGroup()
+				.addGroup(layout.createSequentialGroup()
+					  .addGap(250, 250, 250)
+					  .addComponent(jButton1, javax.swing.GroupLayout.PREFERRED_SIZE, 211, javax.swing.GroupLayout.PREFERRED_SIZE)))
+		      .addGroup(layout.createSequentialGroup()
+				.addGroup(layout.createSequentialGroup()
+					  .addComponent(query_output))))));
+
+        layout.setVerticalGroup(
+				layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+				.addGroup(layout.createSequentialGroup()
+					  .addContainerGap()
+					  .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+						    .addComponent(IDtype, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+						    .addComponent(jLabel1)
+						    .addComponent(jLabel2)
+						    .addComponent(IDname, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+						    .addComponent(jLabel3)
+						    .addComponent(Identifier, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+					  .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+					  .addComponent(jButton1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+					  .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+					  .addComponent(query_output)));
 
         pack();
     }
@@ -119,99 +147,27 @@ public class idclient
 
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {
 
-	/* Location information. */
-	java.awt.Point locn = getLocation();
+	IDserver = new Duct();
+	if ( !IDserver.connect("192.168.2.1", 10988) ) {
+ 	    query_output.append("Cannot open query server connection.\n");
+ 	    return;
+ 	}
 
-	/* Text areas for query output and console log. */
-	query_output = new JTextArea();
-	query_output.setEditable(false);
-	query_output.setColumns(80);
-	query_output.setRows(50);
-	JScrollPane query_pane = new JScrollPane(query_output);
-
-	log_output   = new JTextArea();
-	log_output.setEditable(false);
-	log_output.setColumns(80);
-	log_output.setRows(50);
-	JScrollPane log_pane = new JScrollPane(log_output);
+	query_output.setText(null);
+	query_output.append("Identity generation/reciprocation output\n\n");
+	query_output.append("Type: " + IDtype.getText() + "\n");
+	query_output.append("Name: " + IDname.getText() + "\n");
+	query_output.append("Identifier: " + Identifier.getText() + "\n\n");
 	
-	/* Frames for the two output windows. */
-	JFrame query_frame = new JFrame("Query output.");
-	JFrame log_frame   = new JFrame("Log output.");
+	System.out.println("Sending:" + IDtype.getText() + "IDname.getText()"
+			   + IDname.getText());
+	IDserver.send(IDtype.getText() + ":" + IDname.getText() + ":"
+		      + Identifier.getText());
 
-	/* Setup content layouts. */
-	Container query_content = query_frame.getContentPane();
-	query_content.setLayout(new BorderLayout());
-	query_content.add(query_pane);
-
-	Container log_content = log_frame.getContentPane();
-	log_content.setLayout(new BorderLayout());
-	log_content.add(log_pane);
-
-	/* Set screen sizes and the output and console windows. */
-	log_frame.setSize(500, 500);
-	log_frame.setVisible(true);
-	locn.translate(0, 115);
-	log_frame.setLocation(locn);
-
-	query_frame.setSize(500, 500);
-	query_frame.setVisible(true);
-	locn = log_frame.getLocation();
-	locn.translate(500, 0);
-	query_frame.setLocation(locn);
-
-
-	/*
-	 * The following implements an inner class used to implement
-	 * dynamic updates to the console and log outputs.
-	 */
-
-	SwingWorker worker = new SwingWorker<String, Void>() {
-	    
-	    public String doInBackground() {
-
-		String line, error;
-
-		try {
-		    while ((error = ac.readLine()) != null) {
-			log_output.append(error + "\n");
-			System.out.println(error);
-		    }
-
-		    while ((line = br.readLine()) != null) {
-			query_output.append(line + "\n");
-			System.out.println(line);
-		    }
-		}
-		catch (IOException ex) {
-		    Logger.getLogger(idclient.class.getName()).log(Level.SEVERE,
-								   null, ex);
-		}
-		return null;
-	    }
-
-	    public void done() {
-	    }
-	};
-
-
-        /*
-	 * Get the user pin number and compose the executable command.
-	 */
-        String pin = userpin.getText();
-        String run = glob + " -p " + pin;
-	String[] cmd = {"/bin/bash", "-c", run};
-
-
-	/* Strings to hold command line information. */
-	String error;
-	ArrayList<String> results = new ArrayList<String>();
-
-	IDserver.send(pin);
-	query_output.append("Identity: " + pin + "\n");
 	IDserver.receive();
 	query_output.append(IDserver.toString());
 	query_output.append("\n");
+	IDserver.close();
     }
 
 
@@ -231,12 +187,9 @@ public class idclient
     */
     public static void main(String args[]) {
 
-	IDserver = new Duct();
+	/* Set the keystore name. */
+	System.setProperty("javax.net.ssl.trustStore", "idclient.jks");
 
-	if ( !IDserver.connect("192.168.1.250", 10988) ) {
-	    System.err.println("Cannot open query server connection.");
-	    return;
-	}
 
 	/*Set our global variable to program name*/
         java.awt.EventQueue.invokeLater(new Runnable() {
@@ -246,3 +199,4 @@ public class idclient
 	    });
     }
 }
+

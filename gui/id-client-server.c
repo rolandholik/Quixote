@@ -15,6 +15,12 @@
 #define IDQUERY_HOST "10.0.2.1"
 #define IDQUERY_PORT 10988
 
+#define IDSVR_HOST   "10.0.2.1"
+#define IDSVR_PORT   10903
+
+#define IDRECIP_HOST "10.0.4.1"
+#define IDRECIP_PORT 10904
+
 
 /* Include files. */
 #include <stdio.h>
@@ -32,8 +38,12 @@
 #include <Config.h>
 #include <Buffer.h>
 #include <String.h>
+#include <Duct.h>
 
 #include "SSLduct.h"
+#include "OrgID.h"
+#include "Identity.h"
+#include "IDengine.h"
 
 
 /* Variables static to this module. */
@@ -83,6 +93,31 @@ static void add_process(pid_t pid)
 }
 
 
+static void add_hex(CO(String, identifier), CO(Buffer, identity))
+
+{
+        uint16_t lp,
+                 idsize;
+
+        char bufr[3];
+
+        unsigned char *p;
+
+
+        p      = identity->get(identity);
+        idsize = identity->size(identity);
+
+        for (lp= 0; lp < idsize; ++lp) {
+                snprintf(bufr, sizeof(bufr), "%02x", *p);
+                identifier->add(identifier, bufr);
+                ++p;
+        }
+
+        memset(bufr, '\0', sizeof(bufr));
+        return;
+}
+
+
 /**
  * Private function.
  *
@@ -127,28 +162,165 @@ static void update_process_table(void)
  * \return	No return value is defined.
  */
 
-static void handle_connection(CO(SSLduct,duct))
+static void handle_connection(CO(SSLduct,sslduct))
 
 {
-	char *id = "dd5fa01a73b3a365bf677f5819c7fbdd3ea85e4d437e93d7ccd12cd84a889e50";
+
+	char *p,
+	     *bp;
+
+	IDengine_identity idtype = IDengine_none;
+
+	String name	  = NULL,
+	       identifier = NULL;
+
+	IDengine idengine = NULL;
+
+	Duct duct = NULL,
+	     fwd  = NULL;
 
 	Buffer identity = NULL;
 
 
 	/* Receive the identity request. */
 	INIT(HurdLib, Buffer, identity, goto done);
-	if ( !duct->receive_Buffer(duct, identity) )
+	if ( !sslduct->receive_Buffer(sslduct, identity) )
 		goto done;
 
-	fputs("Identity request received.\n", stdout);
-	identity->hprint(identity);
+
+	/* Parse the message into type, name and identifier. */
+	INIT(HurdLib, String, name, goto done);
+	INIT(HurdLib, String, identifier, goto done);
+	if ( !identity->add(identity, (unsigned char *) "\0", 1) )
+		goto done;
+	fprintf(stderr, "Identity request string: %s\n", \
+		identity->get(identity));
+	bp = (char *) identity->get(identity);
+
+	if ( (p = strchr(bp, ':')) == NULL )
+		goto done;
+	*p = '\0';
+	if ( strcmp(bp, "user") == 0 )
+		idtype = IDengine_user;
+	if ( strcmp(bp, "device") == 0 )
+		idtype = IDengine_device;
+	if ( strcmp(bp, "service") == 0 )
+		idtype = IDengine_service;
+	bp = p + 1;
+
+	if ( (p = strchr(bp, ':')) == NULL )
+		goto done;
+	*p = '\0';
+	if ( !name->add(name, bp) )
+		goto done;
+	bp = p + 1;
+
+	if ( !identifier->add(identifier, bp) )
+		goto done;
+
+	fprintf(stderr, "type: %d\n", idtype);
+	fputs("name: ", stderr);
+	name->print(name);
+	fputs("identifier: ", stderr);
+	identifier->print(name);
+	fputc('\n', stderr);
+
+
+	/* Process identity request. */
+	INIT(NAAAIM, Duct, duct, goto done);
+	INIT(NAAAIM, IDengine, idengine, goto done);
 
 	identity->reset(identity);
-	identity->add(identity, (unsigned char *) id, strlen(id));
-	duct->send_Buffer(duct, identity);
+	if ( !idengine->encode_get_identity(idengine, idtype, name, \
+					    identifier, identity) ) {
+		fputs("Identity encoding failed.\n", stderr);
+		goto done;
+	}
+
+	if ( !duct->init_client(duct) ) {
+		fputs("Cannot initialize network client.\n", stderr);
+		goto done;
+	}
+	if ( !duct->init_port(duct, IDSVR_HOST, IDSVR_PORT) ) {
+		fputs("Cannot initiate connection.\n", stderr);
+		goto done;
+	}
+
+	if ( !duct->send_Buffer(duct, identity) ) {
+		fputs("Error sending buffer.\n", stderr);
+		goto done;
+	}
+
+	identity->reset(identity);
+	if ( !duct->receive_Buffer(duct, identity) ) {
+		fputs("Error receiving buffer.\n", stderr);
+		goto done;
+	}
+
+	if ( !idengine->decode_identity(idengine, identity) ) {
+		fputs("Error decoding identity\n", stderr);
+		goto done;
+	}
+#if 0
+	if ( idengine->query_failed(idengine) ) {
+		fputs("Local identity generation failed.\n", stderr);
+		goto done;
+	}
+#endif
+
+
+	/* Forward the identity for reciprocation. */
+	fputs("Fowarding local identity:\n", stdout);
+	identity->print(identity);
+
+	identifier->reset(identifier);
+	identifier->add(identifier, "Local identity:\n");
+	add_hex(identifier, identity);
+	identifier->add(identifier, "\n");
+
+	INIT(NAAAIM, Duct, fwd, goto done);
+	if ( !fwd->init_client(fwd) ) {
+		fputs("Cannot initialize forwarding client.\n", stderr);
+		goto done;
+	}
+	if ( !duct->init_port(duct, IDRECIP_HOST, IDRECIP_PORT) ) {
+		fputs("Cannot initiate forwarding connection.\n", stderr);
+		goto done;
+	}
+
+	if ( !duct->send_Buffer(duct, identity) ) {
+		fputs("Error sending buffer.\n", stderr);
+		goto done;
+	}
+
+	identity->reset(identity);
+	if ( !duct->receive_Buffer(duct, identity) ) {
+		fputs("Error receiving buffer.\n", stderr);
+		goto done;
+	}
+	fputs("Reciprocated identity:\n", stdout);
+	identity->print(identity);
+	fputc('\n', stdout);
+
+	identifier->add(identifier, "Reciprocated identity:\n");
+	add_hex(identifier, identity);
+	identifier->add(identifier, "\n");
+
+	identity->reset(identity);
+	identity->add(identity,					     \
+		      (unsigned char *) identifier->get(identifier), \
+		      identifier->size(identifier));
+	sslduct->send_Buffer(sslduct, identity);
 
 
  done:
+	WHACK(name);
+	WHACK(identifier);
+	WHACK(idengine);
+	WHACK(duct);
+	WHACK(fwd);
+	WHACK(identity);
+		
 	return;
 }
 
@@ -203,8 +375,8 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
-	if ( !duct->load_credentials(duct, "./server-private.pem", \
-				     "./server-cert.pem") ) {
+	if ( !duct->load_credentials(duct, "/etc/server-private.pem", \
+				     "/etc/server-cert.pem") ) {
 		fputs("Cannot load credentials.\n", stderr);
 	}
 
@@ -215,6 +387,7 @@ extern int main(int argc, char *argv[])
 	}
 
 	while ( 1 ) {
+		fputs("Waiting for connection.\n", stderr);
 		if ( !duct->accept_connection(duct) ) {
 			err = "Error on connection accept.";
 			goto done;

@@ -52,7 +52,7 @@ COBJS = ${CSRC:.c=.o}
 LIBS = -lNAAAIM -lHurdLib
 
 CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I${SSL_INCLUDE} \
-	-I${MUSL_INCLUDE}/tss
+	-I${MUSL_INCLUDE}/tss -I../idgine
 
 
 #
@@ -67,12 +67,15 @@ binaries: ${BINARIES}
 
 classes: ${CLASSES}
 
-id-client-server: id-client-server.o SSLduct.o
+jar: classes
+	jar cvf idclient.jar *.class;
+
+id-client-server: id-client-server.o SSLduct.o ../idgine/IDengine.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY} -lfl;
 
 clean:
-	rm -f *.o *~ TAGS;
-	rm -f ${BINARIES};
+	rm -f *.o *~ *.class TAGS;
+	rm -f ${BINARIES} idclient.jar;
 
 
 # Source dependencies.
