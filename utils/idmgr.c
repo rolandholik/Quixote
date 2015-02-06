@@ -307,7 +307,12 @@ static void identity_manager(CO(IDtoken, identity))
 	if ( !idmgr->setup(idmgr) )
 		goto done;
 
+
+	if ( sigemptyset(&signal_action.sa_mask) == -1 )
+		goto done;
+	signal_action.sa_flags = 0;
 	signal_action.sa_handler = signal_handler;
+
 	if ( sigaction(SIGUSR1, &signal_action, NULL) == -1 )
 		goto done;
 	if ( sigaction(SIGINT, &signal_action, NULL) == -1 )
