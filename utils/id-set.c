@@ -81,10 +81,9 @@ extern int main(int argc, char *argv[])
 	if ( !pwd->add(pwd, (unsigned char *) nvpwd, strlen(nvpwd)) )
 		goto done;
 
-	if ( !cmd->nv_remove(cmd, IDENTITY_NV_INDEX, false, pwd) ) {
-		fputs("Failed to remove NVram region.\n", stderr);
-		goto done;
-	}
+	if ( !cmd->nv_remove(cmd, IDENTITY_NV_INDEX, false, pwd) )
+		fputs("Failed to remove NVram region, assuming not " \
+		      "defined.\n", stderr);
 
 	if ( system(nvcmd) != 0 ) {
 		fputs("Failed to define NVram region.\n", stderr);

@@ -135,7 +135,7 @@ static _Bool tpm_daemon(const _Bool start)
 
 	/* Parent - verify DAEMON is running. */
 	fputs("Checking for daemon presence.\n", stderr);
-	sleep(5);
+	sleep(10);
 	if ( kill(tpm_pid, 0) == -1 )
 		return false;
 
