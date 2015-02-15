@@ -192,70 +192,6 @@ static _Bool initialize_device_identity(CO(IDtoken, identity))
 /**
  * Private function.
  *
- * This function is responsible for reducing the device identity into
- * a form which can be used for generating OTI keys
- *
- *
- * \param identity	The token which contains the implementation of
- *			the device's identity.
- *
- * \return		A false value indicates the identity was
- *			not properly reduced.  A true value indicates
- *			the identity is in reduced form.
- */
-
-static _Bool reduce_identity(CO(IDtoken, identity))
-
-{
-	_Bool retn = false;
-
-	Buffer b,
-	       orgkey	= NULL,
-	       orgid	= NULL,
-	       idkey	= NULL;
-
-	SHA256 sha256 = NULL;
-
-
-	INIT(NAAAIM, SHA256, sha256, goto done);
-
-	b = identity->get_element(identity, IDtoken_id);
-	sha256->add(sha256, b);
-	if ( !sha256->compute(sha256) )
-		goto done;
-
-	INIT(HurdLib, Buffer, orgkey, goto done);
-	INIT(HurdLib, Buffer, orgid,  goto done);
-	INIT(HurdLib, Buffer, idkey,  goto done);
-
-	orgkey->add_Buffer(orgkey, identity->get_element(identity, \
-							 IDtoken_orgkey));
-	orgid->add_Buffer(orgid, identity->get_element(identity, \
-						       IDtoken_orgid));
-	idkey->add_Buffer(idkey, identity->get_element(identity, IDtoken_key));
-
-	identity->reset(identity);
-	identity->set_element(identity, IDtoken_orgkey, orgkey);
-	identity->set_element(identity, IDtoken_orgid, orgid);
-	identity->set_element(identity, IDtoken_id, \
-			      sha256->get_Buffer(sha256));
-	if ( identity->set_element(identity, IDtoken_key, idkey) )
-		retn = true;
-
-
- done:
-	WHACK(sha256);
-	WHACK(orgkey);
-	WHACK(orgid);
-	WHACK(idkey);
-
-	return retn;
-}
-
-
-/**
- * Private function.
- *
  * This function implements the signal handler for the utility.  It
  * sets the signal type in the signals structure.
  *
@@ -359,8 +295,8 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
-	if ( !reduce_identity(identity) ) {
-		fputs("Failed to store identity.\n", stderr);
+	if ( !identity->to_verifier(identity) ) {
+		fputs("Failed to reduce device identity.\n", stderr);
 		goto done;
 	}
 
