@@ -11,6 +11,12 @@
  * for licensing information.
  **************************************************************************/
 
+
+/* Local defines. */
+/* Maximum lenth of an identity name. */
+#define NAME_LENGTH 64
+
+
 /* Include files. */
 #include <stdint.h>
 #include <stdlib.h>
@@ -24,6 +30,7 @@
 #include <Origin.h>
 #include <HurdLib.h>
 #include <Buffer.h>
+#include <String.h>
 
 #include "NAAAIM.h"
 #include "IDtoken.h"
@@ -69,6 +76,8 @@ struct IDmgr_ipc
 	pid_t pid;
 
 	_Bool valid;
+
+	char name[NAME_LENGTH];
 
 	unsigned char assertion_key[NAAAIM_IDSIZE],
 		      assertion_id[NAAAIM_IDSIZE];
@@ -247,6 +256,9 @@ static _Bool set_idtoken(CO(IDmgr, this), CO(IDtoken, token))
  * \param this		A pointer to the identity manager object which
  *			is requesting the identity.
  *
+ * \param name		A String object containing the name of the
+ *			identity whose token is to be loaded.
+ *
  * \param token		The IDtoken object which will be loaded with
  *			the identity obtained from the broker.
  *
@@ -254,8 +266,8 @@ static _Bool set_idtoken(CO(IDmgr, this), CO(IDtoken, token))
  *			identity was successful.  A false value indicated
  *			the request failed.
  */
-
-static _Bool get_idtoken(CO(IDmgr, this), CO(IDtoken, token))
+ 
+static _Bool get_idtoken(CO(IDmgr, this), CO(String, name), CO(IDtoken, token))
 
 {
 	STATE(S);
@@ -269,15 +281,23 @@ static _Bool get_idtoken(CO(IDmgr, this), CO(IDtoken, token))
 
 	if ( S->poisoned )
 		goto done;
+	if ( (name == NULL) || name->poisoned(name) )
+		goto done;
 	if ( token == NULL )
 		goto done;
 
 
 	INIT(HurdLib, Buffer, b, goto done);
 
+	if ( name->size(name) >= NAME_LENGTH )
+		goto done;
+
 	ipc = S->ipc->get(S->ipc);
 	if ( !S->ipc->lock(S->ipc) )
 		goto done;
+
+	memset(ipc->name, '\0', sizeof(ipc->name));
+	memcpy(ipc->name, name->get(name), name->size(name));
 
 	ipc->valid = false;
 	kill(ipc->pid, SIGUSR1);
@@ -330,6 +350,10 @@ static _Bool get_idtoken(CO(IDmgr, this), CO(IDtoken, token))
  * \param this		A pointer to the identity manager object which
  *			the identity elements are requested from.
  *
+ * \param name		A String object containing the name of the
+ *			identity whose identity implementation hash
+ *			and authentication element are to be returned.
+ *
  * \param idhash	The Buffer object which will be loaded with
  *			the hash of the identity implementation.
  *
@@ -341,7 +365,8 @@ static _Bool get_idtoken(CO(IDmgr, this), CO(IDtoken, token))
  *			the query failed.
  */
 
-static _Bool get_id_key(CO(IDmgr, this), CO(Buffer, idhash), CO(Buffer, idkey))
+static _Bool get_id_key(CO(IDmgr, this), CO(String, name), \
+			CO(Buffer, idhash), CO(Buffer, idkey))
 
 {
 	STATE(S);
@@ -353,6 +378,8 @@ static _Bool get_id_key(CO(IDmgr, this), CO(Buffer, idhash), CO(Buffer, idkey))
 
 	if ( S->poisoned )
 		goto done;
+	if ( (name == NULL) || name->poisoned(name) )
+		goto done;
 	if ( (idhash == NULL) || idhash->poisoned(idhash) )
 		goto done;
 	if ( (idkey == NULL) || idkey->poisoned(idkey) )
@@ -362,6 +389,9 @@ static _Bool get_id_key(CO(IDmgr, this), CO(Buffer, idhash), CO(Buffer, idkey))
 	ipc = S->ipc->get(S->ipc);
 	if ( !S->ipc->lock(S->ipc) )
 		goto done;
+
+	memset(ipc->name, '\0', sizeof(ipc->name));
+	memcpy(ipc->name, name->get(name), name->size(name));
 
 	ipc->valid = false;
 	kill(ipc->pid, SIGUSR1);

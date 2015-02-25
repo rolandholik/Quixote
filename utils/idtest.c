@@ -35,6 +35,8 @@ extern int main(int argc, char *argv[])
 {
 	int retn = 1;
 
+	String name = NULL;
+
 	IDmgr idmgr = NULL;
 
 	IDtoken token = NULL;
@@ -49,12 +51,16 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
-	if ( !idmgr->get_idtoken(idmgr, token) )
+	if ( (name = HurdLib_String_Init_cstr("device")) == NULL )
+		goto done;
+
+	if ( !idmgr->get_idtoken(idmgr, name, token) )
 		goto done;
 	token->print(token);
 		
 
  done:
+	WHACK(name);
 	WHACK(token);
 	WHACK(idmgr);
 

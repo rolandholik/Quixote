@@ -1176,7 +1176,8 @@ static _Bool host_mode(CO(Config, cfg))
 	       public		= NULL,
 	       shared_key	= NULL;
 
-	String remote_ip = NULL;
+	String name	 = NULL,
+	       remote_ip = NULL;
 
 	IDtoken token  = NULL;
 	
@@ -1275,8 +1276,11 @@ static _Bool host_mode(CO(Config, cfg))
 	/* Compose and send a reply packet. */
 	token->reset(token);
 	INIT(NAAAIM, IDmgr, idmgr, goto done);
+	if ( (name = HurdLib_String_Init_cstr("device")) == NULL )
+		goto done;
+
 	idmgr->attach(idmgr);
-	if ( !idmgr->get_idtoken(idmgr, token) )
+	if ( !idmgr->get_idtoken(idmgr, name, token) )
 		goto done;
 	
 	packet->reset(packet);
@@ -1379,6 +1383,7 @@ static _Bool host_mode(CO(Config, cfg))
 	WHACK(packet);
 	WHACK(dhkey);
 	WHACK(shared_key);
+	WHACK(name);
 	WHACK(remote_ip);
 	WHACK(idmgr);
 	WHACK(ivy);
@@ -1454,6 +1459,8 @@ static _Bool client_mode(CO(Config, cfg))
 	       bufr	   = NULL,
 	       shared_key  = NULL;
 
+	String name = NULL;
+
 	IDmgr idmgr = NULL;
 
 	IDtoken token = NULL;
@@ -1468,9 +1475,11 @@ static _Bool client_mode(CO(Config, cfg))
 	/* Load identity token. */
 	INIT(NAAAIM, IDtoken, token, goto done);
 	INIT(NAAAIM, IDmgr, idmgr, goto done);
+	if ( (name = HurdLib_String_Init_cstr("device")) == NULL )
+		goto done;
 
 	idmgr->attach(idmgr);
-	if ( !idmgr->get_idtoken(idmgr, token) ) {
+	if ( !idmgr->get_idtoken(idmgr, name, token) ) {
 		fputs("Failed to obtain identity token.\n", stderr);
 		goto done;
 	}
@@ -1641,6 +1650,7 @@ static _Bool client_mode(CO(Config, cfg))
 	WHACK(dhkey);
 	WHACK(packet);
 	WHACK(shared_key);
+	WHACK(name);
 	WHACK(ivy);
 
 	return retn;

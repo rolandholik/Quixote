@@ -167,6 +167,8 @@ extern int main(int argc, char *argv[])
 	Buffer bufr = NULL,
 	       uuid = NULL;
 
+	String name = NULL;
+
 	File file = NULL;
 
 	IDtoken token = NULL;
@@ -225,10 +227,12 @@ extern int main(int argc, char *argv[])
 			ERR(goto done);
 	} else {
 		INIT(NAAAIM, IDmgr, idmgr, goto done);
+		if ( (name = HurdLib_String_Init_cstr("device")) == NULL )
+			ERR(goto done);
 
 		if ( !idmgr->attach(idmgr) )
 			ERR(goto done);
-		if ( !idmgr->get_idtoken(idmgr, token) )
+		if ( !idmgr->get_idtoken(idmgr, name, token) )
 			ERR(goto done);
 	}
 
@@ -314,6 +318,7 @@ extern int main(int argc, char *argv[])
 	WHACK(ivy);
 	WHACK(bufr);
 	WHACK(uuid);
+	       
 	WHACK(file);
 	WHACK(token);
 	WHACK(idmgr);
