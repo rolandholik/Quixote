@@ -33,7 +33,10 @@
 extern int main(int argc, char *argv[])
 
 {
-	int retn = 1;
+	char *identity = "device";
+
+	int opt,
+	    retn = 1;
 
 	String name = NULL;
 
@@ -41,6 +44,13 @@ extern int main(int argc, char *argv[])
 
 	IDtoken token = NULL;
 
+
+	while ( (opt = getopt(argc, argv, "i:")) != EOF )
+		switch ( opt ) {
+			case 'i':
+				identity = optarg;
+				break;
+		}
 
 	INIT(NAAAIM, IDtoken, token, goto done);
 
@@ -51,11 +61,13 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
-	if ( (name = HurdLib_String_Init_cstr("device")) == NULL )
+	if ( (name = HurdLib_String_Init_cstr(identity)) == NULL )
 		goto done;
 
 	if ( !idmgr->get_idtoken(idmgr, name, token) )
 		goto done;
+
+	fprintf(stdout, "Identity: %s\n", identity);
 	token->print(token);
 		
 

@@ -131,7 +131,7 @@ static IDtoken find_identity(CO(String, name))
 
 	for (lp= 0; lp < IDcnt; ++lp) {
 		nm = IDarray[lp].name;
-		if ( memcmp(name->get(name), nm->get(nm), nm->size(nm)) == 0 )
+		if ( strcmp(name->get(name), nm->get(nm)) == 0 )
 			return IDarray[lp].token;
 	}
 
@@ -426,7 +426,9 @@ static void identity_manager(void)
 
 		if ( !idmgr->set_idtoken(idmgr, identity) )
 			goto done;
+
 		signals.sigint = false;
+		name->reset(name);
 	}
 
  done:
