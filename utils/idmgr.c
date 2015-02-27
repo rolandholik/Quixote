@@ -18,6 +18,7 @@
 
 /* Local defines. */
 #define IDENTITY "/mnt/boot/device.idt"
+#define IDCOUNT 10
 
 #define IDENTITY_NV_INDEX 0xbeaf
 #define IDENTITY_PCR 15
@@ -56,6 +57,110 @@ struct {
 	_Bool sigusr1;
 	_Bool sigint;
 } signals;
+
+
+unsigned int IDcnt = 0;
+struct {
+	String name;
+	IDtoken token;
+} IDarray[IDCOUNT];
+
+
+/**
+ * Private function.
+ *
+ * This function is responsible for adding an entry into the IDarray
+ * array.  This array associates the name of an identity with the
+ * reduced version of an identity.
+ *
+ * \param name		The name of the identity to be stored.
+ *
+ * \param idtoken	The identity to be associated with the name.  The
+ *			identity is in reduced form.
+ *
+ * \return		A false value is returned if storing of the
+ *			identity fails.  If the identity is successfully
+ *			storage a true value is returned.
+ */
+
+static _Bool save_identity(CO(String, name), CO(IDtoken, idtoken))
+
+{
+	/* Verify arguement status. */
+	if ( (name == NULL) || name->poisoned(name) )
+		return false;
+	if ( idtoken == NULL )
+		return false;
+
+	/* Verify the identity array is not full. */
+	if ( IDcnt == (IDCOUNT - 1) )
+		return false;
+
+	/* Save the name and the identity. */
+	IDarray[IDcnt].name  = name;
+	IDarray[IDcnt].token = idtoken;
+	++IDcnt;
+
+	return true;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function is responsible for finding an identity in the set of
+ * arrays under management.
+ *
+ * \param name		The name of the identity to be located.
+ *
+ * \return		If the named identity is located it is returned
+ *			to the caller.  If the identity is not found
+ *			a NULL value is returned.
+ */
+
+static IDtoken find_identity(CO(String, name))
+
+{
+	unsigned int lp;
+
+	String nm;
+
+
+	if ( (name == NULL) || name->poisoned(name) )
+		return NULL;
+
+	for (lp= 0; lp < IDcnt; ++lp) {
+		nm = IDarray[lp].name;
+		if ( memcmp(name->get(name), nm->get(nm), nm->size(nm)) == 0 )
+			return IDarray[lp].token;
+	}
+
+	return NULL;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function is responsible for freeing the objects which have
+ * been stored in the identity array.
+ *
+ * \return	No return values have been defined.
+ */
+
+static IDtoken free_identities(void)
+
+{
+	unsigned int lp;
+
+
+	for (lp= 0; lp < IDcnt; ++lp) {
+		WHACK(IDarray[lp].name);
+		WHACK(IDarray[lp].token);
+	}
+
+	return NULL;
+}
 
 
 /**
@@ -189,6 +294,58 @@ static _Bool initialize_device_identity(CO(IDtoken, identity))
 }
 
 
+
+/**
+ * Private function.
+ *
+ * This function is responsible for loading and saving the device
+ * identity.  The device identity is a special case since its
+ * implementation is used to extend the attestation state of the
+ * device.
+ *
+ * \return	A false value indicates the device identity was not
+ *		properly loaded.  A true value indicates the identity
+ *		was not loaded.
+ */
+
+static _Bool load_device_identity(void)
+
+{
+	_Bool retn = false;
+
+	String name = NULL;
+
+	IDtoken identity = NULL;
+
+
+	INIT(NAAAIM, IDtoken, identity, goto done);
+
+	if ( !load_identity(identity) )
+		goto done;
+
+	if ( !initialize_device_identity(identity) )
+		goto done;
+
+	if ( !identity->to_verifier(identity) )
+		goto done;
+
+	if ( (name = HurdLib_String_Init_cstr("device")) == NULL )
+		goto done;
+	if ( !save_identity(name, identity) )
+		goto done;
+	retn = true;
+
+
+ done:
+	if ( !retn ) {
+		WHACK(name);
+		WHACK(identity);
+	}
+
+	return retn;
+}
+
+
 /**
  * Private function.
  *
@@ -225,24 +382,28 @@ void signal_handler(int signal)
  * for generation of an OTI key from the idmgr shared memory array
  * and writes the result back into the output area.
  *
- * \param identity	The token which the identity manager is
- *			implementing identity services for.
- *
  * \return		No return value is specified.
  */
 
-static void identity_manager(CO(IDtoken, identity))
+static void identity_manager(void)
 
 {
 	struct sigaction signal_action;
 
+	String name = NULL;
+
+	IDtoken identity,
+		null = NULL;
+
 	IDmgr idmgr = NULL;
 
+
+	INIT(HurdLib, String, name, goto done);
+	INIT(NAAAIM, IDtoken, null, goto done);
 
 	INIT(NAAAIM, IDmgr, idmgr, goto done);
 	if ( !idmgr->setup(idmgr) )
 		goto done;
-
 
 	if ( sigemptyset(&signal_action.sa_mask) == -1 )
 		goto done;
@@ -259,12 +420,18 @@ static void identity_manager(CO(IDtoken, identity))
 		if ( signals.sigint )
 			goto done;
 
+		idmgr->get_idname(idmgr, name);
+		if ( (identity = find_identity(name)) == NULL )
+			identity = null;
+
 		if ( !idmgr->set_idtoken(idmgr, identity) )
 			goto done;
 		signals.sigint = false;
 	}
 
  done:
+	WHACK(name);
+	WHACK(null);
 	WHACK(idmgr);
 
 	return;
@@ -280,32 +447,16 @@ extern int main(int argc, char *argv[])
 {
 	int retn = 1;
 
-	IDtoken identity = NULL;
 
-
-	INIT(NAAAIM, IDtoken, identity, goto done);
-
-	if ( !load_identity(identity) ) {
-		fputs("Failed identity load.\n", stderr);
+	if ( !load_device_identity() )
 		goto done;
-	}
 
-	if ( !initialize_device_identity(identity) ) {
-		fputs("Failed to initialize identity.\n", stderr);
-		goto done;
-	}
-
-	if ( !identity->to_verifier(identity) ) {
-		fputs("Failed to reduce device identity.\n", stderr);
-		goto done;
-	}
-
-	identity_manager(identity);
+	identity_manager();
 	retn = 0;
 
 
  done:
-	WHACK(identity);
+	free_identities();
 
 	return retn;
 }
