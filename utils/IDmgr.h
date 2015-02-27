@@ -27,6 +27,8 @@ struct NAAAIM_IDmgr
 	_Bool (*setup)(const IDmgr);
 	_Bool (*attach)(const IDmgr);
 
+	_Bool (*get_idname)(const IDmgr, const String);
+
 	_Bool (*get_id_key)(const IDmgr, const String, const Buffer, \
 			    const Buffer);
 	_Bool (*set_id_key)(const IDmgr, const Buffer, const Buffer);

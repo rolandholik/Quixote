@@ -165,7 +165,7 @@ static _Bool setup(CO(IDmgr, this))
  *
  * \return	If the attachment is successfully created a true value
  *		is returned.  If a failure occurs during the setup a
- &		false value is returned.
+ *		false value is returned.
  */
 
 static _Bool attach(CO(IDmgr, this))
@@ -185,6 +185,47 @@ static _Bool attach(CO(IDmgr, this))
  done:
 	if ( !retn )
 		S->poisoned = true;
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements a method for determining the name of the
+ * identity which is being requested by the client.
+ *
+ * \param this	A pointer to the identity manager object which is
+ *		requesting the identity name.
+ *
+ * \param name	The object which will be loaded with the name of
+ *		the identity being requested.
+ *
+ * \return	If the name retrieval succeeds a true value is returned.
+ *		If an error is encountered a false value is returned.
+ */
+
+static _Bool get_idname(CO(IDmgr, this), CO(String, name))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	struct IDmgr_ipc *ipc;
+
+
+	if ( S->poisoned )
+		return NULL;
+	if ( (name == NULL) || name->poisoned(name) )
+		return NULL;
+
+	ipc = S->ipc->get(S->ipc);
+	if ( ipc->name[NAME_LENGTH-1] != '\0' )
+		ipc->name[NAME_LENGTH - 1] = '\0';
+	if ( name->add(name, ipc->name) )
+		retn = true;
+
 	return retn;
 }
 
@@ -531,6 +572,8 @@ extern IDmgr NAAAIM_IDmgr_Init(void)
 	/* Method initialization. */
 	this->setup  = setup;
 	this->attach = attach;
+
+	this->get_idname = get_idname;
 
 	this->set_idtoken = set_idtoken;
 	this->get_idtoken = get_idtoken;
