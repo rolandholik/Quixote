@@ -31,6 +31,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <signal.h>
+#include <glob.h>
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -294,7 +295,6 @@ static _Bool initialize_device_identity(CO(IDtoken, identity))
 }
 
 
-
 /**
  * Private function.
  *
@@ -341,6 +341,98 @@ static _Bool load_device_identity(void)
 		WHACK(name);
 		WHACK(identity);
 	}
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function is responsible for loading any service identities
+ * which are available on the configuration filesystem.  Any files
+ * which have an .idt suffix are loaded into the identity manager.
+ * The basename of the identity is used as the search name for the
+ * identity.
+ *
+ * \return	A false value indicates an error was encountered while
+ *		loading the cohort of identities.  A true value
+ *		indicates the identities were successfully loaded.
+ */
+
+static _Bool load_service_identities(void)
+
+{
+	_Bool retn    = false,
+	      globbed = false;
+
+	char *p,
+	     *fname;
+
+	int gretn;
+
+	unsigned int lp;
+
+	glob_t identities;
+
+	FILE *idfile = NULL;
+
+	String name = NULL;
+
+	IDtoken identity = NULL;
+
+
+	if ( (gretn = glob("/etc/conf/*.idt", 0, NULL, &identities)) != 0 ) {
+		if ( gretn == GLOB_NOMATCH )
+			retn = true;
+		goto done;
+	}
+	globbed = true;
+
+	for (lp= 0; lp < identities.gl_pathc; ++lp) {
+		if ( (idfile = fopen(identities.gl_pathv[lp], "r")) == NULL )
+			goto done;
+
+		INIT(NAAAIM, IDtoken, identity, goto done);
+		if ( !identity->parse(identity, idfile) )
+			goto done;
+		fclose(idfile);
+		idfile = NULL;
+		if ( unlink(identities.gl_pathv[lp]) != 0 ) {
+			fputs("Failed device unlink.\n", stderr);
+			goto done;
+		}
+
+		if ( !identity->to_verifier(identity) )
+			goto done;
+
+		INIT(HurdLib, String, name, goto done);
+		if ( (fname = strrchr(identities.gl_pathv[lp], '/')) != NULL )
+			++fname;
+		else
+			fname = identities.gl_pathv[lp];
+		if ( (p = strchr(fname, '.')) != NULL )
+			*p = '\0';
+		if ( !name->add(name, fname) )
+			goto done;
+
+		if ( !save_identity(name, identity) )
+			goto done;
+
+		name	 = NULL;
+		identity = NULL;
+	}
+	retn = true;
+
+
+ done:
+	if ( idfile != NULL )
+		fclose(idfile);
+	if ( globbed )
+		globfree(&identities);
+
+	WHACK(name);
+	WHACK(identity);
 
 	return retn;
 }
@@ -451,6 +543,8 @@ extern int main(int argc, char *argv[])
 
 
 	if ( !load_device_identity() )
+		goto done;
+	if ( !load_service_identities() )
 		goto done;
 
 	identity_manager();
