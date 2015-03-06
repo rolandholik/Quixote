@@ -12,15 +12,15 @@ CFLAGS = -Wall ${CARGS} ${CDEBUG}
 MUSL_INCLUDE   = -I /usr/local/musl/include
 HURD_INCLUDE   = -I ../HurdLib
 SSL_INCLUDE    = -I /usr/local/musl/ssl/include
-NAAAIM_INCLUDE = -I ../include
+NAAAIM_INCLUDE = -I ../lib
 INCLUDES = ${MUSL_INCLUDE} ${HURD_INCLUDE} ${SSL_INCLUDE} ${NAAAIM_INCLUDE}
 
 HURD_LIBRARY   = -L ../HurdLib -lHurdLib
 SSL_LIBRARY    = -L /usr/local/musl/ssl/lib -lssl
-NAAAIM_LIBRARY = -L ../lib -L NAAAIM
+NAAAIM_LIBRARY = -L ../lib -lNAAAIM
 LIBS = ${NAAAIM_LIBRARY} ${HURD_LIBRARY} ${SSL_LIBRARY}
 
-LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib ${LIBS}
+LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib
 
 CFLAGS := ${CFLAGS} ${INCLUDES}
 
