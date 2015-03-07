@@ -77,6 +77,8 @@ struct IDmgr_ipc
 
 	_Bool valid;
 
+	IDmgr_type type;
+
 	char name[NAME_LENGTH];
 
 	unsigned char assertion_key[NAAAIM_IDSIZE],
@@ -86,6 +88,29 @@ struct IDmgr_ipc
 
 	unsigned char idhash[NAAAIM_IDSIZE];
 };
+
+
+/**
+ * Internal private function.
+ *
+ * This method is responsible for initializing the NAAAIM_IDmgr_State
+ * structure which holds state information for each instantiated object.
+ *
+ * \param S A pointer to the object containing the state information which
+ *        is to be initialized.
+ */
+
+static void _clear_ipc(struct IDmgr_ipc *ipc)
+
+{
+	memset(ipc->name,	   '\0', sizeof(ipc->name));
+	memset(ipc->assertion_key, '\0', sizeof(ipc->assertion_key));
+	memset(ipc->assertion_id,  '\0', sizeof(ipc->assertion_id));
+	memset(ipc->idhash,	   '\0', sizeof(ipc->idhash));
+	memset(ipc->idkey,	   '\0', sizeof(ipc->idkey));
+
+	return;
+}
 
 
 /**
@@ -146,7 +171,7 @@ static _Bool setup(CO(IDmgr, this))
 
 	retn = true;
 
-	
+
  done:
 	if ( !retn )
 		S->poisoned = true;
@@ -185,6 +210,44 @@ static _Bool attach(CO(IDmgr, this))
  done:
 	if ( !retn )
 		S->poisoned = true;
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements an accessor method for returning the manifestation
+ * type of the identity which is being requested.
+ *
+ * \param this	A pointer to the identity manager object which is
+ *		requesting the identity type.
+ *
+ * \return	The type of the identity request is returned.  On error
+ *		the enumerated type indicating no identity is present
+ *		is returned.
+ */
+
+static IDmgr_type get_idtype(CO(IDmgr, this))
+
+{
+	STATE(S);
+
+        IDmgr_type retn = IDmgr_none;
+
+	struct IDmgr_ipc *ipc;
+
+
+	if ( S->poisoned )
+		goto done;
+
+	ipc = S->ipc->get(S->ipc);
+	retn = ipc->type;
+
+
+ done:
+	if ( ipc->type == IDmgr_none )
+		ipc->valid = true;
 	return retn;
 }
 
@@ -280,7 +343,7 @@ static _Bool set_idtoken(CO(IDmgr, this), CO(IDtoken, token))
 	ipc->valid = true;
 	retn = true;
 
-	
+
  done:
 	if ( !retn )
 		S->poisoned = true;
@@ -307,13 +370,14 @@ static _Bool set_idtoken(CO(IDmgr, this), CO(IDtoken, token))
  *			identity was successful.  A false value indicated
  *			the request failed.
  */
- 
+
 static _Bool get_idtoken(CO(IDmgr, this), CO(String, name), CO(IDtoken, token))
 
 {
 	STATE(S);
 
-	_Bool retn = false;
+	_Bool retn   = false,
+	      locked = false;
 
 	struct IDmgr_ipc *ipc;
 
@@ -336,11 +400,14 @@ static _Bool get_idtoken(CO(IDmgr, this), CO(String, name), CO(IDtoken, token))
 	ipc = S->ipc->get(S->ipc);
 	if ( !S->ipc->lock(S->ipc) )
 		goto done;
+	locked = true;
 
 	memset(ipc->name, '\0', sizeof(ipc->name));
 	memcpy(ipc->name, name->get(name), name->size(name));
 
+	ipc->type  = IDmgr_token;
 	ipc->valid = false;
+
 	kill(ipc->pid, SIGUSR1);
 	while ( !ipc->valid )
 		continue;
@@ -363,17 +430,17 @@ static _Bool get_idtoken(CO(IDmgr, this), CO(String, name), CO(IDtoken, token))
 	if ( !token->set_element(token, IDtoken_key, b) )
 		goto done;
 
-	if ( !S->ipc->unlock(S->ipc) )
-		goto done;
 	retn = true;
-	
+
 
  done:
+	_clear_ipc(ipc);
+	if ( locked ) {
+		if ( !S->ipc->unlock(S->ipc) )
+			retn = false;
+	}
+
 	WHACK(b);
-	memset(ipc->assertion_key, '\0', sizeof(ipc->assertion_key));	
-	memset(ipc->assertion_id, '\0', sizeof(ipc->assertion_id));	
-	memset(ipc->idhash, '\0', sizeof(ipc->idhash));	
-	memset(ipc->idkey, '\0', sizeof(ipc->idkey));	
 
 	if ( !retn )
 		S->poisoned = true;
@@ -412,7 +479,8 @@ static _Bool get_id_key(CO(IDmgr, this), CO(String, name), \
 {
 	STATE(S);
 
-	_Bool retn = false;
+	_Bool retn   = false,
+	      locked = false;
 
 	struct IDmgr_ipc *ipc;
 
@@ -426,15 +494,17 @@ static _Bool get_id_key(CO(IDmgr, this), CO(String, name), \
 	if ( (idkey == NULL) || idkey->poisoned(idkey) )
 		goto done;
 
-
 	ipc = S->ipc->get(S->ipc);
 	if ( !S->ipc->lock(S->ipc) )
 		goto done;
+	locked = true;
 
 	memset(ipc->name, '\0', sizeof(ipc->name));
 	memcpy(ipc->name, name->get(name), name->size(name));
 
+	ipc->type  = IDmgr_idhash;
 	ipc->valid = false;
+
 	kill(ipc->pid, SIGUSR1);
 	while ( !ipc->valid )
 		continue;
@@ -444,13 +514,15 @@ static _Bool get_id_key(CO(IDmgr, this), CO(String, name), \
 	if ( !idkey->add(idkey, ipc->idkey, sizeof(ipc->idkey)) )
 		goto done;
 
-	if ( !S->ipc->unlock(S->ipc) )
-		goto done;
 	retn = true;
-	
+
 
  done:
-	memset(ipc, '\0', sizeof(struct IDmgr_ipc));	
+	_clear_ipc(ipc);
+	if ( locked ) {
+		if ( !S->ipc->unlock(S->ipc) )
+			retn = false;
+	}
 
 	if ( !retn )
 		S->poisoned = true;
@@ -468,18 +540,16 @@ static _Bool get_id_key(CO(IDmgr, this), CO(String, name), \
  * \param this		A pointer to the identity manager object which
  *			the identity elements are requested from.
  *
- * \param idhash	The Buffer object which contains the hash of
- *			the identity implementation.
- *
- * \param idkey		The Buffer object which contains the identity
- *			authenticator.
+ * \param idtoken	The identity object whose identity hash
+ *			implementation and key will be returned to
+ *			the client.
  *
  * \return		A true value is returned if the identity
  *			elements were successfuly conveyed to the
  *			consumer.
  */
 
-static _Bool set_id_key(CO(IDmgr, this), CO(Buffer, idhash), CO(Buffer, idkey))
+static _Bool set_id_key(CO(IDmgr, this), CO(IDtoken, idtoken))
 
 {
 	STATE(S);
@@ -488,22 +558,26 @@ static _Bool set_id_key(CO(IDmgr, this), CO(Buffer, idhash), CO(Buffer, idkey))
 
 	struct IDmgr_ipc *ipc;
 
+	Buffer b;
+
 
 	if ( S->poisoned )
 		goto done;
-	if ( (idhash == NULL) || idhash->poisoned(idhash) )
-		goto done;
-	if ( (idkey == NULL) || idkey->poisoned(idkey) )
+	if ( idtoken == NULL )
 		goto done;
 
 	ipc = S->ipc->get(S->ipc);
-	memcpy(ipc->idhash, idhash->get(idhash), idhash->size(idhash));
-	memcpy(ipc->idkey, idkey->get(idkey), idkey->size(idkey));
+
+        b = idtoken->get_element(idtoken, IDtoken_id);
+	memcpy(ipc->idhash, b->get(b), b->size(b));
+
+	b = idtoken->get_element(idtoken, IDtoken_key);
+	memcpy(ipc->idkey, b->get(b), b->size(b));
 
 	ipc->valid = true;
-	retn = true;
+	retn	   = true;
 
-	
+
  done:
 	if ( !retn )
 		S->poisoned = true;
@@ -532,7 +606,7 @@ static void whack(CO(IDmgr, this))
 	return;
 }
 
-	
+
 /**
  * External constructor call.
  *
@@ -573,6 +647,7 @@ extern IDmgr NAAAIM_IDmgr_Init(void)
 	this->setup  = setup;
 	this->attach = attach;
 
+	this->get_idtype = get_idtype;
 	this->get_idname = get_idname;
 
 	this->set_idtoken = set_idtoken;

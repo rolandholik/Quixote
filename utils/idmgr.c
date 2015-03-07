@@ -516,8 +516,16 @@ static void identity_manager(void)
 		if ( (identity = find_identity(name)) == NULL )
 			identity = null;
 
-		if ( !idmgr->set_idtoken(idmgr, identity) )
-			goto done;
+		switch ( idmgr->get_idtype(idmgr) ) {
+			case IDmgr_none:
+				break;
+			case IDmgr_token:
+				if ( !idmgr->set_idtoken(idmgr, identity) )
+					goto done;
+			case IDmgr_idhash:
+				if ( !idmgr->set_id_key(idmgr, identity) )
+					goto done;
+		}
 
 		signals.sigint = false;
 		name->reset(name);
