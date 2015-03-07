@@ -10,7 +10,7 @@ include ../Makefile.mak
 
 
 # Executable targets.
-edi-engine: edi-engine.o
+edi-engine: edi-engine.o ../utils/IDmgr.o ../SHA256.o ../SHA256_hmac.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
 edi-transmitter: edi-transmitter.o
@@ -21,3 +21,8 @@ edi-receiver: edi-receiver.o
 
 send-edi: send-edi.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
+
+# Source file specific rules.
+edi-engine.o: edi-engine.c edi.h
+	${CC} ${CFLAGS} -I../utils -I.. -c $< -o $@;
+

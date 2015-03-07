@@ -12,6 +12,9 @@
  * for licensing information.
  **************************************************************************/
 
+/* Local defines. */
+#define BIRTHDATE 1425679137
+
 
 /* Include files. */
 #include <stdio.h>
@@ -19,6 +22,8 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <string.h>
+#include <time.h>
+
 #include <pwd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -31,6 +36,9 @@
 #include <String.h>
 
 #include <Duct.h>
+#include <IDtoken.h>
+#include <OTEDKS.h>
+#include <IDmgr.h>
 
 #include "edi.h"
 
@@ -117,6 +125,76 @@ static void update_process_table(void)
 /**
  * Private function.
  *
+ * This function is responsible for generating the OTEDKS
+ * iniitialization vector and key based on the current time and the
+ * specified service identity.
+ *
+ * \param service	The object containing the name of the identity
+ * 			whose identity will be used for the encryption
+ *			key.
+ *
+ * \param iv		The generated initialization vector.
+ *
+ * \param key		The generated key.
+ *
+ * \return		If an error occurs during the lookup and
+ *			generation of the keying material a false
+ *			value is returned.  A true value indicates the
+ *			supplied Buffer objects contain valid material.
+ */
+
+static _Bool get_encryption_key(CO(String, service), CO(Buffer, iv), \
+				CO(Buffer, key))
+
+{
+	_Bool retn = false;
+
+	Buffer idkey  = NULL,
+	       idhash = NULL;
+
+	IDmgr idmgr = NULL;
+
+	OTEDKS otedks = NULL;
+
+
+	INIT(HurdLib, Buffer, idkey, goto done);
+	INIT(HurdLib, Buffer, idhash, goto done);
+
+	INIT(NAAAIM, IDmgr, idmgr, goto done);
+	if ( !idmgr->attach(idmgr) ) {
+		fputs("Error attaching to identity manager.\n", stderr);
+		goto done;
+	}
+	if ( !idmgr->get_id_key(idmgr, service, idhash, idkey) ) {
+		fputs("Error obtaining key information.\n", stderr);
+		goto done;
+	}
+
+	if ( (otedks = NAAAIM_OTEDKS_Init(BIRTHDATE)) == NULL )
+		goto done;
+	if ( !otedks->compute(otedks, time(NULL), idkey, idhash) )
+		goto done;
+	if ( !iv->add_Buffer(iv, otedks->get_iv(otedks)) )
+		goto done;
+	if ( !key->add_Buffer(key, otedks->get_key(otedks)) )
+		goto done;
+
+	retn = true;
+
+
+ done:
+	WHACK(idkey);
+	WHACK(idhash);
+	WHACK(idmgr);
+	WHACK(otedks);
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
  * This function is called to handle a connection for an identity
  * generation request.
  *
@@ -133,25 +211,42 @@ static void handle_connection(CO(Duct,duct))
 
 	pid_t id;
 
-	Buffer bufr = NULL;
+	Buffer iv   = NULL,
+	       key  = NULL,
+	       bufr = NULL;
+
+	String svc = NULL;
 
 
+	INIT(HurdLib, Buffer, iv, goto done);
+	INIT(HurdLib, Buffer, key, goto done);
 	INIT(HurdLib, Buffer, bufr, goto done);
+
+	if ( (svc = HurdLib_String_Init_cstr("service1")) == NULL )
+		goto done;
+
 
 	id = getpid();
 	fprintf(stdout, "\n.%d: EDI engine connection, client=%s.\n", id, \
 		duct->get_client(duct));
+
 
 	while ( 1 ) {
 		if ( !duct->receive_Buffer(duct, bufr) )
 			goto done;
 		fprintf(stderr, "%d: Processing EDI request:\n", id);
 
+		if ( !get_encryption_key(svc, iv, key) )
+			goto done;
+
 		bufr->reset(bufr);
 		if ( !bufr->add(bufr, (unsigned char *) OK, strlen(OK)) )
 			goto done;
 		if ( !duct->send_Buffer(duct, bufr) )
 			goto done;
+
+		iv->reset(iv);
+		key->reset(key);
 	}
 
 

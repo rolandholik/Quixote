@@ -158,9 +158,6 @@ static void handle_connection(CO(Duct,duct))
 		fputs("Error receiving response from engine.\n", stderr);
 		goto done;
 	}
-	fputs("Encrypter response:\n", stderr);
-	bufr->hprint(bufr);
-
 
 	/* Send encrypted response to EDI receiver. */
 	fputs("Sending encrypted EDI packet to receiver.\n", stderr);
@@ -173,8 +170,6 @@ static void handle_connection(CO(Duct,duct))
 		fputs("Error receiving response from receiver.\n", stderr);
 		goto done;
 	}
-	fputs("Receiver response:\n", stderr);
-	bufr->hprint(bufr);
 
 
 	/* Send response to client. */
