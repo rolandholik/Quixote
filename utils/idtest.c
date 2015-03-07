@@ -33,10 +33,15 @@
 extern int main(int argc, char *argv[])
 
 {
+	_Bool key = false;
+
 	char *identity = "device";
 
 	int opt,
 	    retn = 1;
+
+	Buffer idhash = NULL,
+	       idkey  = NULL;
 
 	String name = NULL;
 
@@ -45,14 +50,16 @@ extern int main(int argc, char *argv[])
 	IDtoken token = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "i:")) != EOF )
+	while ( (opt = getopt(argc, argv, "ki:")) != EOF )
 		switch ( opt ) {
+			case 'k':
+				key = true;
+				break;
 			case 'i':
 				identity = optarg;
 				break;
 		}
 
-	INIT(NAAAIM, IDtoken, token, goto done);
 
 	INIT(NAAAIM, IDmgr, idmgr, goto done);
 	if ( !idmgr->attach(idmgr) ) {
@@ -64,14 +71,30 @@ extern int main(int argc, char *argv[])
 	if ( (name = HurdLib_String_Init_cstr(identity)) == NULL )
 		goto done;
 
-	if ( !idmgr->get_idtoken(idmgr, name, token) )
-		goto done;
+	if ( key ) {
+		INIT(HurdLib, Buffer, idhash, goto done);
+		INIT(HurdLib, Buffer, idkey, goto done);
 
-	fprintf(stdout, "Identity: %s\n", identity);
-	token->print(token);
+		if ( !idmgr->get_id_key(idmgr, name, idhash, idkey) )
+			goto done;
+		fputs("idhash:\n", stdout);
+		idhash->print(idhash);
+		fputs("idkey:\n", stdout);
+		idkey->print(idkey);
+	} else {
+		INIT(NAAAIM, IDtoken, token, goto done);
+
+		if ( !idmgr->get_idtoken(idmgr, name, token) )
+			goto done;
+
+		fprintf(stdout, "Identity: %s\n", identity);
+		token->print(token);
+	}
 		
 
  done:
+	WHACK(idhash);
+	WHACK(idkey);
 	WHACK(name);
 	WHACK(token);
 	WHACK(idmgr);
