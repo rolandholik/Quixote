@@ -2,7 +2,8 @@
 # (C)Copyright 2014, IDfusion, LLC. All rights reserved.
 # ***************************************************************************
 
-CSRC = edi-transmitter.c edi-engine.c edi-receiver.c send-edi.c
+CSRC = edi-transmitter.c edi-engine.c edi-receiver.c send-edi.c \
+	EDIpacket.c
 
 BINARIES = edi-transmitter edi-engine edi-receiver send-edi
 
@@ -26,3 +27,5 @@ send-edi: send-edi.o
 edi-engine.o: edi-engine.c edi.h
 	${CC} ${CFLAGS} -I../utils -I.. -c $< -o $@;
 
+EDIpacket.o: EDIpacket.c EDIpacket.h ../NAAAIM.h
+	${CC} ${CFLAGS} -I.. -c $< -o $@;

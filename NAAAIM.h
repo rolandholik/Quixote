@@ -49,3 +49,4 @@
 #define NAAAIM_Ivy_OBJID		28
 #define NAAAIM_IDengine_OBJID		29
 #define NAAAIM_Identity_OBJID		30
+#define NAAAIM_EDIpacket_OBJID		31
