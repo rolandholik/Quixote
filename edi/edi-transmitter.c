@@ -32,6 +32,7 @@
 #include <Duct.h>
 
 #include "edi.h"
+#include "EDIpacket.h"
 
 
 /* Variables static to this module. */
@@ -136,23 +137,31 @@ static void handle_connection(CO(Duct,duct))
 	Buffer bufr    = NULL,
 	       request = NULL;
 
+	EDIpacket edi = NULL;
+
 
 	INIT(HurdLib, Buffer, bufr, goto done);
 	INIT(HurdLib, Buffer, request, goto done);
+	INIT(NAAAIM, EDIpacket, edi, goto done);
 
 	fprintf(stdout, "\n.%d: Processing EDI transmit request from %s.\n", \
 		getpid(), duct->get_client(duct));
-
 	if ( !duct->receive_Buffer(duct, request) )
 		goto done;
 
-
 	/* Send request to EDI encryption engine. */
 	fputs("Sending transaction to encrypter.\n", stdout);
+	edi->set_type(edi, EDIpacket_decrypted);
+	edi->set_payload(edi, request);
+	request->reset(request);
+	edi->encode_payload(edi, request);
+	fputs("Encoded payload.\n", stdout);
+	edi->print(edi);
 	if ( !Engine->send_Buffer(Engine, request) ) {
 		fputs("Error sending buffer.\n", stderr);
 		goto done;
 	}
+
 	bufr->reset(bufr);
 	if ( !Engine->receive_Buffer(Engine, bufr) ) {
 		fputs("Error receiving response from engine.\n", stderr);
@@ -161,10 +170,15 @@ static void handle_connection(CO(Duct,duct))
 
 	/* Send encrypted response to EDI receiver. */
 	fputs("Sending encrypted EDI packet to receiver.\n", stderr);
-	if ( !Receiver->send_Buffer(Receiver, request) ) {
+	edi->reset(edi);
+	edi->decode_payload(edi, bufr);
+	edi->print(edi);
+
+	if ( !Receiver->send_Buffer(Receiver, bufr) ) {
 		fputs("Error sending request to receiver.\n", stderr);
 		goto done;
 	}
+
 	bufr->reset(bufr);
 	if ( !Receiver->receive_Buffer(Receiver, bufr) ) {
 		fputs("Error receiving response from receiver.\n", stderr);
@@ -184,6 +198,7 @@ static void handle_connection(CO(Duct,duct))
 
  done:
 	WHACK(bufr);
+	WHACK(edi);
 
 	return;
 }

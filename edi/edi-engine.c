@@ -39,8 +39,10 @@
 #include <IDtoken.h>
 #include <OTEDKS.h>
 #include <IDmgr.h>
+#include <AES256_cbc.h>
 
 #include "edi.h"
+#include "EDIpacket.h"
 
 
 /* Variables static to this module. */
@@ -125,40 +127,44 @@ static void update_process_table(void)
 /**
  * Private function.
  *
- * This function is responsible for generating the OTEDKS
- * iniitialization vector and key based on the current time and the
- * specified service identity.
+ * This function is responsible for generating a OTEDKS initialization
+ * vector and key and using this key to encrypt the payload contents
+ * of an EDI transaction.
  *
  * \param service	The object containing the name of the identity
  * 			whose identity will be used for the encryption
  *			key.
  *
- * \param iv		The generated initialization vector.
+ * \param edi		The EDI transaction which is to be
+ *			encrypted.
  *
- * \param key		The generated key.
- *
- * \return		If an error occurs during the lookup and
- *			generation of the keying material a false
- *			value is returned.  A true value indicates the
- *			supplied Buffer objects contain valid material.
+ * \return		If an error occurs during the encryption of
+ *			the EDI transaction a false value is returned.
+ *			A true value indicates the supplied Buffer objects
+ *			contain valid material.
  */
 
-static _Bool get_encryption_key(CO(String, service), CO(Buffer, iv), \
-				CO(Buffer, key))
+static _Bool encrypt_edi(CO(String, service), CO(EDIpacket, edi))
 
 {
 	_Bool retn = false;
 
-	Buffer idkey  = NULL,
-	       idhash = NULL;
+	time_t authtime = time(NULL);
+
+	Buffer idkey   = NULL,
+	       idhash  = NULL,
+	       payload = NULL;
 
 	IDmgr idmgr = NULL;
 
 	OTEDKS otedks = NULL;
 
+	AES256_cbc cipher = NULL;
+
 
 	INIT(HurdLib, Buffer, idkey, goto done);
 	INIT(HurdLib, Buffer, idhash, goto done);
+	INIT(HurdLib, Buffer, payload, goto done);
 
 	INIT(NAAAIM, IDmgr, idmgr, goto done);
 	if ( !idmgr->attach(idmgr) ) {
@@ -170,13 +176,26 @@ static _Bool get_encryption_key(CO(String, service), CO(Buffer, iv), \
 		goto done;
 	}
 
+	fprintf(stderr, "Using authtime %d\n", (int) authtime);
 	if ( (otedks = NAAAIM_OTEDKS_Init(BIRTHDATE)) == NULL )
 		goto done;
-	if ( !otedks->compute(otedks, time(NULL), idkey, idhash) )
+	if ( !otedks->compute(otedks, authtime, idkey, idhash) )
 		goto done;
-	if ( !iv->add_Buffer(iv, otedks->get_iv(otedks)) )
+
+	if ( !edi->get_payload(edi, payload) )
 		goto done;
-	if ( !key->add_Buffer(key, otedks->get_key(otedks)) )
+	edi->reset(edi);
+	edi->set_authtime(edi, authtime);
+	edi->set_type(edi, EDIpacket_encrypted);
+
+	cipher = NAAAIM_AES256_cbc_Init_encrypt(otedks->get_key(otedks),
+						otedks->get_iv(otedks));
+	if ( cipher == NULL )
+		goto done;
+	if ( !cipher->encrypt(cipher, payload) )
+		goto done;
+
+	if ( !edi->set_payload(edi, cipher->get_Buffer(cipher)) )
 		goto done;
 
 	retn = true;
@@ -185,8 +204,98 @@ static _Bool get_encryption_key(CO(String, service), CO(Buffer, iv), \
  done:
 	WHACK(idkey);
 	WHACK(idhash);
+	WHACK(payload);
 	WHACK(idmgr);
 	WHACK(otedks);
+	WHACK(cipher);
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function is responsible for generating a OTEDKS initialization
+ * vector and key and using this key to decrypt the payload contents
+ * of an EDI transaction.
+ *
+ * \param service	The object containing the name of the identity
+ * 			whose identity will be used to generate the
+ *			decryption key.
+ *
+ * \param edi		The EDI transaction which is to be decrypted.
+ *
+ * \return		If an error occurs during the decryption of
+ *			the EDI transaction a false value is returned.
+ *			A true value indicates the supplied Buffer objects
+ *			contain valid material.
+ */
+
+static _Bool decrypt_edi(CO(String, service), CO(EDIpacket, edi))
+
+{
+	_Bool retn = false;
+
+	Buffer idkey   = NULL,
+	       idhash  = NULL,
+	       payload = NULL;
+
+	IDmgr idmgr = NULL;
+
+	OTEDKS otedks = NULL;
+
+	AES256_cbc cipher = NULL;
+
+
+	INIT(HurdLib, Buffer, idkey, goto done);
+	INIT(HurdLib, Buffer, idhash, goto done);
+	INIT(HurdLib, Buffer, payload, goto done);
+
+	INIT(NAAAIM, IDmgr, idmgr, goto done);
+	if ( !idmgr->attach(idmgr) ) {
+		fputs("Error attaching to identity manager.\n", stderr);
+		goto done;
+	}
+	if ( !idmgr->get_id_key(idmgr, service, idhash, idkey) ) {
+		fputs("Error obtaining key information.\n", stderr);
+		goto done;
+	}
+
+	fprintf(stderr, "%s: EDI packet:\n", __func__);
+	edi->print(edi);
+
+	if ( (otedks = NAAAIM_OTEDKS_Init(BIRTHDATE)) == NULL )
+		goto done;
+	if ( !otedks->compute(otedks, edi->get_authtime(edi), idkey, idhash) )
+		goto done;
+
+
+	if ( !edi->get_payload(edi, payload) )
+		goto done;
+	edi->reset(edi);
+	edi->set_type(edi, EDIpacket_decrypted);
+
+	cipher = NAAAIM_AES256_cbc_Init_decrypt(otedks->get_key(otedks),
+						otedks->get_iv(otedks));
+	if ( cipher == NULL )
+		goto done;
+	if ( !cipher->decrypt(cipher, payload) )
+		goto done;
+
+	if ( !edi->set_payload(edi, cipher->get_Buffer(cipher)) )
+		goto done;
+
+	retn = true;
+
+
+ done:
+	WHACK(idkey);
+	WHACK(idhash);
+	WHACK(payload);
+	WHACK(idmgr);
+	WHACK(otedks);
+	WHACK(cipher);
 
 	return retn;
 }
@@ -207,8 +316,6 @@ static _Bool get_encryption_key(CO(String, service), CO(Buffer, iv), \
 static void handle_connection(CO(Duct,duct))
 
 {
-	const char *OK = "OK";
-
 	pid_t id;
 
 	Buffer iv   = NULL,
@@ -217,10 +324,13 @@ static void handle_connection(CO(Duct,duct))
 
 	String svc = NULL;
 
+	EDIpacket edi = NULL;
+
 
 	INIT(HurdLib, Buffer, iv, goto done);
 	INIT(HurdLib, Buffer, key, goto done);
 	INIT(HurdLib, Buffer, bufr, goto done);
+	INIT(NAAAIM, EDIpacket, edi, goto done);
 
 	if ( (svc = HurdLib_String_Init_cstr("service1")) == NULL )
 		goto done;
@@ -234,17 +344,36 @@ static void handle_connection(CO(Duct,duct))
 	while ( 1 ) {
 		if ( !duct->receive_Buffer(duct, bufr) )
 			goto done;
-		fprintf(stderr, "%d: Processing EDI request:\n", id);
 
-		if ( !get_encryption_key(svc, iv, key) )
+		fprintf(stderr, "%d: Processing EDI request:\n", id);
+		if ( !edi->decode_payload(edi, bufr) ) {
+			fputs("Failed to decode buffer.\n", stderr);
 			goto done;
+		}
+
+		if ( edi->get_type(edi) == EDIpacket_decrypted ) {
+			if ( !encrypt_edi(svc, edi) ) {
+				fputs("Failed to encrypt buffer.\n", stderr);
+				goto done;
+			}
+		} else if ( edi->get_type(edi) == EDIpacket_encrypted ) {
+			if ( !decrypt_edi(svc, edi) ) {
+				fputs("Failed to decrypt buffer.\n", stderr);
+				goto done;
+			}
+		}
 
 		bufr->reset(bufr);
-		if ( !bufr->add(bufr, (unsigned char *) OK, strlen(OK)) )
+		if ( !edi->encode_payload(edi, bufr) )
 			goto done;
+
+		fputs("Returning payload:\n", stderr);
+		edi->print(edi);
 		if ( !duct->send_Buffer(duct, bufr) )
 			goto done;
 
+		bufr->reset(bufr);
+		edi->reset(edi);
 		iv->reset(iv);
 		key->reset(key);
 	}

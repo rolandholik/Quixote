@@ -11,13 +11,14 @@ include ../Makefile.mak
 
 
 # Executable targets.
-edi-engine: edi-engine.o ../utils/IDmgr.o ../SHA256.o ../SHA256_hmac.o
+edi-engine: edi-engine.o EDIpacket.o ../utils/IDmgr.o ../SHA256.o \
+	../SHA256_hmac.o ../AES256_cbc.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
-edi-transmitter: edi-transmitter.o
+edi-transmitter: edi-transmitter.o EDIpacket.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
-edi-receiver: edi-receiver.o
+edi-receiver: edi-receiver.o EDIpacket.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
 send-edi: send-edi.o
