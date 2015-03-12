@@ -5,6 +5,7 @@
 
 /**************************************************************************
  * (C)Copyright 2007, The Open Hurderos Foundation. All rights reserved.
+ * (C)Copyright 2015, IDfusion, LLC. All rights reserved.
  *
  * Please refer to the file named COPYING in the top of the source tree
  * for licensing information.
@@ -268,6 +269,75 @@ static _Bool compute(const SHA256 const this)
 /**
  * External public method.
  *
+ * This method implements performing one or more iterations over a
+ * previously computed hash.  The ->compute method must have been
+ * called on some preliminary contents before this method is called.
+ *
+ * \param this	A pointer to the digest object whose value is to be
+ *		rehashed.
+ *
+ * \param cnt	The number of times the hash is to be iteratively
+ *		computed.
+ *
+ * \return	A boolean value is used to indicate success or failure
+ *		of the hashing sequence.
+ */
+
+static _Bool rehash(const SHA256 const this, unsigned int cnt)
+
+{
+	const SHA256_State const S = this->state;
+
+	_Bool retn = false;
+
+	unsigned char buffer[EVP_MD_size(S->digest)];
+
+	unsigned int lp,
+		     size;
+
+	Buffer b = S->buffer;
+
+
+	if ( S->poisoned ) {
+		fputs("poisoned\n", stderr);
+		goto done;
+	}
+	if ( cnt == 0 ) {
+		fputs("non-zero count\n", stderr);
+		goto done;
+	}
+	if ( !S->computed ) {
+		fputs("not computed\n", stderr);
+		goto done;
+	}
+
+
+	for (lp= 0; lp < cnt; ++lp) {
+		if ( !EVP_DigestInit_ex(&S->context, S->digest, NULL) )
+			goto done;
+		if ( !EVP_DigestUpdate(&S->context, b->get(b), b->size(b)) )
+			goto done;
+		if ( !EVP_DigestFinal_ex(&S->context, buffer, &size) )
+			goto done;
+
+		b->reset(b);
+		if ( !b->add(b, buffer, size) )
+			goto done;
+	}
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements resetting the hash in preparation for computation
  * of another element.  It flags the digest to be re-initialized and
  * clears the current digest Buffer.
@@ -446,6 +516,7 @@ extern SHA256 NAAAIM_SHA256_Init(void)
 	/* Method initialization. */
 	this->add	 = add;
 	this->compute	 = compute;
+	this->rehash	 = rehash;
 	this->reset	 = reset;
 	this->get   	 = get;
 	this->get_Buffer = get_Buffer;

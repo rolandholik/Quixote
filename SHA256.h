@@ -6,6 +6,7 @@
 
 /**************************************************************************
  * (C)Copyright 2007, The Open Hurderos Foundation. All rights reserved.
+ * (C)Copyright 2015, IDfusion, LLC. All rights reserved.
  *
  * Please refer to the file named COPYING in the top of the source tree
  * for licensing information.
@@ -28,6 +29,7 @@ struct NAAAIM_SHA256
 	/* External methods. */
 	_Bool (*add)(const SHA256, const Buffer);
 	_Bool (*compute)(const SHA256);
+	_Bool (*rehash)(const SHA256, unsigned int);
 	void (*reset)(const SHA256);
 	unsigned char * (*get)(const SHA256);
 	Buffer (*get_Buffer)(const SHA256);
