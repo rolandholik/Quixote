@@ -44,12 +44,14 @@ extern int main(int argc, char *argv[])
 	long int lp,
 		 edi_cnt = 1;
 
+	long long int start,
+		      end;
+
 	char *host = NULL,
 	     *edi  = NULL,
 	     *cnt  = NULL;
 
-	struct timeval start,
-		       end;
+	struct timeval the_time;
 
 	Buffer bufr = NULL;
 
@@ -92,11 +94,11 @@ extern int main(int argc, char *argv[])
 			goto done;
 	}
 
-	if ( gettimeofday(&start, NULL) == -1 ) {
+	if ( gettimeofday(&the_time, NULL) == -1 ) {
 		fputs("Failed to get start time.\n", stderr);
 		goto done;
 	}
-
+	start = (the_time.tv_sec * 1000000) + the_time.tv_usec;
 
 	/* Open the EDI access port connection. */
 	INIT(NAAAIM, Duct, duct, goto done);
@@ -149,13 +151,12 @@ extern int main(int argc, char *argv[])
 
 
 	/* Determine transaction time. */
-	if ( gettimeofday(&end, NULL) == -1 ) {
+	if ( gettimeofday(&the_time, NULL) == -1 ) {
 		fputs("Failed to get end time.\n", stderr);
 		goto done;
 	}
-	fprintf(stdout, "Transaction time: seconds=%u, microseconds=%u\n", \
-		(unsigned int) (end.tv_sec - start.tv_sec), (unsigned int) \
-		(end.tv_usec - start.tv_usec));
+	end = (the_time.tv_sec * 1000000) + the_time.tv_usec;
+	fprintf(stdout, "Transaction time: microseconds=%llu\n", end - start);
 	retn = 0;
 
 
