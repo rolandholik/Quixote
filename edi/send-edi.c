@@ -42,18 +42,21 @@ extern int main(int argc, char *argv[])
 	    retn = 1;
 
 	long int lp,
-		 edi_cnt = 1;
+		 edi_cnt = 1,
+		 edi_repeat = 1;
 
 	long long int start,
 		      end;
 
-	char *host = NULL,
-	     *edi  = NULL,
-	     *cnt  = NULL;
+	char *host   = NULL,
+	     *edi    = NULL,
+	     *cnt    = NULL,
+	     *repeat = NULL;
 
 	struct timeval the_time;
 
-	Buffer bufr = NULL;
+	Buffer bufr  = NULL,
+	       reply = NULL;
 
 	File edi_file = NULL;
 
@@ -61,7 +64,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse options and set mode. */
-	while ( (opt = getopt(argc, argv, "c:h:i:")) != EOF )
+	while ( (opt = getopt(argc, argv, "c:h:i:r:")) != EOF )
 		switch ( opt ) {
 			case 'c':
 				cnt = optarg;
@@ -72,6 +75,9 @@ extern int main(int argc, char *argv[])
 
 			case 'i':
 				edi = optarg;
+				break;
+			case 'r':
+				repeat = optarg;
 				break;
 		}
 
@@ -91,6 +97,14 @@ extern int main(int argc, char *argv[])
 		if ( errno == ERANGE )
 			goto done;
 		if ( edi_cnt < 0 )
+			goto done;
+	}
+
+	if ( repeat != NULL ) {
+		edi_repeat = strtol(repeat, NULL, 10);
+		if ( errno == ERANGE )
+			goto done;
+		if ( edi_repeat < 0 )
 			goto done;
 	}
 
@@ -114,6 +128,7 @@ extern int main(int argc, char *argv[])
 
 	/* Open the EDI transaction file and send it. */
 	INIT(HurdLib, Buffer, bufr, goto done);
+	INIT(HurdLib, Buffer, reply, goto done);
 
 	INIT(HurdLib, File, edi_file, goto done);
 	if ( !edi_file->open_ro(edi_file, edi) ) {
@@ -132,23 +147,24 @@ extern int main(int argc, char *argv[])
 		}
 	}
 
-	fprintf(stdout, "Sending buffer, cnt=%lu:\n", edi_cnt);
-	bufr->print(bufr);
+	fprintf(stdout, "count=%ld, repeat=%ld\n", edi_cnt, edi_repeat);
+	for (lp= 0; lp < edi_repeat; ++lp) {
+		fprintf(stdout, "Sending buffer, cnt=%lu:\n", edi_cnt);
+		bufr->print(bufr);
 
-	if ( !duct->send_Buffer(duct, bufr) ) {
-		fputs("Error sending buffer.\n", stderr);
-		goto done;
+		if ( !duct->send_Buffer(duct, bufr) ) {
+			fputs("Error sending buffer.\n", stderr);
+			goto done;
+		}
+
+		if ( !duct->receive_Buffer(duct, reply) ) {
+			fputs("Error receiving buffer.\n", stderr);
+			goto done;
+		}
+		fputs("Received response:\n", stdout);
+		reply->hprint(reply);
+		reply->reset(reply);
 	}
-
-	fputs("Resetting buffer.\n", stdout);
-	bufr->reset(bufr);
-	if ( !duct->receive_Buffer(duct, bufr) ) {
-		fputs("Error receiving buffer.\n", stderr);
-		goto done;
-	}
-	fputs("Received response:\n", stdout);
-	bufr->hprint(bufr);
-
 
 	/* Determine transaction time. */
 	if ( gettimeofday(&the_time, NULL) == -1 ) {
@@ -162,6 +178,7 @@ extern int main(int argc, char *argv[])
 
  done:
 	WHACK(bufr);
+	WHACK(reply);
 	WHACK(edi_file);
 	WHACK(duct);
 
