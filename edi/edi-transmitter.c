@@ -30,6 +30,7 @@
 #include <String.h>
 
 #include <Duct.h>
+#include <Curve25519.h>
 
 #include "edi.h"
 #include "EDIpacket.h"
@@ -123,6 +124,82 @@ static void update_process_table(void)
  * This function is called to handle a connection for an identity
  * generation request.
  *
+ * \param receiver	The network connection to the EDI transaction
+ *			receiver with which a session key should be
+ *			established.
+ *
+ * \param engine	The network connection to the EDI encryption
+ *			engine which will use the session key.
+ *
+ * \return		A false value is returned if an error occurs
+ *			during the setup of the session key.  A true
+ *			value means a session key has been terminated
+ *			between the EDI receiver and encryption engine.
+ */
+
+static _Bool setup_session(CO(Duct, receiver), CO(Duct, engine))
+
+{
+	_Bool retn = false;
+
+	Buffer bufr   = NULL,
+	       shared = NULL;
+
+	Curve25519 dh = NULL;
+
+	EDIpacket edi = NULL;
+
+
+	/* Generate and send a DH public key to receiver. */
+	INIT(HurdLib, Buffer, bufr, goto done);
+	INIT(HurdLib, Buffer, shared, goto done);
+
+	INIT(NAAAIM, Curve25519, dh, goto done);
+	if ( !dh->generate(dh) )
+		goto done;
+
+	INIT(NAAAIM, EDIpacket, edi, goto done);
+	edi->set_type(edi, EDIpacket_getkey);
+	edi->set_payload(edi, dh->get_public(dh));
+	edi->encode_payload(edi, bufr);
+	if ( !receiver->send_Buffer(receiver, bufr) )
+		goto done;
+
+	/* Receive the public key and generate a shared secret. */
+	bufr->reset(bufr);
+	if ( !receiver->receive_Buffer(receiver, bufr) )
+		goto done;
+	if ( !dh->compute(dh, bufr, shared) )
+		goto done;
+
+	/* Send the shared secret to the engine. */
+	bufr->reset(bufr);
+	edi->reset(edi);
+	edi->set_type(edi, EDIpacket_key);
+	edi->set_payload(edi, shared);
+	if ( !edi->encode_payload(edi, bufr) )
+		goto done;
+	if ( !engine->send_Buffer(engine, bufr) )
+		goto done;
+
+	retn = true;
+
+
+ done:
+	WHACK(bufr);
+	WHACK(dh);
+	WHACK(edi);
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function is called to handle a connection for an identity
+ * generation request.
+ *
  * \param duct	The network connection object being used to handle
  *		the identity generation request.
  *
@@ -134,66 +211,72 @@ static void handle_connection(CO(Duct,duct))
 {
 	const char *OK = "OK";
 
-	Buffer bufr    = NULL,
-	       request = NULL;
+	Buffer bufr = NULL;
 
 	EDIpacket edi = NULL;
 
 
 	INIT(HurdLib, Buffer, bufr, goto done);
-	INIT(HurdLib, Buffer, request, goto done);
+	INIT(HurdLib, Buffer, bufr, goto done);
 	INIT(NAAAIM, EDIpacket, edi, goto done);
 
 	fprintf(stdout, "\n.%d: Processing EDI transmit request from %s.\n", \
 		getpid(), duct->get_client(duct));
-	if ( !duct->receive_Buffer(duct, request) )
-		goto done;
 
-	/* Send request to EDI encryption engine. */
-	fputs("Sending transaction to encrypter.\n", stdout);
-	edi->set_type(edi, EDIpacket_decrypted);
-	edi->set_payload(edi, request);
-	request->reset(request);
-	edi->encode_payload(edi, request);
-	fputs("Encoded payload.\n", stdout);
-	edi->print(edi);
-	if ( !Engine->send_Buffer(Engine, request) ) {
-		fputs("Error sending buffer.\n", stderr);
-		goto done;
+	/* Process incoming transactions in a loop. */
+	while ( 1 ) {
+		if ( !duct->receive_Buffer(duct, bufr) )
+			goto done;
+
+		/* Send bufr to EDI encryption engine. */
+		fputs("Sending transaction to encrypter.\n", stdout);
+		edi->set_type(edi, EDIpacket_decrypted);
+		edi->set_payload(edi, bufr);
+		bufr->reset(bufr);
+		edi->encode_payload(edi, bufr);
+		fputs("Encoded payload.\n", stdout);
+		edi->print(edi);
+		if ( !Engine->send_Buffer(Engine, bufr) ) {
+			fputs("Error sending buffer.\n", stderr);
+			goto done;
+		}
+
+		bufr->reset(bufr);
+		if ( !Engine->receive_Buffer(Engine, bufr) ) {
+			fputs("Error receiving response from engine.\n", \
+			      stderr);
+			goto done;
+		}
+
+		/* Send encrypted response to EDI receiver. */
+		fputs("Sending encrypted EDI packet to receiver.\n", stderr);
+		edi->reset(edi);
+		edi->decode_payload(edi, bufr);
+		edi->print(edi);
+
+		if ( !Receiver->send_Buffer(Receiver, bufr) ) {
+			fputs("Error sending request to receiver.\n", stderr);
+			goto done;
+		}
+
+		bufr->reset(bufr);
+		if ( !Receiver->receive_Buffer(Receiver, bufr) ) {
+			fputs("Error receiving response from receiver.\n", \
+			      stderr);
+			goto done;
+		}
+
+		/* Send response to client. */
+		bufr->reset(bufr);
+		if ( !bufr->add(bufr, (unsigned char *) OK, strlen(OK)) )
+			goto done;
+		if ( !duct->send_Buffer(duct, bufr) )
+			goto done;
+		fputs("Transaction complete.\n", stderr);
+
+		bufr->reset(bufr);
+		edi->reset(edi);
 	}
-
-	bufr->reset(bufr);
-	if ( !Engine->receive_Buffer(Engine, bufr) ) {
-		fputs("Error receiving response from engine.\n", stderr);
-		goto done;
-	}
-
-	/* Send encrypted response to EDI receiver. */
-	fputs("Sending encrypted EDI packet to receiver.\n", stderr);
-	edi->reset(edi);
-	edi->decode_payload(edi, bufr);
-	edi->print(edi);
-
-	if ( !Receiver->send_Buffer(Receiver, bufr) ) {
-		fputs("Error sending request to receiver.\n", stderr);
-		goto done;
-	}
-
-	bufr->reset(bufr);
-	if ( !Receiver->receive_Buffer(Receiver, bufr) ) {
-		fputs("Error receiving response from receiver.\n", stderr);
-		goto done;
-	}
-
-
-	/* Send response to client. */
-	bufr->reset(bufr);
-	if ( !bufr->add(bufr, (unsigned char *) OK, strlen(OK)) )
-		goto done;
-	if ( !duct->send_Buffer(duct, bufr) )
-		goto done;
-
-	fputs("Transaction complete.\n", stderr);
 
 
  done:
@@ -279,6 +362,9 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
+	/* Setup shared session state between the receiver and engine. */
+	if ( !setup_session(Receiver, Engine) )
+		goto done;
 
 	/* Initialize the network port and wait for connections. */
 	INIT(NAAAIM, Duct, duct, goto done);
@@ -299,6 +385,7 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
+	/* Process connections. */
 	while ( 1 ) {
 		if ( !duct->accept_connection(duct) ) {
 			err = "Error on connection accept.";

@@ -30,6 +30,7 @@
 #include <String.h>
 
 #include <Duct.h>
+#include <Curve25519.h>
 
 #include "edi.h"
 #include "EDIpacket.h"
@@ -122,6 +123,89 @@ static void update_process_table(void)
  * This function is called to handle a connection for an identity
  * generation request.
  *
+ * \param transmitter	The network connection to the EDI transaction
+ *			transmitter with which a session key should be
+ *			established.
+ *
+ * \param engine	The network connection to the EDI encryption
+ *			engine which will use the session key.
+ *
+ * \return		A false value is returned if an error occurs
+ *			during the setup of the session key.  A true
+ *			value means a session key has been terminated
+ *			between the EDI receiver and encryption engine.
+ */
+
+static _Bool setup_session(CO(Duct, transmitter), CO(Duct, engine))
+
+{
+	_Bool retn = false;
+
+	Buffer bufr   = NULL,
+	       shared = NULL;
+
+	Curve25519 dh = NULL;
+
+	EDIpacket edi = NULL;
+
+
+	/* Receive packet from transmitter with DH public key. */
+	INIT(HurdLib, Buffer, shared, goto done);
+	INIT(HurdLib, Buffer, bufr, goto done);
+	if ( !transmitter->receive_Buffer(transmitter, bufr) )
+		goto done;
+
+	INIT(NAAAIM, EDIpacket, edi, goto done);
+	edi->decode_payload(edi, bufr);
+	if ( edi->get_type(edi) != EDIpacket_getkey )
+		goto done;
+	bufr->reset(bufr);
+	if ( !edi->get_payload(edi, bufr) )
+		goto done;
+	fprintf(stderr, "%s: DH key:\n", __func__);
+	bufr->hprint(bufr);
+
+	/* Generate local DH key and send public portion to transmitter. */
+	INIT(NAAAIM, Curve25519, dh, goto done);
+	dh->generate(dh);
+	if ( !dh->compute(dh, bufr, shared) )
+		goto done;
+	fprintf(stderr, "%s: Shared secret:\n", __func__);
+	shared->hprint(shared);
+	if ( !transmitter->send_Buffer(transmitter, dh->get_public(dh)) )
+		goto done;
+	fprintf(stderr, "%s: Transmitted public key.\n", __func__);
+
+	/* Send the shared secret to the engine. */
+	bufr->reset(bufr);
+	edi->reset(edi);
+	edi->set_type(edi, EDIpacket_key);
+	edi->set_payload(edi, shared);
+	if ( !edi->encode_payload(edi, bufr) )
+		goto done;
+	if ( !engine->send_Buffer(engine, bufr) )
+		goto done;
+	fprintf(stderr, "%s: Send shared secret to engine.\n", __func__);
+
+	retn = true;
+
+
+ done:
+	WHACK(bufr);
+	WHACK(shared);
+	WHACK(dh);
+	WHACK(edi);
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function is called to handle a connection for an identity
+ * generation request.
+ *
  * \param duct	The network connection object being used to handle
  *		the identity generation request.
  *
@@ -144,6 +228,8 @@ static void handle_connection(CO(Duct,duct))
 	fprintf(stdout, "\n.%d: Processing EDI receiver request from %s.\n", \
 		getpid(), duct->get_client(duct));
 
+	if ( !setup_session(duct, Engine) )
+		goto done;
 
 	/* Process incoming transactions in a loop. */
 	while ( 1 ) {
@@ -179,8 +265,8 @@ static void handle_connection(CO(Duct,duct))
 			goto done;
 		if ( !duct->send_Buffer(duct, bufr) )
 			goto done;
-
 		fputs("EDI reception complete.\n", stderr);
+
 		bufr->reset(bufr);
 		edi->reset(edi);
 	}
@@ -271,6 +357,8 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
+
+	/* Process connections. */
 	while ( 1 ) {
 		if ( !duct->accept_connection(duct) ) {
 			err = "Error on connection accept.";

@@ -23,7 +23,9 @@ typedef struct NAAAIM_EDIpacket_State * EDIpacket_State;
 typedef enum {
 	EDIpacket_none,
 	EDIpacket_decrypted,
-	EDIpacket_encrypted
+	EDIpacket_encrypted,
+	EDIpacket_getkey,
+	EDIpacket_key
 } EDIpacket_type;
 
 
