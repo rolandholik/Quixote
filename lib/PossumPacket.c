@@ -32,8 +32,6 @@
 #include <HurdLib.h>
 #include <Buffer.h>
 
-#include <Curve25519.h>
-
 #include "NAAAIM.h"
 #include "RandomBuffer.h"
 #include "IDtoken.h"
@@ -42,6 +40,7 @@
 #include "SHA256_hmac.h"
 #include "OTEDKS.h"
 
+#include "Curve25519.h"
 #include "PossumPacket.h"
 
 #define STATE(var) CO(PossumPacket_State, var) = this->state

@@ -4,8 +4,8 @@
 
 
 # Variable declarations.
-CSRC = gen-image.c load-image.c boot.c Netconfig.c IPsec.c PossumPacket.c \
-	SoftwareTPM.c TPMcmd.c
+CSRC = gen-image.c load-image.c boot.c Netconfig.c IPsec.c SoftwareTPM.c \
+	 TPMcmd.c
 
 TOOLS = gen-image load-image boot sboot init possum gen-id-verifier	\
 	software-status software-tpm tpm-cmd id-set idmgr net-config	\
@@ -76,7 +76,7 @@ sboot: sboot.o Netconfig.o SoftwareTPM.o ../SHA256.o
 init: init.o Netconfig.o SoftwareTPM.o TPMcmd.o ../SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl -ltspi;
 
-possum: possum.o Netconfig.o IPsec.o PossumPacket.o TPMcmd.o
+possum: possum.o Netconfig.o IPsec.o TPMcmd.o
 	${CC} ${LDFLAGS} -o $@ $^ ../IDtoken.o ../SHA256_hmac.o ../SHA256.o \
 		../RandomBuffer.o ../AES256_cbc.o ${SSL_LIBRARY} ${LIBS}    \
 		-ltspi -lfl;
@@ -117,7 +117,7 @@ clean:
 Netconfig.o: Netconfig.h
 IPsec.o: IPsec.h
 
-possum.o: Netconfig.h IPsec.h PossumPacket.h ../IDtoken.h \
-	../SHA256_hmac.h ../RandomBuffer.h ../AES256_cbc.h ../SHA256.h
+possum.o: Netconfig.h IPsec.h ../IDtoken.h ../SHA256_hmac.h \
+	../RandomBuffer.h ../AES256_cbc.h ../SHA256.h
 
 gen-id-verifier.o: TPMcmd.h
