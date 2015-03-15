@@ -11,8 +11,8 @@ include ../Makefile.mak
 
 
 # Executable targets.
-edi-engine: edi-engine.o EDIpacket.o ../utils/IDmgr.o ../SHA256.o \
-	../SHA256_hmac.o ../AES256_cbc.o
+edi-engine: edi-engine.o EDIpacket.o ../SHA256.o ../SHA256_hmac.o \
+	../AES256_cbc.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
 edi-transmitter: edi-transmitter.o EDIpacket.o ../RandomBuffer.o
