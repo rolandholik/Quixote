@@ -21,9 +21,9 @@
 
 #include <IDtoken.h>
 #include <SHA256.h>
+#include <IDmgr.h>
 
 #include "TPMcmd.h"
-#include "IDmgr.h"
 
 
 /*

@@ -59,10 +59,10 @@
 #include <AES256_cbc.h>
 #include <SoftwareStatus.h>
 #include <Ivy.h>
+#include <IDmgr.h>
 
 #include "Netconfig.h"
 #include "IDtoken.h"
-#include "IDmgr.h"
 #include "IPsec.h"
 #include "PossumPacket.h"
 #include "TPMcmd.h"

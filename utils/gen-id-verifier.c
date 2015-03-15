@@ -39,8 +39,8 @@
 #include <SHA256.h>
 #include <SoftwareStatus.h>
 #include <Ivy.h>
+#include <IDmgr.h>
 
-#include "IDmgr.h"
 #include "TPMcmd.h"
 
 
