@@ -27,8 +27,7 @@
 #include <Buffer.h>
 
 #include <NAAAIM.h>
-
-#include "SoftwareStatus.h"
+#include <SoftwareStatus.h>
 
 
 extern int main(int argc, char *argv[])

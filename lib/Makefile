@@ -4,7 +4,7 @@
 
 
 # Variable declarations.
-CSRC = Duct.c OTEDKS.c Curve25519.c IPC.c
+CSRC = Duct.c OTEDKS.c Curve25519.c IPC.c SoftwareStatus.c
 
 TESTS = Duct_test OTEDKS_test Curve25519_test IPC_test
 
@@ -86,5 +86,6 @@ clean:
 Duct.o: Duct.h ../NAAAIM.h
 OTEDKS.o: ../NAAAIM.h OTEDKS.h
 Curve25519.o: ../NAAAIM.h Curve25519.h
+SoftwareStatus.o: ../NAAAIM.h SoftwareStatus.h
 
 Duct_test.o: Duct.h ../NAAAIM.h

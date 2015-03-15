@@ -49,8 +49,9 @@
 #include <String.h>
 #include <File.h>
 
+#include <SoftwareStatus.h>
+
 #include "Netconfig.h"
-#include "SoftwareStatus.h"
 #include "SoftwareTPM.h"
 
 

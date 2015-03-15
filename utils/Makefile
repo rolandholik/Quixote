@@ -5,7 +5,7 @@
 
 # Variable declarations.
 CSRC = gen-image.c load-image.c boot.c Netconfig.c IPsec.c PossumPacket.c \
-	SoftwareStatus.c SoftwareTPM.c TPMcmd.c IDmgr.c Ivy.c
+	SoftwareTPM.c TPMcmd.c IDmgr.c Ivy.c
 
 TOOLS = gen-image load-image boot sboot init possum gen-id-verifier	\
 	software-status software-tpm tpm-cmd id-set idmgr net-config	\
@@ -67,26 +67,26 @@ load-image: load-image.o
 	${CC} ${LDFLAGS} -o $@ $^ ../AES256_cbc.o ../SHA256_hmac.o ${LIBS} \
 		-ltpm_unseal ${SSL_LIBRARY};
 
-boot: boot.o SoftwareStatus.o Netconfig.o ../SHA256.o
+boot: boot.o Netconfig.o ../SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
-sboot: sboot.o SoftwareStatus.o Netconfig.o SoftwareTPM.o ../SHA256.o
+sboot: sboot.o Netconfig.o SoftwareTPM.o ../SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
-init: init.o Netconfig.o SoftwareTPM.o SoftwareStatus.o TPMcmd.o ../SHA256.o
+init: init.o Netconfig.o SoftwareTPM.o TPMcmd.o ../SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl -ltspi;
 
-possum: possum.o Netconfig.o IPsec.o PossumPacket.o SoftwareStatus.o IDmgr.o \
+possum: possum.o Netconfig.o IPsec.o PossumPacket.o IDmgr.o \
 	Ivy.o TPMcmd.o
 	${CC} ${LDFLAGS} -o $@ $^ ../IDtoken.o ../SHA256_hmac.o ../SHA256.o \
 		../RandomBuffer.o ../AES256_cbc.o ${SSL_LIBRARY} ${LIBS}    \
 		-ltspi -lfl;
 
 gen-id-verifier: gen-id-verifier.o IDmgr.o ../IDtoken.o ../SHA256_hmac.o \
-	../SHA256.o ../RandomBuffer.o Ivy.o SoftwareStatus.o TPMcmd.o
+	../SHA256.o ../RandomBuffer.o Ivy.o TPMcmd.o
 	${CC} ${LDFLAGS} -o $@ $^ ${SSL_LIBRARY} ${LIBS} -ltspi;
 
-software-status: software-status.o SoftwareStatus.o
+software-status: software-status.o
 	${CC} ${LDFLAGS} -o $@ $^ ${SSL_LIBRARY} ../SHA256.o ${LIBS};
 
 software-tpm: software-tpm.o SoftwareTPM.o
@@ -122,6 +122,6 @@ IDmgr.o: IDmgr.h TPMcmd.h ../IDtoken.h ../SHA256.h
 possum.o: Netconfig.h IPsec.h PossumPacket.h Ivy.h ../IDtoken.h \
 	../SHA256_hmac.h ../RandomBuffer.h ../AES256_cbc.h ../SHA256.h
 
-gen-id-verifier.o: IDmgr.h Ivy.h SoftwareStatus.h TPMcmd.h
+gen-id-verifier.o: IDmgr.h Ivy.h TPMcmd.h
 
 Ivy.o: Ivy.h ../NAAAIM.h ../IDtoken.h

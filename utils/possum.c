@@ -57,13 +57,13 @@
 #include <Curve25519.h>
 #include <RandomBuffer.h>
 #include <AES256_cbc.h>
+#include <SoftwareStatus.h>
 
 #include "Netconfig.h"
 #include "IDtoken.h"
 #include "IDmgr.h"
 #include "IPsec.h"
 #include "PossumPacket.h"
-#include "SoftwareStatus.h"
 #include "Ivy.h"
 #include "TPMcmd.h"
 

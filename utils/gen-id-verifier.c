@@ -37,10 +37,10 @@
 #include <IDtoken.h>
 #include <RandomBuffer.h>
 #include <SHA256.h>
+#include <SoftwareStatus.h>
 
 #include "IDmgr.h"
 #include "Ivy.h"
-#include "SoftwareStatus.h"
 #include "TPMcmd.h"
 
 

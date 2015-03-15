@@ -46,7 +46,8 @@
 #include <String.h>
 #include <File.h>
 
-#include "SoftwareStatus.h"
+#include <SoftwareStatus.h>
+
 #include "Netconfig.h"
 
 

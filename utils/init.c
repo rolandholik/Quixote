@@ -51,10 +51,10 @@
 #include <String.h>
 
 #include <SHA256.h>
+#include <SoftwareStatus.h>
 
 #include "Netconfig.h"
 #include "SoftwareTPM.h"
-#include "SoftwareStatus.h"
 #include "TPMcmd.h"
 
 
