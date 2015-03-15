@@ -38,9 +38,9 @@
 #include <RandomBuffer.h>
 #include <SHA256.h>
 #include <SoftwareStatus.h>
+#include <Ivy.h>
 
 #include "IDmgr.h"
-#include "Ivy.h"
 #include "TPMcmd.h"
 
 
