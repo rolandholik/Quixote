@@ -38,15 +38,15 @@
 #define NAAAIM_OTEDKS_OBJID		18
 #define NAAAIM_Curve25519_OBJID		19
 #define NAAAIM_IPC_OBJID		20
+#define NAAAIM_SoftwareStatus_OBJID	21
+#define NAAAIM_PossumPacket_OBJID	22
+#define NAAAIM_IDmgr_OBJID		23
+#define NAAAIM_Ivy_OBJID		24
 
-#define NAAAIM_Netconfig_OBJID		21
-#define NAAAIM_IPsec_OBJID		22
-#define NAAAIM_PossumPacket_OBJID	23
-#define NAAAIM_SoftwareStatus_OBJID	24
-#define NAAAIM_SoftwareTPM_OBJID	25
-#define NAAAIM_TPMcmd_OBJID		26
-#define NAAAIM_IDmgr_OBJID		27
-#define NAAAIM_Ivy_OBJID		28
+#define NAAAIM_Netconfig_OBJID		25
+#define NAAAIM_IPsec_OBJID		26
+#define NAAAIM_SoftwareTPM_OBJID	27
+#define NAAAIM_TPMcmd_OBJID		28
 #define NAAAIM_IDengine_OBJID		29
 #define NAAAIM_Identity_OBJID		30
 #define NAAAIM_EDIpacket_OBJID		31
