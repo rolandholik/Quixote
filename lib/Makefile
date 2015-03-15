@@ -5,7 +5,7 @@
 
 # Variable declarations.
 CSRC = Duct.c OTEDKS.c Curve25519.c IPC.c SoftwareStatus.c Ivy.c IDmgr.c \
-	PossumPacket.c
+	PossumPacket.c PossumPipe.c
 
 TESTS = Duct_test OTEDKS_test Curve25519_test IPC_test
 
