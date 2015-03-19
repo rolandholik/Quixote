@@ -24,10 +24,10 @@
 #include <Buffer.h>
 #include <String.h>
 #include <File.h>
+#include <TPMcmd.h>
 
 #include <NAAAIM.h>
 #include <RandomBuffer.h>
-#include "TPMcmd.h"
 
 
 extern int main(int argc, char *argv[])

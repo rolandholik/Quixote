@@ -52,10 +52,10 @@
 
 #include <SHA256.h>
 #include <SoftwareStatus.h>
+#include <TPMcmd.h>
 
 #include "Netconfig.h"
 #include "SoftwareTPM.h"
-#include "TPMcmd.h"
 
 
 /* Definitions static to this module. */

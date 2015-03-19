@@ -4,8 +4,7 @@
 
 
 # Variable declarations.
-CSRC = gen-image.c load-image.c boot.c Netconfig.c IPsec.c SoftwareTPM.c \
-	 TPMcmd.c
+CSRC = gen-image.c load-image.c boot.c Netconfig.c IPsec.c SoftwareTPM.c
 
 TOOLS = gen-image load-image boot sboot init possum gen-id-verifier	\
 	software-status software-tpm tpm-cmd id-set idmgr net-config	\
@@ -73,16 +72,16 @@ boot: boot.o Netconfig.o ../SHA256.o
 sboot: sboot.o Netconfig.o SoftwareTPM.o ../SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
-init: init.o Netconfig.o SoftwareTPM.o TPMcmd.o ../SHA256.o
+init: init.o Netconfig.o SoftwareTPM.o ../SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl -ltspi;
 
-possum: possum.o Netconfig.o IPsec.o TPMcmd.o
+possum: possum.o Netconfig.o IPsec.o
 	${CC} ${LDFLAGS} -o $@ $^ ../IDtoken.o ../SHA256_hmac.o ../SHA256.o \
 		../RandomBuffer.o ../AES256_cbc.o ${SSL_LIBRARY} ${LIBS}    \
 		-ltspi -lfl;
 
 gen-id-verifier: gen-id-verifier.o ../IDtoken.o ../SHA256_hmac.o \
-	../SHA256.o ../RandomBuffer.o TPMcmd.o
+	../SHA256.o ../RandomBuffer.o
 	${CC} ${LDFLAGS} -o $@ $^ ${SSL_LIBRARY} ${LIBS} -ltspi;
 
 software-status: software-status.o
@@ -91,13 +90,13 @@ software-status: software-status.o
 software-tpm: software-tpm.o SoftwareTPM.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
-tpm-cmd: tpm-cmd.o TPMcmd.o ../RandomBuffer.o
+tpm-cmd: tpm-cmd.o ../RandomBuffer.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi;
 
-id-set: id-set.o TPMcmd.o ../IDtoken.o ../SHA256_hmac.o ../SHA256.o
+id-set: id-set.o ../IDtoken.o ../SHA256_hmac.o ../SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi;
 
-idmgr: idmgr.o TPMcmd.o ../IDtoken.o ../SHA256_hmac.o ../SHA256.o
+idmgr: idmgr.o ../IDtoken.o ../SHA256_hmac.o ../SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi;
 
 net-config: net-config.o Netconfig.o
@@ -120,4 +119,4 @@ IPsec.o: IPsec.h
 possum.o: Netconfig.h IPsec.h ../IDtoken.h ../SHA256_hmac.h \
 	../RandomBuffer.h ../AES256_cbc.h ../SHA256.h
 
-gen-id-verifier.o: TPMcmd.h
+gen-id-verifier.o:

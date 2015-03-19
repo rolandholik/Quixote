@@ -61,11 +61,11 @@
 #include <Ivy.h>
 #include <IDmgr.h>
 #include <PossumPacket.h>
+#include <TPMcmd.h>
 
 #include "Netconfig.h"
 #include "IDtoken.h"
 #include "IPsec.h"
-#include "TPMcmd.h"
 
 
 /* Variable static to this file. */

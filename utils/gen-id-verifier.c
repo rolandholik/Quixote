@@ -40,8 +40,7 @@
 #include <SoftwareStatus.h>
 #include <Ivy.h>
 #include <IDmgr.h>
-
-#include "TPMcmd.h"
+#include <TPMcmd.h>
 
 
 /* Macro for setting error location. */

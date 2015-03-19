@@ -29,10 +29,9 @@
 #include <Buffer.h>
 #include <String.h>
 #include <File.h>
+#include <TPMcmd.h>
 
 #include <IDtoken.h>
-
-#include "TPMcmd.h"
 
 /*
  * Program entry point begins here.
