@@ -72,11 +72,19 @@ extern int main(int argc, char *argv[])
 
 	/* Server management. */
 	if ( Mode == server ) {
+		fputs("Initializing server connection.\n", stderr);
 		if ( !pipe->init_server(pipe, host, 11990, do_reverse) ) {
 			fputs("Cannot set server mode.\n", stderr);
 			goto done;
 		}
 
+		fputs("Waiting for client connection.\n", stderr);
+		if ( !pipe->accept_connection(pipe) ) {
+			fputs("Error accepting connection.\n", stderr);
+			goto done;
+		}
+
+		fputs("Starting host mode.\n", stderr);
 		if ( !pipe->start_host_mode(pipe) ) {
 			fputs("Startup of host mode failed.\n", stderr);
 			goto done;
@@ -93,9 +101,14 @@ extern int main(int argc, char *argv[])
 		fputs("Client mode start:\n", stdout);
 
 		if ( !pipe->init_client(pipe, host, 11990) ) {
-			fputs("Cannot initialize client mode.\n", stderr);
+			fputs("Cannot initialize client pipe.\n", stderr);
 			goto done;
 		}
+		if ( !pipe->start_client_mode(pipe)) {
+			fputs("Error starting client mode.\n", stderr);
+			goto done;
+		}
+
 		fputs("Client mode ok.\n", stderr);
 	}
 

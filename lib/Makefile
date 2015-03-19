@@ -7,7 +7,7 @@
 CSRC = Duct.c OTEDKS.c Curve25519.c IPC.c SoftwareStatus.c Ivy.c IDmgr.c \
 	TPMcmd.c PossumPacket.c PossumPipe.c
 
-TESTS = Duct_test OTEDKS_test Curve25519_test IPC_test
+TESTS = Duct_test OTEDKS_test Curve25519_test IPC_test PossumPipe_test
 
 CC = musl-gcc
 
@@ -75,6 +75,11 @@ Curve25519_test: Curve25519_test.o Curve25519.o ../RandomBuffer.o
 IPC_test: IPC_test.o IPC.o
 	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib -lrt;
 
+PossumPipe_test: PossumPipe_test.o PossumPipe.o ../SHA256.o ../SHA256_hmac.o \
+	../AES256_cbc.o ../RandomBuffer.o ../IDtoken.o
+	${CC} ${LDFLAGS} -o $@ $^ -L . -lNAAAIM -L../HurdLib -lHurdLib \
+	-lrt -ltspi;
+
 tags:
 	/opt/emacs/bin/etags *.{h,c};
 clean:
@@ -89,4 +94,8 @@ OTEDKS.o: ../NAAAIM.h OTEDKS.h
 Curve25519.o: ../NAAAIM.h Curve25519.h
 SoftwareStatus.o: ../NAAAIM.h SoftwareStatus.h
 
+PossumPipe.o: ../NAAAIM.h PossumPipe.h Duct.h SoftwareStatus.h Curve25519.h \
+	PossumPacket.h IDmgr.h Ivy.h TPMcmd.h
+
 Duct_test.o: Duct.h ../NAAAIM.h
+PossumpPipe_test.o: PossumPipe.h

@@ -18,13 +18,20 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <time.h>
+#include <glob.h>
 
 #include <Origin.h>
 #include <HurdLib.h>
+#include <Config.h>
 #include <Buffer.h>
 #include <String.h>
+#include <File.h>
 
 #include <IDtoken.h>
+#include <SHA256.h>
+#include <SHA256_hmac.h>
+#include <AES256_cbc.h>
+#include <RandomBuffer.h>
 
 #include "NAAAIM.h"
 #include "Duct.h"
@@ -33,6 +40,7 @@
 #include "PossumPacket.h"
 #include "IDmgr.h"
 #include "Ivy.h"
+#include "TPMcmd.h"
 #include "PossumPipe.h"
 
 
@@ -90,6 +98,587 @@ static void _init_state(CO(PossumPipe_State,S))
 
 
 /**
+ * Private function.
+ *
+ * This function is responsible for searching the list of attestable
+ * clients based on the identification challenge.
+ *
+ * \param packet	The Buffer object containing the type 1 POSSUM
+ *			packet which was received.
+ *
+ * \param token		The IDtoken object which will be loaded with
+ *			the identity token which identifies the
+ *			client.
+ *
+ * \param ivy		The identify verifier object which will be
+ *			loaded with the verifier which matches the
+ *			client.
+ *
+ * \return		A true value is used to indicate the search
+ *			for the client was successful.  A false value
+ *			is returned if the search was unsuccessful.
+ */
+
+static _Bool find_client(CO(Buffer, packet), CO(IDtoken, token), CO(Ivy, ivy))
+
+{
+	_Bool retn	 = false,
+	      changed_id = false;
+
+	size_t lp;
+
+	glob_t identities;
+
+	Buffer b,
+	       asn	= NULL,
+	       idkey	= NULL,
+	       identity = NULL;
+
+	File file = NULL;
+
+	SHA256_hmac idf = NULL;
+
+
+	/* Loop over the available identities. */
+	INIT(HurdLib, Buffer, asn, goto done);
+	INIT(HurdLib, Buffer, idkey, goto done);
+	INIT(HurdLib, Buffer, identity, goto done);
+	INIT(HurdLib, File, file, goto done);
+
+	/* Load the identity key/salt and the asserted client identity. */
+	if ( !idkey->add(idkey, packet->get(packet), NAAAIM_IDSIZE) )
+		goto done;
+	if ( !identity->add(identity, packet->get(packet) + NAAAIM_IDSIZE, \
+			    NAAAIM_IDSIZE) )
+		goto done;
+	if ( (idf = NAAAIM_SHA256_hmac_Init(idkey)) == NULL )
+		goto done;
+
+
+	/*
+	 * Extract each available identity and compute its identity
+	 * assertion against the value provided by the caller.
+	 *
+	 * The call to the glob() function is done with non-root
+	 * privileges in order to prevent the device identification
+	 * files from being incorporated in the system measurement.
+	 */
+#if 0
+	if ( setreuid(1, -1) == -1 )
+		goto done;
+	changed_id = true;
+#endif
+
+	if ( glob("/etc/conf/*.ivy", 0, NULL, &identities) != 0 )
+		goto done;
+
+	for (lp= 0; lp < identities.gl_pathc; ++lp) {
+		token->reset(token);
+		ivy->reset(ivy);
+
+		file->open_ro(file, identities.gl_pathv[lp]);
+		if ( !file->slurp(file, asn) )
+			goto done;
+		file->reset(file);
+
+		if ( !ivy->decode(ivy, asn) )
+			goto done;
+		asn->reset(asn);
+
+		/* Extract identity token. */
+		if ( (b = ivy->get_element(ivy, Ivy_id)) == NULL )
+			goto done;
+		if ( !token->decode(token, b) )
+			goto done;
+
+		if ( (b = token->get_element(token, IDtoken_orgkey)) == NULL )
+			goto done;
+		idf->add_Buffer(idf, b);
+
+		if ( (b = token->get_element(token, IDtoken_orgid)) == NULL )
+			goto done;
+		idf->add_Buffer(idf, b);
+
+		if ( !idf->compute(idf) )
+			goto done;
+
+		if ( identity->equal(identity, idf->get_Buffer(idf)) ) {
+			retn = true;
+			goto done;
+		}
+
+		idf->reset(idf);
+	}
+
+
+ done:
+	if ( changed_id ) {
+		if ( setreuid(geteuid(), -1) == -1 )
+			retn = false;
+	}
+
+	WHACK(asn);
+	WHACK(idkey);
+	WHACK(identity);
+	WHACK(file);
+	WHACK(idf);
+
+	return retn;
+}
+
+
+#if 0
+/**
+ * Private function.
+ *
+ * This function is responsible for setting the active personality in
+ * the configuration object to the identity of the counter-party
+ * which is requesting setup of the session.
+ *
+ * \param config	The configuration object which is to have its
+ *			personality configured.
+ *
+ * \param token	        The identity of the counter-party involved in
+ *			the connection.  The organizational ID of this
+ *			counter-party is used as the personality name
+ *			of the section.
+ *
+ * \return		A false value indicates the personality could
+ *			not be set or did not exist.  A true value
+ *			indicates the personality was successfuly
+ *			set.
+ */
+
+static _Bool set_counter_party_personality(CO(Config, cfg), CO(IDtoken, token))
+
+{
+	_Bool retn = false;
+
+	unsigned char *p;
+
+	char bufr[3];
+
+	size_t lp,
+	       cnt;
+
+	Buffer b;
+
+	String personality = NULL;
+
+
+	INIT(HurdLib, String, personality, goto done);
+	if ( (b = token->get_element(token, IDtoken_id)) == NULL )
+		goto done;
+
+	p   = b->get(b);
+        cnt = b->size(b);
+        for (lp= 0; lp < cnt; ++lp) {
+                snprintf(bufr, sizeof(bufr), "%02x", *p);
+                personality->add(personality, bufr);
+                ++p;
+        }
+
+	if ( cfg->set_section(cfg, personality->get(personality)) )
+		retn = true;
+
+ done:
+	WHACK(personality);
+
+	return retn;
+}
+#endif
+
+
+/**
+ * Private function.
+ *
+ * This function is responsible for generating the shared key which
+ * will be used between the client and host.
+ *
+ * The shared key is based on the following:
+ *
+ *	HMAC_dhkey(client_nonce ^ host_nonce)
+ *
+ *	Where dhkey is the shared secret generated from the Diffie-Hellman
+ *	key exchange.
+ *
+ * \param nonce1	The first nonce to be used in key generation.
+ *
+ * \param nonce2	The second nonce to be used in key generation.
+ *
+ * \param dhkey		The Diffie-Hellman key to be used in computing
+ *			the shared secret.
+
+ * \param public	The public key to be used in combination with
+ *			the public key in the dhkey parameter to generate
+ *			shared secret.
+ *
+ * \param shared	The object which the generated key is to be
+ *			loaded into.
+ *
+ * \return		A true value is used to indicate the key was
+ *			successfully generated.  A false value indicates
+ *			the key parameter does not contain a valid
+ *			value.
+ */
+
+static _Bool generate_shared_key(CO(Buffer, nonce1), CO(Buffer, nonce2),    \
+				 CO(Curve25519, dhkey), CO(Buffer, public), \
+				 CO(Buffer, shared))
+
+{
+	_Bool retn = false;
+
+	unsigned char *p,
+		      *p1;
+
+	unsigned int lp;
+
+	Buffer xor = NULL,
+	       key = NULL;
+
+	SHA256_hmac hmac;
+
+
+	/* XOR the supplied nonces. */
+	INIT(HurdLib, Buffer, xor, goto done);
+	if ( nonce1->size(nonce1) != nonce2->size(nonce2) )
+		goto done;
+	if ( !xor->add_Buffer(xor, nonce1) )
+		goto done;
+
+	p  = xor->get(xor);
+	p1 = nonce2->get(nonce2);
+	for (lp= 0; lp < xor->size(xor); ++lp) {
+		*p ^= *p1;
+		++p;
+		++p1;
+	}
+
+	/*
+	 * Generate the HMAC_SHA256 hash of the XOR'ed buffer under the
+	 * computered shared key.
+	 */
+	INIT(HurdLib, Buffer, key, goto done);
+	dhkey->compute(dhkey, public, key);
+
+	if ( (hmac = NAAAIM_SHA256_hmac_Init(key)) == NULL )
+		goto done;
+	hmac->add_Buffer(hmac, key);
+	hmac->compute(hmac);
+	if ( shared->add_Buffer(shared, hmac->get_Buffer(hmac)) )
+		retn = true;
+
+ done:
+	WHACK(xor);
+	WHACK(key);
+	WHACK(hmac);
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function waits to receive a hardware reference quote.
+ *
+ * \param duct		The network object which the reference quote is
+ *			to be received on.
+ *
+ * \param bufr		The Buffer object which is to be used to receive
+ *			the platform quote.
+ *
+ * \param ivy		The identify reference which is to be used to
+ *			verify the platform reference quote.
+ *
+ * \param nonce		The nonce which was used to create the reference.
+ *
+ * \param key		The shared key to be used to decrypt the reference
+ *			quote.
+ *
+ * \return		If the quote is received and verified a true
+ *			value is returned.  If an error is encountered a
+ *			false value is returned.
+ */
+
+static _Bool receive_platform_quote(CO(Duct, duct), CO(Buffer, bufr), \
+				    CO(Ivy, ivy), CO(Buffer, nonce),  \
+				    CO(Buffer, key))
+
+{
+	_Bool retn = false;
+
+	size_t payload;
+
+	Buffer pubkey,
+	       ref,
+	       cksum = NULL,
+	       iv    = NULL,
+	       quote = NULL;
+
+	TPMcmd tpmcmd = NULL;
+
+	AES256_cbc cipher = NULL;
+
+	SHA256_hmac hmac = NULL;
+
+
+	if ( !duct->receive_Buffer(duct, bufr) )
+		goto done;
+
+
+	INIT(HurdLib, Buffer, cksum, goto done);
+	payload = bufr->size(bufr) - 32;
+	cksum->add(cksum, bufr->get(bufr) + payload, 32);
+
+
+	if ( (hmac = NAAAIM_SHA256_hmac_Init(key)) == NULL )
+		goto done;
+	bufr->shrink(bufr, 32);
+	hmac->add_Buffer(hmac, bufr);
+	if ( !hmac->compute(hmac) )
+		goto done;
+	if ( !cksum->equal(cksum, hmac->get_Buffer(hmac)) )
+		goto done;
+
+
+	INIT(HurdLib, Buffer, iv, goto done);
+	if ( !iv->add(iv, bufr->get(bufr), 16) )
+		goto done;
+
+	if ( (cipher = NAAAIM_AES256_cbc_Init_decrypt(key, iv)) == NULL )
+		goto done;
+
+	INIT(HurdLib, Buffer, quote, goto done);
+	cksum->reset(cksum);
+	if ( !cksum->add(cksum, bufr->get(bufr) + 16, bufr->size(bufr) - 16) )
+		goto done;
+	if ( !cipher->decrypt(cipher, cksum) )
+		goto done;
+	if ( !quote->add_Buffer(quote, cipher->get_Buffer(cipher)) )
+		goto done;
+
+
+	INIT(NAAAIM, TPMcmd, tpmcmd, goto done);
+
+	if ( (pubkey = ivy->get_element(ivy, Ivy_pubkey)) == NULL )
+		goto done;
+	if ( (ref = ivy->get_element(ivy, Ivy_reference)) == NULL )
+		goto done;
+	if ( !tpmcmd->verify(tpmcmd, pubkey, ref, nonce, quote) )
+		goto done;
+
+	retn = true;
+
+
+ done:
+	WHACK(cksum);
+	WHACK(iv);
+	WHACK(quote);
+	WHACK(tpmcmd);
+	WHACK(cipher);
+	WHACK(hmac);
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function creates and sends a platform reference quote.
+ *
+ * \param duct		The network object which the reference quote is
+ *			to be sent on on.
+ *
+ * \param bufr		The Buffer object which is to be used to transmit
+ *			the platform quote.
+ *
+ * \param key		The shared key to be used to encrypt the reference
+ *			quote.
+ *
+ * \param nonce		The nonce to be used to generate the quote.
+ *
+ * \return		If the quote is received and verified a true
+ *			value is returned.  If an error is encountered a
+ *			false value is returned.
+ */
+
+static _Bool send_platform_quote(CO(Duct, duct), CO(Buffer, bufr), \
+				 CO(Buffer, key), CO(Buffer, nonce))
+
+{
+	_Bool retn = false;
+
+	Buffer b,
+	       uuid  = NULL,
+	       quote = NULL;
+
+	File aik_file = NULL;
+
+	TPMcmd tpmcmd = NULL;
+
+	AES256_cbc cipher = NULL;
+
+	RandomBuffer iv = NULL;
+
+	SHA256_hmac hmac = NULL;
+
+
+	INIT(HurdLib, File, aik_file, goto done);
+	INIT(HurdLib, Buffer, uuid, goto done);
+	aik_file->open_ro(aik_file, "/etc/conf/aik");
+	if ( !aik_file->slurp(aik_file, uuid) )
+		goto done;
+
+	INIT(NAAAIM, TPMcmd, tpmcmd, goto done);
+	INIT(HurdLib, Buffer, quote, goto done);
+	INIT(NAAAIM, RandomBuffer, iv, goto done);
+
+	if ( !tpmcmd->pcrmask(tpmcmd, 10, 15, 17, 18, -1) )
+		goto done;
+	if ( !quote->add_Buffer(quote, nonce) )
+		goto done;
+
+	if ( !tpmcmd->quote(tpmcmd, uuid, quote) )
+		goto done;
+
+	if ( !iv->generate(iv, 16) )
+		goto done;
+	b= iv->get_Buffer(iv);
+	bufr->add_Buffer(bufr, b);
+
+	if ( (cipher = NAAAIM_AES256_cbc_Init_encrypt(key, b)) == NULL )
+		goto done;
+	if ( !cipher->encrypt(cipher, quote) )
+		goto done;
+	if ( !bufr->add_Buffer(bufr, cipher->get_Buffer(cipher)) )
+		goto done;
+
+	if ( (hmac = NAAAIM_SHA256_hmac_Init(key)) == NULL )
+		goto done;
+	hmac->add_Buffer(hmac, bufr);
+	if ( !hmac->compute(hmac) )
+		goto done;
+	if ( !bufr->add_Buffer(bufr, hmac->get_Buffer(hmac)) )
+		goto done;
+
+	if ( !duct->send_Buffer(duct, bufr) )
+		goto done;
+	retn = true;
+
+
+ done:
+	WHACK(uuid);
+	WHACK(quote);
+	WHACK(aik_file);
+	WHACK(tpmcmd);
+	WHACK(iv);
+	WHACK(cipher);
+	WHACK(hmac);
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function receives and confirms a request to initiate a
+ * connection from the client.
+ *
+ * \param duct		The network object which the reference quote is
+ *			to be received on.
+ *
+ * \param bufr		The Buffer object which is to be used to receive
+ *			the initiation request.
+ *
+ * \param key		The shared key used to authenticated the request.
+ *
+ * \return		If a confirmation quote is received without
+ *			error and validated a true value is returned.  A
+ *			false value indicates the confirmation failed.
+ */
+
+static _Bool receive_connection_start(CO(Duct, duct), CO(Buffer, bufr), \
+				      CO(Buffer, key))
+
+{
+	_Bool retn = false;
+
+	size_t payload;
+
+	Buffer b,
+	       cksum = NULL,
+	       iv    = NULL;
+
+	AES256_cbc cipher = NULL;
+
+	SHA256 sha256 = NULL;
+
+	SHA256_hmac hmac = NULL;
+
+
+	/* Receive the confirmation message. */
+	if ( !duct->receive_Buffer(duct, bufr) )
+		goto done;
+
+
+	/* Validate the confirmation checksum. */
+	INIT(HurdLib, Buffer, cksum, goto done);
+	payload = bufr->size(bufr) - 32;
+	cksum->add(cksum, bufr->get(bufr) + payload, 32);
+
+	if ( (hmac = NAAAIM_SHA256_hmac_Init(key)) == NULL )
+		goto done;
+	bufr->shrink(bufr, 32);
+	hmac->add_Buffer(hmac, bufr);
+	if ( !hmac->compute(hmac) )
+		goto done;
+	if ( !cksum->equal(cksum, hmac->get_Buffer(hmac)) )
+		goto done;
+
+
+	/* Decrypt the authenticator. */
+	INIT(HurdLib, Buffer, iv, goto done);
+	if ( !iv->add(iv, bufr->get(bufr), 16) )
+		goto done;
+
+	if ( (cipher = NAAAIM_AES256_cbc_Init_decrypt(key, iv)) == NULL )
+		goto done;
+	cksum->reset(cksum);
+	if ( !cksum->add(cksum, bufr->get(bufr) + 16, bufr->size(bufr) - 16) )
+		goto done;
+	if ( !cipher->decrypt(cipher, cksum) )
+		goto done;
+
+
+	/* Confirm the authenticator. */
+	INIT(NAAAIM, SHA256, sha256, goto done);
+	sha256->add(sha256, key);
+	if ( !sha256->compute(sha256) )
+		goto done;
+	b = sha256->get_Buffer(sha256);
+	if ( !b->equal(b, cipher->get_Buffer(cipher)) )
+		goto done;
+
+	retn = true;
+
+
+ done:
+	WHACK(cksum);
+	WHACK(iv);
+	WHACK(cipher);
+	WHACK(sha256);
+	WHACK(hmac);
+
+	return retn;
+
+}
+
+
+/**
  * External public method.
  *
  * This method encapsulates all of the functionality needed to
@@ -126,7 +715,7 @@ static _Bool init_server(CO(PossumPipe, this), CO(char *, host), \
 
 	if ( !S->duct->init_server(S->duct) )
 		goto done;
-	if ( (host != NULL) & !S->duct->set_server(S->duct, host) )
+	if ( (host != NULL) && !S->duct->set_server(S->duct, host) )
 		goto done;
 	if ( !S->duct->init_port(S->duct, NULL, port) )
 		goto done;
@@ -184,16 +773,15 @@ static _Bool accept_connection(CO(PossumPipe, this))
 static _Bool start_host_mode(CO(PossumPipe, this))
 
 {
+	STATE(S);
+
 	_Bool retn = false;
 
-#if 0
-	uint32_t tspi,
-		 spi,
-		 protocol;
+	uint32_t spi;
 
 	SoftwareStatus software_status = NULL;
 
-	Duct duct = NULL;
+	Duct duct = S->duct;
 
 	Buffer b,
 	       netbufr		= NULL,
@@ -207,7 +795,7 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 	       remote_ip = NULL;
 
 	IDtoken token  = NULL;
-	
+
 	PossumPacket packet = NULL;
 
 	Curve25519 dhkey = NULL;
@@ -220,6 +808,7 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 	/* Get current software status. */
 	INIT(NAAAIM, SoftwareStatus, software_status, goto done);
 	software_status->open(software_status);
+	fputs("Measuring software status.\n", stderr);
 	if ( !software_status->measure(software_status) )
 		goto done;
 	fputs("Host software status:\n", stdout);
@@ -230,14 +819,12 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 	INIT(HurdLib, Buffer, netbufr, goto done);
 	INIT(HurdLib, Buffer, software, goto done);
 
-	INIT(NAAAIM, Duct, duct, goto done);
-	duct->init_server(duct);
-	duct->init_port(duct, NULL, 10902);
-	duct->accept_connection(duct);
-
 	/* Wait for a packet to arrive. */
-	if ( !duct->receive_Buffer(duct, netbufr) )
+	fprintf(stderr, "%s: Waiting for initialization packet.\n", __func__);
+	if ( !duct->receive_Buffer(duct, netbufr) ) {
+		fputs("Packet receive failed.\n", stderr);
 		goto done;
+	}
 	fprintf(stdout, "\n%s: Raw receive packet:\n", __func__);
 	netbufr->hprint(netbufr);
 	fputc('\n', stdout);
@@ -251,10 +838,21 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 	}
 
 	/* Set the client configuration personality. */
+#if 0
+	/*
+	 * Setting the counter party personality was only needed when
+	 * the PossumPipe object was intimately connected to establishing
+	 * an IPsec tunnel.
+	 *
+	 * A decision needs to be made as to how the remote client
+	 * is to be surfaced from this object since the remote client
+	 * is a characteristic of the connection.
+	 */
 	if ( !set_counter_party_personality(cfg, token) ) {
 		fputs("Cannot find personality.\n", stdout);
 		goto done;
 	}
+#endif
 
 	/* Verify and decode packet. */
 	if ( (b = ivy->get_element(ivy, Ivy_software)) == NULL )
@@ -309,7 +907,7 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 	idmgr->attach(idmgr);
 	if ( !idmgr->get_idtoken(idmgr, name, token) )
 		goto done;
-	
+
 	packet->reset(packet);
 	netbufr->reset(netbufr);
 
@@ -317,6 +915,7 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 	 * Check both SPI's proposed by the caller.  If neither are
 	 * available allocate an SPI from the reserve arena.
 	 */
+#if 0
 	if ( (tspi = packet->get_value(packet, PossumPacket_spi)) == 0 )
 		goto done;
 	spi = propose_spi(HOST_SPI_ARENA, tspi & UINT16_MAX);
@@ -326,6 +925,7 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 		spi = propose_spi(RESERVE_SPI_ARENA, 0);
 	if ( spi == 0 )
 		goto done;
+#endif
 
 	packet->set_schedule(packet, token, time(NULL));
 	packet->create_packet1(packet, token, dhkey, spi);
@@ -378,25 +978,14 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 		fputs("Failed connection start.\n", stderr);
 		goto done;
 	}
+
 	fputs("Have connection start.\n", stderr);
-
-	/* Create IPsec endpoint. */
-	spi	 = packet->get_value(packet, PossumPacket_spi);
-	protocol = packet->get_value(packet, PossumPacket_protocol);
-
-	INIT(HurdLib, String, remote_ip, goto done);
-	if ( !remote_ip->add(remote_ip, inet_ntoa(*(duct->get_ipv4(duct)))) )
-		goto done;
-	if ( !setup_ipsec(cfg, remote_ip->get(remote_ip), protocol, spi, \
-			  shared_key) )
-		goto done;
-
 	retn = true;
 
  done:
 	sleep(5);
+
 	WHACK(software_status);
-	WHACK(duct);
 	WHACK(netbufr);
 	WHACK(nonce);
 	WHACK(quote_nonce);
@@ -410,7 +999,7 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 	WHACK(remote_ip);
 	WHACK(idmgr);
 	WHACK(ivy);
-#endif
+
 	return retn;
 }
 
@@ -440,7 +1029,105 @@ static _Bool init_client(CO(PossumPipe, this), CO(char *, host), \
 			 const int port)
 
 {
+	STATE(S);
+
 	_Bool retn = false;
+
+
+	if ( !S->duct->init_client(S->duct) )
+		goto done;
+	if ( !S->duct->init_port(S->duct, host, 11990) )
+		goto done;
+
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function transmits confirmation for the host to move forward
+ * with the secured connection.  The confirmation consists of
+ * the SHA256 hash of the negotiated secret.
+ *
+ * \param duct		The network object which the reference quote is
+ *			to be received on.
+ *
+ * \param bufr		The Buffer object which is to be used to send the
+ *			confirmation message.
+ *
+ * \param key		The shared key used in the connextion.
+ *
+ *
+ * \return		If an error is encountered in composing or
+ *			sending the confirmation a false value is
+ *			returned.  Success is indicated by returning
+ *			true.
+ */
+
+static _Bool send_connection_start(CO(Duct, duct), CO(Buffer, bufr), \
+				   CO(Buffer, key))
+
+{
+	_Bool retn = false;
+
+	Buffer b;
+
+	AES256_cbc cipher = NULL;
+
+	RandomBuffer iv = NULL;
+
+	SHA256 sha256 = NULL;
+
+	SHA256_hmac hmac = NULL;
+
+
+	/* Generate the initialization vector. */
+	INIT(NAAAIM, RandomBuffer, iv, goto done);
+	if ( !iv->generate(iv, 16) )
+		goto done;
+	if ( !bufr->add_Buffer(bufr, iv->get_Buffer(iv)) )
+		goto done;
+
+	/* Generate the connection authenticator. */
+	INIT(NAAAIM, SHA256, sha256, goto done);
+	sha256->add(sha256, key);
+	if ( !sha256->compute(sha256) )
+		goto done;
+
+	/* Encrypt the authenticator. */
+	b = iv->get_Buffer(iv);
+	if ( (cipher = NAAAIM_AES256_cbc_Init_encrypt(key, b)) == NULL )
+		goto done;
+	if ( !cipher->encrypt(cipher, sha256->get_Buffer(sha256)) )
+		goto done;
+	if ( !bufr->add_Buffer(bufr, cipher->get_Buffer(cipher)) )
+		goto done;
+
+	/* Add the authenticator checksum. */
+	if ( (hmac = NAAAIM_SHA256_hmac_Init(key)) == NULL )
+		goto done;
+	hmac->add_Buffer(hmac, bufr);
+	if ( !hmac->compute(hmac) )
+		goto done;
+	if ( !bufr->add_Buffer(bufr, hmac->get_Buffer(hmac)) )
+		goto done;
+
+	/* Send the authenticator. */
+	if ( !duct->send_Buffer(duct, bufr) )
+		goto done;
+	retn = true;
+
+
+ done:
+	WHACK(iv);
+	WHACK(cipher);
+	WHACK(sha256);
+	WHACK(hmac);
 
 	return retn;
 }
@@ -466,17 +1153,13 @@ static _Bool init_client(CO(PossumPipe, this), CO(char *, host), \
 static _Bool start_client_mode(CO(PossumPipe, this))
 
 {
+	STATE(S);
+
 	_Bool retn = false;
 
-#if 0
-	const char *retry,
-		   *remote_ip;
+	uint32_t spi;
 
-	uint32_t spi,
-		 tspi,
-		 protocol;
-
-	Duct duct = NULL;
+	Duct duct = S->duct;
 
 	SoftwareStatus software_status = NULL;
 
@@ -519,31 +1202,6 @@ static _Bool start_client_mode(CO(PossumPipe, this))
 	if ( !software_status->measure(software_status) )
 		goto done;
 
-	/* Setup a connection to the remote host. */
-	if ( (remote_ip = cfg->get(cfg, "remote_ip")) == NULL )
-		goto done;
-	retry = cfg->get(cfg, "retry");
-
-	if ( retry != NULL ) {
-		while ( retry != NULL ) {
-			INIT(NAAAIM, Duct, duct, goto done);
-			duct->init_client(duct);
-			if ( !duct->init_port(duct, remote_ip, POSSUM_PORT) ) {
-				fputs("Retrying possum connection in " \
-				      "five seconds.\n", stderr);
-				sleep(5);
-				WHACK(duct);
-			}
-			else
-				retry = NULL;
-		}
-	} else {
-		INIT(NAAAIM, Duct, duct, goto done);
-		duct->init_client(duct);
-		if ( duct->init_port(duct, remote_ip, POSSUM_PORT) )
-			goto done;
-	}
-
 	/* Send a session initiation packet. */
 	INIT(HurdLib, Buffer, bufr, goto done);
 	INIT(HurdLib, Buffer, software, goto done);
@@ -552,10 +1210,13 @@ static _Bool start_client_mode(CO(PossumPipe, this))
 	INIT(NAAAIM, PossumPacket, packet, goto done);
 	packet->set_schedule(packet, token, time(NULL));
 	dhkey->generate(dhkey);
+
+#if 0
 	tspi = propose_spi(CLIENT_SPI_ARENA, 0);
 	spi = tspi << 16;
 	tspi = propose_spi(HOST_SPI_ARENA, 0);
 	spi = spi | tspi;
+#endif
 	packet->create_packet1(packet, token, dhkey, spi);
 
 	b = software_status->get_template_hash(software_status);
@@ -602,8 +1263,15 @@ static _Bool start_client_mode(CO(PossumPipe, this))
 		goto done;
 
 	/* Set the host configuration personality. */
+
+#if 0
+	/*
+	 * See comments above in host_mode() as to disposition of this
+	 * function
+	 */
 	if ( !set_counter_party_personality(cfg, token) )
 	     goto done;
+#endif
 
 	software->reset(software);
 	if ( (b = ivy->get_element(ivy, Ivy_software)) == NULL )
@@ -656,16 +1324,9 @@ static _Bool start_client_mode(CO(PossumPipe, this))
 	if ( !send_connection_start(duct, bufr, shared_key) )
 		goto done;
 
-	/* Initiate IPsec link. */
-	spi	 = packet->get_value(packet, PossumPacket_spi);
-	protocol = packet->get_value(packet, PossumPacket_protocol);
-	if ( !setup_ipsec(cfg, remote_ip, protocol, spi, shared_key) )
-		goto done;
-
 	retn = true;
 
  done:
-	WHACK(duct);
 	WHACK(software_status);
 	WHACK(nonce);
 	WHACK(quote_nonce);
@@ -678,7 +1339,7 @@ static _Bool start_client_mode(CO(PossumPipe, this))
 	WHACK(shared_key);
 	WHACK(name);
 	WHACK(ivy);
-#endif
+
 	return retn;
 }
 
@@ -703,7 +1364,7 @@ static void whack(CO(PossumPipe, this))
 	return;
 }
 
-	
+
 /**
  * External constructor call.
  *
