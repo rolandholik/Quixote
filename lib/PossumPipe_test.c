@@ -89,6 +89,8 @@ extern int main(int argc, char *argv[])
 			fputs("Startup of host mode failed.\n", stderr);
 			goto done;
 		}
+
+		fputs("Host mode ok.\n", stderr);
 	}
 
 

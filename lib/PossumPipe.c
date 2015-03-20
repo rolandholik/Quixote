@@ -74,6 +74,10 @@ struct NAAAIM_PossumPipe_State
 
 	/* Network connection object. */
 	Duct duct;
+
+	/* Shared secrets. */
+	SHA256 shared1;
+	SHA256 shared2;
 };
 
 
@@ -290,18 +294,26 @@ static _Bool set_counter_party_personality(CO(Config, cfg), CO(IDtoken, token))
 
 
 /**
- * Private function.
+ * Private method.
  *
- * This function is responsible for generating the shared key which
- * will be used between the client and host.
+ * This function is responsible for generating the shared keys which
+ * will be used to generate to generate.  Two separate schedules are
+ * generated.
  *
- * The shared key is based on the following:
+ * The first is based on the following:
  *
- *	HMAC_dhkey(client_nonce ^ host_nonce)
+ *	Shared1 = sha256(HMAC_dhkey(client_nonce ^ host_nonce))
+ *
+ *	Shared2 = sha256(HMAC_dhkey(host_nonce || client_nonce))
  *
  *	Where dhkey is the shared secret generated from the Diffie-Hellman
  *	key exchange.
  *
+ * The two shared keys are stored in the object state for subsequent
+ * generation of the encryption and authentication keys.
+ *
+ * \param this		The object whose shared keys are to be generated.
+
  * \param nonce1	The first nonce to be used in key generation.
  *
  * \param nonce2	The second nonce to be used in key generation.
@@ -313,20 +325,18 @@ static _Bool set_counter_party_personality(CO(Config, cfg), CO(IDtoken, token))
  *			the public key in the dhkey parameter to generate
  *			shared secret.
  *
- * \param shared	The object which the generated key is to be
- *			loaded into.
- *
- * \return		A true value is used to indicate the key was
+ * \return		A true value is used to indicate the keys were
  *			successfully generated.  A false value indicates
- *			the key parameter does not contain a valid
- *			value.
+ *			that key generation failed.
  */
 
-static _Bool generate_shared_key(CO(Buffer, nonce1), CO(Buffer, nonce2),    \
-				 CO(Curve25519, dhkey), CO(Buffer, public), \
-				 CO(Buffer, shared))
+static _Bool generate_shared_keys(CO(PossumPipe, this), CO(Buffer, nonce1),   \
+				  CO(Buffer, nonce2),  CO(Curve25519, dhkey), \
+				  CO(Buffer, public))
 
 {
+	STATE(S);
+
 	_Bool retn = false;
 
 	unsigned char *p,
@@ -337,7 +347,30 @@ static _Bool generate_shared_key(CO(Buffer, nonce1), CO(Buffer, nonce2),    \
 	Buffer xor = NULL,
 	       key = NULL;
 
+	SHA256 sha256 = NULL;
+
 	SHA256_hmac hmac;
+
+
+	/* Compute the shared secret and initialize the HMAC. */
+	INIT(HurdLib, Buffer, key, goto done);
+	dhkey->compute(dhkey, public, key);
+
+	if ( (hmac = NAAAIM_SHA256_hmac_Init(key)) == NULL )
+		goto done;
+
+	/*
+	 * Generate the HMACsha256 hash of the inverted concantenated
+	 * nonces and then hash the output so it is ready for use.
+	 */
+	hmac->add_Buffer(hmac, nonce2);
+	hmac->add_Buffer(hmac, nonce1);
+	if ( !hmac->compute(hmac) )
+		goto done;
+
+	S->shared1->add(S->shared1, hmac->get_Buffer(hmac));
+	if ( !S->shared1->compute(S->shared1) )
+		goto done;
 
 
 	/* XOR the supplied nonces. */
@@ -356,22 +389,25 @@ static _Bool generate_shared_key(CO(Buffer, nonce1), CO(Buffer, nonce2),    \
 	}
 
 	/*
-	 * Generate the HMAC_SHA256 hash of the XOR'ed buffer under
+	 * Generate the HMACsha256 hash of the XOR'ed buffer under
 	 * the ECDH generated key.
 	 */
-	INIT(HurdLib, Buffer, key, goto done);
-	dhkey->compute(dhkey, public, key);
-
-	if ( (hmac = NAAAIM_SHA256_hmac_Init(key)) == NULL )
-		goto done;
+	hmac->reset(hmac);
 	hmac->add_Buffer(hmac, xor);
-	hmac->compute(hmac);
-	if ( shared->add_Buffer(shared, hmac->get_Buffer(hmac)) )
-		retn = true;
+	if ( !hmac->compute(hmac) )
+		goto done;
+
+	S->shared2->add(S->shared2, hmac->get_Buffer(hmac));
+	if ( !S->shared2->compute(S->shared2) )
+		goto done;
+
+	retn = true;
+
 
  done:
 	WHACK(xor);
 	WHACK(key);
+	WHACK(sha256);
 	WHACK(hmac);
 
 	return retn;
@@ -379,12 +415,13 @@ static _Bool generate_shared_key(CO(Buffer, nonce1), CO(Buffer, nonce2),    \
 
 
 /**
- * Private function.
+ * Private method.
  *
- * This function waits to receive a hardware reference quote.
+ * This method receives and authenticates the hardware reference
+ * quote.
  *
- * \param duct		The network object which the reference quote is
- *			to be received on.
+ * \param this		The object which is to receive the hardware
+ *			reference quote.
  *
  * \param bufr		The Buffer object which is to be used to receive
  *			the platform quote.
@@ -394,25 +431,24 @@ static _Bool generate_shared_key(CO(Buffer, nonce1), CO(Buffer, nonce2),    \
  *
  * \param nonce		The nonce which was used to create the reference.
  *
- * \param key		The shared key to be used to decrypt the reference
- *			quote.
- *
  * \return		If the quote is received and verified a true
  *			value is returned.  If an error is encountered a
  *			false value is returned.
  */
 
-static _Bool receive_platform_quote(CO(Duct, duct), CO(Buffer, bufr), \
-				    CO(Ivy, ivy), CO(Buffer, nonce),  \
-				    CO(Buffer, key))
+static _Bool receive_platform_quote(CO(PossumPipe, this), CO(Buffer, bufr), \
+				    CO(Ivy, ivy), CO(Buffer, nonce))
 
 {
+	STATE(S);
+
 	_Bool retn = false;
 
 	size_t payload;
 
 	Buffer pubkey,
 	       ref,
+	       key   = S->shared2->get_Buffer(S->shared2),
 	       cksum = NULL,
 	       iv    = NULL,
 	       quote = NULL;
@@ -424,7 +460,7 @@ static _Bool receive_platform_quote(CO(Duct, duct), CO(Buffer, bufr), \
 	SHA256_hmac hmac = NULL;
 
 
-	if ( !duct->receive_Buffer(duct, bufr) )
+	if ( !S->duct->receive_Buffer(S->duct, bufr) )
 		goto done;
 
 
@@ -447,7 +483,8 @@ static _Bool receive_platform_quote(CO(Duct, duct), CO(Buffer, bufr), \
 	if ( !iv->add(iv, bufr->get(bufr), 16) )
 		goto done;
 
-	if ( (cipher = NAAAIM_AES256_cbc_Init_decrypt(key, iv)) == NULL )
+	if ( (cipher = NAAAIM_AES256_cbc_Init_decrypt(key, iv)) \
+	     == NULL )
 		goto done;
 
 	INIT(HurdLib, Buffer, quote, goto done);
@@ -485,12 +522,11 @@ static _Bool receive_platform_quote(CO(Duct, duct), CO(Buffer, bufr), \
 
 
 /**
- * Private function.
+ * Private method.
  *
- * This function creates and sends a platform reference quote.
+ * This method creates and sends a platform reference quote.
  *
- * \param duct		The network object which the reference quote is
- *			to be sent on on.
+ * \param this		The object which is to send the reference quote.
  *
  * \param bufr		The Buffer object which is to be used to transmit
  *			the platform quote.
@@ -505,13 +541,18 @@ static _Bool receive_platform_quote(CO(Duct, duct), CO(Buffer, bufr), \
  *			false value is returned.
  */
 
-static _Bool send_platform_quote(CO(Duct, duct), CO(Buffer, bufr), \
-				 CO(Buffer, key), CO(Buffer, nonce))
+static _Bool send_platform_quote(CO(PossumPipe, this), CO(Buffer, bufr), \
+				 CO(Buffer, nonce))
 
 {
+	STATE(S);
+
 	_Bool retn = false;
 
+	Duct duct = S->duct;
+
 	Buffer b,
+	       key   = S->shared2->get_Buffer(S->shared2),
 	       uuid  = NULL,
 	       quote = NULL;
 
@@ -583,33 +624,36 @@ static _Bool send_platform_quote(CO(Duct, duct), CO(Buffer, bufr), \
 
 
 /**
- * Private function.
+ * Private method.
  *
  * This function receives and confirms a request to initiate a
  * connection from the client.
  *
- * \param duct		The network object which the reference quote is
- *			to be received on.
+ * \param this	The object which is to receive the connection start.
  *
- * \param bufr		The Buffer object which is to be used to receive
- *			the initiation request.
+ * \param bufr	The Buffer object which is to be used to receive
+ *		the initiation request.
  *
- * \param key		The shared key used to authenticated the request.
+ * \param key	The shared key used to authenticated the request.
  *
- * \return		If a confirmation quote is received without
- *			error and validated a true value is returned.  A
- *			false value indicates the confirmation failed.
+ * \return	If a confirmation quote is received without
+ *		error and validated a true value is returned.  A
+ *		false value indicates the confirmation failed.
  */
 
-static _Bool receive_connection_start(CO(Duct, duct), CO(Buffer, bufr), \
-				      CO(Buffer, key))
+static _Bool receive_connection_start(CO(PossumPipe, this), CO(Buffer, bufr))
 
 {
+	STATE(S);
+
 	_Bool retn = false;
 
 	size_t payload;
 
+	Duct duct = S->duct;
+
 	Buffer b,
+	       key   = S->shared2->get_Buffer(S->shared2),
 	       cksum = NULL,
 	       iv    = NULL;
 
@@ -788,8 +832,7 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 	       nonce		= NULL,
 	       quote_nonce	= NULL,
 	       software		= NULL,
-	       public		= NULL,
-	       shared_key	= NULL;
+	       public		= NULL;
 
 	String name	 = NULL,
 	       remote_ip = NULL;
@@ -946,22 +989,20 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 	packet->print(packet);
 	fputc('\n', stdout);
 
-	INIT(HurdLib, Buffer, shared_key, goto done);
 	if ( (b = packet->get_element(packet, PossumPacket_replay_nonce)) \
 	     == NULL )
 		goto done;
-	if ( !generate_shared_key(b, nonce, dhkey, public, shared_key) )
+	if ( !generate_shared_keys(this, b, nonce, dhkey, public) ) {
+		fputs("Failed key generation.\n", stderr);
 		goto done;
-	fprintf(stdout, "%s: shared key:\n", __func__);
-	shared_key->print(shared_key);
-	fputc('\n', stdout);
+	}
 
 	/* Wait for platform verification reference quote. */
 	netbufr->reset(netbufr);
 	if ( (b = packet->get_element(packet, PossumPacket_quote_nonce)) == \
 	     NULL )
 		goto done;
-	if ( !receive_platform_quote(duct, netbufr, ivy, b, shared_key ) )
+	if ( !receive_platform_quote(this, netbufr, ivy, b) )
 		goto done;
 	fputs("\nVerified secure counter-party:\n", stdout);
 	ivy->print(ivy);
@@ -969,17 +1010,22 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 
 	/* Send platform verification quote. */
 	netbufr->reset(netbufr);
-	if ( !send_platform_quote(duct, netbufr, shared_key, quote_nonce) )
+	if ( !send_platform_quote(this, netbufr, quote_nonce) )
 		goto done;
 
 	/* Get connection confirmation start. */
 	netbufr->reset(netbufr);
-	if ( !receive_connection_start(duct, netbufr, shared_key) ) {
+	if ( !receive_connection_start(this, netbufr) ) {
 		fputs("Failed connection start.\n", stderr);
 		goto done;
 	}
 
-	fputs("Have connection start.\n", stderr);
+	fputs("Shared 1:\n", stderr);
+	S->shared1->print(S->shared1);
+	fputs("Shared 2:\n", stderr);
+	S->shared2->print(S->shared2);
+	fputc('\n', stderr);
+
 	retn = true;
 
  done:
@@ -994,7 +1040,6 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 	WHACK(token);
 	WHACK(packet);
 	WHACK(dhkey);
-	WHACK(shared_key);
 	WHACK(name);
 	WHACK(remote_ip);
 	WHACK(idmgr);
@@ -1069,13 +1114,17 @@ static _Bool init_client(CO(PossumPipe, this), CO(char *, host), \
  *			true.
  */
 
-static _Bool send_connection_start(CO(Duct, duct), CO(Buffer, bufr), \
-				   CO(Buffer, key))
+static _Bool send_connection_start(CO(PossumPipe, this), CO(Buffer, bufr))
 
 {
+	STATE(S);
+
 	_Bool retn = false;
 
-	Buffer b;
+	Buffer b,
+	       key = S->shared2->get_Buffer(S->shared2);
+
+	Duct duct = S->duct;
 
 	AES256_cbc cipher = NULL;
 
@@ -1120,6 +1169,7 @@ static _Bool send_connection_start(CO(Duct, duct), CO(Buffer, bufr), \
 	/* Send the authenticator. */
 	if ( !duct->send_Buffer(duct, bufr) )
 		goto done;
+
 	retn = true;
 
 
@@ -1168,8 +1218,7 @@ static _Bool start_client_mode(CO(PossumPipe, this))
 	       nonce	   = NULL,
 	       quote_nonce = NULL,
 	       software	   = NULL,
-	       bufr	   = NULL,
-	       shared_key  = NULL;
+	       bufr	   = NULL;
 
 	String name = NULL;
 
@@ -1295,25 +1344,20 @@ static _Bool start_client_mode(CO(PossumPipe, this))
 	if ( !bufr->add_Buffer(bufr, b) )
 		goto done;
 
-	INIT(HurdLib, Buffer, shared_key, goto done);
-	if ( !generate_shared_key(bufr, nonce, dhkey, public, shared_key) )
+	if ( !generate_shared_keys(this, bufr, nonce, dhkey, public) )
 		goto done;
-	fprintf(stdout, "%s: shared key:\n", __func__);
-	shared_key->print(shared_key);
-	fputc('\n', stdout);
 
 	/* Send platform reference. */
 	if ( (b = packet->get_element(packet, PossumPacket_quote_nonce)) \
 	     == NULL )
 		goto done;
 	bufr->reset(bufr);
-	if ( !send_platform_quote(duct, bufr, shared_key, b) )
+	if ( !send_platform_quote(this, bufr, b) )
 		goto done;
 
 	/* Receive platform reference. */
 	bufr->reset(bufr);
-	if ( !receive_platform_quote(duct, bufr, ivy, quote_nonce, \
-				     shared_key) )
+	if ( !receive_platform_quote(this, bufr, ivy, quote_nonce) )
 		goto done;
 	fputs("\nVerified secure host:\n", stderr);
 	ivy->print(ivy);
@@ -1321,8 +1365,14 @@ static _Bool start_client_mode(CO(PossumPipe, this))
 
 	/* Send initiation packet. */
 	bufr->reset(bufr);
-	if ( !send_connection_start(duct, bufr, shared_key) )
+	if ( !send_connection_start(this, bufr) )
 		goto done;
+
+	fputs("Shared 1:\n", stderr);
+	S->shared1->print(S->shared1);
+	fputs("Shared 2:\n", stderr);
+	S->shared2->print(S->shared2);
+	fputc('\n', stderr);
 
 	retn = true;
 
@@ -1336,7 +1386,6 @@ static _Bool start_client_mode(CO(PossumPipe, this))
 	WHACK(token);
 	WHACK(dhkey);
 	WHACK(packet);
-	WHACK(shared_key);
 	WHACK(name);
 	WHACK(ivy);
 
@@ -1359,6 +1408,9 @@ static void whack(CO(PossumPipe, this))
 
 
 	S->duct->whack(S->duct);
+
+	S->shared1->whack(S->shared1);
+	S->shared2->whack(S->shared2);
 
 	S->root->whack(S->root, this, S);
 	return;
@@ -1397,7 +1449,9 @@ extern PossumPipe NAAAIM_PossumPipe_Init(void)
 	this->state->root = root;
 
 	/* Initialize aggregate objects. */
-	INIT(NAAAIM, Duct, this->state->duct, goto fail);
+	INIT(NAAAIM, Duct,   this->state->duct,	   goto fail);
+	INIT(NAAAIM, SHA256, this->state->shared1, goto fail);
+	INIT(NAAAIM, SHA256, this->state->shared2, goto fail);
 
 	/* Initialize object state. */
 	_init_state(this->state);
