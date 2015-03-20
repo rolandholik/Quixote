@@ -356,15 +356,15 @@ static _Bool generate_shared_key(CO(Buffer, nonce1), CO(Buffer, nonce2),    \
 	}
 
 	/*
-	 * Generate the HMAC_SHA256 hash of the XOR'ed buffer under the
-	 * computered shared key.
+	 * Generate the HMAC_SHA256 hash of the XOR'ed buffer under
+	 * the ECDH generated key.
 	 */
 	INIT(HurdLib, Buffer, key, goto done);
 	dhkey->compute(dhkey, public, key);
 
 	if ( (hmac = NAAAIM_SHA256_hmac_Init(key)) == NULL )
 		goto done;
-	hmac->add_Buffer(hmac, key);
+	hmac->add_Buffer(hmac, xor);
 	hmac->compute(hmac);
 	if ( shared->add_Buffer(shared, hmac->get_Buffer(hmac)) )
 		retn = true;
