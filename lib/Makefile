@@ -78,7 +78,7 @@ IPC_test: IPC_test.o IPC.o
 PossumPipe_test: PossumPipe_test.o PossumPipe.o ../SHA256.o ../SHA256_hmac.o \
 	../AES256_cbc.o ../RandomBuffer.o ../IDtoken.o
 	${CC} ${LDFLAGS} -o $@ $^ -L . -lNAAAIM -L../HurdLib -lHurdLib \
-	-lrt -ltspi;
+	${SSL_LIBRARY} -lrt -ltspi;
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};
