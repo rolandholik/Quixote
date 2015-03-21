@@ -338,6 +338,81 @@ static _Bool rehash(const SHA256 const this, unsigned int cnt)
 /**
  * External public method.
  *
+ * This method implements extending the current hash value of the
+ * object with the supplied material.  The strategy is to compute
+ * the hash of the supplied material and concantenate the hash
+ * to the current hash with subseqent re-hashing of the combined
+ * value.
+ *
+ * The gotal of this is to implement the equivalent of a TPM PCR
+ * register extension.
+ *
+ * \param this	A pointer to the digest object whose value is to be
+ *		extended.
+ *
+ * \param bufr	The object containing the data to extend the hash
+ *		with.
+ *
+ * \return	A boolean value is used to indicate success or failure
+ *		of the extension sequence.
+ */
+
+static _Bool extend(const SHA256 const this, const Buffer const bufr)
+
+{
+	const SHA256_State const S = this->state;
+
+	_Bool retn = false;
+
+	unsigned char buffer[EVP_MD_size(S->digest)];
+
+	unsigned int size;
+
+
+	if ( S->poisoned )
+		goto done;
+	if ( !S->computed )
+		goto done;
+	if ( (bufr == NULL) || bufr->poisoned(bufr) )
+		goto done;
+
+
+	/* Hash the supplied material. */
+	if ( !EVP_DigestInit_ex(&S->context, S->digest, NULL) )
+		goto done;
+	if ( !EVP_DigestUpdate(&S->context, bufr->get(bufr), \
+			       bufr->size(bufr)) )
+		goto done;
+	if ( !EVP_DigestFinal_ex(&S->context, buffer, &size) )
+		goto done;
+
+	if ( !S->buffer->add(S->buffer, buffer, size) )
+		goto done;
+
+
+	/* Hash the current buffer contents. */
+	S->computed    = false;
+	S->initialized = false;
+
+	add(this, S->buffer);
+	S->buffer->reset(S->buffer);
+	if ( !compute(this) )
+		goto done;
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements resetting the hash in preparation for computation
  * of another element.  It flags the digest to be re-initialized and
  * clears the current digest Buffer.
@@ -517,6 +592,7 @@ extern SHA256 NAAAIM_SHA256_Init(void)
 	this->add	 = add;
 	this->compute	 = compute;
 	this->rehash	 = rehash;
+	this->extend	 = extend;
 	this->reset	 = reset;
 	this->get   	 = get;
 	this->get_Buffer = get_Buffer;

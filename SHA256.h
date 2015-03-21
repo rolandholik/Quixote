@@ -30,6 +30,7 @@ struct NAAAIM_SHA256
 	_Bool (*add)(const SHA256, const Buffer);
 	_Bool (*compute)(const SHA256);
 	_Bool (*rehash)(const SHA256, unsigned int);
+	_Bool (*extend)(const SHA256, const Buffer);
 	void (*reset)(const SHA256);
 	unsigned char * (*get)(const SHA256);
 	Buffer (*get_Buffer)(const SHA256);
