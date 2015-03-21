@@ -86,6 +86,9 @@ struct NAAAIM_PossumPipe_State
 	/* Shared secrets. */
 	SHA256 shared1;
 	SHA256 shared2;
+
+	/* Remote software status. */
+	Buffer software;
 };
 
 
@@ -121,6 +124,8 @@ static void _init_state(CO(PossumPipe_State,S))
 {
 	S->libid = NAAAIM_LIBID;
 	S->objid = NAAAIM_PossumPipe_OBJID;
+
+	S->software = NULL;
 
 	return;
 }
@@ -256,6 +261,9 @@ static _Bool accept_connection(CO(PossumPipe, this))
  * \param bufr		The object containing the payload on which the
  *			checksum is to be computed.
  *
+ * \param software	The buffer containing the software checksum to
+ *			be used to generate the authentication key.
+ *
  * \param chksum	The object which will contain the checksum.
  *
  * \return		A boolean value is returned to indicate the
@@ -267,7 +275,7 @@ static _Bool accept_connection(CO(PossumPipe, this))
  */
 
 static _Bool _compute_checksum(CO(PossumPipe_State, S), CO(Buffer, payload), \
-			       CO(Buffer, chksum))
+			       CO(Buffer, software), CO(Buffer, chksum))
 
 {
 	_Bool retn = false;
@@ -285,7 +293,7 @@ static _Bool _compute_checksum(CO(PossumPipe_State, S), CO(Buffer, payload), \
 	if ( (chksum == NULL) || chksum->poisoned(chksum) )
 		goto done;
 
-	/* Extract the keying material for the checksum. */
+	/* Generate the key for the checksum. */
 	INIT(HurdLib, Buffer, key, goto done);
 
 	if ( b->size(b) <= IV_SIZE )
@@ -294,9 +302,21 @@ static _Bool _compute_checksum(CO(PossumPipe_State, S), CO(Buffer, payload), \
 	if ( !key->add(key, p, b->size(b) - IV_SIZE) )
 		goto done;
 
-	/* Compute the checksum over the packet payload. */
 	if ( (hmac = NAAAIM_SHA256_hmac_Init(key)) == NULL )
 		goto done;
+	hmac->add_Buffer(hmac, software);
+	if ( !hmac->compute(hmac) )
+		goto done;
+
+	key->reset(key);
+	if ( !key->add_Buffer(key, hmac->get_Buffer(hmac)) )
+	     goto done;
+	fputs("Checksum key:\n", stderr);
+	key->print(key);
+
+
+	/* Compute the checksum over the packet payload with the key. */
+	hmac->reset(hmac);
 	hmac->add_Buffer(hmac, payload);
 	if ( !hmac->compute(hmac) )
 		goto done;
@@ -359,7 +379,7 @@ static _Bool _verify_checksum(CO(PossumPipe_State, S), CO(Buffer, packet))
 
 	/* Compute the checksum over the packet body. */
 	INIT(HurdLib, Buffer, computed, goto done);
-	if ( !_compute_checksum(S, packet, computed) )
+	if ( !_compute_checksum(S, packet, S->software, computed) )
 		goto done;
 	if ( !incoming->equal(incoming, computed) )
 		goto done;
@@ -477,7 +497,10 @@ static _Bool send_packet(CO(PossumPipe, this), const PossumPipe_type type, \
 
 	possum_packet *packet = NULL;
 
-	Buffer chksum = NULL;
+	Buffer b,
+	       chksum = NULL;
+
+	SoftwareStatus software = NULL;
 
 
 	if ( S->poisoned )
@@ -503,14 +526,23 @@ static _Bool send_packet(CO(PossumPipe, this), const PossumPipe_type type, \
 		goto done;
 
 	/* Encrypt the buffer contents and add an authentication checksum. */
+	INIT(NAAAIM, SoftwareStatus, software, goto done);
+	if ( !software->open(software) )
+		goto done;
+	if ( !software->measure(software) )
+		goto done;
+	b = software->get_template_hash(software);
+
 	INIT(HurdLib, Buffer, chksum, goto done);
 	if ( !_encrypt_packet(S, bufr) )
 		goto done;
-	if ( !_compute_checksum(S, bufr, chksum) )
-		goto done;
-	if ( !S->shared1->rehash(S->shared1, 1) )
+
+	if ( !_compute_checksum(S, bufr, b, chksum) )
 		goto done;
 	bufr->add_Buffer(bufr, chksum);
+
+	if ( !S->shared1->rehash(S->shared1, 1) )
+		goto done;
 
 	/* Send the processed buffer. */
 	if ( !S->duct->send_Buffer(S->duct, bufr) )
@@ -521,6 +553,7 @@ static _Bool send_packet(CO(PossumPipe, this), const PossumPipe_type type, \
 
  done:
 	WHACK(chksum);
+	WHACK(software);
 
 	if ( !retn )
 		S->poisoned = true;
@@ -1333,7 +1366,6 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 	       netbufr		= NULL,
 	       nonce		= NULL,
 	       quote_nonce	= NULL,
-	       software		= NULL,
 	       public		= NULL;
 
 	String name	 = NULL,
@@ -1362,7 +1394,7 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 
 	/* Setup the network port. */
 	INIT(HurdLib, Buffer, netbufr, goto done);
-	INIT(HurdLib, Buffer, software, goto done);
+	INIT(HurdLib, Buffer, S->software, goto done);
 
 	/* Wait for a packet to arrive. */
 	fprintf(stderr, "%s: Waiting for initialization packet.\n", __func__);
@@ -1402,13 +1434,13 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 	/* Verify and decode packet. */
 	if ( (b = ivy->get_element(ivy, Ivy_software)) == NULL )
 		goto done;
-	software->add_Buffer(software, b);
+	S->software->add_Buffer(S->software, b);
 	fputs("Client software:\n", stdout);
-	software->print(software);
+	S->software->print(S->software);
 	fputc('\n', stdout);
 
 	INIT(NAAAIM, PossumPacket, packet, goto done);
-	if ( !packet->decode_packet1(packet, token, software, netbufr) )
+	if ( !packet->decode_packet1(packet, token, S->software, netbufr) )
 		goto done;
 	fprintf(stdout, "%s: Incoming client packet 1:\n", __func__);
 	packet->print(packet);
@@ -1477,13 +1509,11 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 
 	/* Reset the section back to the original. */
 	b = software_status->get_template_hash(software_status);
-	software->reset(software);
-	software->add_Buffer(software, b);
 	fputs("Local software status:\n", stdout);
-	software->print(software);
+	b->print(b);
 	fputc('\n', stdout);
 
-	if ( !packet->encode_packet1(packet, software, netbufr) )
+	if ( !packet->encode_packet1(packet, b, netbufr) )
 		goto done;
 	if ( !duct->send_Buffer(duct, netbufr) )
 		goto done;
@@ -1535,7 +1565,6 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 	WHACK(netbufr);
 	WHACK(nonce);
 	WHACK(quote_nonce);
-	WHACK(software);
 	WHACK(public);
 	WHACK(token);
 	WHACK(packet);
@@ -1674,7 +1703,6 @@ static _Bool start_client_mode(CO(PossumPipe, this))
 	       public,
 	       nonce	   = NULL,
 	       quote_nonce = NULL,
-	       software	   = NULL,
 	       bufr	   = NULL;
 
 	String name = NULL;
@@ -1710,7 +1738,7 @@ static _Bool start_client_mode(CO(PossumPipe, this))
 
 	/* Send a session initiation packet. */
 	INIT(HurdLib, Buffer, bufr, goto done);
-	INIT(HurdLib, Buffer, software, goto done);
+
 	INIT(NAAAIM, Curve25519, dhkey, goto done);
 
 	INIT(NAAAIM, PossumPacket, packet, goto done);
@@ -1728,8 +1756,7 @@ static _Bool start_client_mode(CO(PossumPipe, this))
 	b = software_status->get_template_hash(software_status);
 	fputs("Software status:\n", stdout);
 	b->print(b);
-	software->add_Buffer(software, b);
-	if ( !packet->encode_packet1(packet, software, bufr) )
+	if ( !packet->encode_packet1(packet, b, bufr) )
 		goto done;
 	if ( !duct->send_Buffer(duct, bufr) )
 		goto done;
@@ -1779,11 +1806,11 @@ static _Bool start_client_mode(CO(PossumPipe, this))
 	     goto done;
 #endif
 
-	software->reset(software);
+	INIT(HurdLib, Buffer, S->software, goto done);
 	if ( (b = ivy->get_element(ivy, Ivy_software)) == NULL )
 		goto done;
-	software->add_Buffer(software, b);
-	if ( !packet->decode_packet1(packet, token, software, bufr) )
+	S->software->add_Buffer(S->software, b);
+	if ( !packet->decode_packet1(packet, token, S->software, bufr) )
 		goto done;
 
 	fprintf(stdout, "%s: Received host packet 1.\n", __func__);
@@ -1837,7 +1864,6 @@ static _Bool start_client_mode(CO(PossumPipe, this))
 	WHACK(software_status);
 	WHACK(nonce);
 	WHACK(quote_nonce);
-	WHACK(software);
 	WHACK(bufr);
 	WHACK(idmgr);
 	WHACK(token);
@@ -1868,6 +1894,8 @@ static void whack(CO(PossumPipe, this))
 
 	S->shared1->whack(S->shared1);
 	S->shared2->whack(S->shared2);
+
+	S->software->whack(S->software);
 
 	S->root->whack(S->root, this, S);
 	return;
