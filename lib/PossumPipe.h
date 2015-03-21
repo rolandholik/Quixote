@@ -21,6 +21,17 @@ typedef struct NAAAIM_PossumPipe * PossumPipe;
 typedef struct NAAAIM_PossumPipe_State * PossumPipe_State;
 
 /**
+ * Enumerated definitions for packet types.
+ */
+typedef enum {
+	PossumPipe_failure,
+	PossumPipe_error,
+	PossumPipe_setup,
+	PossumPipe_data,
+	PossumPipe_rekey
+} PossumPipe_type;
+
+/**
  * External PossumPipe object representation.
  */
 struct NAAAIM_PossumPipe
@@ -33,6 +44,9 @@ struct NAAAIM_PossumPipe
 
 	_Bool (*start_host_mode)(const PossumPipe);
 	_Bool (*start_client_mode)(const PossumPipe);
+
+	_Bool (*send_packet)(const PossumPipe, PossumPipe_type, const Buffer);
+	PossumPipe_type (*receive_packet)(const PossumPipe, const Buffer);
 
 	void (*whack)(const PossumPipe);
 

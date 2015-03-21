@@ -20,6 +20,9 @@
 #include <time.h>
 #include <glob.h>
 
+#include <openssl/asn1.h>
+#include <openssl/asn1t.h>
+
 #include <Origin.h>
 #include <HurdLib.h>
 #include <Config.h>
@@ -82,6 +85,23 @@ struct NAAAIM_PossumPipe_State
 
 
 /**
+ * The following definitions define the ASN1 encoding sequence for
+ * the DER encoding of the packet which is transmitted over the wire.
+ */
+typedef struct {
+	ASN1_INTEGER *type;
+	ASN1_OCTET_STRING *payload;
+} possum_packet;
+
+ASN1_SEQUENCE(possum_packet) = {
+	ASN1_SIMPLE(possum_packet, type,    ASN1_INTEGER),
+	ASN1_SIMPLE(possum_packet, payload, ASN1_OCTET_STRING),
+} ASN1_SEQUENCE_END(possum_packet)
+
+IMPLEMENT_ASN1_FUNCTIONS(possum_packet)
+
+
+/**
  * Internal private method.
  *
  * This method is responsible for initializing the NAAAIM_PossumPipe_State
@@ -98,6 +118,279 @@ static void _init_state(CO(PossumPipe_State,S))
 	S->objid = NAAAIM_PossumPipe_OBJID;
 
 	return;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method encapsulates all of the functionality needed to
+ * initiate a PossumPipe running in server mode.
+ *
+ * \param this		A pointer to the object which is to be initialized
+ *			as a server.
+ *
+ * \param host		The name or ID address of the interface which
+ *			the server is to listen on.
+ *
+ * \param port		The port number which the server is to listen on.
+ *
+ * \param do_reverse	A flag to indicate whether or not reverse DNS
+ *			lookups are to be done on the incoming connection.
+ *			A false value inhibits reverse DNS lookups while
+ *			a true value (default).
+ *
+ * \return		A boolean value is returned to indicate the
+ *			status of the server setup.  A false value
+ *			indicates that connection setup failed while a
+ *			true value indicates the server is listening
+ *			for connections.
+ */
+
+static _Bool init_server(CO(PossumPipe, this), CO(char *, host), \
+			 const int port, const _Bool do_reverse)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	if ( !S->duct->init_server(S->duct) )
+		goto done;
+	if ( (host != NULL) && !S->duct->set_server(S->duct, host) )
+		goto done;
+	if ( !S->duct->init_port(S->duct, NULL, port) )
+		goto done;
+	S->duct->do_reverse(S->duct, do_reverse);
+
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method encapsulates the functionality needed to initiate the
+ * client side of a PossumPipe connection.
+ *
+ * \param this		A pointer to the object which is to be initialized
+ *			as a client.
+ *
+ * \param host		The name or ID address of the server to be
+ *			connected to.
+ *
+ * \param port		The port number on the server to which the
+ *			connection is to be initiatedto.
+ *
+ * \return		A boolean value is returned to indicate the
+ *			status of the connection.  A false value denotes
+ *			connection setup failed while a true value
+ *			indicates the setup was successful.
+ */
+
+static _Bool init_client(CO(PossumPipe, this), CO(char *, host), \
+			 const int port)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	if ( !S->duct->init_client(S->duct) )
+		goto done;
+	if ( !S->duct->init_port(S->duct, host, 11990) )
+		goto done;
+
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements accepting a connection on an initialized server
+ * port.  This is an inheritance interface to the Duct object imbeded
+ * in this object.
+ *
+ * \param this	The object which is to accept the client connection.
+ *
+ * \return	This call blocks until a connection occurs.  If a
+ *		connection is successfully established a true value is
+ *		returned to the caller.  A false value indicates the
+ *		connection was not successfully established.
+ */
+
+static _Bool accept_connection(CO(PossumPipe, this))
+
+{
+	STATE(S);
+
+	return S->duct->accept_connection(S->duct);
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements sending a packet to the remote endpoint.
+ * The supplied packet information is ASN1 encoded and the resulting
+ * ASN1 data structure is encrypted and an HMAC trailing checksum
+ * is added.  The resulting data structure is transmitted to the
+ * endpoint.
+ *
+ * \param this		A pointer to the object which is to initiate
+ *			the send.
+ *
+ * \param type		The type of packet to be sent.
+ *
+ * \param packet	The object containing the raw data to be
+ *			transmited.
+ *
+ * \return		A boolean value is returned to indicate the
+ *			status of packet transmission.  A false value
+ *			indicates an error occured during
+ *			transmission. A true value indicates the
+ *			packet was successfully transmitted.
+ */
+
+static _Bool send_packet(CO(PossumPipe, this), const PossumPipe_type type, \
+			 CO(Buffer, bufr))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+        unsigned char *asn = NULL;
+
+        unsigned char **p = &asn;
+
+	int asn_size;
+
+	possum_packet *packet = NULL;
+
+
+	if ( S->poisoned )
+		goto done;
+	if ( (bufr == NULL) || bufr->poisoned(bufr) )
+		goto done;
+
+	/* ASN1 encode the packet. */
+	if ( (packet = possum_packet_new()) == NULL )
+		goto done;
+	if ( ASN1_INTEGER_set(packet->type, type) != 1 )
+		goto done;
+	if ( ASN1_OCTET_STRING_set(packet->payload, bufr->get(bufr), \
+				   bufr->size(bufr)) != 1 )
+		goto done;
+
+        asn_size = i2d_possum_packet(packet, p);
+        if ( asn_size < 0 )
+                goto done;
+
+	bufr->reset(bufr);
+	if ( !bufr->add(bufr, asn, asn_size) )
+		goto done;
+
+	/* Send the processed buffer. */
+	if ( !S->duct->send_Buffer(S->duct, bufr) )
+		goto done;
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+	if ( packet != NULL )
+		possum_packet_free(packet);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements the reception and decoding of a packet from
+ * a remote endpoint.  The raw packet is decrypted and authenticated
+ * with the trailing checksum.  The ASN1 data structure is decoded and
+ * loaded into the supplied buffer.
+ *
+ * \param this	A pointer to the object which is to initiate
+ *		the send.
+ *
+ * \param bufr	The object which will be loaded with the packet payload.
+ *
+ * \return		An enumerated type is returned to indicate the
+ *			status and type of the payload.
+ */
+
+static PossumPipe_type receive_packet(CO(PossumPipe, this), CO(Buffer, bufr))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	PossumPipe_type status,
+			remote_retn;
+
+        unsigned char *asn = NULL;
+
+        unsigned const char *p = asn;
+
+	int asn_size;
+
+	possum_packet *packet = NULL;
+
+
+	if ( S->poisoned )
+		goto done;
+	if ( (bufr == NULL) || bufr->poisoned(bufr) )
+		goto done;
+
+	/* Receive and decode the packet. */
+	if ( !S->duct->receive_Buffer(S->duct, bufr) )
+		goto done;
+
+	p = bufr->get(bufr);
+	asn_size = bufr->size(bufr);
+        if ( !d2i_possum_packet(&packet, &p, asn_size) )
+                goto done;
+
+	remote_retn = ASN1_INTEGER_get(packet->type);
+
+	bufr->reset(bufr);
+	if ( !bufr->add(bufr, ASN1_STRING_data(packet->payload), \
+			ASN1_STRING_length(packet->payload)) )
+		goto done;
+
+	retn = true;
+
+
+ done:
+	if ( retn )
+		status = remote_retn;
+	else {
+		S->poisoned = true;
+		status = PossumPipe_failure;
+	}
+
+	if ( packet != NULL )
+		possum_packet_free(packet);
+
+	return status;
 }
 
 
@@ -725,81 +1018,6 @@ static _Bool receive_connection_start(CO(PossumPipe, this), CO(Buffer, bufr))
 /**
  * External public method.
  *
- * This method encapsulates all of the functionality needed to
- * initiate a PossumPipe running in server mode.
- *
- * \param this		A pointer to the object which is to be initialized
- *			as a server.
- *
- * \param host		The name or ID address of the interface which
- *			the server is to listen on.
- *
- * \param port		The port number which the server is to listen on.
- *
- * \param do_reverse	A flag to indicate whether or not reverse DNS
- *			lookups are to be done on the incoming connection.
- *			A false value inhibits reverse DNS lookups while
- *			a true value (default).
- *
- * \return		A boolean value is returned to indicate the
- *			status of the server setup.  A false value
- *			indicates that connection setup failed while a
- *			true value indicates the server is listening
- *			for connections.
- */
-
-static _Bool init_server(CO(PossumPipe, this), CO(char *, host), \
-			 const int port, const _Bool do_reverse)
-
-{
-	STATE(S);
-
-	_Bool retn = false;
-
-
-	if ( !S->duct->init_server(S->duct) )
-		goto done;
-	if ( (host != NULL) && !S->duct->set_server(S->duct, host) )
-		goto done;
-	if ( !S->duct->init_port(S->duct, NULL, port) )
-		goto done;
-	S->duct->do_reverse(S->duct, do_reverse);
-
-	retn = true;
-
-
- done:
-	return retn;
-}
-
-
-/**
- * External public method.
- *
- * This method implements accepting a connection on an initialized server
- * port.  This is an inheritance interface to the Duct object imbeded
- * in this object.
- *
- * \param this	The object which is to accept the client connection.
- *
- * \return	This call blocks until a connection occurs.  If a
- *		connection is successfully established a true value is
- *		returned to the caller.  A false value indicates the
- *		connection was not successfully established.
- */
-
-static _Bool accept_connection(CO(PossumPipe, this))
-
-{
-	STATE(S);
-
-	return S->duct->accept_connection(S->duct);
-}
-
-
-/**
- * External public method.
- *
  * This method implements handling the authentication and initiation of
  * a client connection.  It is designed to be called after the successful
  * acceptance of a client connection.
@@ -1029,8 +1247,6 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 	retn = true;
 
  done:
-	sleep(5);
-
 	WHACK(software_status);
 	WHACK(netbufr);
 	WHACK(nonce);
@@ -1045,49 +1261,6 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 	WHACK(idmgr);
 	WHACK(ivy);
 
-	return retn;
-}
-
-
-/**
- * External public method.
- *
- * This method encapsulates the functionality needed to initiate the
- * client side of a PossumPipe connection.
- *
- * \param this		A pointer to the object which is to be initialized
- *			as a client.
- *
- * \param host		The name or ID address of the server to be
- *			connected to.
- *
- * \param port		The port number on the server to which the
- *			connection is to be initiatedto.
- *
- * \return		A boolean value is returned to indicate the
- *			status of the connection.  A false value denotes
- *			connection setup failed while a true value
- *			indicates the setup was successful.
- */
-
-static _Bool init_client(CO(PossumPipe, this), CO(char *, host), \
-			 const int port)
-
-{
-	STATE(S);
-
-	_Bool retn = false;
-
-
-	if ( !S->duct->init_client(S->duct) )
-		goto done;
-	if ( !S->duct->init_port(S->duct, host, 11990) )
-		goto done;
-
-	retn = true;
-
-
- done:
 	return retn;
 }
 
@@ -1462,7 +1635,10 @@ extern PossumPipe NAAAIM_PossumPipe_Init(void)
 
 	this->accept_connection = accept_connection;
 
-	this->start_host_mode = start_host_mode;
+	this->send_packet    = send_packet;
+	this->receive_packet = receive_packet;
+
+	this->start_host_mode	= start_host_mode;
 	this->start_client_mode = start_client_mode;
 
 	this->whack = whack;

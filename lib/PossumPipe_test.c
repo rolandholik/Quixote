@@ -90,7 +90,23 @@ extern int main(int argc, char *argv[])
 			goto done;
 		}
 
-		fputs("Host mode ok.\n", stderr);
+		fputs("Host mode startup complete - waiting for packet.\n", \
+		      stderr);
+		if ( pipe->receive_packet(pipe, bufr) != PossumPipe_data ) {
+			fputs("Error receiving packet.\n", stderr);
+			goto done;
+		}
+		fputs("Received payload:\n", stdout);
+		bufr->print(bufr);
+
+		fputs("Returning payload.\n", stdout);
+		if ( !pipe->send_packet(pipe, PossumPipe_data, bufr) ) {
+			fputs("Error sending packet.\n", stderr);
+			goto done;
+		}
+
+		fputs("Waiting to shutdown.\n", stdout);
+		sleep(5);
 	}
 
 
@@ -111,7 +127,23 @@ extern int main(int argc, char *argv[])
 			goto done;
 		}
 
-		fputs("Client mode ok.\n", stderr);
+		fputs("Client mode setup complete - sending packet:\n", \
+		      stderr);
+		bufr->add_hexstring(bufr, KEY1);
+		bufr->print(bufr);
+		if ( !pipe->send_packet(pipe, PossumPipe_data, bufr) ) {
+			fputs("Error sending data packet.\n", stderr);
+			goto done;
+		}
+
+		bufr->reset(bufr);
+		if ( pipe->receive_packet(pipe, bufr) != PossumPipe_data ) {
+			fputs("Error receiving packet.\n", stderr);
+			goto done;
+		}
+
+		fputs("Received payload:\n", stdout);
+		bufr->print(bufr);
 	}
 
 
