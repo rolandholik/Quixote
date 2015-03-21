@@ -12,6 +12,11 @@
  * for licensing information.
  **************************************************************************/
 
+/* Local defines. */
+#define IV_SIZE 16
+#define CHECKSUM_SIZE 32
+
+
 /* Include files. */
 #include <stdint.h>
 #include <stdbool.h>
@@ -240,6 +245,199 @@ static _Bool accept_connection(CO(PossumPipe, this))
 
 
 /**
+ * Internal private method.
+ *
+ * This method implements the computation of the HMAC checksum over
+ * the supplied payload.
+ *
+ * \param S		A pointer to the object state of the object
+ *			requesting checksum computation.
+ *
+ * \param bufr		The object containing the payload on which the
+ *			checksum is to be computed.
+ *
+ * \param chksum	The object which will contain the checksum.
+ *
+ * \return		A boolean value is returned to indicate the
+ *			status of the checksum encryption.  A false value
+ *			indicates an error occured during computation
+ *			of the checksum.  A true value indicates the
+ *			computation was successful and the output
+ *			buffer contains a valid checksum.
+ */
+
+static _Bool _compute_checksum(CO(PossumPipe_State, S), CO(Buffer, payload), \
+			       CO(Buffer, chksum))
+
+{
+	_Bool retn = false;
+
+	unsigned char *p;
+
+	Buffer b   = S->shared1->get_Buffer(S->shared1),
+	       key = NULL;
+
+	SHA256_hmac hmac = NULL;
+
+
+	if ( (payload == NULL) || payload->poisoned(payload) )
+		goto done;
+	if ( (chksum == NULL) || chksum->poisoned(chksum) )
+		goto done;
+
+	/* Extract the keying material for the checksum. */
+	INIT(HurdLib, Buffer, key, goto done);
+
+	if ( b->size(b) <= IV_SIZE )
+		goto done;
+	p = b->get(b) + IV_SIZE;
+	if ( !key->add(key, p, b->size(b) - IV_SIZE) )
+		goto done;
+
+	/* Compute the checksum over the packet payload. */
+	if ( (hmac = NAAAIM_SHA256_hmac_Init(key)) == NULL )
+		goto done;
+	hmac->add_Buffer(hmac, payload);
+	if ( !hmac->compute(hmac) )
+		goto done;
+
+	if ( !chksum->add_Buffer(chksum, hmac->get_Buffer(hmac)) )
+		goto done;
+
+	retn = true;
+
+
+ done:
+	WHACK(key);
+	WHACK(hmac);
+
+	return retn;
+}
+
+
+/**
+ * Internal private method.
+ *
+ * This method implements the verification of the checksum in the
+ * supplied payload.
+ *
+ * \param S		A pointer to the object state of the object
+ *			requesting checksum verification.
+ *
+ * \param packet	The object containing the payload containing
+ *			the checksum to be verified.
+ *
+ * \return		A boolean value is returned to indicate the
+ *			status of the checksum verification.  A false
+ *			value indicates an error occured during verification
+ *			of the checksum.  A true value indicates the
+ *			computation was successful and the payload was
+ *			verfified as valid.
+ */
+
+static _Bool _verify_checksum(CO(PossumPipe_State, S), CO(Buffer, packet))
+
+{
+	_Bool retn = false;
+
+	size_t payload;
+
+	Buffer computed = NULL,
+	       incoming = NULL;
+
+
+	if ( (packet == NULL) || packet->poisoned(packet) )
+		goto done;
+
+	/* Extract the incoming checksum. */
+	INIT(HurdLib, Buffer, incoming, goto done);
+	payload = packet->size(packet) - CHECKSUM_SIZE;
+	if ( !incoming->add(incoming, packet->get(packet) + payload, \
+			    CHECKSUM_SIZE) )
+		goto done;
+	packet->shrink(packet, CHECKSUM_SIZE);
+
+	/* Compute the checksum over the packet body. */
+	INIT(HurdLib, Buffer, computed, goto done);
+	if ( !_compute_checksum(S, packet, computed) )
+		goto done;
+	if ( !incoming->equal(incoming, computed) )
+		goto done;
+
+	retn = true;
+
+
+ done:
+	WHACK(computed);
+	WHACK(incoming);
+
+	return retn;
+}
+
+
+/**
+ * Internal private method.
+ *
+ * This method implements the generation of the initialization vector
+ * and key for the supplied packet payload for the remote host.  This
+ * vector and key are then used to encrypt the packet.
+ *
+ * \param S		A pointer to the object state of the object
+ *			requesting encryption.
+ *
+ * \param bufr		The object containing the packet payload.  The
+ *			contents of the object is replaced with the
+ *			encrypted payload.
+ *
+ * \return		A boolean value is returned to indicate the
+ *			status of packet encryption.  A false value
+ *			indicates an error occured during
+ *			encryption. A true value indicates the
+ *			packet was successfully encrypted.
+ */
+
+static _Bool _encrypt_packet(CO(PossumPipe_State, S), CO(Buffer, payload))
+
+{
+	_Bool retn = false;
+
+	Buffer iv  = NULL,
+	       key = S->shared2->get_Buffer(S->shared2);
+
+	AES256_cbc cipher = NULL;
+
+
+	if ( (payload == NULL) || payload->poisoned(payload) )
+		goto done;
+
+
+	/* Extract the initialization vector from the first shared secret. */
+	INIT(HurdLib, Buffer, iv, goto done);
+	if ( !iv->add(iv, S->shared1->get(S->shared1), IV_SIZE) )
+		goto done;
+
+	/* Encrypt the packet. */
+	if ( (cipher = NAAAIM_AES256_cbc_Init_encrypt(key, iv)) == NULL )
+		goto done;
+	if ( cipher->encrypt(cipher, payload) == NULL )
+		goto done;
+
+	payload->reset(payload);
+	if ( !payload->add_Buffer(payload, cipher->get_Buffer(cipher)) )
+		goto done;
+
+	retn = true;
+
+
+done:
+	WHACK(iv);
+	WHACK(cipher);
+
+	return retn;
+}
+
+
+/**
  * External public method.
  *
  * This method implements sending a packet to the remote endpoint.
@@ -279,6 +477,8 @@ static _Bool send_packet(CO(PossumPipe, this), const PossumPipe_type type, \
 
 	possum_packet *packet = NULL;
 
+	Buffer chksum = NULL;
+
 
 	if ( S->poisoned )
 		goto done;
@@ -302,6 +502,16 @@ static _Bool send_packet(CO(PossumPipe, this), const PossumPipe_type type, \
 	if ( !bufr->add(bufr, asn, asn_size) )
 		goto done;
 
+	/* Encrypt the buffer contents and add an authentication checksum. */
+	INIT(HurdLib, Buffer, chksum, goto done);
+	if ( !_encrypt_packet(S, bufr) )
+		goto done;
+	if ( !_compute_checksum(S, bufr, chksum) )
+		goto done;
+	if ( !S->shared1->rehash(S->shared1, 1) )
+		goto done;
+	bufr->add_Buffer(bufr, chksum);
+
 	/* Send the processed buffer. */
 	if ( !S->duct->send_Buffer(S->duct, bufr) )
 		goto done;
@@ -310,10 +520,75 @@ static _Bool send_packet(CO(PossumPipe, this), const PossumPipe_type type, \
 
 
  done:
+	WHACK(chksum);
+
 	if ( !retn )
 		S->poisoned = true;
 	if ( packet != NULL )
 		possum_packet_free(packet);
+
+	return retn;
+}
+
+
+/**
+ * Internal private method.
+ *
+ * This method implements the generation of the initialization vector
+ * and key for the supplied packet payload for the remote host.  This
+ * vector and key are then used to decrypt the packet.
+ *
+ * \param S		A pointer to the object state of the object
+ *			requesting decryption.
+ *
+ * \param bufr		The object containing the encrypted packet
+ *			payload.  The contents of the object is
+ *			replaced with the encrypted payload.
+ *
+ * \return		A boolean value is returned to indicate the
+ *			status of payload decryption.  A false value
+ *			indicates an error occured during
+ *			decryption. A true value indicates the
+ *			packet was successfully encrypted and the
+ *			contents of the result object is valid.
+ */
+
+static _Bool _decrypt_packet(CO(PossumPipe_State, S), CO(Buffer, payload))
+
+{
+	_Bool retn = false;
+
+	Buffer iv,
+	       key = S->shared2->get_Buffer(S->shared2);
+
+	AES256_cbc cipher = NULL;
+
+
+	if ( (payload == NULL) || payload->poisoned(payload) )
+		goto done;
+
+
+	/* Extract the initialization vector from the first shared secret. */
+	INIT(HurdLib, Buffer, iv, goto done);
+	if ( !iv->add(iv, S->shared1->get(S->shared1), IV_SIZE) )
+		goto done;
+
+	/* Decrypt the packet. */
+	if ( (cipher = NAAAIM_AES256_cbc_Init_decrypt(key, iv)) == NULL )
+		goto done;
+	if ( cipher->decrypt(cipher, payload) == NULL )
+		goto done;
+
+	payload->reset(payload);
+	if ( !payload->add_Buffer(payload, cipher->get_Buffer(cipher)) )
+		goto done;
+
+	retn = true;
+
+
+done:
+	WHACK(iv);
+	WHACK(cipher);
 
 	return retn;
 }
@@ -364,6 +639,15 @@ static PossumPipe_type receive_packet(CO(PossumPipe, this), CO(Buffer, bufr))
 	if ( !S->duct->receive_Buffer(S->duct, bufr) )
 		goto done;
 
+	/* Decrypt the payload. */
+	if ( !_verify_checksum(S, bufr) )
+		goto done;
+	if ( !_decrypt_packet(S, bufr) )
+		goto done;
+	if ( !S->shared1->rehash(S->shared1, 1) )
+		goto done;
+
+	/* Decode the packet. */
 	p = bufr->get(bufr);
 	asn_size = bufr->size(bufr);
         if ( !d2i_possum_packet(&packet, &p, asn_size) )
