@@ -214,7 +214,7 @@ static _Bool init_client(CO(PossumPipe, this), CO(char *, host), \
 
 	if ( !S->duct->init_client(S->duct) )
 		goto done;
-	if ( !S->duct->init_port(S->duct, host, 11990) )
+	if ( !S->duct->init_port(S->duct, host, port) )
 		goto done;
 
 	retn = true;
