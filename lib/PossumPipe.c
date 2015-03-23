@@ -87,6 +87,10 @@ struct NAAAIM_PossumPipe_State
 	SHA256 shared1;
 	SHA256 shared2;
 
+	/* Sent and received data extension hashes. */
+	SHA256 sent;
+	SHA256 received;
+
 	/* Remote software status. */
 	Buffer software;
 };
@@ -124,6 +128,9 @@ static void _init_state(CO(PossumPipe_State,S))
 {
 	S->libid = NAAAIM_LIBID;
 	S->objid = NAAAIM_PossumPipe_OBJID;
+
+	S->sent	    = NULL;
+	S->received = NULL;
 
 	S->software = NULL;
 
@@ -421,10 +428,12 @@ static _Bool _encrypt_packet(CO(PossumPipe_State, S), CO(Buffer, payload))
 {
 	_Bool retn = false;
 
-	Buffer iv  = NULL,
-	       key = S->shared2->get_Buffer(S->shared2);
+	Buffer b,
+	       iv = NULL;
 
 	AES256_cbc cipher = NULL;
+
+	SHA256_hmac key = NULL;
 
 
 	if ( (payload == NULL) || payload->poisoned(payload) )
@@ -436,8 +445,21 @@ static _Bool _encrypt_packet(CO(PossumPipe_State, S), CO(Buffer, payload))
 	if ( !iv->add(iv, S->shared1->get(S->shared1), IV_SIZE) )
 		goto done;
 
+	/* Generate the encryption key. */
+	b = S->shared2->get_Buffer(S->shared2);
+	if ( (key = NAAAIM_SHA256_hmac_Init(b)) == NULL )
+		goto done;
+	key->add_Buffer(key, S->sent->get_Buffer(S->sent));
+	if ( !key->compute(key) )
+		goto done;
+	if ( !S->sent->extend(S->sent, payload) )
+		goto done;
+
 	/* Encrypt the packet. */
-	if ( (cipher = NAAAIM_AES256_cbc_Init_encrypt(key, iv)) == NULL )
+	b = key->get_Buffer(key);
+	fputs("Encrypt key:\n", stderr);
+	b->print(b);
+	if ( (cipher = NAAAIM_AES256_cbc_Init_encrypt(b, iv)) == NULL )
 		goto done;
 	if ( cipher->encrypt(cipher, payload) == NULL )
 		goto done;
@@ -452,6 +474,7 @@ static _Bool _encrypt_packet(CO(PossumPipe_State, S), CO(Buffer, payload))
 done:
 	WHACK(iv);
 	WHACK(cipher);
+	WHACK(key);
 
 	return retn;
 }
@@ -591,10 +614,12 @@ static _Bool _decrypt_packet(CO(PossumPipe_State, S), CO(Buffer, payload))
 {
 	_Bool retn = false;
 
-	Buffer iv,
-	       key = S->shared2->get_Buffer(S->shared2);
+	Buffer b,
+	       iv = NULL;
 
 	AES256_cbc cipher = NULL;
+
+	SHA256_hmac key = NULL;
 
 
 	if ( (payload == NULL) || payload->poisoned(payload) )
@@ -606,14 +631,27 @@ static _Bool _decrypt_packet(CO(PossumPipe_State, S), CO(Buffer, payload))
 	if ( !iv->add(iv, S->shared1->get(S->shared1), IV_SIZE) )
 		goto done;
 
+	/* Generate the encryption key. */
+	b = S->shared2->get_Buffer(S->shared2);
+	if ( (key = NAAAIM_SHA256_hmac_Init(b)) == NULL )
+		goto done;
+	key->add_Buffer(key, S->received->get_Buffer(S->received));
+	if ( !key->compute(key) )
+		goto done;
+
 	/* Decrypt the packet. */
-	if ( (cipher = NAAAIM_AES256_cbc_Init_decrypt(key, iv)) == NULL )
+	b = key->get_Buffer(key);
+	fputs("Decrypt key:\n", stderr);
+	b->print(b);
+	if ( (cipher = NAAAIM_AES256_cbc_Init_decrypt(b, iv)) == NULL )
 		goto done;
 	if ( cipher->decrypt(cipher, payload) == NULL )
 		goto done;
 
 	payload->reset(payload);
 	if ( !payload->add_Buffer(payload, cipher->get_Buffer(cipher)) )
+		goto done;
+	if ( !S->received->extend(S->received, payload) )
 		goto done;
 
 	retn = true;
@@ -622,6 +660,7 @@ static _Bool _decrypt_packet(CO(PossumPipe_State, S), CO(Buffer, payload))
 done:
 	WHACK(iv);
 	WHACK(cipher);
+	WHACK(key);
 
 	return retn;
 }
@@ -1558,6 +1597,23 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 	S->shared2->print(S->shared2);
 	fputc('\n', stderr);
 
+	INIT(NAAAIM, SHA256, S->sent, goto done);
+	S->sent->add(S->sent, S->shared1->get_Buffer(S->shared1));
+	S->sent->add(S->sent, S->shared2->get_Buffer(S->shared2));
+	if ( !S->sent->compute(S->sent) )
+		goto done;
+	fputs("Send root:\n", stderr);
+	S->sent->print(S->sent);
+
+	INIT(NAAAIM, SHA256, S->received, goto done);
+	S->received->add(S->received, S->shared2->get_Buffer(S->shared2));
+	S->received->add(S->received, S->shared1->get_Buffer(S->shared1));
+	if ( !S->received->compute(S->received) )
+		goto done;
+	fputs("Receive root:\n", stderr);
+	S->received->print(S->received);
+	fputc('\n', stderr);
+
 	retn = true;
 
  done:
@@ -1858,6 +1914,23 @@ static _Bool start_client_mode(CO(PossumPipe, this))
 	S->shared2->print(S->shared2);
 	fputc('\n', stderr);
 
+	INIT(NAAAIM, SHA256, S->sent, goto done);
+	S->sent->add(S->sent, S->shared2->get_Buffer(S->shared2));
+	S->sent->add(S->sent, S->shared1->get_Buffer(S->shared1));
+	if ( !S->sent->compute(S->sent) )
+		goto done;
+	fputs("Send root:\n", stderr);
+	S->sent->print(S->sent);
+
+	INIT(NAAAIM, SHA256, S->received, goto done);
+	S->received->add(S->received, S->shared1->get_Buffer(S->shared1));
+	S->received->add(S->received, S->shared2->get_Buffer(S->shared2));
+	if ( !S->received->compute(S->received) )
+		goto done;
+	fputs("Receive root:\n", stderr);
+	S->received->print(S->received);
+	fputc('\n', stderr);
+
 	retn = true;
 
  done:
@@ -1894,6 +1967,9 @@ static void whack(CO(PossumPipe, this))
 
 	S->shared1->whack(S->shared1);
 	S->shared2->whack(S->shared2);
+
+	WHACK(S->sent);
+	WHACK(S->received);
 
 	S->software->whack(S->software);
 
