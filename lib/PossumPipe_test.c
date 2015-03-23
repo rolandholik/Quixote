@@ -15,13 +15,72 @@
 #define CR "\n"
 #define OK "OK\n"
 
+enum {
+	none,
+	client,
+	server
+} Mode;
+
+
+static _Bool ping(CO(PossumPipe, pipe))
+
+{
+	_Bool retn = false;
+
+	Buffer bufr = NULL;
+
+
+	INIT(HurdLib, Buffer, bufr, goto done);
+
+	if ( Mode == server ) {
+		fputs("Waiting for ping packet.\n", stderr);
+		if ( pipe->receive_packet(pipe, bufr) != PossumPipe_data ) {
+			fputs("Error receiving packet.\n", stderr);
+			goto done;
+		}
+		fputs("Received payload:\n", stdout);
+		bufr->print(bufr);
+
+		fputs("Returning payload.\n", stdout);
+		if ( !pipe->send_packet(pipe, PossumPipe_data, bufr) ) {
+			fputs("Error sending packet.\n", stderr);
+			goto done;
+		}
+
+		retn = true;
+	}
+	if ( Mode == client ) {
+		fputs("Sending ping packet:\n", stderr);
+		bufr->add_hexstring(bufr, KEY1);
+		bufr->print(bufr);
+		if ( !pipe->send_packet(pipe, PossumPipe_data, bufr) ) {
+			fputs("Error sending data packet.\n", stderr);
+			goto done;
+		}
+
+		bufr->reset(bufr);
+		if ( pipe->receive_packet(pipe, bufr) != PossumPipe_data ) {
+			fputs("Error receiving packet.\n", stderr);
+			goto done;
+		}
+
+		fputs("Received payload:\n", stdout);
+		bufr->print(bufr);
+
+		retn = true;
+	}
+
+ done:
+	WHACK(bufr);
+
+	return retn;
+}
+
 
 extern int main(int argc, char *argv[])
 
 {
 	_Bool do_reverse = false;
-
-	enum {none, client, server} Mode = none;
 
 	char *host = NULL;
 
@@ -90,22 +149,7 @@ extern int main(int argc, char *argv[])
 			goto done;
 		}
 
-		fputs("Host mode startup complete - waiting for packet.\n", \
-		      stderr);
-		if ( pipe->receive_packet(pipe, bufr) != PossumPipe_data ) {
-			fputs("Error receiving packet.\n", stderr);
-			goto done;
-		}
-		fputs("Received payload:\n", stdout);
-		bufr->print(bufr);
-
-		fputs("Returning payload.\n", stdout);
-		if ( !pipe->send_packet(pipe, PossumPipe_data, bufr) ) {
-			fputs("Error sending packet.\n", stderr);
-			goto done;
-		}
-
-		fputs("Waiting to shutdown.\n", stdout);
+		ping(pipe);
 		sleep(5);
 	}
 
@@ -127,23 +171,7 @@ extern int main(int argc, char *argv[])
 			goto done;
 		}
 
-		fputs("Client mode setup complete - sending packet:\n", \
-		      stderr);
-		bufr->add_hexstring(bufr, KEY1);
-		bufr->print(bufr);
-		if ( !pipe->send_packet(pipe, PossumPipe_data, bufr) ) {
-			fputs("Error sending data packet.\n", stderr);
-			goto done;
-		}
-
-		bufr->reset(bufr);
-		if ( pipe->receive_packet(pipe, bufr) != PossumPipe_data ) {
-			fputs("Error receiving packet.\n", stderr);
-			goto done;
-		}
-
-		fputs("Received payload:\n", stdout);
-		bufr->print(bufr);
+		ping(pipe);
 	}
 
 
