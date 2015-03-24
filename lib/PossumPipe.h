@@ -48,6 +48,7 @@ struct NAAAIM_PossumPipe
 	_Bool (*send_packet)(const PossumPipe, PossumPipe_type, const Buffer);
 	PossumPipe_type (*receive_packet)(const PossumPipe, const Buffer);
 
+	void (*reset)(const PossumPipe);
 	void (*whack)(const PossumPipe);
 
 	/* Private state. */
