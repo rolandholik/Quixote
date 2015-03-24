@@ -1952,6 +1952,43 @@ static _Bool start_client_mode(CO(PossumPipe, this))
 /**
  * External public method.
  *
+ * This method implements resetting the secured communications object.
+ * Conceptually this method is an extension method of the ->reset
+ * function in the imbedded Duct object.
+ *
+ * In addition to resetting the Duct object this method clears all
+ * the secure communications context in the state object.
+ *
+ * \param this	The communications object which is to be reset.
+ *
+ * \return	No return value is defined.
+ */
+
+static void reset(CO(PossumPipe, this))
+
+{
+	STATE(S);
+
+
+	/* Clear the security state information. */
+	S->shared1->reset(S->shared1);
+	S->shared2->reset(S->shared2);
+
+	S->sent->reset(S->sent);
+	S->received->reset(S->received);
+
+	S->software->reset(S->software);
+
+	/* Close the underlying communications object. */
+	S->duct->reset(S->duct);
+
+	return;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a destructor for a PossumPipe object.
  *
  * \param this	A pointer to the object which is to be destroyed.
@@ -2029,6 +2066,7 @@ extern PossumPipe NAAAIM_PossumPipe_Init(void)
 	this->start_host_mode	= start_host_mode;
 	this->start_client_mode = start_client_mode;
 
+	this->reset = reset;
 	this->whack = whack;
 
 	return this;
