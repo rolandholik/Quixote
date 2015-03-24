@@ -61,6 +61,9 @@ struct NAAAIM_Duct_State
 	/* Object status. */
 	_Bool poisoned;
 
+	/* End of transmission flag. */
+	_Bool eof;
+
 	/* Error code. */
 	int error;
 
@@ -104,6 +107,7 @@ static void _init_state(CO(Duct_State, S)) {
 
 
 	S->poisoned	= false;
+	S->eof		= false;
 	S->error	= 0;
 	S->type		= not_defined;
 	S->sockt	= -1;
@@ -144,7 +148,7 @@ static _Bool _init_server_port(CO(Duct_State, S), const long server, \
 	sdef.sin_family		= AF_INET;
 	sdef.sin_port		= htons(port);
 	sdef.sin_addr.s_addr	= server;
-	
+
 	if ( (S->sockt = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1 ) {
 		err = "Socket creation failed.";
 		goto done;
@@ -205,7 +209,7 @@ static _Bool _init_client_port(CO(Duct_State, S), CO(char *, host), \
 		goto done;
 	}
 	sdef.sin_addr.s_addr = *((unsigned long *) hdef->h_addr_list[0]);
-	
+
 	if ( (S->sockt = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1 ) {
 		err = "Socket creation failed.";
 		goto done;
@@ -337,9 +341,9 @@ static _Bool init_port(CO(Duct, this), CO(char *, host), int const port)
 	_Bool retn = false;
 
 
-	if ( S->poisoned ) 
+	if ( S->poisoned )
 		return retn;
-		
+
 	if ( S->type == server )
 		retn = _init_server_port(S, S->server, port);
 	else
@@ -520,24 +524,30 @@ static _Bool receive_Buffer(CO(Duct, this), CO(Buffer, bf))
 	 * from a standard error number.
 	 */
 	if ( read(S->fd, &rsize, sizeof(rsize)) != sizeof(rsize) ) {
-		S->error    = errno;
+		S->error = errno;
 		goto done;
 	}
+
 	rsize = ntohl(rsize);
-	if ( rsize > MAX_RECEIVE_SIZE ) {
-		S->error    = -1;
+	if ( rsize == 0 ) {
+		retn   = true;
+		S->eof = true;
 		goto done;
-	}	     
+	}
+	if ( rsize > MAX_RECEIVE_SIZE ) {
+		S->error = -1;
+		goto done;
+	}
 
 
 	/* Loop until we receive the specified number of bytes. */
 	while ( rsize-- > 0 ) {
 		if ( read(S->fd, rbufr, sizeof(rbufr)) != sizeof(rbufr) ) {
-			S->error    = errno;
+			S->error = errno;
 			goto done;
 		}
 		if ( !bf->add(bf, rbufr, sizeof(rbufr)) ) {
-			S->error    = -2;
+			S->error = -2;
 			goto done;
 		}
 	}
@@ -600,7 +610,32 @@ static char * get_client(CO(Duct, this))
 
 	return (char *) S->client->get(S->client);
 }
-	
+
+
+/**
+ * External public method.
+ *
+ * This method implements querying for whether or not the end of
+ * transmission from a client has been detected.
+ *
+ * \param this		The Duct object whose client status is to
+ *			be determined.
+ *
+ * \return		A false value indicates that an end-of-duct
+ *			condition has not been detected.  A true
+ *			value indicates the counter-party has generated
+ *			condition indicating the connection has
+ *			been terminated.
+ */
+
+static _Bool eof(CO(Duct, this))
+
+{
+	STATE(S);
+
+	return S->eof;
+}
+
 
 /**
  * External public method.
@@ -631,7 +666,7 @@ static void do_reverse(CO(Duct, this), const _Bool mode)
 
 	return;
 }
-	
+
 
 /**
  * External public method.
@@ -651,6 +686,8 @@ static void reset(CO(Duct, this))
 {
 	STATE(S);
 
+
+	S->eof = false;
 
 	if ( (S->type == server) && (S->fd != -1) ) {
 		close(S->fd);
@@ -673,9 +710,18 @@ static void whack(CO(Duct, this))
 {
 	STATE(S);
 
+	uint32_t size = ntohl(0);
 
-	/* Free client hostname if it has been defined. */
-	WHACK(S->client);
+
+	/*
+	 * If this is a client connection send a zero length write
+	 * to trigger an end of transmission situation.
+	 */
+	if ( (S->type == client) && (S->fd != -1) ) {
+		fputs("Sending EOF\n", stderr);
+		write(S->fd, &size, sizeof(size));
+	}
+
 
 	/* Close the I/O socket. */
 	if ( S->fd != -1 ) {
@@ -686,11 +732,14 @@ static void whack(CO(Duct, this))
 	shutdown(S->sockt, SHUT_RDWR);
 	close(S->sockt);
 
+
+	/* Destroy resources. */
+	WHACK(S->client);
 	S->root->whack(S->root, this, S);
 	return;
 }
 
-	
+
 /**
  * External constructor call.
  *
@@ -741,7 +790,9 @@ extern Duct NAAAIM_Duct_Init(void)
 	this->get_ipv4		= get_ipv4;
 	this->get_client	= get_client;
 
+	this->eof		= eof;
 	this->do_reverse	= do_reverse;
+
 	this->reset		= reset;
 	this->whack		= whack;
 
