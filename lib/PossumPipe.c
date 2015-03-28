@@ -816,11 +816,9 @@ static _Bool find_client(CO(Buffer, packet), CO(IDtoken, token), CO(Ivy, ivy))
 	 * privileges in order to prevent the device identification
 	 * files from being incorporated in the system measurement.
 	 */
-#if 0
 	if ( setreuid(1, -1) == -1 )
 		goto done;
 	changed_id = true;
-#endif
 
 	if ( glob("/etc/conf/*.ivy", 0, NULL, &identities) != 0 )
 		goto done;
