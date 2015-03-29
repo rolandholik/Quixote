@@ -129,6 +129,8 @@ static void _init_state(CO(PossumPipe_State,S))
 	S->libid = NAAAIM_LIBID;
 	S->objid = NAAAIM_PossumPipe_OBJID;
 
+	S->poisoned = false;
+
 	S->sent	    = NULL;
 	S->received = NULL;
 
