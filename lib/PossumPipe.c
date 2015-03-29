@@ -176,11 +176,11 @@ static _Bool init_server(CO(PossumPipe, this), CO(char *, host), \
 
 
 	if ( !S->duct->init_server(S->duct) )
-		goto done;
+		ERR(goto done);
 	if ( (host != NULL) && !S->duct->set_server(S->duct, host) )
-		goto done;
+		ERR(goto done);
 	if ( !S->duct->init_port(S->duct, NULL, port) )
-		goto done;
+		ERR(goto done);
 	S->duct->do_reverse(S->duct, do_reverse);
 
 	retn = true;
@@ -222,9 +222,9 @@ static _Bool init_client(CO(PossumPipe, this), CO(char *, host), \
 
 
 	if ( !S->duct->init_client(S->duct) )
-		goto done;
+		ERR(goto done);
 	if ( !S->duct->init_port(S->duct, host, port) )
-		goto done;
+		ERR(goto done);
 
 	retn = true;
 
@@ -298,28 +298,28 @@ static _Bool _compute_checksum(CO(PossumPipe_State, S), CO(Buffer, payload), \
 
 
 	if ( (payload == NULL) || payload->poisoned(payload) )
-		goto done;
+		ERR(goto done);
 	if ( (chksum == NULL) || chksum->poisoned(chksum) )
-		goto done;
+		ERR(goto done);
 
 	/* Generate the key for the checksum. */
 	INIT(HurdLib, Buffer, key, goto done);
 
 	if ( b->size(b) <= IV_SIZE )
-		goto done;
+		ERR(goto done);
 	p = b->get(b) + IV_SIZE;
 	if ( !key->add(key, p, b->size(b) - IV_SIZE) )
-		goto done;
+		ERR(goto done);
 
 	if ( (hmac = NAAAIM_SHA256_hmac_Init(key)) == NULL )
-		goto done;
+		ERR(goto done);
 	hmac->add_Buffer(hmac, software);
 	if ( !hmac->compute(hmac) )
-		goto done;
+		ERR(goto done);
 
 	key->reset(key);
 	if ( !key->add_Buffer(key, hmac->get_Buffer(hmac)) )
-	     goto done;
+	     ERR(goto done);
 	fputs("Checksum key:\n", stderr);
 	key->print(key);
 
@@ -328,10 +328,10 @@ static _Bool _compute_checksum(CO(PossumPipe_State, S), CO(Buffer, payload), \
 	hmac->reset(hmac);
 	hmac->add_Buffer(hmac, payload);
 	if ( !hmac->compute(hmac) )
-		goto done;
+		ERR(goto done);
 
 	if ( !chksum->add_Buffer(chksum, hmac->get_Buffer(hmac)) )
-		goto done;
+		ERR(goto done);
 
 	retn = true;
 
@@ -376,22 +376,22 @@ static _Bool _verify_checksum(CO(PossumPipe_State, S), CO(Buffer, packet))
 
 
 	if ( (packet == NULL) || packet->poisoned(packet) )
-		goto done;
+		ERR(goto done);
 
 	/* Extract the incoming checksum. */
 	INIT(HurdLib, Buffer, incoming, goto done);
 	payload = packet->size(packet) - CHECKSUM_SIZE;
 	if ( !incoming->add(incoming, packet->get(packet) + payload, \
 			    CHECKSUM_SIZE) )
-		goto done;
+		ERR(goto done);
 	packet->shrink(packet, CHECKSUM_SIZE);
 
 	/* Compute the checksum over the packet body. */
 	INIT(HurdLib, Buffer, computed, goto done);
 	if ( !_compute_checksum(S, packet, S->software, computed) )
-		goto done;
+		ERR(goto done);
 	if ( !incoming->equal(incoming, computed) )
-		goto done;
+		ERR(goto done);
 
 	retn = true;
 
@@ -439,36 +439,36 @@ static _Bool _encrypt_packet(CO(PossumPipe_State, S), CO(Buffer, payload))
 
 
 	if ( (payload == NULL) || payload->poisoned(payload) )
-		goto done;
+		ERR(goto done);
 
 
 	/* Extract the initialization vector from the first shared secret. */
 	INIT(HurdLib, Buffer, iv, goto done);
 	if ( !iv->add(iv, S->shared1->get(S->shared1), IV_SIZE) )
-		goto done;
+		ERR(goto done);
 
 	/* Generate the encryption key. */
 	b = S->shared2->get_Buffer(S->shared2);
 	if ( (key = NAAAIM_SHA256_hmac_Init(b)) == NULL )
-		goto done;
+		ERR(goto done);
 	key->add_Buffer(key, S->sent->get_Buffer(S->sent));
 	if ( !key->compute(key) )
-		goto done;
+		ERR(goto done);
 	if ( !S->sent->extend(S->sent, payload) )
-		goto done;
+		ERR(goto done);
 
 	/* Encrypt the packet. */
 	b = key->get_Buffer(key);
 	fputs("Encrypt key:\n", stderr);
 	b->print(b);
 	if ( (cipher = NAAAIM_AES256_cbc_Init_encrypt(b, iv)) == NULL )
-		goto done;
+		ERR(goto done);
 	if ( cipher->encrypt(cipher, payload) == NULL )
-		goto done;
+		ERR(goto done);
 
 	payload->reset(payload);
 	if ( !payload->add_Buffer(payload, cipher->get_Buffer(cipher)) )
-		goto done;
+		ERR(goto done);
 
 	retn = true;
 
@@ -529,49 +529,49 @@ static _Bool send_packet(CO(PossumPipe, this), const PossumPipe_type type, \
 
 
 	if ( S->poisoned )
-		goto done;
+		ERR(goto done);
 	if ( (bufr == NULL) || bufr->poisoned(bufr) )
-		goto done;
+		ERR(goto done);
 
 	/* ASN1 encode the packet. */
 	if ( (packet = possum_packet_new()) == NULL )
-		goto done;
+		ERR(goto done);
 	if ( ASN1_INTEGER_set(packet->type, type) != 1 )
-		goto done;
+		ERR(goto done);
 	if ( ASN1_OCTET_STRING_set(packet->payload, bufr->get(bufr), \
 				   bufr->size(bufr)) != 1 )
-		goto done;
+		ERR(goto done);
 
         asn_size = i2d_possum_packet(packet, p);
         if ( asn_size < 0 )
-                goto done;
+                ERR(goto done);
 
 	bufr->reset(bufr);
 	if ( !bufr->add(bufr, asn, asn_size) )
-		goto done;
+		ERR(goto done);
 
 	/* Encrypt the buffer contents and add an authentication checksum. */
 	INIT(NAAAIM, SoftwareStatus, software, goto done);
 	if ( !software->open(software) )
-		goto done;
+		ERR(goto done);
 	if ( !software->measure(software) )
-		goto done;
+		ERR(goto done);
 	b = software->get_template_hash(software);
 
 	INIT(HurdLib, Buffer, chksum, goto done);
 	if ( !_encrypt_packet(S, bufr) )
-		goto done;
+		ERR(goto done);
 
 	if ( !_compute_checksum(S, bufr, b, chksum) )
-		goto done;
+		ERR(goto done);
 	bufr->add_Buffer(bufr, chksum);
 
 	if ( !S->shared1->rehash(S->shared1, 1) )
-		goto done;
+		ERR(goto done);
 
 	/* Send the processed buffer. */
 	if ( !S->duct->send_Buffer(S->duct, bufr) )
-		goto done;
+		ERR(goto done);
 
 	retn = true;
 
@@ -625,36 +625,36 @@ static _Bool _decrypt_packet(CO(PossumPipe_State, S), CO(Buffer, payload))
 
 
 	if ( (payload == NULL) || payload->poisoned(payload) )
-		goto done;
+		ERR(goto done);
 
 
 	/* Extract the initialization vector from the first shared secret. */
 	INIT(HurdLib, Buffer, iv, goto done);
 	if ( !iv->add(iv, S->shared1->get(S->shared1), IV_SIZE) )
-		goto done;
+		ERR(goto done);
 
 	/* Generate the encryption key. */
 	b = S->shared2->get_Buffer(S->shared2);
 	if ( (key = NAAAIM_SHA256_hmac_Init(b)) == NULL )
-		goto done;
+		ERR(goto done);
 	key->add_Buffer(key, S->received->get_Buffer(S->received));
 	if ( !key->compute(key) )
-		goto done;
+		ERR(goto done);
 
 	/* Decrypt the packet. */
 	b = key->get_Buffer(key);
 	fputs("Decrypt key:\n", stderr);
 	b->print(b);
 	if ( (cipher = NAAAIM_AES256_cbc_Init_decrypt(b, iv)) == NULL )
-		goto done;
+		ERR(goto done);
 	if ( cipher->decrypt(cipher, payload) == NULL )
-		goto done;
+		ERR(goto done);
 
 	payload->reset(payload);
 	if ( !payload->add_Buffer(payload, cipher->get_Buffer(cipher)) )
-		goto done;
+		ERR(goto done);
 	if ( !S->received->extend(S->received, payload) )
-		goto done;
+		ERR(goto done);
 
 	retn = true;
 
@@ -705,34 +705,34 @@ static PossumPipe_type receive_packet(CO(PossumPipe, this), CO(Buffer, bufr))
 
 
 	if ( S->poisoned )
-		goto done;
+		ERR(goto done);
 	if ( (bufr == NULL) || bufr->poisoned(bufr) )
-		goto done;
+		ERR(goto done);
 
 	/* Receive and decode the packet. */
 	if ( !S->duct->receive_Buffer(S->duct, bufr) )
-		goto done;
+		ERR(goto done);
 
 	/* Decrypt the payload. */
 	if ( !_verify_checksum(S, bufr) )
-		goto done;
+		ERR(goto done);
 	if ( !_decrypt_packet(S, bufr) )
-		goto done;
+		ERR(goto done);
 	if ( !S->shared1->rehash(S->shared1, 1) )
-		goto done;
+		ERR(goto done);
 
 	/* Decode the packet. */
 	p = bufr->get(bufr);
 	asn_size = bufr->size(bufr);
         if ( !d2i_possum_packet(&packet, &p, asn_size) )
-                goto done;
+                ERR(goto done);
 
 	remote_retn = ASN1_INTEGER_get(packet->type);
 
 	bufr->reset(bufr);
 	if ( !bufr->add(bufr, ASN1_STRING_data(packet->payload), \
 			ASN1_STRING_length(packet->payload)) )
-		goto done;
+		ERR(goto done);
 
 	retn = true;
 
@@ -802,12 +802,12 @@ static _Bool find_client(CO(Buffer, packet), CO(IDtoken, token), CO(Ivy, ivy))
 
 	/* Load the identity key/salt and the asserted client identity. */
 	if ( !idkey->add(idkey, packet->get(packet), NAAAIM_IDSIZE) )
-		goto done;
+		ERR(goto done);
 	if ( !identity->add(identity, packet->get(packet) + NAAAIM_IDSIZE, \
 			    NAAAIM_IDSIZE) )
-		goto done;
+		ERR(goto done);
 	if ( (idf = NAAAIM_SHA256_hmac_Init(idkey)) == NULL )
-		goto done;
+		ERR(goto done);
 
 
 	/*
@@ -819,11 +819,11 @@ static _Bool find_client(CO(Buffer, packet), CO(IDtoken, token), CO(Ivy, ivy))
 	 * files from being incorporated in the system measurement.
 	 */
 	if ( setreuid(1, -1) == -1 )
-		goto done;
+		ERR(goto done);
 	changed_id = true;
 
 	if ( glob("/etc/conf/*.ivy", 0, NULL, &identities) != 0 )
-		goto done;
+		ERR(goto done);
 
 	for (lp= 0; lp < identities.gl_pathc; ++lp) {
 		token->reset(token);
@@ -831,29 +831,29 @@ static _Bool find_client(CO(Buffer, packet), CO(IDtoken, token), CO(Ivy, ivy))
 
 		file->open_ro(file, identities.gl_pathv[lp]);
 		if ( !file->slurp(file, asn) )
-			goto done;
+			ERR(goto done);
 		file->reset(file);
 
 		if ( !ivy->decode(ivy, asn) )
-			goto done;
+			ERR(goto done);
 		asn->reset(asn);
 
 		/* Extract identity token. */
 		if ( (b = ivy->get_element(ivy, Ivy_id)) == NULL )
-			goto done;
+			ERR(goto done);
 		if ( !token->decode(token, b) )
-			goto done;
+			ERR(goto done);
 
 		if ( (b = token->get_element(token, IDtoken_orgkey)) == NULL )
-			goto done;
+			ERR(goto done);
 		idf->add_Buffer(idf, b);
 
 		if ( (b = token->get_element(token, IDtoken_orgid)) == NULL )
-			goto done;
+			ERR(goto done);
 		idf->add_Buffer(idf, b);
 
 		if ( !idf->compute(idf) )
-			goto done;
+			ERR(goto done);
 
 		if ( identity->equal(identity, idf->get_Buffer(idf)) ) {
 			retn = true;
@@ -921,7 +921,7 @@ static _Bool set_counter_party_personality(CO(Config, cfg), CO(IDtoken, token))
 
 	INIT(HurdLib, String, personality, goto done);
 	if ( (b = token->get_element(token, IDtoken_id)) == NULL )
-		goto done;
+		ERR(goto done);
 
 	p   = b->get(b);
         cnt = b->size(b);
@@ -1006,7 +1006,7 @@ static _Bool generate_shared_keys(CO(PossumPipe, this), CO(Buffer, nonce1),   \
 	dhkey->compute(dhkey, public, key);
 
 	if ( (hmac = NAAAIM_SHA256_hmac_Init(key)) == NULL )
-		goto done;
+		ERR(goto done);
 
 	/*
 	 * Generate the HMACsha256 hash of the inverted concantenated
@@ -1015,19 +1015,19 @@ static _Bool generate_shared_keys(CO(PossumPipe, this), CO(Buffer, nonce1),   \
 	hmac->add_Buffer(hmac, nonce2);
 	hmac->add_Buffer(hmac, nonce1);
 	if ( !hmac->compute(hmac) )
-		goto done;
+		ERR(goto done);
 
 	S->shared1->add(S->shared1, hmac->get_Buffer(hmac));
 	if ( !S->shared1->compute(S->shared1) )
-		goto done;
+		ERR(goto done);
 
 
 	/* XOR the supplied nonces. */
 	INIT(HurdLib, Buffer, xor, goto done);
 	if ( nonce1->size(nonce1) != nonce2->size(nonce2) )
-		goto done;
+		ERR(goto done);
 	if ( !xor->add_Buffer(xor, nonce1) )
-		goto done;
+		ERR(goto done);
 
 	p  = xor->get(xor);
 	p1 = nonce2->get(nonce2);
@@ -1044,11 +1044,11 @@ static _Bool generate_shared_keys(CO(PossumPipe, this), CO(Buffer, nonce1),   \
 	hmac->reset(hmac);
 	hmac->add_Buffer(hmac, xor);
 	if ( !hmac->compute(hmac) )
-		goto done;
+		ERR(goto done);
 
 	S->shared2->add(S->shared2, hmac->get_Buffer(hmac));
 	if ( !S->shared2->compute(S->shared2) )
-		goto done;
+		ERR(goto done);
 
 	retn = true;
 
@@ -1110,7 +1110,7 @@ static _Bool receive_platform_quote(CO(PossumPipe, this), CO(Buffer, bufr), \
 
 
 	if ( !S->duct->receive_Buffer(S->duct, bufr) )
-		goto done;
+		ERR(goto done);
 
 
 	INIT(HurdLib, Buffer, cksum, goto done);
@@ -1119,41 +1119,41 @@ static _Bool receive_platform_quote(CO(PossumPipe, this), CO(Buffer, bufr), \
 
 
 	if ( (hmac = NAAAIM_SHA256_hmac_Init(key)) == NULL )
-		goto done;
+		ERR(goto done);
 	bufr->shrink(bufr, 32);
 	hmac->add_Buffer(hmac, bufr);
 	if ( !hmac->compute(hmac) )
-		goto done;
+		ERR(goto done);
 	if ( !cksum->equal(cksum, hmac->get_Buffer(hmac)) )
-		goto done;
+		ERR(goto done);
 
 
 	INIT(HurdLib, Buffer, iv, goto done);
 	if ( !iv->add(iv, bufr->get(bufr), 16) )
-		goto done;
+		ERR(goto done);
 
 	if ( (cipher = NAAAIM_AES256_cbc_Init_decrypt(key, iv)) \
 	     == NULL )
-		goto done;
+		ERR(goto done);
 
 	INIT(HurdLib, Buffer, quote, goto done);
 	cksum->reset(cksum);
 	if ( !cksum->add(cksum, bufr->get(bufr) + 16, bufr->size(bufr) - 16) )
-		goto done;
+		ERR(goto done);
 	if ( !cipher->decrypt(cipher, cksum) )
-		goto done;
+		ERR(goto done);
 	if ( !quote->add_Buffer(quote, cipher->get_Buffer(cipher)) )
-		goto done;
+		ERR(goto done);
 
 
 	INIT(NAAAIM, TPMcmd, tpmcmd, goto done);
 
 	if ( (pubkey = ivy->get_element(ivy, Ivy_pubkey)) == NULL )
-		goto done;
+		ERR(goto done);
 	if ( (ref = ivy->get_element(ivy, Ivy_reference)) == NULL )
-		goto done;
+		ERR(goto done);
 	if ( !tpmcmd->verify(tpmcmd, pubkey, ref, nonce, quote) )
-		goto done;
+		ERR(goto done);
 
 	retn = true;
 
@@ -1220,42 +1220,42 @@ static _Bool send_platform_quote(CO(PossumPipe, this), CO(Buffer, bufr), \
 	INIT(HurdLib, Buffer, uuid, goto done);
 	aik_file->open_ro(aik_file, "/etc/conf/aik");
 	if ( !aik_file->slurp(aik_file, uuid) )
-		goto done;
+		ERR(goto done);
 
 	INIT(NAAAIM, TPMcmd, tpmcmd, goto done);
 	INIT(HurdLib, Buffer, quote, goto done);
 	INIT(NAAAIM, RandomBuffer, iv, goto done);
 
 	if ( !tpmcmd->pcrmask(tpmcmd, 10, 15, 17, 18, -1) )
-		goto done;
+		ERR(goto done);
 	if ( !quote->add_Buffer(quote, nonce) )
-		goto done;
+		ERR(goto done);
 
 	if ( !tpmcmd->quote(tpmcmd, uuid, quote) )
-		goto done;
+		ERR(goto done);
 
 	if ( !iv->generate(iv, 16) )
-		goto done;
+		ERR(goto done);
 	b= iv->get_Buffer(iv);
 	bufr->add_Buffer(bufr, b);
 
 	if ( (cipher = NAAAIM_AES256_cbc_Init_encrypt(key, b)) == NULL )
-		goto done;
+		ERR(goto done);
 	if ( !cipher->encrypt(cipher, quote) )
-		goto done;
+		ERR(goto done);
 	if ( !bufr->add_Buffer(bufr, cipher->get_Buffer(cipher)) )
-		goto done;
+		ERR(goto done);
 
 	if ( (hmac = NAAAIM_SHA256_hmac_Init(key)) == NULL )
-		goto done;
+		ERR(goto done);
 	hmac->add_Buffer(hmac, bufr);
 	if ( !hmac->compute(hmac) )
-		goto done;
+		ERR(goto done);
 	if ( !bufr->add_Buffer(bufr, hmac->get_Buffer(hmac)) )
-		goto done;
+		ERR(goto done);
 
 	if ( !duct->send_Buffer(duct, bufr) )
-		goto done;
+		ERR(goto done);
 	retn = true;
 
 
@@ -1315,7 +1315,7 @@ static _Bool receive_connection_start(CO(PossumPipe, this), CO(Buffer, bufr))
 
 	/* Receive the confirmation message. */
 	if ( !duct->receive_Buffer(duct, bufr) )
-		goto done;
+		ERR(goto done);
 
 
 	/* Validate the confirmation checksum. */
@@ -1324,37 +1324,37 @@ static _Bool receive_connection_start(CO(PossumPipe, this), CO(Buffer, bufr))
 	cksum->add(cksum, bufr->get(bufr) + payload, 32);
 
 	if ( (hmac = NAAAIM_SHA256_hmac_Init(key)) == NULL )
-		goto done;
+		ERR(goto done);
 	bufr->shrink(bufr, 32);
 	hmac->add_Buffer(hmac, bufr);
 	if ( !hmac->compute(hmac) )
-		goto done;
+		ERR(goto done);
 	if ( !cksum->equal(cksum, hmac->get_Buffer(hmac)) )
-		goto done;
+		ERR(goto done);
 
 
 	/* Decrypt the authenticator. */
 	INIT(HurdLib, Buffer, iv, goto done);
 	if ( !iv->add(iv, bufr->get(bufr), 16) )
-		goto done;
+		ERR(goto done);
 
 	if ( (cipher = NAAAIM_AES256_cbc_Init_decrypt(key, iv)) == NULL )
-		goto done;
+		ERR(goto done);
 	cksum->reset(cksum);
 	if ( !cksum->add(cksum, bufr->get(bufr) + 16, bufr->size(bufr) - 16) )
-		goto done;
+		ERR(goto done);
 	if ( !cipher->decrypt(cipher, cksum) )
-		goto done;
+		ERR(goto done);
 
 
 	/* Confirm the authenticator. */
 	INIT(NAAAIM, SHA256, sha256, goto done);
 	sha256->add(sha256, key);
 	if ( !sha256->compute(sha256) )
-		goto done;
+		ERR(goto done);
 	b = sha256->get_Buffer(sha256);
 	if ( !b->equal(b, cipher->get_Buffer(cipher)) )
-		goto done;
+		ERR(goto done);
 
 	retn = true;
 
@@ -1426,7 +1426,7 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 	software_status->open(software_status);
 	fputs("Measuring software status.\n", stderr);
 	if ( !software_status->measure(software_status) )
-		goto done;
+		ERR(goto done);
 	fputs("Host software status:\n", stdout);
 	b = software_status->get_template_hash(software_status);
 	b->print(b);
@@ -1437,10 +1437,8 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 
 	/* Wait for a packet to arrive. */
 	fprintf(stderr, "%s: Waiting for initialization packet.\n", __func__);
-	if ( !duct->receive_Buffer(duct, netbufr) ) {
-		fputs("Packet receive failed.\n", stderr);
-		goto done;
-	}
+	if ( !duct->receive_Buffer(duct, netbufr) )
+		ERR(goto done);
 	fprintf(stdout, "\n%s: Raw receive packet:\n", __func__);
 	netbufr->hprint(netbufr);
 	fputc('\n', stdout);
@@ -1448,10 +1446,8 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 	/* Lookup the client identity. */
 	INIT(NAAAIM, IDtoken, token, goto done);
 	INIT(NAAAIM, Ivy, ivy, goto done);
-	if ( !find_client(netbufr, token, ivy) ) {
-		fputs("Cannot locate client.\n", stdout);
-		goto done;
-	}
+	if ( !find_client(netbufr, token, ivy) )
+		ERR(goto done);
 
 	/* Set the client configuration personality. */
 #if 0
@@ -1466,13 +1462,13 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 	 */
 	if ( !set_counter_party_personality(cfg, token) ) {
 		fputs("Cannot find personality.\n", stdout);
-		goto done;
+		ERR(goto done);
 	}
 #endif
 
 	/* Verify and decode packet. */
 	if ( (b = ivy->get_element(ivy, Ivy_software)) == NULL )
-		goto done;
+		ERR(goto done);
 	S->software->add_Buffer(S->software, b);
 	fputs("Client software:\n", stdout);
 	S->software->print(S->software);
@@ -1480,7 +1476,7 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 
 	INIT(NAAAIM, PossumPacket, packet, goto done);
 	if ( !packet->decode_packet1(packet, token, S->software, netbufr) )
-		goto done;
+		ERR(goto done);
 	fprintf(stdout, "%s: Incoming client packet 1:\n", __func__);
 	packet->print(packet);
 	fputc('\n', stdout);
@@ -1490,15 +1486,15 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 	INIT(HurdLib, Buffer, quote_nonce, goto done);
 	if ( (b = packet->get_element(packet, PossumPacket_replay_nonce)) \
 	     == NULL )
-		goto done;
+		ERR(goto done);
 	if ( !nonce->add_Buffer(nonce, b) )
-		goto done;
+		ERR(goto done);
 	if ( (b = packet->get_element(packet, PossumPacket_quote_nonce)) \
 	     == NULL )
-		goto done;
+		ERR(goto done);
 
 	if ( !quote_nonce->add_Buffer(quote_nonce, b) )
-		goto done;
+		ERR(goto done);
 
 	/* Verify hardware quote. */
 
@@ -1506,9 +1502,9 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 
 	INIT(HurdLib, Buffer, public, goto done);
 	if ( (b = packet->get_element(packet, PossumPacket_public)) == NULL )
-		goto done;
+		ERR(goto done);
 	if ( !public->add_Buffer(public, b) )
-		goto done;
+		ERR(goto done);
 
 	/* Generate DH public key for shared secret. */
 	INIT(NAAAIM, Curve25519, dhkey, goto done);
@@ -1518,11 +1514,11 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 	token->reset(token);
 	INIT(NAAAIM, IDmgr, idmgr, goto done);
 	if ( (name = HurdLib_String_Init_cstr("device")) == NULL )
-		goto done;
+		ERR(goto done);
 
 	idmgr->attach(idmgr);
 	if ( !idmgr->get_idtoken(idmgr, name, token) )
-		goto done;
+		ERR(goto done);
 
 	packet->reset(packet);
 	netbufr->reset(netbufr);
@@ -1533,14 +1529,14 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 	 */
 #if 0
 	if ( (tspi = packet->get_value(packet, PossumPacket_spi)) == 0 )
-		goto done;
+		ERR(goto done);
 	spi = propose_spi(HOST_SPI_ARENA, tspi & UINT16_MAX);
 	if ( spi == 0 )
 		spi = propose_spi(CLIENT_SPI_ARENA, tspi >> 16);
 	if ( spi == 0 )
 		spi = propose_spi(RESERVE_SPI_ARENA, 0);
 	if ( spi == 0 )
-		goto done;
+		ERR(goto done);
 #endif
 
 	packet->set_schedule(packet, token, time(NULL));
@@ -1553,28 +1549,28 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 	fputc('\n', stdout);
 
 	if ( !packet->encode_packet1(packet, b, netbufr) )
-		goto done;
+		ERR(goto done);
 	if ( !duct->send_Buffer(duct, netbufr) )
-		goto done;
+		ERR(goto done);
 	fprintf(stdout, "%s: Sent host packet 1:\n", __func__);
 	packet->print(packet);
 	fputc('\n', stdout);
 
 	if ( (b = packet->get_element(packet, PossumPacket_replay_nonce)) \
 	     == NULL )
-		goto done;
+		ERR(goto done);
 	if ( !generate_shared_keys(this, b, nonce, dhkey, public) ) {
 		fputs("Failed key generation.\n", stderr);
-		goto done;
+		ERR(goto done);
 	}
 
 	/* Wait for platform verification reference quote. */
 	netbufr->reset(netbufr);
 	if ( (b = packet->get_element(packet, PossumPacket_quote_nonce)) == \
 	     NULL )
-		goto done;
+		ERR(goto done);
 	if ( !receive_platform_quote(this, netbufr, ivy, b) )
-		goto done;
+		ERR(goto done);
 	fputs("\nVerified secure counter-party:\n", stdout);
 	ivy->print(ivy);
 	fputc('\n', stdout);
@@ -1582,13 +1578,13 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 	/* Send platform verification quote. */
 	netbufr->reset(netbufr);
 	if ( !send_platform_quote(this, netbufr, quote_nonce) )
-		goto done;
+		ERR(goto done);
 
 	/* Get connection confirmation start. */
 	netbufr->reset(netbufr);
 	if ( !receive_connection_start(this, netbufr) ) {
 		fputs("Failed connection start.\n", stderr);
-		goto done;
+		ERR(goto done);
 	}
 
 	fputs("Shared 1:\n", stderr);
@@ -1601,7 +1597,7 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 	S->sent->add(S->sent, S->shared1->get_Buffer(S->shared1));
 	S->sent->add(S->sent, S->shared2->get_Buffer(S->shared2));
 	if ( !S->sent->compute(S->sent) )
-		goto done;
+		ERR(goto done);
 	fputs("Send root:\n", stderr);
 	S->sent->print(S->sent);
 
@@ -1609,7 +1605,7 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 	S->received->add(S->received, S->shared2->get_Buffer(S->shared2));
 	S->received->add(S->received, S->shared1->get_Buffer(S->shared1));
 	if ( !S->received->compute(S->received) )
-		goto done;
+		ERR(goto done);
 	fputs("Receive root:\n", stderr);
 	S->received->print(S->received);
 	fputc('\n', stderr);
@@ -1680,37 +1676,37 @@ static _Bool send_connection_start(CO(PossumPipe, this), CO(Buffer, bufr))
 	/* Generate the initialization vector. */
 	INIT(NAAAIM, RandomBuffer, iv, goto done);
 	if ( !iv->generate(iv, 16) )
-		goto done;
+		ERR(goto done);
 	if ( !bufr->add_Buffer(bufr, iv->get_Buffer(iv)) )
-		goto done;
+		ERR(goto done);
 
 	/* Generate the connection authenticator. */
 	INIT(NAAAIM, SHA256, sha256, goto done);
 	sha256->add(sha256, key);
 	if ( !sha256->compute(sha256) )
-		goto done;
+		ERR(goto done);
 
 	/* Encrypt the authenticator. */
 	b = iv->get_Buffer(iv);
 	if ( (cipher = NAAAIM_AES256_cbc_Init_encrypt(key, b)) == NULL )
-		goto done;
+		ERR(goto done);
 	if ( !cipher->encrypt(cipher, sha256->get_Buffer(sha256)) )
-		goto done;
+		ERR(goto done);
 	if ( !bufr->add_Buffer(bufr, cipher->get_Buffer(cipher)) )
-		goto done;
+		ERR(goto done);
 
 	/* Add the authenticator checksum. */
 	if ( (hmac = NAAAIM_SHA256_hmac_Init(key)) == NULL )
-		goto done;
+		ERR(goto done);
 	hmac->add_Buffer(hmac, bufr);
 	if ( !hmac->compute(hmac) )
-		goto done;
+		ERR(goto done);
 	if ( !bufr->add_Buffer(bufr, hmac->get_Buffer(hmac)) )
-		goto done;
+		ERR(goto done);
 
 	/* Send the authenticator. */
 	if ( !duct->send_Buffer(duct, bufr) )
-		goto done;
+		ERR(goto done);
 
 	retn = true;
 
@@ -1778,19 +1774,17 @@ static _Bool start_client_mode(CO(PossumPipe, this))
 	INIT(NAAAIM, IDtoken, token, goto done);
 	INIT(NAAAIM, IDmgr, idmgr, goto done);
 	if ( (name = HurdLib_String_Init_cstr("device")) == NULL )
-		goto done;
+		ERR(goto done);
 
 	idmgr->attach(idmgr);
-	if ( !idmgr->get_idtoken(idmgr, name, token) ) {
-		fputs("Failed to obtain identity token.\n", stderr);
-		goto done;
-	}
+	if ( !idmgr->get_idtoken(idmgr, name, token) )
+		ERR(goto done);
 
 	/* Measure the current software state. */
 	INIT(NAAAIM, SoftwareStatus, software_status, goto done);
 	software_status->open(software_status);
 	if ( !software_status->measure(software_status) )
-		goto done;
+		ERR(goto done);
 
 	/* Send a session initiation packet. */
 	INIT(HurdLib, Buffer, bufr, goto done);
@@ -1813,9 +1807,9 @@ static _Bool start_client_mode(CO(PossumPipe, this))
 	fputs("Software status:\n", stdout);
 	b->print(b);
 	if ( !packet->encode_packet1(packet, b, bufr) )
-		goto done;
+		ERR(goto done);
 	if ( !duct->send_Buffer(duct, bufr) )
-		goto done;
+		ERR(goto done);
 
 	fprintf(stdout, "\n%s: Sent client packet 1:\n", __func__);
 	packet->print(packet);
@@ -1826,21 +1820,21 @@ static _Bool start_client_mode(CO(PossumPipe, this))
 	INIT(HurdLib, Buffer, quote_nonce, goto done);
 	if ( (b = packet->get_element(packet, PossumPacket_quote_nonce)) == \
 	     NULL )
-		goto done;
+		ERR(goto done);
 	if ( !quote_nonce->add_Buffer(quote_nonce, b) )
-		goto done;
+		ERR(goto done);
 
 	if ( (b = packet->get_element(packet, PossumPacket_replay_nonce)) \
 	     == NULL )
-		goto done;
+		ERR(goto done);
 	if ( !nonce->add_Buffer(nonce, b) )
-		goto done;
+		ERR(goto done);
 
 	/* Wait for a packet to arrive. */
 	packet->reset(packet);
 	bufr->reset(bufr);
 	if ( !duct->receive_Buffer(duct, bufr) )
-		goto done;
+		ERR(goto done);
 	fprintf(stdout, "%s: Raw receive packet:\n", __func__);
 	bufr->hprint(bufr);
 	fputc('\n', stdout);
@@ -1849,7 +1843,7 @@ static _Bool start_client_mode(CO(PossumPipe, this))
 	INIT(NAAAIM, Ivy, ivy, goto done);
 	token->reset(token);
 	if ( !find_client(bufr, token, ivy) )
-		goto done;
+		ERR(goto done);
 
 	/* Set the host configuration personality. */
 
@@ -1859,46 +1853,46 @@ static _Bool start_client_mode(CO(PossumPipe, this))
 	 * function
 	 */
 	if ( !set_counter_party_personality(cfg, token) )
-	     goto done;
+	     ERR(goto done);
 #endif
 
 	INIT(HurdLib, Buffer, S->software, goto done);
 	if ( (b = ivy->get_element(ivy, Ivy_software)) == NULL )
-		goto done;
+		ERR(goto done);
 	S->software->add_Buffer(S->software, b);
 	if ( !packet->decode_packet1(packet, token, S->software, bufr) )
-		goto done;
+		ERR(goto done);
 
 	fprintf(stdout, "%s: Received host packet 1.\n", __func__);
 	packet->print(packet);
 	fputc('\n', stdout);
 
 	if ( (b = packet->get_element(packet, PossumPacket_public)) == NULL )
-		goto done;
+		ERR(goto done);
 	public = b;
 
 	if ( (b = packet->get_element(packet, PossumPacket_replay_nonce)) \
 	     == NULL )
-		goto done;
+		ERR(goto done);
 	bufr->reset(bufr);
 	if ( !bufr->add_Buffer(bufr, b) )
-		goto done;
+		ERR(goto done);
 
 	if ( !generate_shared_keys(this, bufr, nonce, dhkey, public) )
-		goto done;
+		ERR(goto done);
 
 	/* Send platform reference. */
 	if ( (b = packet->get_element(packet, PossumPacket_quote_nonce)) \
 	     == NULL )
-		goto done;
+		ERR(goto done);
 	bufr->reset(bufr);
 	if ( !send_platform_quote(this, bufr, b) )
-		goto done;
+		ERR(goto done);
 
 	/* Receive platform reference. */
 	bufr->reset(bufr);
 	if ( !receive_platform_quote(this, bufr, ivy, quote_nonce) )
-		goto done;
+		ERR(goto done);
 	fputs("\nVerified secure host:\n", stderr);
 	ivy->print(ivy);
 	fputc('\n', stdout);
@@ -1906,7 +1900,7 @@ static _Bool start_client_mode(CO(PossumPipe, this))
 	/* Send initiation packet. */
 	bufr->reset(bufr);
 	if ( !send_connection_start(this, bufr) )
-		goto done;
+		ERR(goto done);
 
 	fputs("Shared 1:\n", stderr);
 	S->shared1->print(S->shared1);
@@ -1918,7 +1912,7 @@ static _Bool start_client_mode(CO(PossumPipe, this))
 	S->sent->add(S->sent, S->shared2->get_Buffer(S->shared2));
 	S->sent->add(S->sent, S->shared1->get_Buffer(S->shared1));
 	if ( !S->sent->compute(S->sent) )
-		goto done;
+		ERR(goto done);
 	fputs("Send root:\n", stderr);
 	S->sent->print(S->sent);
 
@@ -1926,7 +1920,7 @@ static _Bool start_client_mode(CO(PossumPipe, this))
 	S->received->add(S->received, S->shared1->get_Buffer(S->shared1));
 	S->received->add(S->received, S->shared2->get_Buffer(S->shared2));
 	if ( !S->received->compute(S->received) )
-		goto done;
+		ERR(goto done);
 	fputs("Receive root:\n", stderr);
 	S->received->print(S->received);
 	fputc('\n', stderr);
