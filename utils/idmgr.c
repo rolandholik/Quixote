@@ -381,7 +381,8 @@ static _Bool load_service_identities(void)
 	IDtoken identity = NULL;
 
 
-	if ( (gretn = glob("/etc/conf/*.idt", 0, NULL, &identities)) != 0 ) {
+	if ( (gretn = glob("/etc/conf/identities/*.idt", 0, NULL, \
+			   &identities)) != 0 ) {
 		if ( gretn == GLOB_NOMATCH )
 			retn = true;
 		goto done;
