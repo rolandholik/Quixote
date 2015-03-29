@@ -318,6 +318,7 @@ extern int main(int argc, char *argv[])
 	WHACK(bufr);
 	WHACK(uuid);
 	       
+	WHACK(name);
 	WHACK(file);
 	WHACK(token);
 	WHACK(idmgr);
