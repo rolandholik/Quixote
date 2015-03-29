@@ -2,12 +2,25 @@
  * (C)Copyright 2003, The Open Hurderos Foundation. All rights reserved.
  **************************************************************************/
 
+/* Code generation macros. */
+/* Macro for setting error location. */
+#if 0
+#define NAAAIM_DEBUG
+#endif
+
+#define ERR(action) {fprintf(stderr, "[%s,%s,%d]: Error location.\n", __FILE__, __func__, __LINE__); action;}
+
+#if defined(NAAAIM_DEBUG)
+#define SAY(msg) {fprintf(stdout, "%s: %s\n", __func__, msg); fflush(stdout);}
+#else
+#define SAY(msg) {}
+#endif
+
 
 /* Include files. */
 #if defined(DMALLOC)
 #include "dmalloc.h"
 #endif
-
 
 /* The size of an individual identity in bytes. */
 #define NAAAIM_IDSIZE 32
