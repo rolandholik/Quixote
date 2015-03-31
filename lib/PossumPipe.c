@@ -14,6 +14,7 @@
 
 /* Local defines. */
 #define IV_SIZE 16
+#define ENCRYPTION_BLOCKSIZE 16
 #define CHECKSUM_SIZE 32
 
 
@@ -83,6 +84,9 @@ struct NAAAIM_PossumPipe_State
 	/* Network connection object. */
 	Duct duct;
 
+	/* Packet transmission nonce. */
+	SHA256 nonce;
+
 	/* Shared secrets. */
 	SHA256 shared1;
 	SHA256 shared2;
@@ -102,11 +106,13 @@ struct NAAAIM_PossumPipe_State
  */
 typedef struct {
 	ASN1_INTEGER *type;
+	ASN1_OCTET_STRING *nonce;
 	ASN1_OCTET_STRING *payload;
 } possum_packet;
 
 ASN1_SEQUENCE(possum_packet) = {
 	ASN1_SIMPLE(possum_packet, type,    ASN1_INTEGER),
+	ASN1_SIMPLE(possum_packet, nonce,    ASN1_OCTET_STRING),
 	ASN1_SIMPLE(possum_packet, payload, ASN1_OCTET_STRING),
 } ASN1_SEQUENCE_END(possum_packet)
 
@@ -131,12 +137,72 @@ static void _init_state(CO(PossumPipe_State,S))
 
 	S->poisoned = false;
 
+	S->nonce = NULL;
+
 	S->sent	    = NULL;
 	S->received = NULL;
 
 	S->software = NULL;
 
 	return;
+}
+
+
+/**
+ * Internal private method.
+ *
+ * This method implements initialization of the object which will hold
+ * the data used for the per packet nonce.  This is a SHA256 object
+ * which will be used to generate 1-2 encryption blocks of data to be
+ * loaded into the packet.
+ *
+ * \param S		A pointer to the object state of the object
+ *			requesting generation of the nonce.
+ *
+ * \param chksum	The object which will contain the checksum.
+ *
+ * \return		A boolean value is returned to indicate the
+ *			status of the checksum encryption.  A false value
+ *			indicates an error occured during
+ *			initialization of the nonce.  A true value
+ *			indicates the nonce has been successfully
+ *			initialized.
+ */
+
+static _Bool _setup_nonce(CO(PossumPipe_State, S))
+
+{
+	_Bool retn = false;
+
+	Buffer b;
+
+	RandomBuffer rb = NULL;
+
+
+	INIT(NAAAIM, RandomBuffer, rb, goto done);
+
+	/* Seed the random number generator. */
+	if ( !rb->generate(rb, sizeof(unsigned int)) )
+		ERR(goto done);
+	b = rb->get_Buffer(rb);
+	srand(*((unsigned int *) b->get(b)));
+
+
+	/* Initialize the nonce generator. */
+	INIT(NAAAIM, SHA256, S->nonce, goto done);
+	if ( !rb->generate(rb, 2 * ENCRYPTION_BLOCKSIZE) )
+		ERR(goto done);
+	S->nonce->add(S->nonce, rb->get_Buffer(rb));
+	if ( !S->nonce->compute(S->nonce) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	WHACK(rb);
+
+	return retn;
 }
 
 
@@ -540,6 +606,16 @@ static _Bool send_packet(CO(PossumPipe, this), const PossumPipe_type type, \
 		ERR(goto done);
 	if ( ASN1_OCTET_STRING_set(packet->payload, bufr->get(bufr), \
 				   bufr->size(bufr)) != 1 )
+		ERR(goto done);
+
+	/* Generate a per packet nonce. */
+	b = S->nonce->get_Buffer(S->nonce);
+	bufr->reset(bufr);
+	bufr->add(bufr, b->get(b), rand() & 0x1f);
+	if ( ASN1_OCTET_STRING_set(packet->nonce, bufr->get(b), \
+				   bufr->size(b)) != 1 )
+		ERR(goto done);
+	if ( !S->nonce->rehash(S->nonce, (rand() & 0xf) + 1) )
 		ERR(goto done);
 
         asn_size = i2d_possum_packet(packet, p);
@@ -1610,6 +1686,10 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 	S->received->print(S->received);
 	fputc('\n', stderr);
 
+	/* Setup client nonce. */
+	if ( !_setup_nonce(S) )
+		ERR(goto done);
+
 	retn = true;
 
  done:
@@ -1925,6 +2005,10 @@ static _Bool start_client_mode(CO(PossumPipe, this))
 	S->received->print(S->received);
 	fputc('\n', stderr);
 
+	/* Setup client nonce. */
+	if ( !_setup_nonce(S) )
+		ERR(goto done);
+
 	retn = true;
 
  done:
@@ -1995,6 +2079,8 @@ static void whack(CO(PossumPipe, this))
 
 
 	S->duct->whack(S->duct);
+
+	WHACK(S->nonce);
 
 	S->shared1->whack(S->shared1);
 	S->shared2->whack(S->shared2);
