@@ -5,9 +5,10 @@
 
 # Variable declarations.
 CSRC = Duct.c OTEDKS.c Curve25519.c IPC.c SoftwareStatus.c Ivy.c IDmgr.c \
-	TPMcmd.c PossumPacket.c PossumPipe.c
+	TPMcmd.c PossumPacket.c PossumPipe.c RSAkey.c
 
-TESTS = Duct_test OTEDKS_test Curve25519_test IPC_test PossumPipe_test
+TESTS = Duct_test OTEDKS_test Curve25519_test IPC_test PossumPipe_test \
+	RSAkey_test
 
 CC = musl-gcc
 
@@ -80,6 +81,9 @@ PossumPipe_test: PossumPipe_test.o PossumPipe.o ../SHA256.o ../SHA256_hmac.o \
 	${CC} ${LDFLAGS} -o $@ $^ -L . -lNAAAIM -L../HurdLib -lHurdLib \
 	${SSL_LIBRARY} -lrt -ltspi;
 
+RSAkey_test: RSAkey_test.o RSAkey.o
+	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${SSL_LIBRARY};
+
 tags:
 	/opt/emacs/bin/etags *.{h,c};
 clean:
@@ -99,3 +103,4 @@ PossumPipe.o: ../NAAAIM.h PossumPipe.h Duct.h SoftwareStatus.h Curve25519.h \
 
 Duct_test.o: Duct.h ../NAAAIM.h
 PossumpPipe_test.o: PossumPipe.h
+RSAkey.o: RSAkey.h
