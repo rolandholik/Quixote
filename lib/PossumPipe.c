@@ -2049,6 +2049,8 @@ static void reset(CO(PossumPipe, this))
 
 
 	/* Clear the security state information. */
+	S->nonce->reset(S->nonce);
+
 	S->shared1->reset(S->shared1);
 	S->shared2->reset(S->shared2);
 
