@@ -1,5 +1,7 @@
 /** \file
- *
+ * This file implements methods for managing and manipulating
+ * operations using assymetric RSA keys.  The RSAkey.h file provides
+ * the API definitions and contracts for this object.
  */
 
 /**************************************************************************
@@ -19,11 +21,15 @@
 #include <openssl/err.h>
 
 #include <Origin.h>
+#include <HurdLib.h>
 #include <Buffer.h>
 
 #include "NAAAIM.h"
 #include "RSAkey.h"
 
+
+/* State definition macro. */
+#define STATE(var) CO(RSAkey_State, var) = this->state
 
 /* Verify library/object header file inclusions. */
 #if !defined(NAAAIM_LIBID)
@@ -68,13 +74,17 @@ struct NAAAIM_RSAkey_State
  *        is to be initialized.
  */
 
-static void _init_state(const RSAkey_State const S) {
+static void _init_state(CO(RSAkey_State, S))
 
+{
 	S->libid = NAAAIM_LIBID;
 	S->objid = NAAAIM_RSAkey_OBJID;
 
-	S->type = no_key;
 	S->poisoned = false;
+
+	S->type = no_key;
+	S->key	= NULL;
+
 	return;
 }
 
@@ -87,33 +97,33 @@ static void _init_state(const RSAkey_State const S) {
  *
  */
 
-static _Bool load_private_key(const RSAkey const this, const char * const file)
+static _Bool load_private_key(CO(RSAkey, this), CO(char *,file))
 
 {
+	STATE(S);
+
 	_Bool retn = false;
 
-	const RSAkey_State const S = this->state;
-	
 	FILE *infile = NULL;
 
 
-	if ( (infile = fopen(file, "r")) == NULL ) {
-		S->poisoned = true;
-		goto done;
-	}
+	if ( (infile = fopen(file, "r")) == NULL )
+		ERR(goto done);
 
-	if ( PEM_read_RSAPrivateKey(infile, &S->key, NULL, NULL) == NULL ) {
-		S->poisoned = true;
-		goto done;
-	}
+	if ( PEM_read_RSAPrivateKey(infile, &S->key, NULL, NULL) == NULL )
+		ERR(goto done);
 
-	retn = true;
+	retn	= true;
 	S->type = private_key;
 
 
  done:
+	if ( !retn )
+		S->poisoned = true;
+
 	if ( infile != NULL )
 		fclose(infile);
+
 	return retn;
 }
 
@@ -126,34 +136,33 @@ static _Bool load_private_key(const RSAkey const this, const char * const file)
  *
  */
 
-static _Bool load_public_key(const RSAkey const this, const char * const file)
+static _Bool load_public_key(CO(RSAkey, this), CO(char *, file))
 
 {
-	_Bool retn = false;
+	STATE(S);
 
-	const RSAkey_State const S = this->state;
+	_Bool retn = false;
 	
 	FILE *infile = NULL;
 
 
+	if ( (infile = fopen(file, "r")) == NULL )
+		ERR(goto done);
 
-	if ( (infile = fopen(file, "r")) == NULL ) {
-		S->poisoned = true;
-		goto done;
-	}
+	if ( PEM_read_RSA_PUBKEY(infile, &S->key, NULL, NULL) == NULL )
+		ERR(goto done);
 
-	if ( PEM_read_RSA_PUBKEY(infile, &S->key, NULL, NULL) == NULL ) {
-		S->poisoned = true;
-		goto done;
-	}
-
-	retn = true;
+	retn	= true;
 	S->type = public_key;
 
 
  done:
+	if ( !retn )
+		S->poisoned = true;
+
 	if ( infile != NULL )
 		fclose(infile);
+
 	return retn;
 }
 
@@ -184,25 +193,25 @@ static _Bool load_public_key(const RSAkey const this, const char * const file)
  *			success.
  */
 
-static _Bool encrypt(const RSAkey const this, const Buffer payload)
+static _Bool encrypt(CO(RSAkey, this), CO(Buffer, payload))
 
 {
-	auto const RSAkey_State const S = this->state;
+	STATE(S);
 
-	auto _Bool retn = false;
+	_Bool retn = false;
 
-	auto int enc_status;
+	int enc_status;
 
-	auto unsigned char output[RSA_size(S->key)];
+	unsigned char output[RSA_size(S->key)];
 
 
 	/* Sanity checks. */
 	if ( S->poisoned )
-		goto done;
-	if ( (S->type == no_key) || payload->poisoned(payload) ) {
-		S->poisoned = true;
-		goto done;
-	}
+		ERR(goto done);
+	if ( S->type == no_key )
+		ERR(goto done);
+	if ( (payload == NULL) || payload->poisoned(payload) )
+		ERR(goto done);
 
 
 	/* Encrypt with private key. */
@@ -217,16 +226,20 @@ static _Bool encrypt(const RSAkey const this, const Buffer payload)
 						output, S->key,	 \
 						RSA_PKCS1_OAEP_PADDING);
 
-	if ( enc_status == -1 || (enc_status != RSA_size(S->key)) ) {
-		S->poisoned = true;
-		goto done;
-	}
+	if ( enc_status == -1 || (enc_status != RSA_size(S->key)) )
+		ERR(goto done);
 
 	payload->reset(payload);
-	payload->add(payload, output, sizeof(output));
+	if ( !payload->add(payload, output, sizeof(output)) )
+		ERR(goto done);
+
 	retn = true;
 
+
  done:
+	if ( !retn )
+		S->poisoned = true;
+
 	return retn;
 }
 
@@ -254,25 +267,25 @@ static _Bool encrypt(const RSAkey const this, const Buffer payload)
  *			success.
  */
 
-static _Bool decrypt(const RSAkey const this, const Buffer payload)
+static _Bool decrypt(CO(RSAkey, this), CO(Buffer, payload))
 
 {
-	auto const RSAkey_State const S = this->state;
+	STATE(S);
 
-	auto _Bool retn = false;
+	_Bool retn = false;
 
-	auto int status;
+	int status;
 
-	auto unsigned char output[RSA_size(S->key)];
+	unsigned char output[RSA_size(S->key)];
 
 
 	/* Sanity checks. */
 	if ( S->poisoned )
-		goto done;
-	if ( (S->type == no_key) || payload->poisoned(payload) ) {
-		S->poisoned = true;
-		goto done;
-	}
+		ERR(goto done);
+	if ( S->type == no_key )
+		ERR(goto done);
+	if ( (payload == NULL) || payload->poisoned(payload) )
+		ERR(goto done);
 
 
 	/* Encrypt with private key. */
@@ -285,16 +298,20 @@ static _Bool decrypt(const RSAkey const this, const Buffer payload)
 					    payload->get(payload), output, \
 					    S->key, RSA_PKCS1_PADDING);
 
-	if ( status == -1 ) {
-		S->poisoned = true;
-		goto done;
-	}
+	if ( status == -1 )
+		ERR(goto done);
 
 	payload->reset(payload);
-	payload->add(payload, output, status);
+	if ( !payload->add(payload, output, status) )
+		goto done;
+
 	retn = true;
 
+
 done:
+	if ( !retn )
+		S->poisoned = true;
+
 	return retn;
 }
 
@@ -309,7 +326,7 @@ done:
  * \return	The size of the encrypion key in bytes.
  */
 
-static int size(const RSAkey const this)
+static int size(CO(RSAkey, this))
 
 {
 	return RSA_size(this->state->key);
@@ -326,23 +343,27 @@ static int size(const RSAkey const this)
  * \param this	A pointer to the key which is to be printed.
  */
 
-static void print(const RSAkey const this)
+static void print(CO(RSAkey, this))
 
 {
-	auto const RSAkey_State const S = this->state;
+	STATE(S);
 
-	auto BIO *output;
+	BIO *output;
 
 
-	if ( S->type == no_key )
+	if ( S->poisoned ) {
+		fputs("Object is poisoned.\n", stderr);
 		return;
-
+	}
+	if ( S->type == no_key ) {
+		fputs("Object has no key.\n", stderr);
+		return;
+	}
 
         output=BIO_new(BIO_s_file());
 	BIO_set_fp(output, stdout, BIO_NOCLOSE);
 	if ( !RSA_print(output, S->key, 0) )
-		fputs("Error printing file.\n", stderr);
-
+		fputs("Error printing key.\n", stderr);
 
 	return;
 }
@@ -356,15 +377,16 @@ static void print(const RSAkey const this)
  * \param this	A pointer to the object which is to be destroyed.
  */
 
-static void whack(const RSAkey const this)
+static void whack(CO(RSAkey, this))
 
 {
-	auto const RSAkey_State const S = this->state;
+	STATE(S);
 
 
-	RSA_free(S->key);
-
+	if ( S->key != NULL )
+		RSA_free(S->key);
 	S->root->whack(S->root, this, S);
+
 	return;
 }
 

@@ -1,5 +1,6 @@
 /** \file
- *
+ * This file implements the methods and API definitions for an object
+ * which implements operations on assymetric RSA keys.
  */
 
 /**************************************************************************
