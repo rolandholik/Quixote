@@ -22,6 +22,7 @@ LIBRARY = lib${LIBNAME}.a
 #
 SSL_INCLUDE = /usr/local/musl/ssl/include
 SSL_LIBRARY = -L /usr/local/musl/ssl/lib -l ssl
+SSL_CRYPTO = -L /usr/local/musl/ssl/lib -l crypto
 
 
 CDEBUG = -O2 -fomit-frame-pointer -march=core2
@@ -82,7 +83,7 @@ PossumPipe_test: PossumPipe_test.o PossumPipe.o ../SHA256.o ../SHA256_hmac.o \
 	${SSL_LIBRARY} -lrt -ltspi;
 
 RSAkey_test: RSAkey_test.o RSAkey.o
-	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${SSL_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${SSL_CRYPTO}
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};

@@ -15,10 +15,12 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 
 #include <openssl/rsa.h>
 #include <openssl/pem.h>
 #include <openssl/err.h>
+#include <openssl/engine.h>
 
 #include <Origin.h>
 #include <HurdLib.h>
@@ -57,7 +59,10 @@ struct NAAAIM_RSAkey_State
 	_Bool poisoned;
 
 	/* Type of RSA key. */
-	enum {no_key, public_key, private_key} type;
+	enum {no_key, public_key, private_key, hardware_key} type;
+
+	/* Hardware engine definition. */
+	ENGINE *engine;
 
 	/* RSA key. */
 	RSA *key;
@@ -82,8 +87,9 @@ static void _init_state(CO(RSAkey_State, S))
 
 	S->poisoned = false;
 
-	S->type = no_key;
-	S->key	= NULL;
+	S->type	  = no_key;
+	S->engine = NULL;
+	S->key	  = NULL;
 
 	return;
 }
@@ -95,9 +101,29 @@ static void _init_state(CO(RSAkey_State, S))
  * This method implements loading of an RSA private key and sets
  * the object type to be a private key object.
  *
+ * \param this		A pointer to the key object whose private key
+ *			is to be loaded.
+ *
+ * \param source	The identifier for the source of the private
+ *			key.  In the case of a file this will be the
+ *			name of the file containing the PEM encoded
+ *			key.  In the case of a hardware token this
+ *			will be the slot identifier of the token.
+ *
+ * \param prompt	A pointer to a null-terminated character
+ *			buffer containing the prompt to be used
+ *			to request the pincode or password from
+ *			the user.  A NULL value will cause the
+ *			default prompt to be used.
+ *
+ * \return	If the load of the private key failed for any reason
+ *		a falsed value is returned to the caller.  A true
+ *		value indicates the key has been loaded and the
+ *		object is ready for use.
  */
 
-static _Bool load_private_key(CO(RSAkey, this), CO(char *,file))
+static _Bool load_private_key(CO(RSAkey, this), CO(char *, source), \
+			      CO(char *, prompt))
 
 {
 	STATE(S);
@@ -106,15 +132,54 @@ static _Bool load_private_key(CO(RSAkey, this), CO(char *,file))
 
 	FILE *infile = NULL;
 
+	struct {
+		const void *pwd;
+		const void *prompt;
+	} cb_data;
 
-	if ( (infile = fopen(file, "r")) == NULL )
+	EVP_PKEY *key = NULL;
+
+	UI_METHOD *method = UI_OpenSSL();
+
+
+	/* Load the key from an alternate engine. */
+	if ( S->engine != NULL ) {
+		memset(&cb_data, '\0', sizeof(cb_data));
+		if ( prompt != NULL )
+			cb_data.prompt = prompt;
+
+		key = ENGINE_load_private_key(S->engine, source, method, \
+					      &cb_data);
+		if ( key == NULL )
+			ERR(goto done);
+		if ( (S->key = EVP_PKEY_get1_RSA(key)) == NULL )
+			ERR(goto done);
+
+		retn	= true;
+		S->type = hardware_key;
+		goto done;
+	}
+
+	/* Handle a load from a file. */
+	if ( source != NULL ) {
+		if ( (infile = fopen(source, "r")) == NULL )
+			ERR(goto done);
+
+		if ( PEM_read_RSAPrivateKey(infile, &S->key, NULL, NULL) == \
+		     NULL )
+			ERR(goto done);
+
+		retn	= true;
+		S->type = private_key;
+		goto done;
+	}
+
+
+	/* Load the key from an alternate engine if supplied. */
+	if ( S->engine == NULL )
 		ERR(goto done);
 
-	if ( PEM_read_RSAPrivateKey(infile, &S->key, NULL, NULL) == NULL )
-		ERR(goto done);
 
-	retn	= true;
-	S->type = private_key;
 
 
  done:
@@ -131,20 +196,67 @@ static _Bool load_private_key(CO(RSAkey, this), CO(char *,file))
 /**
  * External public method.
  *
- * This method implements loading of an RSA public key and sets the object
- * type to be a public key object.
+ * This method implements loading of an RSA public key and sets
+ * the object type to be a public key object.
  *
+ * \param this		A pointer to the key object whose public key
+ *			is to be loaded.
+ *
+ * \param source	The identifier for the source of the public
+ *			key.  In the case of a file this will be the
+ *			name of the file containing the PEM encoded
+ *			key.  In the case of a hardware token this
+ *			will be the slot identifier of the token.
+ *
+ * \param prompt	A pointer to a null-terminated character
+ *			buffer containing the prompt to be used
+ *			to request the pincode or password from
+ *			the user.  A NULL value will cause the
+ *			default prompt to be used.
+ *
+ * \return	If the load of the public key failed for any reason
+ *		a falsed value is returned to the caller.  A true
+ *		value indicates the key has been loaded and the
+ *		object is ready for use.
  */
 
-static _Bool load_public_key(CO(RSAkey, this), CO(char *, file))
+static _Bool load_public_key(CO(RSAkey, this), CO(char *, file), \
+			     CO(char *, prompt))
 
 {
 	STATE(S);
 
 	_Bool retn = false;
-	
+
 	FILE *infile = NULL;
 
+	struct {
+		const void *pwd;
+		const void *prompt;
+	} cb_data;
+
+	EVP_PKEY *key = NULL;
+
+	UI_METHOD *method = UI_OpenSSL();
+
+
+	/* Load the key from an alternate engine. */
+	if ( S->engine != NULL ) {
+		memset(&cb_data, '\0', sizeof(cb_data));
+		if ( prompt != NULL )
+			cb_data.prompt = prompt;
+
+		key = ENGINE_load_public_key(S->engine, file, method, \
+					     &cb_data);
+		if ( key == NULL )
+			ERR(goto done);
+		if ( (S->key = EVP_PKEY_get1_RSA(key)) == NULL )
+			ERR(goto done);
+
+		retn	= true;
+		S->type = hardware_key;
+		goto done;
+	}
 
 	if ( (infile = fopen(file, "r")) == NULL )
 		ERR(goto done);
@@ -208,23 +320,34 @@ static _Bool encrypt(CO(RSAkey, this), CO(Buffer, payload))
 	/* Sanity checks. */
 	if ( S->poisoned )
 		ERR(goto done);
-	if ( S->type == no_key )
-		ERR(goto done);
 	if ( (payload == NULL) || payload->poisoned(payload) )
 		ERR(goto done);
 
 
 	/* Encrypt with private key. */
-	if ( S->type == private_key )
+	switch ( S->type ) {
+	case no_key:
+		ERR(goto done);
+		break;
+	case private_key:
 		enc_status = RSA_private_encrypt(payload->size(payload), \
 						 payload->get(payload),	 \
 						 output, S->key,	 \
 						 RSA_PKCS1_PADDING);
-	else
+		break;
+	case public_key:
 		enc_status = RSA_public_encrypt(payload->size(payload), \
-						payload->get(payload),	 \
-						output, S->key,	 \
+						payload->get(payload),	\
+						output, S->key,		\
 						RSA_PKCS1_OAEP_PADDING);
+		break;
+	case hardware_key:
+		enc_status = RSA_private_encrypt(payload->size(payload), \
+						 payload->get(payload),	 \
+						 output, S->key, 	 \
+						 RSA_PKCS1_PADDING);
+		break;
+	}
 
 	if ( enc_status == -1 || (enc_status != RSA_size(S->key)) )
 		ERR(goto done);
@@ -282,21 +405,29 @@ static _Bool decrypt(CO(RSAkey, this), CO(Buffer, payload))
 	/* Sanity checks. */
 	if ( S->poisoned )
 		ERR(goto done);
-	if ( S->type == no_key )
-		ERR(goto done);
 	if ( (payload == NULL) || payload->poisoned(payload) )
 		ERR(goto done);
 
 
-	/* Encrypt with private key. */
-	if ( S->type == private_key )
+	/* Encrypt with the relevant key. */
+	switch ( S->type ) {
+	case no_key:
+		ERR(goto done);
+		break;
+	case private_key:
 		status = RSA_private_decrypt(payload->size(payload),	    \
 					     payload->get(payload), output, \
 					     S->key, RSA_PKCS1_OAEP_PADDING);
-	else
+		break;
+	case public_key:
 		status = RSA_public_decrypt(payload->size(payload),	   \
 					    payload->get(payload), output, \
 					    S->key, RSA_PKCS1_PADDING);
+	case hardware_key:
+		status = RSA_private_decrypt(payload->size(payload),	    \
+					     payload->get(payload), output, \
+					     S->key, RSA_PKCS1_PADDING);
+	}
 
 	if ( status == -1 )
 		ERR(goto done);
@@ -309,6 +440,75 @@ static _Bool decrypt(CO(RSAkey, this), CO(Buffer, payload))
 
 
 done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements initialization of an alternate engine for
+ * executing the RSA key operations.  The engine is specifically
+ * attached to the current RSA key instance.
+ *
+ * \param this	The key which is requesting initialization of the
+ *		engine.
+ *
+ * \param cmds	A pointer to an array of strings which contain the
+ *		commands needed to initialize the engine.  The end
+ *		of the array is indicated by two consecutive NULL
+ *		pointers.
+ *
+ * \return	A boolean value is returned to indicate the status of
+ *		the engine initialization request.  A false value
+ *		indicates the operation was unsuccessful while a true
+ *		value indicates the engine has been initialized and
+ *		attached to the key.
+ */
+
+static _Bool init_engine(CO(RSAkey, this), CO(char **, cmds))
+
+{
+	STATE(S);
+
+	unsigned int lp = 0;
+
+	_Bool retn = false;
+
+
+	if ( S->poisoned )
+		ERR(goto done);
+
+	/* Initialize a functional reference to the dynamic engine. */
+	ENGINE_load_dynamic();
+	if ( (S->engine = ENGINE_by_id("dynamic")) == NULL )
+		ERR(goto done);
+
+	/* Issue the commands needed to initialize the engine. */
+	if ( cmds == NULL ) {
+		retn = true;
+		goto done;
+	}
+
+	while ( cmds[lp] != NULL ) {
+		if ( !ENGINE_ctrl_cmd_string(S->engine, cmds[lp], \
+					     cmds[lp+1], 0) )
+			ERR(goto done);
+		lp += 2;
+	}
+
+	/* Install engine support for this instance of the key. */
+	RSA_free(S->key);
+	if ( (S->key = RSA_new_method(S->engine)) == NULL )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
 	if ( !retn )
 		S->poisoned = true;
 
@@ -352,11 +552,11 @@ static void print(CO(RSAkey, this))
 
 
 	if ( S->poisoned ) {
-		fputs("Object is poisoned.\n", stderr);
+		fputs("Object is poisoned.\n", stdout);
 		return;
 	}
 	if ( S->type == no_key ) {
-		fputs("Object has no key.\n", stderr);
+		fputs("Object has no key.\n", stdout);
 		return;
 	}
 
@@ -383,14 +583,17 @@ static void whack(CO(RSAkey, this))
 	STATE(S);
 
 
+	if ( S->engine != NULL )
+		ENGINE_free(S->engine);
 	if ( S->key != NULL )
 		RSA_free(S->key);
+
 	S->root->whack(S->root, this, S);
 
 	return;
 }
 
-	
+
 /**
  * External constructor call.
  *
@@ -434,11 +637,15 @@ extern RSAkey NAAAIM_RSAkey_Init(void)
 	/* Method initialization. */
 	this->load_private_key = load_private_key;
 	this->load_public_key  = load_public_key;
-	this->encrypt	       = encrypt;
-	this->decrypt	       = decrypt;
-	this->size	       = size;
-	this->print	       = print;
-	this->whack 	       = whack;
+
+	this->encrypt = encrypt;
+	this->decrypt = decrypt;
+
+	this->init_engine = init_engine;
+
+	this->size  = size;
+	this->print = print;
+	this->whack = whack;
 
 	return this;
 }

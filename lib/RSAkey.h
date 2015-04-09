@@ -25,10 +25,14 @@ typedef struct NAAAIM_RSAkey_State * RSAkey_State;
 struct NAAAIM_RSAkey
 {
 	/* External methods. */
-	_Bool (*load_public_key)(const RSAkey, const char *);
-	_Bool (*load_private_key)(const RSAkey, const char *);
+	_Bool (*load_public_key)(const RSAkey, const char *, const char *);
+	_Bool (*load_private_key)(const RSAkey, const char *, const char *);
+
 	_Bool (*encrypt)(const RSAkey, Buffer);
 	_Bool (*decrypt)(const RSAkey, Buffer);
+
+	_Bool (*init_engine)(const RSAkey, const char **);
+
 	int (*size)(const RSAkey);
 	void (*print)(const RSAkey);
 	void (*whack)(const RSAkey);
