@@ -31,6 +31,7 @@
 
 #include <Duct.h>
 #include <Curve25519.h>
+#include <PossumPipe.h>
 
 #include "edi.h"
 #include "EDIpacket.h"
@@ -136,7 +137,7 @@ static void update_process_table(void)
  *			between the EDI receiver and encryption engine.
  */
 
-static _Bool setup_session(CO(Duct, transmitter), CO(Duct, engine))
+static _Bool setup_session(CO(PossumPipe, transmitter), CO(Duct, engine))
 
 {
 	_Bool retn = false;
@@ -152,7 +153,7 @@ static _Bool setup_session(CO(Duct, transmitter), CO(Duct, engine))
 	/* Receive packet from transmitter with DH public key. */
 	INIT(HurdLib, Buffer, shared, goto done);
 	INIT(HurdLib, Buffer, bufr, goto done);
-	if ( !transmitter->receive_Buffer(transmitter, bufr) )
+	if ( !transmitter->receive_packet(transmitter, bufr) )
 		goto done;
 
 	INIT(NAAAIM, EDIpacket, edi, goto done);
@@ -172,7 +173,8 @@ static _Bool setup_session(CO(Duct, transmitter), CO(Duct, engine))
 		goto done;
 	fprintf(stderr, "%s: Shared secret:\n", __func__);
 	shared->hprint(shared);
-	if ( !transmitter->send_Buffer(transmitter, dh->get_public(dh)) )
+	if ( !transmitter->send_packet(transmitter, PossumPipe_data, \
+				       dh->get_public(dh)) )
 		goto done;
 	fprintf(stderr, "%s: Transmitted public key.\n", __func__);
 
@@ -212,7 +214,7 @@ static _Bool setup_session(CO(Duct, transmitter), CO(Duct, engine))
  * \return	No return value is defined.
  */
 
-static void handle_connection(CO(Duct,duct))
+static void handle_connection(CO(PossumPipe, duct))
 
 {
 	const char *OK = "OK";
@@ -222,11 +224,16 @@ static void handle_connection(CO(Duct,duct))
 	EDIpacket edi = NULL;
 
 
+	/* Initialize connection. */
+	fputs("Starting host mode\n", stderr);
+	if ( !duct->start_host_mode(duct) )
+		goto done;
+
 	INIT(HurdLib, Buffer, bufr, goto done);
 	INIT(NAAAIM, EDIpacket, edi, goto done);
 
-	fprintf(stdout, "\n.%d: Processing EDI receiver request from %s.\n", \
-		getpid(), duct->get_client(duct));
+	fprintf(stdout, "\n.%d: Processing EDI receiver request from.\n", \
+		getpid());
 
 	if ( !setup_session(duct, Engine) )
 		goto done;
@@ -234,7 +241,7 @@ static void handle_connection(CO(Duct,duct))
 	/* Process incoming transactions in a loop. */
 	while ( 1 ) {
 		fputs("Waiting for EDI reception.\n", stderr);
-		if ( !duct->receive_Buffer(duct, bufr) )
+		if ( !duct->receive_packet(duct, bufr) )
 			goto done;
 
 		fputs("Sending transaction to engine.\n", stdout);
@@ -263,7 +270,7 @@ static void handle_connection(CO(Duct,duct))
 		bufr->reset(bufr);
 		if ( !bufr->add(bufr, (unsigned char *) OK, strlen(OK)) )
 			goto done;
-		if ( !duct->send_Buffer(duct, bufr) )
+		if ( !duct->send_packet(duct, PossumPipe_data, bufr) )
 			goto done;
 		fputs("EDI reception complete.\n", stderr);
 
@@ -296,7 +303,7 @@ extern int main(int argc, char *argv[])
 
 	pid_t pid = 0;
 
-	Duct duct = NULL;
+	PossumPipe pipe = NULL;
 
 
 	fputs("EDI receiver started.\n", stdout);
@@ -327,6 +334,8 @@ extern int main(int argc, char *argv[])
 	init_process_table();
 
 	/* Initialize the connection to the EDI engine. */
+	fputs("Waiting for engine.\n", stderr);
+	sleep(10);
 	INIT(NAAAIM, Duct, Engine, goto done);
 	if ( !Engine->init_client(Engine) ) {
 		fputs("Cannot initialize engine connection.\n", stderr);
@@ -339,28 +348,17 @@ extern int main(int argc, char *argv[])
 
 
 	/* Initialize the network port and wait for connections. */
-	INIT(NAAAIM, Duct, duct, goto done);
-
-	if ( !duct->init_server(duct) ) {
+	INIT(NAAAIM, PossumPipe, pipe, goto done);
+	if ( !pipe->init_server(pipe, host, RECEIVER_PORT, false) ) {
 		fputs("Cannot set server mode.\n", stderr);
-		goto done;
-	}
-
-	fprintf(stderr, "initializing server port: %s\n", host);
-	if ( !duct->set_server(duct, host) ) {
-		err = "Cannot set server name.";
-		goto done;
-	}
-
-	if ( !duct->init_port(duct, NULL, RECEIVER_PORT) ) {
-		fputs("Cannot initialize access port.\n", stderr);
 		goto done;
 	}
 
 
 	/* Process connections. */
 	while ( 1 ) {
-		if ( !duct->accept_connection(duct) ) {
+		fputs("Waiting for connection.\n", stderr);
+		if ( !pipe->accept_connection(pipe) ) {
 			err = "Error on connection accept.";
 			goto done;
 		}
@@ -371,25 +369,32 @@ extern int main(int argc, char *argv[])
 			goto done;
 		}
 		if ( pid == 0 ) {
-			handle_connection(duct);
+			fputs("Calling connection handler.\n", stderr);
+			handle_connection(pipe);
 			_exit(0);
 		}
 
 		add_process(pid);
 		update_process_table();
-		duct->reset(duct);
+		pipe->reset(pipe);
 	}
+
+#if 0
+	fputs("Waiting for connection.\n", stderr);
+	if ( !pipe->accept_connection(pipe) ) {
+		err = "Error on connection accept.";
+		goto done;
+	}
+	handle_connection(pipe);
+#endif
 
 
  done:
 	if ( err != NULL )
 		fprintf(stderr, "!%s\n", err);
 
-	if ( duct != NULL ) {
-	     if ( !duct->whack_connection(duct) )
-		     fputs("Error closing duct connection.\n", stderr);
-	     duct->whack(duct);
-	}
+	WHACK(pipe);
+	WHACK(Engine);
 
 	if ( pid == 0 )
 		fputs(".Client terminated.\n", stdout);

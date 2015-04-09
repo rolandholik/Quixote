@@ -15,11 +15,13 @@ edi-engine: edi-engine.o EDIpacket.o ../SHA256.o ../SHA256_hmac.o \
 	../AES256_cbc.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
-edi-transmitter: edi-transmitter.o EDIpacket.o ../RandomBuffer.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
+edi-transmitter: edi-transmitter.o EDIpacket.o ../RandomBuffer.o ../SHA256.o \
+	../SHA256_hmac.o ../AES256_cbc.o ../IDtoken.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi;
 
-edi-receiver: edi-receiver.o EDIpacket.o ../RandomBuffer.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
+edi-receiver: edi-receiver.o EDIpacket.o ../RandomBuffer.o ../SHA256.o \
+	../SHA256_hmac.o ../AES256_cbc.o ../IDtoken.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi;
 
 send-edi: send-edi.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
