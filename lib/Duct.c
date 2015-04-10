@@ -139,7 +139,7 @@ static _Bool _init_server_port(CO(Duct_State, S), const long server, \
 			       const int port)
 
 {
-	const char *err = NULL;
+	_Bool retn = false;
 
 	struct sockaddr_in sdef;
 
@@ -149,28 +149,21 @@ static _Bool _init_server_port(CO(Duct_State, S), const long server, \
 	sdef.sin_port		= htons(port);
 	sdef.sin_addr.s_addr	= server;
 
-	if ( (S->sockt = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1 ) {
-		err = "Socket creation failed.";
-		goto done;
-	}
-	if ( bind(S->sockt, (struct sockaddr *) &sdef, sizeof(sdef)) == -1 ) {
-		err = "Socket bind failed.";
-		goto done;
-	}
-	if ( listen(S->sockt, 128) == -1 ) {
-		err = "Socket listen failed.";
-		goto done;
-	}
+	if ( (S->sockt = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1 )
+		ERR(goto done);
+	if ( bind(S->sockt, (struct sockaddr *) &sdef, sizeof(sdef)) == -1 )
+		ERR(goto done);
+	if ( listen(S->sockt, 128) == -1 )
+		ERR(goto done);
+
+	retn = true;
 
 
  done:
-	if ( err != NULL ) {
-		fprintf(stderr, "!%s[%s]: %s\n", __FILE__, __func__, err);
+	if ( !retn )
 		S->poisoned = true;
-		return false;
-	}
 
-	return true;
+	return retn;
 }
 
 
@@ -192,7 +185,7 @@ static _Bool _init_client_port(CO(Duct_State, S), CO(char *, host), \
 			       const int port)
 
 {
-	const char *err = NULL;
+	_Bool retn = false;
 
 	struct sockaddr_in sdef;
 
@@ -204,34 +197,26 @@ static _Bool _init_client_port(CO(Duct_State, S), CO(char *, host), \
 	sdef.sin_family	= AF_INET;
 	sdef.sin_port	= htons(port);
 
-	if ( (hdef = gethostbyname2(host, AF_INET)) == NULL ) {
-		err = "Host lookup failed.";
-		goto done;
-	}
+	if ( (hdef = gethostbyname2(host, AF_INET)) == NULL )
+		ERR(goto done);
 	sdef.sin_addr.s_addr = *((unsigned long *) hdef->h_addr_list[0]);
 
-	if ( (S->sockt = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1 ) {
-		err = "Socket creation failed.";
-		goto done;
-	}
+	if ( (S->sockt = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1 )
+		ERR(goto done);
 
 	if ( connect(S->sockt, (struct sockaddr *) &sdef, sizeof(sdef)) \
-	     == -1 ) {
-		err = "Socket connection failed.";
-		goto done;
-	}
-
+	     == -1 )
+		ERR(goto done);
 	S->fd = S->sockt;
+
+	retn = true;
 
 
  done:
-	if ( err != NULL ) {
-		fprintf(stderr, "!%s[%s]: %s\n", __FILE__, __func__, err);
+	if ( !retn )
 		S->poisoned = true;
-		return false;
-	}
 
-	return true;
+	return retn;
 }
 
 
@@ -254,6 +239,7 @@ static _Bool init_server(CO(Duct, this))
 
 	S->type	    = server;
 	S->poisoned = false;
+
 	return true;
 }
 
@@ -284,11 +270,16 @@ static _Bool set_server(CO(Duct, this), CO(char *, addr))
 
 
 	if ( (hdef = gethostbyname2(addr, AF_INET)) == NULL )
-		goto done;
+		ERR(goto done);
 	S->server = *((unsigned long *) hdef->h_addr_list[0]);
+
 	retn = true;
 
+
  done:
+	if ( !retn )
+		S->poisoned = true;
+
 	return retn;
 }
 
@@ -313,6 +304,7 @@ static _Bool init_client(CO(Duct, this))
 
 	S->type	    = client;
 	S->poisoned = false;
+
 	return true;
 }
 
@@ -342,12 +334,16 @@ static _Bool init_port(CO(Duct, this), CO(char *, host), int const port)
 
 
 	if ( S->poisoned )
-		return retn;
+		ERR(return retn);
 
 	if ( S->type == server )
 		retn = _init_server_port(S, S->server, port);
 	else
 		retn = _init_client_port(S, host, port);
+
+
+	if ( !retn )
+		S->poisoned = true;
 
 	return retn;
 }
@@ -370,7 +366,7 @@ static _Bool accept_connection(CO(Duct, this))
 {
 	STATE(S);
 
-	const char *err = NULL;
+	_Bool retn = false;
 
 	char host[256];
 	static const char * const reverse = " [reverse disabled]";
@@ -381,34 +377,26 @@ static _Bool accept_connection(CO(Duct, this))
 
 
 	if ( S->poisoned )
-		return false;
-	if ( S->sockt == -1 ) {
-		S->poisoned = true;
-		return false;
-	}
+		ERR(goto done);
+	if ( S->sockt == -1 )
+		ERR(goto done);
 
 	client_size = sizeof(client);
 	memset(&client, '\0', client_size);
 
 	if ( (S->fd = accept(S->sockt, (struct sockaddr *) &client, \
-			     (void *) &client_size)) == -1 ) {
-		err = "Socket accept failed.";
-		goto done;
-	}
+			     (void *) &client_size)) == -1 )
+		ERR(goto done);
 
 	S->ipv4.s_addr = client.sin_addr.s_addr;
 	if ( getnameinfo((struct sockaddr *) &client,			    \
 			 sizeof(struct sockaddr), host, sizeof(host), NULL, \
-			 0, S->do_reverse ? 0 : NI_NUMERICHOST) != 0 ) {
-		err = "Name lookup failed.";
-		goto done;
-	}
+			 0, S->do_reverse ? 0 : NI_NUMERICHOST) != 0 )
+		ERR(goto done);
 	if ( S->client == NULL ) {
 		S->client = HurdLib_Buffer_Init();
-		if ( S->client == NULL ) {
-			err = "Client object name initialization failed.";
-			goto done;
-		}
+		if ( S->client == NULL )
+			ERR(goto done);
 	}
 	else
 		S->client->reset(S->client);
@@ -417,20 +405,17 @@ static _Bool accept_connection(CO(Duct, this))
 	if ( !S->do_reverse )
 		S->client->add(S->client, (unsigned char *) reverse, \
 			       strlen(reverse));
-	if ( !S->client->add(S->client, (unsigned char *) "\0", 1) ) {
-		err = "Store of client named failed.";
-		goto done;
-	}
+	if ( !S->client->add(S->client, (unsigned char *) "\0", 1) )
+		ERR(goto done);
+
+	retn = true;
 
 
  done:
-	if ( err != NULL ) {
-		fprintf(stderr, "!%s[%s]: %s\n", __FILE__, __func__, err);
+	if ( !retn )
 		S->poisoned = true;
-		return false;
-	}
 
-	return true;
+	return retn;
 }
 
 
@@ -458,22 +443,20 @@ static _Bool send_Buffer(CO(Duct, this), CO(Buffer, bf))
 
 
 	if ( S->poisoned )
-		return false;
-	if ( bf->poisoned(bf) || (S->fd == -1) )
-		goto done;
+		ERR(goto done);
+	if ( S->fd == -1 )
+		ERR(goto done);
+	if ( (bf == NULL) || bf->poisoned(bf))
+		ERR(goto done);
 
 
 	/* Send size of transmission. */
-	if ( write(S->fd, &size, sizeof(size)) != sizeof(size) ) {
-		S->error = errno;
-		goto done;
-	}
+	if ( write(S->fd, &size, sizeof(size)) != sizeof(size) )
+		ERR(S->error = errno; goto done);
 
 	/* Then the contents of the buffer. */
-	if ( write(S->fd, bf->get(bf), bf->size(bf)) != bf->size(bf) ) {
-		S->error = errno;
-		goto done;
-	}
+	if ( write(S->fd, bf->get(bf), bf->size(bf)) != bf->size(bf) )
+		ERR(S->error = errno; goto done);
 
 	retn = true;
 
@@ -481,6 +464,7 @@ static _Bool send_Buffer(CO(Duct, this), CO(Buffer, bf))
  done:
 	if ( !retn )
 		S->poisoned = true;
+
 	return retn;
 }
 
@@ -511,9 +495,9 @@ static _Bool receive_Buffer(CO(Duct, this), CO(Buffer, bf))
 
 
 	if ( S->poisoned )
-		return false;
-	if ( bf->poisoned(bf) || (S->fd == -1) )
-		goto done;
+		ERR(goto done);
+	if ( (bf == NULL) || bf->poisoned(bf) )
+		ERR(goto done);
 
 
 	/*
@@ -523,10 +507,8 @@ static _Bool receive_Buffer(CO(Duct, this), CO(Buffer, bf))
 	 * variable to be a negative value so it can be distinguished
 	 * from a standard error number.
 	 */
-	if ( read(S->fd, &rsize, sizeof(rsize)) != sizeof(rsize) ) {
-		S->error = errno;
-		goto done;
-	}
+	if ( read(S->fd, &rsize, sizeof(rsize)) != sizeof(rsize) )
+		ERR(S->error = errno; goto done);
 
 	rsize = ntohl(rsize);
 	if ( rsize == 0 ) {
@@ -534,22 +516,16 @@ static _Bool receive_Buffer(CO(Duct, this), CO(Buffer, bf))
 		S->eof = true;
 		goto done;
 	}
-	if ( rsize > MAX_RECEIVE_SIZE ) {
-		S->error = -1;
-		goto done;
-	}
+	if ( rsize > MAX_RECEIVE_SIZE )
+		ERR(S->error = -1; goto done);
 
 
 	/* Loop until we receive the specified number of bytes. */
 	while ( rsize-- > 0 ) {
-		if ( read(S->fd, rbufr, sizeof(rbufr)) != sizeof(rbufr) ) {
-			S->error = errno;
-			goto done;
-		}
-		if ( !bf->add(bf, rbufr, sizeof(rbufr)) ) {
-			S->error = -2;
-			goto done;
-		}
+		if ( read(S->fd, rbufr, sizeof(rbufr)) != sizeof(rbufr) )
+			ERR(S->error = errno; goto done);
+		if ( !bf->add(bf, rbufr, sizeof(rbufr)) )
+			ERR(S->error = -2; goto done);
 	}
 
 	retn = true;
@@ -558,6 +534,7 @@ static _Bool receive_Buffer(CO(Duct, this), CO(Buffer, bf))
  done:
 	if ( !retn )
 		S->poisoned = true;
+
 	return retn;
 }
 
@@ -602,11 +579,9 @@ static char * get_client(CO(Duct, this))
 
 	/* Sanity checks. */
 	if ( S->poisoned )
-		return NULL;
-	if ( S->client == NULL ) {
-		S->poisoned = true;
-		return NULL;
-	}
+		ERR(return NULL);
+	if ( S->client == NULL )
+		ERR(S->poisoned = true; return NULL);
 
 	return (char *) S->client->get(S->client);
 }
@@ -661,7 +636,7 @@ static void do_reverse(CO(Duct, this), const _Bool mode)
 
 
 	if ( S->poisoned )
-		return;
+		ERR(return);
 	S->do_reverse = mode;
 
 	return;
