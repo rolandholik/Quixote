@@ -717,10 +717,8 @@ static void whack(CO(Duct, this))
 	 * If this is a client connection send a zero length write
 	 * to trigger an end of transmission situation.
 	 */
-	if ( (S->type == client) && (S->fd != -1) ) {
-		fputs("Sending EOF\n", stderr);
+	if ( (S->type == client) && (S->fd != -1) )
 		write(S->fd, &size, sizeof(size));
-	}
 
 
 	/* Close the I/O socket. */
