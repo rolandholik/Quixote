@@ -19,6 +19,7 @@
 #include <errno.h>
 #include <netdb.h>
 #include <sys/socket.h>
+#include <sys/uio.h>
 #include <netinet/in.h>
 
 #include <Origin.h>
@@ -439,7 +440,11 @@ static _Bool send_Buffer(CO(Duct, this), CO(Buffer, bf))
 
 	_Bool retn = false;
 
+	struct iovec vector[2];
+
 	uint32_t size = htonl(bf->size(bf));
+
+	ssize_t sent;
 
 
 	if ( S->poisoned )
@@ -450,12 +455,16 @@ static _Bool send_Buffer(CO(Duct, this), CO(Buffer, bf))
 		ERR(goto done);
 
 
-	/* Send size of transmission. */
-	if ( write(S->fd, &size, sizeof(size)) != sizeof(size) )
-		ERR(S->error = errno; goto done);
+	/* Setup vectors for packet size and payload. */
+	vector[0].iov_len  = sizeof(uint32_t);
+	vector[0].iov_base = &size;
 
-	/* Then the contents of the buffer. */
-	if ( write(S->fd, bf->get(bf), bf->size(bf)) != bf->size(bf) )
+	vector[1].iov_len  = bf->size(bf);
+	vector[1].iov_base = bf->get(bf);
+
+	/* Transmit the vector. */
+	sent = writev(S->fd, vector, 2);
+	if ( sent != (vector[0].iov_len + vector[1].iov_len) )
 		ERR(S->error = errno; goto done);
 
 	retn = true;
