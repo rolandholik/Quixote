@@ -86,6 +86,9 @@ struct NAAAIM_Duct_State
 	/* Client ip and hostname .*/
 	struct in_addr ipv4;
 	Buffer client;
+
+	/* Receive buffer. */
+	unsigned char bufr[1024];
 };
 
 
@@ -498,9 +501,11 @@ static _Bool receive_Buffer(CO(Duct, this), CO(Buffer, bf))
 
 	_Bool retn = false;
 
-	unsigned char rbufr[1];
-
 	uint32_t rsize;
+
+	size_t lp,
+	       blocks,
+	       residual;
 
 
 	if ( S->poisoned )
@@ -529,13 +534,22 @@ static _Bool receive_Buffer(CO(Duct, this), CO(Buffer, bf))
 		ERR(S->error = -1; goto done);
 
 
-	/* Loop until we receive the specified number of bytes. */
-	while ( rsize-- > 0 ) {
-		if ( read(S->fd, rbufr, sizeof(rbufr)) != sizeof(rbufr) )
+	/* Loop over the number of integral receipt blocks. */
+	blocks	 = rsize / sizeof(S->bufr);
+	residual = rsize % sizeof(S->bufr);
+
+	for (lp= 0; lp < blocks; ++lp) {
+		if ( read(S->fd, S->bufr, sizeof(S->bufr)) != sizeof(S->bufr) )
 			ERR(S->error = errno; goto done);
-		if ( !bf->add(bf, rbufr, sizeof(rbufr)) )
+		if ( !bf->add(bf, S->bufr, sizeof(S->bufr)) )
 			ERR(S->error = -2; goto done);
 	}
+
+	/* Field the residual data. */
+	if ( read(S->fd, S->bufr, residual) != residual )
+		ERR(S->error = errno; goto done);
+	if ( !bf->add(bf, S->bufr, residual) )
+		ERR(S->error = -2; goto done);
 
 	retn = true;
 
