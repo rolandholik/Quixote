@@ -8,7 +8,7 @@ CSRC = gen-image.c load-image.c boot.c Netconfig.c IPsec.c SoftwareTPM.c
 
 TOOLS = gen-image load-image boot sboot init possum gen-id-verifier	\
 	software-status software-tpm tpm-cmd id-set idmgr net-config	\
-	idtest
+	idtest hotplug
 
 CC = musl-gcc
 
@@ -104,6 +104,9 @@ net-config: net-config.o Netconfig.o
 
 idtest: idtest.o ../IDtoken.o ../SHA256_hmac.o ../SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi;
+
+hotplug: hotplug.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};
