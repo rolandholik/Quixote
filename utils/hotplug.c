@@ -19,6 +19,9 @@
 
 /* Local defines. */
 
+/* Owner of the device nodes. */
+#define OWNER 32767
+
 
 /* Include files. */
 #include <stdio.h>
@@ -27,8 +30,10 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <fcntl.h>
 
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/socket.h>
 
 #include <linux/netlink.h>
@@ -42,8 +47,12 @@
 
 /* Variables referenced statically by this program. */
 
+/** Run in debug mode. */
+static _Bool Debug = false;
+
 /** The file descriptor bound to the netlink socket. */
 static int NetlinkFD = 0;
+
 
 
 /**
@@ -282,23 +291,34 @@ static _Bool process_device(CO(Buffer, list), const _Bool add)
 	dev_t major,
 	      minor;
 
+	struct stat statbuf;
+
 	String entry,
-	       path = NULL;
+	       busdir = NULL,
+	       path   = NULL;
 
 
 	/* Create the device path. */
 	if ( (entry = _search_list(list, "DEVNAME=")) == NULL )
 		ERR(goto done);
+	p = strchr(entry->get(entry), '=') + 1;
+
 	if ( (path = HurdLib_String_Init_cstr("/dev/")) == NULL )
 		ERR(goto done);
-	if ( !path->add(path, entry->get(entry)) )
+	if ( !path->add(path, p) )
 		ERR(goto done);
 
 
 	/* Process a removal. */
 	if ( !add ) {
+		if ( Debug ) {
+			fputs("Event:\n", stdout);
+			_print_list(list);
+			fprintf(stdout, "\nRemoving: %s\n", path->get(path));
+			fflush(stdout);
+		}
+
 		unlink(path->get(path));
-		fprintf(stderr, "Removed: %s\n", path->get(path));
 		retn = true;
 		goto done;
 	}
@@ -318,14 +338,53 @@ static _Bool process_device(CO(Buffer, list), const _Bool add)
 	if ( errno == ERANGE )
 		ERR(goto done);
 
-	fprintf(stdout, "Created device=%s, major=%d, minor=%d\n", \
-		entry->get(entry), (int) major, (int) minor);
+	if ( Debug ) {
+		fputs("Event:\n", stdout);
+		_print_list(list);
+		fprintf(stdout, "Creating device=%s, major=%d, minor=%d\n", \
+			path->get(path), (int) major, (int) minor);
+		fflush(stdout);
+	}
+
+
+	/* Verify the bus directory is present. */
+	if ( (busdir = HurdLib_String_Init_cstr("/dev/bus/usb/")) == NULL)
+		ERR(goto done);
+	if ( (entry = _search_list(list, "BUSNUM=")) == NULL )
+		ERR(goto done);
+
+	p = strchr(entry->get(entry), '=') + 1;
+	if ( !busdir->add(busdir, p) )
+		ERR(goto done);
+
+	if ( stat(busdir->get(busdir), &statbuf) != 0 ) {
+		if ( errno != ENOENT )
+			ERR(goto done);
+		if ( mkdir(busdir->get(busdir), S_IRUSR | S_IWUSR | S_IXUSR) \
+		     != 0 )
+			ERR(goto done);
+		if ( chown(busdir->get(busdir), OWNER, OWNER) != 0 )
+			ERR(goto done);
+	}
+
+
+	/* Create the device node. */
+	if ( mknod(path->get(path), S_IFCHR | S_IRUSR | S_IWUSR, \
+		   makedev(major, minor)) != 0 )
+		ERR(goto done);
+	if ( chown(path->get(path), OWNER, OWNER) != 0 )
+		ERR(goto done);
+
 	retn = true;
 
+
  done:
+	WHACK(path);
+	WHACK(busdir);
+
 	return retn;
 }
-	
+
 
 /**
  * Internal function.
@@ -368,26 +427,24 @@ static _Bool process_event(CO(Buffer, event))
 			ERR(goto done);
 		if ( !list->add(list, (void *) &entry, sizeof(entry)) )
 			ERR(goto done);
-		
+
 		size += (strlen(bp) + 1);
 		bp   += (strlen(bp) + 1);
 	}
+
 
 	if ( (entry = _search_list(list, "DEVTYPE=usb_device")) != NULL ) {
 		if ( _search_list(list, "PRODUCT=1050/116/336") == NULL ) {
 			retn = true;
 			goto done;
 		}
-		if ( _search_list(list, "ACTION=add") != NULL ) {
-			fputs("Calling device add\n", stderr);
+		if ( _search_list(list, "ACTION=add") != NULL )
 			retn = process_device(list, true);
-		}
-		if ( _search_list(list, "ACTION=remove") != NULL ) {
-			fputs("Calling device remove.\n", stdout);
+		if ( _search_list(list, "ACTION=remove") != NULL )
 			retn = process_device(list, false);
-		}
 	}
-	fprintf(stdout, "%s: return = %d\n", __func__, retn);
+	else
+		retn = true;
 
 
  done:
@@ -405,9 +462,18 @@ static _Bool process_event(CO(Buffer, event))
 extern int main(int argc, char *argv[])
 
 {
-	int retn = 1;
+	int opt,
+	    retn = 1;
 
 	Buffer event = NULL;
+
+
+	while ( (opt = getopt(argc, argv, "d")) != EOF )
+		switch ( opt ) {
+			case 'd':
+				Debug = true;
+				break;
+		}
 
 
 	/* Initialize socket interface for netlink messages. */
