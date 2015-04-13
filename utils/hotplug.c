@@ -31,6 +31,7 @@
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <glob.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -41,6 +42,7 @@
 #include <HurdLib.h>
 #include <Buffer.h>
 #include <String.h>
+#include <File.h>
 
 #include <NAAAIM.h>
 
@@ -52,7 +54,6 @@ static _Bool Debug = false;
 
 /** The file descriptor bound to the netlink socket. */
 static int NetlinkFD = 0;
-
 
 
 /**
@@ -455,6 +456,168 @@ static _Bool process_event(CO(Buffer, event))
 }
 
 
+/**
+ * Internal private function.
+ *
+ * This function is responsible for creating a device node for an
+ * eligible device.  The strategy used by this function is to
+ * read the uevent pseudo-file and convert the file into a Buffer
+ * object which can then be processed by the process_device function.
+ *
+ * \param sysfile	A character pointer to the name of the
+ *			directory in the /sys heirarchy which describes
+ *			the device.
+ *
+ * \return	A boolean value is used to indicate the status of
+ *		device creation.  A false value indicates there was
+ *		a failure in creating the device while a true value
+ *		indicates the device was successfully created.
+ */
+
+static _Bool _create_device(CO(char *, sysfile))
+
+{
+	_Bool retn = false;
+
+	char *p;
+	const char *add = "ACTION=add\n";
+
+	Buffer event = NULL;
+
+	String device = NULL;
+
+	File uevent = NULL;
+
+
+	INIT(HurdLib, String, device, goto done);
+	device->add(device, sysfile);
+	if ( !device->add(device, "/uevent") )
+		ERR(goto done);
+
+	INIT(HurdLib, File, uevent, goto done);
+	INIT(HurdLib, Buffer, event, goto done);
+
+	uevent->open_ro(uevent, device->get(device));
+	event->add(event, (unsigned char *) add, strlen(add));
+	if ( !uevent->slurp(uevent, event) )
+		ERR(goto done);
+
+	/*
+	 * Convert all linefeeds into NULL's to match the buffer format
+	 * which is supplied by a netlink message.
+	 */
+	p = (char *) (event->get(event) + event->size(event) - 1);
+	*p = '\0';
+
+	p = (char *) event->get(event);
+	while ( (p = strchr(p, '\n')) != NULL )
+		*p++ = '\0';
+
+	if ( !process_event(event) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	WHACK(event);
+	WHACK(device);
+	WHACK(uevent);
+
+	return retn;
+}
+
+
+/**
+ * Internal function.
+ *
+ * This function is responsible for searching for devices which have
+ * been introduced or discovered before the daemon was started.  This
+ * allows the daemon to manage a current list of devices after
+ * startup.
+ *
+ * This function expects no input variables.
+ *
+ * \return	A boolean value is used to indicate the status of
+ *		the device.  A false value indicates discovery and
+ *		setup failed while a true value indicates the device
+ *		nodes were updated.
+ */
+
+static _Bool update_devices(void)
+
+{
+	_Bool retn = false;
+
+	const char *device_list[] = {
+		"Yubikey NEO OTP+U2F+CCID",
+		NULL
+	};
+
+	int rv;
+	unsigned int lp,
+		     lp1;
+
+	glob_t devices;
+
+	String device  = NULL,
+	       product = NULL;
+
+	File sysfile = NULL;
+
+
+	/* Get a list of USB devices. */
+	rv = glob("/sys/bus/usb/devices/[0-9]*", 0, NULL, &devices);
+	if ( rv != 0 ) {
+		if ( rv == GLOB_NOMATCH ) {
+			retn = true;
+			goto done;
+		}
+		ERR(goto done);
+	}
+
+
+	/* Iterate through the device list looking for ones of interest. */
+	INIT(HurdLib, String, device, goto done);
+	INIT(HurdLib, String, product, goto done);
+	INIT(HurdLib, File, sysfile, goto done);
+
+	for (lp= 0; lp < devices.gl_pathc; ++lp) {
+		device->add(device, devices.gl_pathv[lp]);
+		if ( !device->add(device, "/product") )
+			ERR(goto done);
+
+		sysfile->open_ro(sysfile, device->get(device));
+		if ( sysfile->read_String(sysfile, product) ) {
+			char *p;
+
+			for (lp1= 0; device_list[lp1] != NULL; ++lp1) {
+				if ( strcmp(product->get(product), \
+					    device_list[lp1]) == 0 ) {
+					p = devices.gl_pathv[lp];
+					if ( !_create_device(p) )
+						ERR(goto done);
+				}
+			}
+		}
+
+		sysfile->reset(sysfile);
+		device->reset(device);
+		product->reset(product);
+	}
+
+	retn = true;
+
+
+ done:
+	WHACK(device);
+	WHACK(product);
+	WHACK(sysfile);
+
+	return retn;
+}
+
+
 /*
  * Program entry point begins here.
  */
@@ -476,9 +639,13 @@ extern int main(int argc, char *argv[])
 		}
 
 
+	/* Add device nodes for previously plugged devices. */
+	if ( !update_devices() )
+		ERR(goto done);
+
 	/* Initialize socket interface for netlink messages. */
 	if ( !setup_netlink() )
-		goto done;
+		ERR(goto done);
 
 	/* Loop over events. */
 	INIT(HurdLib, Buffer, event, goto done);
