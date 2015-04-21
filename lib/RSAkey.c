@@ -342,10 +342,10 @@ static _Bool encrypt(CO(RSAkey, this), CO(Buffer, payload))
 						RSA_PKCS1_OAEP_PADDING);
 		break;
 	case hardware_key:
-		enc_status = RSA_private_encrypt(payload->size(payload), \
-						 payload->get(payload),	 \
-						 output, S->key, 	 \
-						 RSA_PKCS1_PADDING);
+		enc_status = RSA_public_encrypt(payload->size(payload),	 \
+						payload->get(payload),	 \
+						output, S->key, 	 \
+						RSA_PKCS1_PADDING);
 		break;
 	}
 
@@ -423,10 +423,12 @@ static _Bool decrypt(CO(RSAkey, this), CO(Buffer, payload))
 		status = RSA_public_decrypt(payload->size(payload),	   \
 					    payload->get(payload), output, \
 					    S->key, RSA_PKCS1_PADDING);
+		break;
 	case hardware_key:
 		status = RSA_private_decrypt(payload->size(payload),	    \
 					     payload->get(payload), output, \
 					     S->key, RSA_PKCS1_PADDING);
+		break;
 	}
 
 	if ( status == -1 )
