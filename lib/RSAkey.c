@@ -61,6 +61,9 @@ struct NAAAIM_RSAkey_State
 	/* Type of RSA key. */
 	enum {no_key, public_key, private_key, hardware_key} type;
 
+	/* Type of padding. */
+	RSAkey_padding padding;
+
 	/* Hardware engine definition. */
 	ENGINE *engine;
 
@@ -87,11 +90,47 @@ static void _init_state(CO(RSAkey_State, S))
 
 	S->poisoned = false;
 
-	S->type	  = no_key;
-	S->engine = NULL;
-	S->key	  = NULL;
+	S->type	   = no_key;
+	S->padding = RSAkey_pad_pkcs1;
+	S->engine  = NULL;
+	S->key	   = NULL;
 
 	return;
+}
+
+
+/**
+ * Internal private method.
+ *
+ * This function is responsible for translating the enumerated padding
+ * type with the internal value used by the OpenSSL library to specify
+ * the padding type.
+ *
+ * \param this	The object state whose padding type is to be
+ *		returned.
+ *
+ * \return	The numerical coding value is be used is returned.
+ */
+
+static int _padding(CO(RSAkey_State, S))
+
+{
+	int padding;
+
+
+	switch ( S->padding ) {
+		case RSAkey_pad_none:
+			padding = RSA_NO_PADDING;
+			break;
+		case RSAkey_pad_pkcs1:
+			padding = RSA_PKCS1_PADDING;
+			break;
+		case RSAkey_pad_oaep:
+			padding = RSA_PKCS1_OAEP_PADDING;
+			break;
+	}
+
+	return padding;
 }
 
 
@@ -332,20 +371,17 @@ static _Bool encrypt(CO(RSAkey, this), CO(Buffer, payload))
 	case private_key:
 		enc_status = RSA_private_encrypt(payload->size(payload), \
 						 payload->get(payload),	 \
-						 output, S->key,	 \
-						 RSA_PKCS1_PADDING);
+						 output, S->key, _padding(S));
 		break;
 	case public_key:
 		enc_status = RSA_public_encrypt(payload->size(payload), \
 						payload->get(payload),	\
-						output, S->key,		\
-						RSA_PKCS1_OAEP_PADDING);
+						output, S->key, _padding(S));
 		break;
 	case hardware_key:
 		enc_status = RSA_public_encrypt(payload->size(payload),	 \
 						payload->get(payload),	 \
-						output, S->key, 	 \
-						RSA_PKCS1_PADDING);
+						output, S->key, _padding(S));
 		break;
 	}
 
@@ -417,17 +453,17 @@ static _Bool decrypt(CO(RSAkey, this), CO(Buffer, payload))
 	case private_key:
 		status = RSA_private_decrypt(payload->size(payload),	    \
 					     payload->get(payload), output, \
-					     S->key, RSA_PKCS1_OAEP_PADDING);
+					     S->key, _padding(S));
 		break;
 	case public_key:
 		status = RSA_public_decrypt(payload->size(payload),	   \
 					    payload->get(payload), output, \
-					    S->key, RSA_PKCS1_PADDING);
+					    S->key, _padding(S));
 		break;
 	case hardware_key:
 		status = RSA_private_decrypt(payload->size(payload),	    \
 					     payload->get(payload), output, \
-					     S->key, RSA_PKCS1_PADDING);
+					     S->key, _padding(S));
 		break;
 	}
 
@@ -513,6 +549,47 @@ static _Bool init_engine(CO(RSAkey, this), CO(char **, cmds))
  done:
 	if ( !retn )
 		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements setting the type of padding to be used for
+ * the RSA key object.
+ *
+ * \param this	The key whose padding type is to be set.
+ *
+ * \param type	The type of padding which is constrained to the
+ *		enumerated types defined in the header file for this
+ *		boject.
+ *
+ * \return	A boolean value is returned to indicate the status of
+ *		configuring the padding type.  A false value indicates
+ *		an invalid padding type was specified.
+ */
+
+static _Bool set_padding(CO(RSAkey, this), const int type)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	if ( S->poisoned )
+		return retn;
+
+	switch ( type ) {
+		case RSAkey_pad_none:
+		case RSAkey_pad_pkcs1:
+		case RSAkey_pad_oaep:
+			S->padding = type;
+			retn = true;
+			break;
+	}
 
 	return retn;
 }
@@ -644,6 +721,7 @@ extern RSAkey NAAAIM_RSAkey_Init(void)
 	this->decrypt = decrypt;
 
 	this->init_engine = init_engine;
+	this->set_padding = set_padding;
 
 	this->size  = size;
 	this->print = print;

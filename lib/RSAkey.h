@@ -20,6 +20,15 @@ typedef struct NAAAIM_RSAkey * RSAkey;
 typedef struct NAAAIM_RSAkey_State * RSAkey_State;
 
 /**
+ * Enumerated definitions for encryption padding.
+ */
+typedef enum {
+	RSAkey_pad_none,
+	RSAkey_pad_pkcs1,
+	RSAkey_pad_oaep
+} RSAkey_padding;
+
+/**
  * External RSAkey object representation.
  */
 struct NAAAIM_RSAkey
@@ -32,6 +41,7 @@ struct NAAAIM_RSAkey
 	_Bool (*decrypt)(const RSAkey, Buffer);
 
 	_Bool (*init_engine)(const RSAkey, const char **);
+	_Bool (*set_padding)(const RSAkey, const int);
 
 	int (*size)(const RSAkey);
 	void (*print)(const RSAkey);
