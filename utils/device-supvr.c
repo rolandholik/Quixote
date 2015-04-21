@@ -1,8 +1,8 @@
 /** \file
- * This file implements the system hotplug manager.  The purpose of
- * this manager is to monitor for KOBJECT addition and deletion events
- * and respond with appropriate actions such as device node creation
- * and removal.
+ * This file implements the system hotplug manager and device supervisor.
+ * The purpose of this utility is to monitor for KOBJECT addition and
+ * deletion events and respond with appropriate actions such as device
+ * node creation and removal.
  *
  * Its primary role is to manage the creation and deletion of the USB
  * endpoint devices created when hardware authentication keys are
