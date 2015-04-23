@@ -1,13 +1,17 @@
 /** \file
- *
+ * This file implements provides the implementation of an object which
+ * is used to manage CCID based smartcards.  The object provides a
+ * HurdLib based wrapper around the PC  SmartCard (PCSC)
+ * implementation of the Winscard API for smartcard management.
  */
 
 /**************************************************************************
- * (C)Copyright 2011, The Open Hurderos Foundation. All rights reserved.
+ * (C)Copyright 2011,2015 The Open Hurderos Foundation. All rights reserved.
  *
  * Please refer to the file named COPYING in the top of the source tree
  * for licensing information.
  **************************************************************************/
+
 
 /* Include files. */
 #include <stdlib.h>
@@ -20,10 +24,14 @@
 #include <reader.h>
 
 #include <Origin.h>
+#include <HurdLib.h>
 
 #include "NAAAIM.h"
 #include "SmartCard.h"
 
+
+/* State definition macro. */
+#define STATE(var) CO(SmartCard_State, var) = this->state
 
 /* Verify library/object header file inclusions. */
 #if !defined(NAAAIM_LIBID)
@@ -71,8 +79,9 @@ struct NAAAIM_SmartCard_State
  *        is to be initialized.
  */
 
-static void _init_state(const SmartCard_State const S) {
+static void _init_state(CO(SmartCard_State, S))
 
+{
 	S->libid = NAAAIM_LIBID;
 	S->objid = NAAAIM_SmartCard_OBJID;
 
@@ -101,46 +110,50 @@ static void _init_state(const SmartCard_State const S) {
  *		available.
  */
 
-static _Bool _init_context(const SmartCard_State const S) {
+static _Bool _init_context(CO(SmartCard_State, S))
+
+{
+	_Bool retn = false;
 
 	DWORD reader_cnt,
 	      group_cnt;
 
-	LONG retn;
+
+	if ( SCardEstablishContext(SCARD_SCOPE_SYSTEM, NULL, NULL, \
+				   &S->context) != SCARD_S_SUCCESS )
+		ERR(goto done);
+	if ( SCardIsValidContext(S->context) != SCARD_S_SUCCESS )
+		ERR(goto done);
 
 
-	if ( (retn = SCardEstablishContext(SCARD_SCOPE_SYSTEM, NULL, NULL, \
-					   &S->context)) != SCARD_S_SUCCESS )
-		return false;
-	if ( (retn = SCardIsValidContext(S->context)) != SCARD_S_SUCCESS )
-		return false;
-
-
-	if ( (retn = SCardListReaderGroups(S->context, NULL, &group_cnt) ) != \
+	if ( SCardListReaderGroups(S->context, NULL, &group_cnt) != \
 	     SCARD_S_SUCCESS )
-		return false;
+		ERR(goto done);
 	if ( (S->groups = calloc(group_cnt, sizeof(char))) == NULL )
-		return false;
-	if ( (retn = SCardListReaderGroups(S->context, S->groups, \
-					   &group_cnt)) != SCARD_S_SUCCESS )
-		return false;
+		ERR(goto done);
+	if ( SCardListReaderGroups(S->context, S->groups, \
+				   &group_cnt) != SCARD_S_SUCCESS )
+		ERR(goto done);
 	fprintf(stderr, "Group count: %ld\n", group_cnt);
 
 
-	if ( (retn = SCardListReaders(S->context, S->groups, NULL, \
-				      &reader_cnt)) ==		   \
-	     SCARD_E_NO_READERS_AVAILABLE )
-		return false;
+	if ( SCardListReaders(S->context, S->groups, NULL, \
+			      &reader_cnt) == SCARD_E_NO_READERS_AVAILABLE )
+		ERR(goto done);
 	fprintf(stderr, "Reader count: %ld\n", reader_cnt);
 
 	S->readers = calloc(reader_cnt, sizeof(char));
 	if ( (retn = SCardListReaders(S->context, S->groups, S->readers, \
 				      &reader_cnt)) != \
 	     SCARD_S_SUCCESS )
-		return false;
+		ERR(goto done);
 	fprintf(stderr, "Reader 1: %s\n", S->readers);
 
-	return true;
+	retn = true;
+
+
+ done:
+	return retn;
 }
 
 
@@ -156,42 +169,44 @@ static _Bool _init_context(const SmartCard_State const S) {
  *		indicates a valid card insertion.
  */
 
-static _Bool wait_for_insertion(const SmartCard const this)
+static _Bool wait_for_insertion(CO(SmartCard, this))
 
 {
-	const SmartCard_State const S = this->state;
+	STATE(S);
+
+	_Bool retn = false;
 
 	DWORD prefs;
-
-	LONG retn;
 
 	SCARD_READERSTATE state[1];
 
 
 	state[0].szReader	= &S->readers[0];
 	state[0].dwCurrentState = SCARD_STATE_EMPTY;
-	if ( (retn = SCardGetStatusChange(S->context, INFINITE, state, 1)) != \
+	if ( SCardGetStatusChange(S->context, INFINITE, state, 1) != \
 	     SCARD_S_SUCCESS )
-		return false;
+		ERR(goto done);
 
 	if ( state[0].dwEventState & SCARD_STATE_UNKNOWN )
-		return false;
+		ERR(goto done);
 
-	if ( (retn = SCardConnect(S->context, &S->readers[0],		   \
-				  SCARD_SHARE_SHARED, SCARD_PROTOCOL_T0 |  \
-				  SCARD_PROTOCOL_T1, &S->card, &prefs)) != \
-	     SCARD_S_SUCCESS )
-		return false;
+	if ( SCardConnect(S->context, &S->readers[0], SCARD_SHARE_SHARED,  \
+			  SCARD_PROTOCOL_T0 | SCARD_PROTOCOL_T1, &S->card, \
+			  &prefs) != SCARD_S_SUCCESS )
+		ERR(goto done);
 
-	if ( (retn = SCardDisconnect(S->card, SCARD_UNPOWER_CARD) != \
-	      SCARD_S_SUCCESS) )
-		return false;
+	if ( SCardDisconnect(S->card, SCARD_UNPOWER_CARD) != SCARD_S_SUCCESS )
+		ERR(goto done);
+
 	S->card = -1;
+	retn = true;
 
-	return true;
+
+ done:
+	return retn;
 }
 
-	
+
 /**
  * External public method.
  *
@@ -200,10 +215,10 @@ static _Bool wait_for_insertion(const SmartCard const this)
  * \param this	A pointer to the object which is to be destroyed.
  */
 
-static void whack(const SmartCard const this)
+static void whack(CO(SmartCard, this))
 
 {
-	const SmartCard_State const S = this->state;
+	STATE(S);
 
 
 	if ( S->groups != NULL )
@@ -218,7 +233,7 @@ static void whack(const SmartCard const this)
 	return;
 }
 
-	
+
 /**
  * External constructor call.
  *
