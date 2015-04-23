@@ -4,7 +4,8 @@
 
 
 # Variable declarations.
-CSRC = gen-image.c load-image.c boot.c Netconfig.c IPsec.c SoftwareTPM.c
+CSRC = gen-image.c load-image.c boot.c Netconfig.c IPsec.c SoftwareTPM.c \
+	device-supvr.c
 
 TOOLS = gen-image load-image boot sboot init possum gen-id-verifier	\
 	software-status software-tpm tpm-cmd id-set idmgr net-config	\
