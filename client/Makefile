@@ -4,7 +4,7 @@
 
 
 # Variable declarations.
-CSRC = LCDriver.c SmartCard.c
+CSRC = LCDriver.c
 
 CLIENTS = query-server
 
@@ -69,5 +69,3 @@ clean:
 query-server.o: LCDriver.h SmartCard.h
 
 LCDriver.o: LCDriver.h
-
-SmartCard.o: SmartCard.h

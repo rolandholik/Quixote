@@ -5,7 +5,7 @@
 
 # Variable declarations.
 CSRC = Duct.c OTEDKS.c Curve25519.c IPC.c SoftwareStatus.c Ivy.c IDmgr.c \
-	TPMcmd.c PossumPacket.c PossumPipe.c RSAkey.c
+	TPMcmd.c PossumPacket.c PossumPipe.c RSAkey.c SmartCard.c
 
 TESTS = Duct_test OTEDKS_test Curve25519_test IPC_test PossumPipe_test \
 	RSAkey_test
@@ -91,6 +91,9 @@ clean:
 	rm -f *.o *~ TAGS;
 	rm -f ${LIBRARY};
 	rm -f ${TESTS} OTEDKS.out;
+
+SmartCard.o: SmartCard.c SmartCard.h
+	$(CC) $(CFLAGS) -I/usr/local/include/PCSC -c $< -o $@;
 
 
 # Source dependencies.
