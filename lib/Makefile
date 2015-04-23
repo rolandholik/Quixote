@@ -8,7 +8,7 @@ CSRC = Duct.c OTEDKS.c Curve25519.c IPC.c SoftwareStatus.c Ivy.c IDmgr.c \
 	TPMcmd.c PossumPacket.c PossumPipe.c RSAkey.c SmartCard.c
 
 TESTS = Duct_test OTEDKS_test Curve25519_test IPC_test PossumPipe_test \
-	RSAkey_test
+	RSAkey_test SmartCard_test
 
 CC = musl-gcc
 
@@ -85,8 +85,13 @@ PossumPipe_test: PossumPipe_test.o PossumPipe.o ../SHA256.o ../SHA256_hmac.o \
 RSAkey_test: RSAkey_test.o RSAkey.o
 	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${SSL_CRYPTO}
 
+SmartCard_test: SmartCard_test.o SmartCard.o
+	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib \
+		-L/usr/local/lib -lpcsclite
+
 tags:
 	/opt/emacs/bin/etags *.{h,c};
+
 clean:
 	rm -f *.o *~ TAGS;
 	rm -f ${LIBRARY};
