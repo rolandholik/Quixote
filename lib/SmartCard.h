@@ -25,6 +25,8 @@ typedef struct NAAAIM_SmartCard_State * SmartCard_State;
 struct NAAAIM_SmartCard
 {
 	/* External methods. */
+	_Bool (*get_readers)(const SmartCard, int *);
+
 	_Bool (*wait_for_insertion)(const SmartCard);
 
 	void (*whack)(const SmartCard);

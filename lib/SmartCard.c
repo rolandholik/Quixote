@@ -7,9 +7,6 @@
 
 /**************************************************************************
  * (C)Copyright 2011,2015 The Open Hurderos Foundation. All rights reserved.
- *
- * Please refer to the file named COPYING in the top of the source tree
- * for licensing information.
  **************************************************************************/
 
 
@@ -115,8 +112,7 @@ static _Bool _init_context(CO(SmartCard_State, S))
 {
 	_Bool retn = false;
 
-	DWORD reader_cnt,
-	      group_cnt;
+	DWORD group_cnt;
 
 
 	if ( SCardEstablishContext(SCARD_SCOPE_SYSTEM, NULL, NULL, \
@@ -134,20 +130,67 @@ static _Bool _init_context(CO(SmartCard_State, S))
 	if ( SCardListReaderGroups(S->context, S->groups, \
 				   &group_cnt) != SCARD_S_SUCCESS )
 		ERR(goto done);
-	fprintf(stderr, "Group count: %ld\n", group_cnt);
+
+	retn = true;
 
 
-	if ( SCardListReaders(S->context, S->groups, NULL, \
-			      &reader_cnt) == SCARD_E_NO_READERS_AVAILABLE )
-		ERR(goto done);
-	fprintf(stderr, "Reader count: %ld\n", reader_cnt);
+ done:
+	return retn;
+}
 
-	S->readers = calloc(reader_cnt, sizeof(char));
+
+/**
+ * External public method.
+ *
+ * This method determines the number of readers which are available.
+ *
+ * \param this	A pointer to the object whose reader count is to be
+ *		determined.
+ *
+ * \parm cnt	A pointer to the value which will be updated with
+ *		the current reader count.
+ *
+ * \return	A boolean value is returned to indicate that a reader
+ *		count had been successfully obtained.  A false value
+ *		is used to indicate that the process of determining
+ *		the reader count has failed.
+ */
+
+static _Bool get_readers(CO(SmartCard, this), int * const reader_cnt)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	int cnt = 0;
+
+	char *p;
+
+	DWORD size;
+
+
+	*reader_cnt = cnt;
+	if ( SCardListReaders(S->context, S->groups, NULL, &size) \
+	     == SCARD_E_NO_READERS_AVAILABLE ) {
+		retn = true;
+		goto done;
+	}
+
+	S->readers = calloc(size, sizeof(char));
 	if ( (retn = SCardListReaders(S->context, S->groups, S->readers, \
-				      &reader_cnt)) != \
-	     SCARD_S_SUCCESS )
+				      &size)) != SCARD_S_SUCCESS )
 		ERR(goto done);
-	fprintf(stderr, "Reader 1: %s\n", S->readers);
+
+	p = S->readers;
+	while ( p < (S->readers + size) ) {
+		if ( *p == '\0' ) {
+			++p;
+			++cnt;
+		}
+		++p;
+	}
+	*reader_cnt = cnt;
 
 	retn = true;
 
@@ -275,6 +318,7 @@ extern SmartCard NAAAIM_SmartCard_Init(void)
 	}
 
 	/* Method initialization. */
+	this->get_readers = get_readers;
 	this->wait_for_insertion = wait_for_insertion;
 
 	this->whack = whack;

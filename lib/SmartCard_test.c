@@ -22,13 +22,17 @@
 extern int main(int argc, char *argv[])
 
 {
-	int retn = 1;
+	int cnt,
+	    retn = 1;
 
 	SmartCard card = NULL;
 
 
 	INIT(NAAAIM, SmartCard, card, goto done);
+	if ( !card->get_readers(card, &cnt) )
+		ERR(goto done);
 
+	fprintf(stdout, "Reader cnt: %d\n", cnt);
 	retn = 0;
 
 
