@@ -9,12 +9,17 @@
  * (C)Copyright 2011,2015 The Open Hurderos Foundation. All rights reserved.
  **************************************************************************/
 
+/* Local defines. */
+/* The number of seconds between attempts to poll for a reader. */
+#define POLL_INTERVAL 1
+
 
 /* Include files. */
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <unistd.h>
 
 #include <pcsclite.h>
 #include <winscard.h>
@@ -203,6 +208,55 @@ static _Bool get_readers(CO(SmartCard, this), int * const reader_cnt)
 /**
  * External public method.
  *
+ * This method waits for the availability of a reader.  In the case of
+ * hardware tokens such as the Yubikey the token itself is considered
+ * the reader which makes ->wait_for_insertion method problematic for
+ * detecting a token insertion event.
+ *
+ * This method sits in a one second loop waiting for the reader
+ * count to transition from a value of zero.  The one second loop is
+ * consistent with the delay which the pcscd daemon uses as a polling
+ * interval for hotplug insertion events.
+ *
+ * \param this	A pointer to the object which is waiting for a
+ *		reader.
+ *
+ * \parm cnt	A pointer to the variable which contains the number
+ *		of readers when this method was called.  This variable
+ *		will be updated with the new reader count on a
+ *		successful return.
+ *
+ * \return	A boolean value is returned to indicate the status
+ *		of reader acquisition.  A false value indicates an
+ *		error was encountered while a true value indicates
+ *		a reader was detected.
+ */
+
+static _Bool wait_for_reader(CO(SmartCard, this), int * const reader_cnt)
+
+{
+	_Bool retn  = false;
+
+	int initial = *reader_cnt;
+
+
+	while ( initial == *reader_cnt ) {
+		sleep(POLL_INTERVAL);
+		if ( !get_readers(this, reader_cnt) )
+			goto done;
+	}
+
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method waits for a card insertion event.
  *
  * \param this	A pointer to the card reader waiting for a card insertion.
@@ -318,7 +372,9 @@ extern SmartCard NAAAIM_SmartCard_Init(void)
 	}
 
 	/* Method initialization. */
-	this->get_readers = get_readers;
+	this->get_readers     = get_readers;
+	this->wait_for_reader = wait_for_reader;
+
 	this->wait_for_insertion = wait_for_insertion;
 
 	this->whack = whack;

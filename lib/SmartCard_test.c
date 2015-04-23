@@ -31,6 +31,10 @@ extern int main(int argc, char *argv[])
 	INIT(NAAAIM, SmartCard, card, goto done);
 	if ( !card->get_readers(card, &cnt) )
 		ERR(goto done);
+	if ( cnt == 0 ) {
+		if ( !card->wait_for_reader(card, &cnt) )
+			ERR(goto done);
+	}
 
 	fprintf(stdout, "Reader cnt: %d\n", cnt);
 	retn = 0;

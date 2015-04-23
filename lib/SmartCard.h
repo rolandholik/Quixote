@@ -26,6 +26,7 @@ struct NAAAIM_SmartCard
 {
 	/* External methods. */
 	_Bool (*get_readers)(const SmartCard, int *);
+	_Bool (*wait_for_reader)(const SmartCard, int *);
 
 	_Bool (*wait_for_insertion)(const SmartCard);
 
