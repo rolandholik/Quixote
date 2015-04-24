@@ -378,7 +378,7 @@ static _Bool encrypt(const Authenticator const this, const char * const rsa)
 
 	S->key->add_Buffer(S->key, iv);
 		
-	rsakey->load_private_key(rsakey, rsa);
+	rsakey->load_private_key(rsakey, rsa, NULL);
 	if ( !rsakey->encrypt(rsakey, S->key) )
 		goto done;
 
@@ -445,7 +445,7 @@ static _Bool decrypt(const Authenticator const this, const char * const rsa)
 	/* Decrypt the initialization vector and symmetric key. */
 	if ( (rsakey = NAAAIM_RSAkey_Init()) == NULL )
 		goto done;
-	rsakey->load_public_key(rsakey, rsa);
+	rsakey->load_public_key(rsakey, rsa, NULL);
 	if ( !rsakey->decrypt(rsakey, S->key) )
 		goto done;
 

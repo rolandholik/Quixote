@@ -243,7 +243,7 @@ static _Bool authenticate_identity(const IDtoken const token,  \
 
 	if ( (rsa = NAAAIM_RSAkey_Init()) == NULL )
 		goto done;
-	if ( !rsa->load_public_key(rsa, rsafile) ) { 
+	if ( !rsa->load_public_key(rsa, rsafile, NULL) ) { 
 		fputs("Cannot load public key.\n", stderr);
 		goto done;
 	}
