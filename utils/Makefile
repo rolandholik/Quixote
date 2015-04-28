@@ -5,11 +5,11 @@
 
 # Variable declarations.
 CSRC = gen-image.c load-image.c boot.c Netconfig.c IPsec.c SoftwareTPM.c \
-	device-supvr.c
+	device-supvr.c mgmt-supvr.c
 
 TOOLS = gen-image load-image boot sboot init possum gen-id-verifier	\
 	software-status software-tpm tpm-cmd id-set idmgr net-config	\
-	idtest device-supvr
+	idtest device-supvr mgmt-supvr
 
 CC = musl-gcc
 
@@ -20,6 +20,10 @@ MUSL_INCLUDE = /usr/local/musl/include
 #
 SSL_INCLUDE = /usr/local/musl/ssl/include
 SSL_LIBRARY = -L /usr/local/musl/ssl/lib -l ssl
+SSL_CRYPTO  = -L /usr/local/musl/ssl/lib -lcrypto
+
+# Location of smartcard library.
+PCSC_LIBRARY = -L/usr/local/lib -lpcsclite
 
 
 CDEBUG = -O2 -fomit-frame-pointer -march=core2
@@ -108,6 +112,9 @@ idtest: idtest.o ../IDtoken.o ../SHA256_hmac.o ../SHA256.o
 
 device-supvr: device-supvr.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
+
+mgmt-supvr: mgmt-supvr.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO} ${PCSC_LIBRARY};
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};
