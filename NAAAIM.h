@@ -64,3 +64,4 @@
 #define NAAAIM_IDengine_OBJID		30
 #define NAAAIM_Identity_OBJID		31
 #define NAAAIM_EDIpacket_OBJID		32
+#define NAAAIM_MGMTsupvr_OBJID		33

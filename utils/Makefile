@@ -5,11 +5,11 @@
 
 # Variable declarations.
 CSRC = gen-image.c load-image.c boot.c Netconfig.c IPsec.c SoftwareTPM.c \
-	device-supvr.c mgmt-supvr.c
+	device-supvr.c mgmt-supvr.c MGMTsupvr.c
 
 TOOLS = gen-image load-image boot sboot init possum gen-id-verifier	\
 	software-status software-tpm tpm-cmd id-set idmgr net-config	\
-	idtest device-supvr mgmt-supvr
+	idtest device-supvr mgmt-supvr mgmt-set-key
 
 CC = musl-gcc
 
@@ -113,7 +113,10 @@ idtest: idtest.o ../IDtoken.o ../SHA256_hmac.o ../SHA256.o
 device-supvr: device-supvr.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
-mgmt-supvr: mgmt-supvr.o
+mgmt-supvr: mgmt-supvr.o MGMTsupvr.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO} ${PCSC_LIBRARY};
+
+mgmt-set-key: mgmt-set-key.o MGMTsupvr.o ../RandomBuffer.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO} ${PCSC_LIBRARY};
 
 tags:
@@ -126,8 +129,10 @@ clean:
 # Source dependencies.
 Netconfig.o: Netconfig.h
 IPsec.o: IPsec.h
+MGMTsupvr.o: MGMTsupvr.h
 
 possum.o: Netconfig.h IPsec.h ../IDtoken.h ../SHA256_hmac.h \
 	../RandomBuffer.h ../AES256_cbc.h ../SHA256.h
+mgmt-supvr.o: MGMTsupvr.h
 
 gen-id-verifier.o:

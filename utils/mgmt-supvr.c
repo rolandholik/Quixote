@@ -39,6 +39,8 @@
 #include <SmartCard.h>
 #include <IPC.h>
 
+#include "MGMTsupvr.h"
+
 
 /**
  * Internal function.
@@ -81,8 +83,8 @@ static _Bool get_reader(void)
 
 	retn = true;
 
-
  done:
+	WHACK(card);
 	return retn;
 }
 
@@ -113,6 +115,7 @@ static _Bool release_reader(void)
 
 
 	INIT(NAAAIM, SmartCard, card, goto done);
+
 	while ( 1 ) {
 		if ( !card->get_readers(card, &cnt) )
 			ERR(goto done);
@@ -123,8 +126,8 @@ static _Bool release_reader(void)
 		sleep(5);
 	}
 
-
  done:
+	WHACK(card);
 	return retn;
 }
 
@@ -139,23 +142,21 @@ static _Bool release_reader(void)
  *			the name of the platform management token to
  *			be decrypted.
  *
- * \param token		The object which the configuration token will
- *			be loaded into.
- *
  * \param prompt	A character pointer to a buffer containing
  *			the prompt which is to be used to unlock
  *			the platform configuration token key.
  *
- * \return	If an error has been encountered during the platform
- *		check for configuration a false value is returned.  It
- *		should be noted that failing to decrypt the
- *		configuration token is not an error.  If the
- *		configuration process has been succssful a true value
- *		is returned.
+ * \param mgmt		The object which will hold the encryption
+ *			vector and key.
+ *
+ * \return	If an error has been encountered during the loading
+ *		of the platform configuration keys a false value is
+ *		returned.  If acquisition of the keys are successfull
+ *		a true value is returned.
  */
 
 static _Bool _decrypt_platform_token(CO(char *, file), CO(char*, prompt), \
-				     CO(Buffer, token))
+				     CO(MGMTsupvr, mgmt))
 
 {
 	_Bool retn = false;
@@ -169,42 +170,15 @@ static _Bool _decrypt_platform_token(CO(char *, file), CO(char*, prompt), \
 		NULL, NULL
 	};
 
-	RSAkey rsakey = NULL;
 
-	File token_file = NULL;
-
-
-	if ( (token == NULL) || token->poisoned(token) )
+	if ( (mgmt == NULL) || mgmt->poisoned(mgmt) )
 		ERR(goto done);
 
-	INIT(HurdLib, File, token_file, goto done);
-	if ( !token_file->open_ro(token_file, CONFIG) )
+	if ( !mgmt->load_key(mgmt, "01:02", engine_cmds, prompt) )
 		ERR(goto done);
-	if ( !token_file->slurp(token_file, token) )
-		ERR(goto done);
-
-
-	INIT(NAAAIM, RSAkey, rsakey, goto done);
-	if ( !rsakey->init_engine(rsakey, engine_cmds) )
-		ERR(goto done);
-	if ( !rsakey->load_private_key(rsakey, "01:02", prompt) ) {
-		token->reset(token);
-		retn = true;
-		goto done;
-	}
-	if ( !rsakey->decrypt(rsakey, token) ) {
-		token->reset(token);
-		retn = true;
-		goto done;
-	}
-
 	retn = true;
 
-
  done:
-	WHACK(rsakey);
-	WHACK(token_file);
-
 	return retn;
 }
 
@@ -212,17 +186,12 @@ static _Bool _decrypt_platform_token(CO(char *, file), CO(char*, prompt), \
 /**
  * Internal function.
  *
- * This function is responsible for attempting to decrypt the
- * configuration token to verify whether or not platform configuration
- * is being requested.  It appears as if the OpenSSL pkcs11 engine
- * retains some type of state which prevents more then a single key
- * operations to be conducted in the context of a single process.  As
- * a result this function forks a subordinate process to decrypt
- * the platform configuration token in order to prevent the long
- * running supervisor process from being poisoned.
- *
- * If a hardware key has been presented which is capable of decrypting
- * the configuration token the configuration processing tool is called.
+ * This function is responsible for driving the generation of a
+ * configuration filesystem.  Since it appears as if the OpenSSL
+ * pkcs11 engine retains some type of state which prevents more then a
+ * single key operation to be conducted in the context of a single
+ * process this process is designed to be called from the context of a
+ * subordinate process to the primary primary process.
  *
  * This function expects no input variables.
  *
@@ -234,7 +203,7 @@ static _Bool _decrypt_platform_token(CO(char *, file), CO(char*, prompt), \
  *		is returned.
  */
 
-static _Bool check_for_configuration(void)
+static _Bool do_configuration(void)
 
 {
 	_Bool retn = false;
@@ -244,17 +213,7 @@ static _Bool check_for_configuration(void)
 
 	pid_t pid;
 
-	Buffer token = NULL;
-
-	IPC ipc = NULL;
-
-
-	INIT(HurdLib, Buffer, token, goto done);
-
-	/* Create a shared memory area to hold the decrypted token. */
-	INIT(NAAAIM, IPC, ipc, goto done);
-	if ( !ipc->create(ipc, "mgmt-super_config", KEYSIZE / 8) )
-		ERR(goto done);
+	MGMTsupvr mgmt = NULL;
 
 
 	/* Spawn a child process to decrypt configuration token. */
@@ -264,25 +223,24 @@ static _Bool check_for_configuration(void)
 
 	/* Child. */
 	if ( pid == 0 ) {
+		status = 1;
+#if 0
 		if ( (fd = open("/dev/null", O_RDWR)) == -1 )
-			_exit(2);
+			goto out;
 		if ( dup2(fd, STDERR_FILENO) == -1 )
-			_exit(2);
+			goto out;
+#endif
 
-		if ( !_decrypt_platform_token(CONFIG, CONFIG_PROMPT, token) ) {
-			WHACK(token);
-			_exit(2);
-		}
-		if ( token->size(token) == 0 ) {
-			WHACK(token);
-			_exit(1);
-		}
+		status = 2;
+		INIT(NAAAIM, MGMTsupvr, mgmt, goto out);
+		if ( !_decrypt_platform_token(CONFIG, CONFIG_PROMPT, mgmt) )
+			goto out;
 
-		if ( !ipc->copy(ipc, token->get(token), token->size(token), \
-				0) )
-			_exit(2);
-		WHACK(ipc);
-		_exit(0);
+		mgmt->dump(mgmt);
+		status = 0;
+
+	out:
+		_exit(status);
 	}
 
 	/* Parent - wait for child termination. */
@@ -297,20 +255,9 @@ static _Bool check_for_configuration(void)
 		goto done;
 	}
 
-	/* Do provisioning. */
-	if ( !token->add(token, ipc->get(ipc), KEYSIZE / 8) )
-		ERR(goto done);
-	fputs("Using key contents for provisioning:\n", stderr);
-	token->hprint(token);
-	
 	retn = true;
 
-
  done:
-	WHACK(token);
-	fputs("Destroying IPC.\n", stderr);
-	WHACK(ipc);
-
 	return retn;
 }
 
@@ -326,11 +273,13 @@ extern int main(int argc, char *argv[])
 
 
 	while ( 1 ) {
+		fputs("Insert key to activate.\n", stdout);
+		fflush(stdout);
 		if ( !get_reader() ) {
 			sleep(10);
 			continue;
 		}
-		if ( !check_for_configuration() ) {
+		if ( !do_configuration() ) {
 			ERR(goto done);
 		}
 		else {
@@ -340,7 +289,6 @@ extern int main(int argc, char *argv[])
 				ERR(goto done);
 		}
 	}
-
 
  done:
 	return retn;
