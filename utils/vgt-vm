@@ -1,0 +1,179 @@
+#! /bin/bash
+
+#
+# This script detaches the USB device which drives the keyboard
+# and mouse and starts a VGT based Xen virtual machine and
+# attaches the USB device to it.  It also loads the virtual
+# machines connector with the EDID information for the
+#
+# The script takes two arguements.  The first is the name of the
+# XEN configuration script which devines the virtual machine
+# environment.  The second arguement is the PCI BDF name of the USB
+# device which is to be connected to the guest.
+#
+# (C)Copyright 2016, IDfusion, LLC. All rights reserved.
+#
+# Please refer to the file named COPYING in the top of the source tree
+# for licensing information.
+#
+
+
+# Virtual machine configuration information.
+declare VM="VGT";
+declare VMscript;
+declare VMid;
+declare Monitor_Source="card0-HDMI-A-1";
+declare Monitor_Port="PORT_B";
+declare Monitor_Type="5";
+
+# The current driver and device for the PCI USB devices.
+declare Driver;
+declare Device;
+
+# Variable to hold whether or not the VM has exited.
+declare VMdone;
+
+# Number of 5 second cycles to wait for the VM to come online.
+declare -i VMwait=30;
+
+
+#
+# This function implements the hotplug of the monitor the guest
+# which has been started.
+#
+function connect_monitor() {
+
+	local source="/sys/class/drm/$1" type="$2";
+	local target="/sys/kernel/vgt/vm$3/$Monitor_Port";
+	local type=$2;
+
+	dd bs=128 count=1 if=$source/edid of=$target/edid 2> /dev/null;
+	echo $type >| $target/type;
+	echo "connect" >| $target/connection;
+
+	return;
+}
+
+
+#
+# Get the name of the virtual machine script.
+#
+if [ -z "$1" ]; then
+	echo "No virtual machine definition specified.";
+	exit 1;
+fi;
+if [ ! -e "$1" ]; then
+	echo "Virtual machine definition not found.";
+	exit 1;
+fi;
+VMscript="$1";
+
+
+#
+# Verify the presence of the device and get its current driver.
+#
+if [ -z "$2" ]; then
+	echo "No USB device specified.";
+	exit 1;
+fi;
+Device="$2";
+
+if [ ! -d /sys/bus/pci/devices/$Device ]; then
+	echo "USB device is not present.";
+	exit 1;
+fi;
+Driver=`readlink /sys/bus/pci/devices/$Device/driver`;
+Driver=`basename $Driver`;
+
+
+#
+# Detach the PCI device and make it generically available to the
+# virtual machine infratructure.
+#
+xl pci-assignable-add $Device;
+if [ $? -ne 0 ]; then
+	echo "Error assigning USB device to pciback.";
+	echo $Device >| /sys/bus/pci/drivers/$Driver/bind;
+	exit 1;
+fi;
+
+
+# Add a snapshot volume for the virtual disk.
+lvcreate -s -L 5G -n windows_snap /dev/localvg1/windows > /dev/null;
+if [ $? -ne 0 ]; then
+	echo "Error creating snapshot.";
+	echo $Device >| /sys/bus/pci/drivers/pciback/unbind;
+	echo $Device >| /sys/bus/pci/drivers/$Driver/bind;
+	exit 1;
+fi;
+
+
+#
+# Start the virtual machine and attach the PCI device after
+# the switch has been made to the virtual console.
+#
+xl create -q $VMscript;
+if [ $? -ne 0 ]; then
+	echo "Error starting virtual machine: $VM";
+	echo $Device >| /sys/bus/pci/drivers/pciback/unbind;
+	echo $Device >| /sys/bus/pci/drivers/$Driver/bind;
+	lvremove -f /dev/localvg1/windows_snap > /dev/null;
+	exit 1;
+fi;
+
+echo -e "Waiting for Windows to start\c";
+VMid=`xl domid $VM`;
+while [ "$VMdone" != "true" ];
+do
+	if [ $VMwait -eq 0 ]; then
+		echo "Timeout waiting for virtual machine.";
+		echo $Device >| /sys/bus/pci/drivers/pciback/unbind;
+		echo $Device >| /sys/bus/pci/drivers/$Driver/bind;
+		lvremove -f /dev/localvg1/windows_snap > /dev/null;
+		exit 1;
+	else
+		let VMwait-=1;
+	fi;
+		
+	if [ "$VMid" = "`cat /sys/kernel/vgt/control/foreground_vm`" ]; then
+		VMdone="true";
+		continue;
+	fi;
+	echo -e ".\c";
+	sleep 2s;
+done;
+echo -e "\nWaiting for Windows to complete.";
+
+
+#
+# Attach monitor and PCI devices.
+#
+connect_monitor $Monitor_Source $Monitor_Type $VMid;
+
+xl pci-attach $VMid $Device;
+
+
+#
+# Wait for the virtual machine to complete and then re-attach
+# USB device to its driver.
+#
+VMdone="";
+while [ "$VMdone" != "true" ];
+do
+        xl domid $VM >/dev/null 2>&1
+        if [ $? -ne 0 ]; then
+                VMdone="true";
+        else
+#                sleep 1m;
+		sleep 15s;
+        fi;
+done;
+
+echo "Releasing resources.";
+echo $Device >| /sys/bus/pci/drivers/pciback/unbind;
+echo $Device >| /sys/bus/pci/drivers/$Driver/bind;
+lvremove -f /dev/localvg1/windows_snap > /dev/null;
+
+
+# All done
+exit 0;
