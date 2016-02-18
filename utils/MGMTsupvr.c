@@ -44,7 +44,7 @@
  * The location of the file containing the platform configuration
  * encryption parameters.
  */
-#define CONFIG "./config.enc"
+#define CONFIG "/etc/conf/config.enc"
 
 /*
  * The magic number used to verify the DER encoding of the encryption

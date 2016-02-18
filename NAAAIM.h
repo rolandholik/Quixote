@@ -57,11 +57,12 @@
 #define NAAAIM_Ivy_OBJID		24
 #define NAAAIM_TPMcmd_OBJID		25
 #define NAAAIM_PossumPipe_OBJID		26
+#define NAAAIM_TPM2cmd_OBJID		27
 
-#define NAAAIM_Netconfig_OBJID		27
-#define NAAAIM_IPsec_OBJID		28
-#define NAAAIM_SoftwareTPM_OBJID	29
-#define NAAAIM_IDengine_OBJID		30
-#define NAAAIM_Identity_OBJID		31
-#define NAAAIM_EDIpacket_OBJID		32
-#define NAAAIM_MGMTsupvr_OBJID		33
+#define NAAAIM_Netconfig_OBJID		28
+#define NAAAIM_IPsec_OBJID		29
+#define NAAAIM_SoftwareTPM_OBJID	30
+#define NAAAIM_IDengine_OBJID		31
+#define NAAAIM_Identity_OBJID		32
+#define NAAAIM_EDIpacket_OBJID		33
+#define NAAAIM_MGMTsupvr_OBJID		34

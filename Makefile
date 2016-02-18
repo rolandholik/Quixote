@@ -29,7 +29,7 @@ CC = musl-gcc
 # Locations of SSL include files and libraries
 #
 SSL_INCLUDE = /usr/local/musl/include
-SSL_LIBRARY = -L /usr/local/musl/lib -l ssl
+SSL_LIBRARY = -L /usr/local/musl/lib -l ssl -l crypto
 
 #
 # Locations for the Postgresql files and libraries.

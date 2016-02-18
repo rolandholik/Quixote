@@ -15,8 +15,8 @@
 
 
 /* Local defines. */
-#define CONFIG "./config.enc"
-#define CONFIG_PROMPT "Enter authentication code: "
+#define CONFIG "/etc/conf/config.enc"
+#define CONFIG_PROMPT "Enter authentication code: >"
 
 #define KEYSIZE 2048
 
@@ -82,7 +82,7 @@ static _Bool start_daemons(void)
 			goto out1;
 		if ( dup2(fd, STDERR_FILENO) == -1 )
 			goto out1;
-		execl("/home/greg/device-supvr", "device-supvr", NULL);
+		execl("/usr/local/sbin/device-supvr", "device-supvr", NULL);
 	out1:
 		_exit(1);
 	}
@@ -332,13 +332,14 @@ static _Bool verify_key(void)
  *		returned.
  */
 
-static _Bool start_windows(void)
+static _Bool start_vm(void)
 
 {
 	_Bool retn = true;
 
-	if ( system("/home/greg/vgt-vm /etc/xen/Windows.vgt 0000:00:1d.0") \
-	     != 0 )
+
+	if ( system("/usr/local/bin/vgt-vm /etc/conf/Windows.xen "
+		    "0000:00:1d.0 ehci-pci") != 0 )
 		retn = false;
 
 	return retn;
@@ -352,6 +353,8 @@ static _Bool start_windows(void)
 extern int main(int argc, char *argv[])
 
 {
+	_Bool need_logo = true;
+
 	int retn = 1;
 
 
@@ -359,13 +362,18 @@ extern int main(int argc, char *argv[])
 		ERR(goto done);
 	sleep(3);
 
-	
 
 	while ( 1 ) {
-		fputs("\x1b\x5b\x48\x1b\x5b\x4a\n", stdout);
-		fputs("DakTech/IDfusion Firenode, insert key to login:", \
-		      stdout);
-		fflush(stdout);
+		if ( need_logo ) {
+			fputs("\x1b\x5b\x48\x1b\x5b\x4a", stdout);
+			fputs("\x1b\x5b\x32\x3b\x35\x34\x48", stdout);
+			fputs("\x1b\x5b\x31\x6d", stdout);
+			fputs("DakTech/IDfusion\x1b\x5b\x33\x31\x6d " \
+			      "IDFSS", stdout);
+			fputs("\x1b\x5b\x30\x3b\x31\x30\x6d", stdout);
+			fputs("\n\nInsert key to activate: >", stdout);
+			fflush(stdout);
+		}
 
 		if ( !get_reader() ) {
 			sleep(10);
@@ -373,20 +381,26 @@ extern int main(int argc, char *argv[])
 		}
 
 		fputc('\n', stdout);
+		fputs(CONFIG_PROMPT, stdout);
 		fflush(stdout);
-		if ( !verify_key() ) {
-			fputs("Failed verification, remove key to retry.\n", \
+
+		if ( verify_key() ) {
+			fputs("\nAuthentication valid, remove key to start.\n",
 			      stdout);
 			fflush(stdout);
-			release_reader();
-			sleep(3);
-		}
-		else {
-			fputs("Pincode valid, remove key to start.\n", stderr);
-					if ( !release_reader() )
+			if ( !release_reader() )
 				ERR(goto done);
-			start_windows();
+			start_vm();
+
+			need_logo = true;
+			continue;
 		}
+
+		fputs("\nFailed authentication code - retry.\n",
+		      stdout);
+		fflush(stdout);
+		need_logo = false;
+		sleep(3);
 	}
 
  done:

@@ -19,8 +19,7 @@ MUSL_INCLUDE = /usr/local/musl/include
 # Locations of SSL include files and libraries
 #
 SSL_INCLUDE = /usr/local/musl/ssl/include
-SSL_LIBRARY = -L /usr/local/musl/ssl/lib -l ssl
-SSL_CRYPTO  = -L /usr/local/musl/ssl/lib -lcrypto
+SSL_LIBRARY  = -L /usr/local/musl/lib -l ssl
 
 # Location of smartcard library.
 PCSC_LIBRARY = -L/usr/local/lib -lpcsclite
@@ -78,7 +77,7 @@ sboot: sboot.o Netconfig.o SoftwareTPM.o ../SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
 init: init.o Netconfig.o SoftwareTPM.o ../SHA256.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl -ltspi;
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl -ltspi ${SSL_LIBRARY};
 
 possum: possum.o Netconfig.o IPsec.o
 	${CC} ${LDFLAGS} -o $@ $^ ../IDtoken.o ../SHA256_hmac.o ../SHA256.o \
@@ -96,34 +95,34 @@ software-tpm: software-tpm.o SoftwareTPM.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
 tpm-cmd: tpm-cmd.o ../RandomBuffer.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi;
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi ${SSL_LIBRARY};
 
 id-set: id-set.o ../IDtoken.o ../SHA256_hmac.o ../SHA256.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi;
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi ${SSL_LIBRARY};
 
 idmgr: idmgr.o ../IDtoken.o ../SHA256_hmac.o ../SHA256.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi;
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi ${SSL_LIBRARY};
 
 net-config: net-config.o Netconfig.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
 idtest: idtest.o ../IDtoken.o ../SHA256_hmac.o ../SHA256.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi;
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi ${SSL_LIBRARY};
 
 device-supvr: device-supvr.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
 mgmt-supvr: mgmt-supvr.o MGMTsupvr.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO} ${PCSC_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY} ${PCSC_LIBRARY};
 
 vm-supvr: vm-supvr.o MGMTsupvr.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO} ${PCSC_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY} ${PCSC_LIBRARY};
 
 copy-edid: copy-edid.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
 mgmt-set-key: mgmt-set-key.o MGMTsupvr.o ../RandomBuffer.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO} ${PCSC_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY} ${PCSC_LIBRARY};
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};

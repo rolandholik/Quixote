@@ -16,7 +16,7 @@ MUSL_INCLUDE = /usr/local/musl/include
 # Locations of SSL include files and libraries
 #
 SSL_INCLUDE = /usr/local/musl/ssl/include
-SSL_LIBRARY = -L /usr/local/musl/ssl/lib -l ssl
+SSL_LIBRARY = -L /usr/local/musl/ssl/lib -l ssl -l crypto
 
 
 CDEBUG = -O2 -fomit-frame-pointer -march=core2

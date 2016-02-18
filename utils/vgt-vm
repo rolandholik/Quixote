@@ -1,53 +1,64 @@
-#! /bin/bash
+#! /bin/sh
 
 #
 # This script detaches the USB device which drives the keyboard
-# and mouse and starts a VGT based Xen virtual machine and
-# attaches the USB device to it.  It also loads the virtual
-# machines connector with the EDID information for the
+# and mouse and starts a VGT based Windows virtual machine and
+# attaches the USB device to it.
+
+# set -xv
+PATH="$PATH:/usr/local/musl/sbin";
+export PATH;
+
 #
-# The script takes two arguements.  The first is the name of the
-# XEN configuration script which devines the virtual machine
-# environment.  The second arguement is the PCI BDF name of the USB
-# device which is to be connected to the guest.
+# Functional replacement for cat which reads a single input
+# line from a pseudo-file.
 #
-# (C)Copyright 2016, IDfusion, LLC. All rights reserved.
-#
-# Please refer to the file named COPYING in the top of the source tree
-# for licensing information.
-#
+get() {
+
+	read input < $1;
+	echo $input;
+}
 
 
-# Virtual machine configuration information.
-declare VM="VGT";
-declare VMscript;
-declare VMid;
-declare Monitor_Source="card0-HDMI-A-1";
-declare Monitor_Port="PORT_B";
-declare Monitor_Type="5";
+# The virtual machine name, configuration and id.
+VM="VGT";
+VMscript="";
+VMid="";
 
-# The current driver and device for the PCI USB devices.
-declare Driver;
-declare Device;
+# EDID/monitor configuration information.
+Monitor_Source="card0-HDMI-A-1";
+Monitor_Port="PORT_B";
+Monitor_Type="5";
+
+# Monitor_Source="card0-VGA-1";
+# Monitor_Port="PORT_E";
+# Monitor_Type="0";
+
+# The current driver for the PCI USB device.
+Driver="";
+
+# The USB PCI bus in BDF format.
+Device="";
 
 # Variable to hold whether or not the VM has exited.
-declare VMdone;
+VMdone="";
 
 # Number of 5 second cycles to wait for the VM to come online.
-declare -i VMwait=30;
+VMwait=35;
 
 
 #
 # This function implements the hotplug of the monitor the guest
 # which has been started.
 #
-function connect_monitor() {
+connect_monitor() {
 
 	local source="/sys/class/drm/$1" type="$2";
 	local target="/sys/kernel/vgt/vm$3/$Monitor_Port";
 	local type=$2;
 
-	dd bs=128 count=1 if=$source/edid of=$target/edid 2> /dev/null;
+	# dd bs=128 count=1 if=$source/edid of=$target/edid 2> /dev/null;
+	copy-edid $source/edid $target/edid;
 	echo $type >| $target/type;
 	echo "connect" >| $target/connection;
 
@@ -78,12 +89,19 @@ if [ -z "$2" ]; then
 fi;
 Device="$2";
 
+
+# Get the driver for the designated device.
 if [ ! -d /sys/bus/pci/devices/$Device ]; then
 	echo "USB device is not present.";
 	exit 1;
 fi;
-Driver=`readlink /sys/bus/pci/devices/$Device/driver`;
-Driver=`basename $Driver`;
+
+if [ -n "$3" ]; then
+	Driver="$3";
+else
+	Driver=`readlink /sys/bus/pci/devices/$Device/driver`;
+	Driver=`basename $Driver`;
+fi;
 
 
 #
@@ -99,7 +117,7 @@ fi;
 
 
 # Add a snapshot volume for the virtual disk.
-lvcreate -s -L 5G -n windows_snap /dev/localvg1/windows > /dev/null;
+lvm lvcreate -s -L 5G -n windows_snap /dev/localvg1/windows 2> /dev/null > /dev/null;
 if [ $? -ne 0 ]; then
 	echo "Error creating snapshot.";
 	echo $Device >| /sys/bus/pci/drivers/pciback/unbind;
@@ -109,47 +127,51 @@ fi;
 
 
 #
-# Start the virtual machine and attach the PCI device after
-# the switch has been made to the virtual console.
+# Start the virtual machine and obtain the VM identifier for the
+# machine.  Connect the monitor immediately after domain creation
+# since that is when the hotplug event occurs.
 #
 xl create -q $VMscript;
 if [ $? -ne 0 ]; then
 	echo "Error starting virtual machine: $VM";
 	echo $Device >| /sys/bus/pci/drivers/pciback/unbind;
 	echo $Device >| /sys/bus/pci/drivers/$Driver/bind;
-	lvremove -f /dev/localvg1/windows_snap > /dev/null;
+	lvm lvremove -f /dev/localvg1/windows_snap 2> /dev/null > /dev/null;
 	exit 1;
 fi;
 
-echo -e "Waiting for Windows to start\c";
 VMid=`xl domid $VM`;
+
+connect_monitor $Monitor_Source $Monitor_Type $VMid;
+
+
+# Wait for the VM to initialize graphics adapter.
+echo "Waiting for Windows to start\c";
 while [ "$VMdone" != "true" ];
 do
 	if [ $VMwait -eq 0 ]; then
 		echo "Timeout waiting for virtual machine.";
 		echo $Device >| /sys/bus/pci/drivers/pciback/unbind;
 		echo $Device >| /sys/bus/pci/drivers/$Driver/bind;
-		lvremove -f /dev/localvg1/windows_snap > /dev/null;
+		lvm lvremove -f /dev/localvg1/windows_snap 2> /dev/null > /dev/null;
 		exit 1;
 	else
-		let VMwait-=1;
+		VMwait=$((VMwait-1));
 	fi;
 		
-	if [ "$VMid" = "`cat /sys/kernel/vgt/control/foreground_vm`" ]; then
+	if [ "$VMid" = "`get /sys/kernel/vgt/control/foreground_vm`" ]; then
 		VMdone="true";
 		continue;
 	fi;
-	echo -e ".\c";
+	echo ".\c";
 	sleep 2s;
 done;
-echo -e "\nWaiting for Windows to complete.";
+echo "\nWaiting for Windows to complete.";
 
 
 #
-# Attach monitor and PCI devices.
+# Attach PCI devices.
 #
-connect_monitor $Monitor_Source $Monitor_Type $VMid;
-
 xl pci-attach $VMid $Device;
 
 
@@ -172,7 +194,7 @@ done;
 echo "Releasing resources.";
 echo $Device >| /sys/bus/pci/drivers/pciback/unbind;
 echo $Device >| /sys/bus/pci/drivers/$Driver/bind;
-lvremove -f /dev/localvg1/windows_snap > /dev/null;
+lvm lvremove -f /dev/localvg1/windows_snap 2> /dev/null > /dev/null;
 
 
 # All done
