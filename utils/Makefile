@@ -5,11 +5,11 @@
 
 # Variable declarations.
 CSRC = gen-image.c load-image.c boot.c Netconfig.c IPsec.c SoftwareTPM.c \
-	device-supvr.c mgmt-supvr.c MGMTsupvr.c vm-supvr.c
+	device-supvr.c mgmt-supvr.c MGMTsupvr.c vm-supvr.c copy-edid.c
 
 TOOLS = gen-image load-image boot sboot init possum gen-id-verifier	\
 	software-status software-tpm tpm-cmd id-set idmgr net-config	\
-	idtest device-supvr mgmt-supvr mgmt-set-key vm-supvr
+	idtest device-supvr mgmt-supvr mgmt-set-key vm-supvr copy-edid
 
 CC = musl-gcc
 
@@ -118,6 +118,9 @@ mgmt-supvr: mgmt-supvr.o MGMTsupvr.o
 
 vm-supvr: vm-supvr.o MGMTsupvr.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO} ${PCSC_LIBRARY};
+
+copy-edid: copy-edid.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
 mgmt-set-key: mgmt-set-key.o MGMTsupvr.o ../RandomBuffer.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO} ${PCSC_LIBRARY};
