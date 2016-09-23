@@ -67,11 +67,10 @@ Duct_test: Duct_test.o Duct.o
 	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib
 
 OTEDKS_test: OTEDKS_test.o OTEDKS.o ../SHA256.o ../IDtoken.o ../SHA256_hmac.o
-	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib -L \
-		/usr/local/musl/ssl/lib -l ssl;
+	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${SSL_CRYPTO};
 
 Curve25519_test: Curve25519_test.o Curve25519.o ../RandomBuffer.o
-	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${SSL_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${SSL_CRYPTO};
 
 IPC_test: IPC_test.o IPC.o
 	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib -lrt;
@@ -79,7 +78,7 @@ IPC_test: IPC_test.o IPC.o
 PossumPipe_test: PossumPipe_test.o PossumPipe.o ../SHA256.o ../SHA256_hmac.o \
 	../AES256_cbc.o ../RandomBuffer.o ../IDtoken.o
 	${CC} ${LDFLAGS} -o $@ $^ -L . -lNAAAIM -L../HurdLib -lHurdLib \
-	${SSL_LIBRARY} -lrt -ltspi;
+	${SSL_CRYPTO} -lrt -ltspi;
 
 RSAkey_test: RSAkey_test.o RSAkey.o
 	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${SSL_CRYPTO}

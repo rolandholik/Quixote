@@ -16,7 +16,7 @@ MUSL_INCLUDE = /usr/local/musl/include
 # Locations of SSL include files and libraries
 #
 SSL_INCLUDE = /usr/local/musl/ssl/include
-SSL_LIBRARY = -L /usr/local/musl/ssl/lib -l ssl -l crypto
+SSL_CRYPTO = -L /usr/local/musl/ssl/lib -lcrypto
 
 
 CDEBUG = -O2 -fomit-frame-pointer -march=core2
@@ -57,22 +57,22 @@ all: ${COBJS} binaries
 binaries: ${BINARIES}
 
 idgine: idgine.o IDengine.o Identity.o ../OrgID.o ../SHA256.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY} -lfl;
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO} -lfl;
 
 gen-id: gen-id.o IDengine.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 idsvr: idsvr.o IDengine.o Identity.o ../SHA256.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 fetch-id: fetch-id.o IDengine.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 recip-svr: recip-svr.o IDengine.o Identity.o ../SHA256.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 fwd-id: fwd-id.o IDengine.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 clean:
 	rm -f *.o *~ TAGS;

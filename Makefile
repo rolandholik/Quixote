@@ -29,6 +29,7 @@ CC = musl-gcc
 # Locations of SSL include files and libraries
 #
 SSL_INCLUDE = /usr/local/musl/include
+SSL_CRYPTO  = -L /usr/local/musl/lib -lcrypto
 SSL_LIBRARY = -L /usr/local/musl/lib -l ssl -l crypto
 
 #
@@ -100,10 +101,10 @@ query-client: query-client.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl ${SSL_LIBRARY};
 
 genrandom: genrandom.o RandomBuffer.o SHA256.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 genid: genid.o ${COBJS} DBduct.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl ${SSL_LIBRARY} \
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl ${SSL_CRYPTO} \
 		${POSTGRES_LIBRARY};
 
 gen-npi-search: gen-npi-search.o ${COBJS}
@@ -128,7 +129,7 @@ DBduct_test: DBduct_test.o DBduct.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${POSTGRES_LIBRARY};
 
 sha256key: sha256key.o SHA256.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 DBduct.o: DBduct.c
 	$(CC) $(CFLAGS) -I${POSTGRES_INCLUDE} -c $< -o $@;

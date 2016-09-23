@@ -19,7 +19,7 @@ MUSL_INCLUDE = /usr/local/musl/include
 # Locations of SSL include files and libraries
 #
 SSL_INCLUDE = /usr/local/musl/ssl/include
-SSL_LIBRARY  = -L /usr/local/musl/lib -l ssl
+SSL_CRYPTO  = -L /usr/local/musl/lib -lcrypto
 
 # Location of smartcard library.
 PCSC_LIBRARY = -L/usr/local/lib -lpcsclite
@@ -64,65 +64,65 @@ tools: ${TOOLS}
 
 gen-image: gen-image.o
 	${CC} ${LDFLAGS} -o $@ $^ ../AES256_cbc.o ../SHA256_hmac.o \
-		../RandomBuffer.o ${LIBS} ${SSL_LIBRARY};
+		../RandomBuffer.o ${LIBS} ${SSL_CRYPTO};
 
 load-image: load-image.o
 	${CC} ${LDFLAGS} -o $@ $^ ../AES256_cbc.o ../SHA256_hmac.o ${LIBS} \
-		-ltpm_unseal ${SSL_LIBRARY};
+		-ltpm_unseal ${SSL_CRYPTO};
 
 boot: boot.o Netconfig.o ../SHA256.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 sboot: sboot.o Netconfig.o SoftwareTPM.o ../SHA256.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 init: init.o Netconfig.o SoftwareTPM.o ../SHA256.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl -ltspi ${SSL_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl -ltspi ${SSL_CRYPTO};
 
 possum: possum.o Netconfig.o IPsec.o
 	${CC} ${LDFLAGS} -o $@ $^ ../IDtoken.o ../SHA256_hmac.o ../SHA256.o \
-		../RandomBuffer.o ../AES256_cbc.o ${SSL_LIBRARY} ${LIBS}    \
+		../RandomBuffer.o ../AES256_cbc.o ${SSL_CRYPTO} ${LIBS}    \
 		-ltspi -lfl;
 
 gen-id-verifier: gen-id-verifier.o ../IDtoken.o ../SHA256_hmac.o \
 	../SHA256.o ../RandomBuffer.o
-	${CC} ${LDFLAGS} -o $@ $^ ${SSL_LIBRARY} ${LIBS} -ltspi;
+	${CC} ${LDFLAGS} -o $@ $^ ${SSL_CRYPTO} ${LIBS} -ltspi;
 
 software-status: software-status.o
-	${CC} ${LDFLAGS} -o $@ $^ ${SSL_LIBRARY} ../SHA256.o ${LIBS};
+	${CC} ${LDFLAGS} -o $@ $^ ${SSL_CRYPTO} ../SHA256.o ${LIBS};
 
 software-tpm: software-tpm.o SoftwareTPM.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
 tpm-cmd: tpm-cmd.o ../RandomBuffer.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi ${SSL_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi ${SSL_CRYPTO};
 
 id-set: id-set.o ../IDtoken.o ../SHA256_hmac.o ../SHA256.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi ${SSL_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi ${SSL_CRYPTO};
 
 idmgr: idmgr.o ../IDtoken.o ../SHA256_hmac.o ../SHA256.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi ${SSL_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi ${SSL_CRYPTO};
 
 net-config: net-config.o Netconfig.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
 idtest: idtest.o ../IDtoken.o ../SHA256_hmac.o ../SHA256.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi ${SSL_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi ${SSL_CRYPTO};
 
 device-supvr: device-supvr.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
 mgmt-supvr: mgmt-supvr.o MGMTsupvr.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY} ${PCSC_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO} ${PCSC_LIBRARY};
 
 vm-supvr: vm-supvr.o MGMTsupvr.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY} ${PCSC_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO} ${PCSC_LIBRARY};
 
 copy-edid: copy-edid.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
 mgmt-set-key: mgmt-set-key.o MGMTsupvr.o ../RandomBuffer.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY} ${PCSC_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO} ${PCSC_LIBRARY};
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};
