@@ -14,7 +14,7 @@ CSRC = 	SHA256.c SHA256_hmac.c OrgID.c PatientID.c RandomBuffer.c  \
 # 	provider-server
 SERVERS = root-referral device-broker user-broker
 
-SUBDIRS = lib idgine utils edi # client
+SUBDIRS = lib idgine utils edi SGX # client
 
 # CC = gcc
 CC = musl-gcc
