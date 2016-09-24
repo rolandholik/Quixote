@@ -9,7 +9,8 @@ CSRC = gen-image.c load-image.c boot.c Netconfig.c IPsec.c SoftwareTPM.c \
 
 TOOLS = gen-image load-image boot sboot init possum gen-id-verifier	\
 	software-status software-tpm tpm-cmd id-set idmgr net-config	\
-	idtest device-supvr mgmt-supvr mgmt-set-key vm-supvr copy-edid
+	idtest device-supvr mgmt-supvr mgmt-set-key vm-supvr copy-edid	\
+	tpm2-cmd
 
 CC = musl-gcc
 
@@ -123,6 +124,9 @@ copy-edid: copy-edid.o
 
 mgmt-set-key: mgmt-set-key.o MGMTsupvr.o ../RandomBuffer.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO} ${PCSC_LIBRARY};
+
+tpm2-cmd: tpm2-cmd.o ../RandomBuffer.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltse ${SSL_CRYPTO};
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};
