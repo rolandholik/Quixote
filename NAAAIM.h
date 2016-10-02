@@ -66,3 +66,5 @@
 #define NAAAIM_Identity_OBJID		32
 #define NAAAIM_EDIpacket_OBJID		33
 #define NAAAIM_MGMTsupvr_OBJID		34
+
+#define NAAAIM_SGXmetadata_OBJID	35

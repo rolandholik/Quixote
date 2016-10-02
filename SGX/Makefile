@@ -4,7 +4,7 @@
 
 
 # Variable declarations.
-CSRC = sgx-check.c sgx-test.c sgx-metadata.c
+CSRC = sgx-check.c sgx-test.c sgx-metadata.c SGXmetadata.c
 
 TOOLS = sgx-check sgx-test sgx-metadata
 
@@ -33,7 +33,10 @@ COBJS = ${CSRC:.c=.o}
 LIBS = -lNAAAIM -lHurdLib 
 ELFLIB = -Wl,--rpath /usr/local/musl/lib -lelf
 
-CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib
+HURDLIB = -L../lib -lHurdLib
+
+
+CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I/usr/local/musl/include
 
 
 #
@@ -52,8 +55,8 @@ sgx-check: sgx-check.o
 sgx-test: sgx-test.o
 	${CC} ${LDFLAGS} -o $@ $^;
 
-sgx-metadata: sgx-metadata.o
-	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB};
+sgx-metadata: sgx-metadata.o SGXmetadata.o
+	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB};
 
 sgx-metadata.o: sgx-metadata.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
@@ -67,3 +70,5 @@ clean:
 
 # Source dependencies.
 sgx-metadata.o: SGX.h
+
+SGXmetadata.o: SGX.h SGXmetadata.h
