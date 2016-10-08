@@ -27,6 +27,7 @@
 
 #include <Origin.h>
 #include <HurdLib.h>
+#include <Buffer.h>
 
 #include "NAAAIM.h"
 #include "SGX.h"
@@ -67,8 +68,11 @@ struct NAAAIM_SGXmetadata_State
 	/* ELF library descriptor. */
 	Elf *elf;
 
-	/* SGX metadata structure. */
+	/* SGX metadata structures. */
 	metadata_t metadata;
+
+	Buffer patches;
+	Buffer layouts;
 };
 
 
@@ -91,6 +95,9 @@ static void _init_state(CO(SGXmetadata_State, S)) {
 	S->elf = NULL;
 
 	memset(&S->metadata, '\0', sizeof(S->metadata));
+
+	S->patches = NULL;
+	S->layouts = NULL;
 
 	return;
 }
@@ -120,6 +127,10 @@ static _Bool load(CO(SGXmetadata, this), CO(char *, enclave))
 
 	_Bool retn = false;
 
+	uint8_t *dirp;
+
+	uint32_t cnt;
+
 	int index;
 
 	size_t name_index,
@@ -127,7 +138,6 @@ static _Bool load(CO(SGXmetadata, this), CO(char *, enclave))
 
 	uint32_t name_size,
 		 desc_size;
-		 
 
 	Elf64_Ehdr *ehdr;
 
@@ -138,6 +148,9 @@ static _Bool load(CO(SGXmetadata, this), CO(char *, enclave))
 
 	Elf_Data *data,
 		 *name_data;
+
+	struct _patch_entry_t *patch;
+	struct _layout_entry_t *layout;
 
 
 	/* Sanity check the object. */
@@ -188,6 +201,38 @@ static _Bool load(CO(SGXmetadata, this), CO(char *, enclave))
 	}
 
 
+	/* Load the patch data. */
+	INIT(HurdLib, Buffer, S->patches, ERR(goto done));
+
+	dirp = (uint8_t *) &S->metadata;
+	dirp += S->metadata.dirs[DIR_PATCH].offset;
+	patch = (struct _patch_entry_t *) dirp;
+	cnt = S->metadata.dirs[DIR_PATCH].size / \
+		sizeof(struct _patch_entry_t);
+
+	for (index= 0; index < cnt; ++index) {
+		S->patches->add(S->patches, (unsigned char *) patch, \
+				sizeof(struct _patch_entry_t));
+		++patch;
+	}
+
+
+	/* Load the layout data. */
+	INIT(HurdLib, Buffer, S->layouts, ERR(goto done));
+
+	dirp = (uint8_t *) &S->metadata;
+	dirp += S->metadata.dirs[DIR_LAYOUT].offset;
+	layout = (struct _layout_entry_t *) dirp;
+	cnt = S->metadata.dirs[DIR_LAYOUT].size / \
+		sizeof(struct _layout_entry_t);
+
+	for (index= 0; index < cnt; ++index) {
+		S->layouts->add(S->layouts, (unsigned char *) layout, \
+				sizeof(struct _layout_entry_t));
+		++layout;
+	}
+
+
  done:
 	if ( !retn ) {
 		if ( S->fd != -1 )
@@ -195,7 +240,6 @@ static _Bool load(CO(SGXmetadata, this), CO(char *, enclave))
 		if ( S->elf != NULL )
 			elf_end(S->elf);
 	}
-
 
 	return retn;
 }
@@ -254,8 +298,6 @@ static void dump(CO(SGXmetadata, this))
 {
 	STATE(S);
 
-	uint8_t *p;
-
 	uint32_t lp,
 		 cnt;
 
@@ -263,22 +305,9 @@ static void dump(CO(SGXmetadata, this))
 
 	struct SGX_sigstruct *sp = &mp->enclave_css;
 
-	struct _patch_entry_t {
-		uint64_t dst;               /* relative to enclave file base */
-		uint32_t src;               /* relative to metadata base */
-		uint32_t size;              /* patched size */
-		uint32_t reserved[4];
-	} __attribute__((packed)) *patch;
+	struct _patch_entry_t *patch;
 
-	struct _layout_entry_t {
-		uint16_t id;
-		uint16_t attributes;
-		uint32_t page_count;
-		uint64_t rva;
-		uint32_t content_size;
-		uint32_t content_offset;
-		uint64_t si_flags;
-	} __attribute__((packed)) *lay;
+	struct _layout_entry_t *layout;
 
 
 	/* Output the enlave header information. */
@@ -343,10 +372,8 @@ static void dump(CO(SGXmetadata, this))
 	fprintf(stdout, "\tOffset: 0x%0x\n", mp->dirs[DIR_PATCH].offset);
 	fprintf(stdout, "\tSize:   0x%0x\n\n", mp->dirs[DIR_PATCH].size);
 
-	p  = (uint8_t *) mp;
-	p += mp->dirs[DIR_PATCH].offset;
-	patch = (struct _patch_entry_t *) p;
-	cnt   = mp->dirs[DIR_PATCH].size / sizeof(struct _patch_entry_t);
+	patch = (struct _patch_entry_t *) S->patches->get(S->patches);
+	cnt   = S->patches->size(S->patches) / sizeof(struct _patch_entry_t);
 
 	for (lp= 0; lp < cnt; ++lp) {
 		fprintf(stdout, "\tPatch %u:\n", lp);
@@ -359,22 +386,22 @@ static void dump(CO(SGXmetadata, this))
 	fputs("\nLAYOUT:\n", stdout);
 	fprintf(stdout, "\tOffset: 0x%0x\n", mp->dirs[DIR_LAYOUT].offset);
 	fprintf(stdout, "\tSize:   0x%0x\n\n", mp->dirs[DIR_LAYOUT].size);
-	p  = (uint8_t *) mp;
-	p += mp->dirs[DIR_LAYOUT].offset;
-	lay = (struct _layout_entry_t *) p;
-	cnt = mp->dirs[DIR_LAYOUT].size / sizeof(struct _layout_entry_t);
+
+	layout = (struct _layout_entry_t *) S->layouts->get(S->layouts);
+	cnt = S->layouts->size(S->layouts) / sizeof(struct _layout_entry_t);
 
 	for (lp= 0; lp < cnt; ++lp) {
 		fprintf(stdout, "\tLayout %u:\n", lp);
-		fprintf(stdout, "\t\tid: 0x%x\n", lay->id);
-		fprintf(stdout, "\t\tattributes: 0x%x\n", lay->attributes);
-		fprintf(stdout, "\t\tpage count: 0x%x\n", lay->page_count);
-		fprintf(stdout, "\t\toffset: 0x%lx\n", lay->rva);
-		fprintf(stdout, "\t\tcontent size: 0x%x\n", lay->content_size);
+		fprintf(stdout, "\t\tid: 0x%x\n", layout->id);
+		fprintf(stdout, "\t\tattributes: 0x%x\n", layout->attributes);
+		fprintf(stdout, "\t\tpage count: 0x%x\n", layout->page_count);
+		fprintf(stdout, "\t\toffset: 0x%lx\n", layout->rva);
+		fprintf(stdout, "\t\tcontent size: 0x%x\n", \
+			layout->content_size);
 		fprintf(stdout, "\t\tcontent offset: 0x%x\n", \
-			lay->content_offset);
-		fprintf(stdout, "\t\tsi flags: 0x%lx\n", lay->si_flags);
-		++lay;
+			layout->content_offset);
+		fprintf(stdout, "\t\tsi flags: 0x%lx\n", layout->si_flags);
+		++layout;
 	}
 
 	
@@ -400,6 +427,9 @@ static void whack(CO(SGXmetadata, this))
 		elf_end(S->elf);
 	if ( S->fd != -1 )
 		close(S->fd);
+
+	WHACK(S->patches);
+	WHACK(S->layouts);
 
 	S->root->whack(S->root, this, S);
 	return;

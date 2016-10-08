@@ -150,6 +150,23 @@ typedef enum {
 	DIR_NUM
 } dir_index_t;
 
+struct _patch_entry_t {
+	uint64_t dst;
+	uint32_t src;
+	uint32_t size;
+	uint32_t reserved[4];
+} __attribute__((packed));
+
+struct _layout_entry_t {
+	uint16_t id;
+	uint16_t attributes;
+	uint32_t page_count;
+	uint64_t rva;
+	uint32_t content_size;
+	uint32_t content_offset;
+	uint64_t si_flags;
+} __attribute__((packed));
+
 typedef struct _data_directory_t {
 	uint32_t offset;
 	uint32_t size;
