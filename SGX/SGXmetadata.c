@@ -246,6 +246,52 @@ static _Bool load(CO(SGXmetadata, this), CO(char *, enclave))
 
 
 /**
+ * External public method.
+ *
+ * This method implements the patching of an enclave shared object
+ * which has been previously memory mapped.  Patching the enclave
+ * involves interating through the array of _patch_entry_t structures
+ * which was loaded from the SGX encalve.
+ *
+ * \param this		A pointer to the object which contains the
+ *			patch data to be applied.
+ *
+ * \param enclave	A pointer to the mapped enclave to which the
+ *			patches are to be applied.
+ *
+ * \return	No return value is defined.
+ */
+
+static void patch_enclave(CO(SGXmetadata, this), uint8_t *image)
+
+{
+	STATE(S);
+
+	uint8_t *src,
+		*dst;
+
+	uint32_t lp,
+		 cnt = S->patches->size(S->patches) / \
+			sizeof(struct _patch_entry_t);
+
+	struct _patch_entry_t *patch = \
+		(struct _patch_entry_t *)S->patches->get(S->patches);
+
+
+	for (lp= 0; lp < cnt; ++lp, ++patch) {
+		src  = (uint8_t *) &S->metadata;
+		src += patch->src;
+		dst  = image;
+		dst += patch->dst;
+		memcpy(dst, src, patch->size);
+	}
+
+
+	return;
+}
+
+
+/**
  * Internal private function
  *
  * This function implements printing out of a character buffer.  It is
@@ -473,7 +519,8 @@ extern SGXmetadata NAAAIM_SGXmetadata_Init(void)
 	_init_state(this->state);
 
 	/* Method initialization. */
-	this->load  = load;
+	this->load	    = load;
+	this->patch_enclave = patch_enclave;
 
 	this->dump  = dump;
 	this->whack = whack;

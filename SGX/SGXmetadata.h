@@ -28,6 +28,7 @@ struct NAAAIM_SGXmetadata
 {
 	/* External methods. */
 	_Bool (*load)(const SGXmetadata, const char *);
+	void (*patch_enclave)(const SGXmetadata, uint8_t *);
 
 	void (*dump)(const SGXmetadata);
 	void (*whack)(const SGXmetadata);
