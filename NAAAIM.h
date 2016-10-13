@@ -68,3 +68,4 @@
 #define NAAAIM_MGMTsupvr_OBJID		34
 
 #define NAAAIM_SGXmetadata_OBJID	35
+#define NAAAIM_SGXloader_OBJID		36

@@ -6,7 +6,7 @@
 # Variable declarations.
 CSRC = sgx-check.c sgx-test.c sgx-metadata.c SGXmetadata.c
 
-TOOLS = sgx-check sgx-test sgx-metadata
+TOOLS = sgx-check sgx-test sgx-metadata sgx-loader
 
 CC = musl-gcc
 
@@ -61,6 +61,12 @@ sgx-metadata: sgx-metadata.o SGXmetadata.o
 sgx-metadata.o: sgx-metadata.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
 
+sgx-loader: sgx-loader.o SGXloader.o SGXmetadata.o
+	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB};
+
+sgx-loader.o: sgx-loader.c
+	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
+
 tags:
 	/opt/emacs/bin/etags *.{h,c};
 clean:
@@ -72,3 +78,4 @@ clean:
 sgx-metadata.o: SGX.h
 
 SGXmetadata.o: SGX.h SGXmetadata.h
+SGXloader.o: SGX.h SGXloader.h
