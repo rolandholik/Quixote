@@ -461,11 +461,13 @@ static void whack(CO(SGXloader, this))
 
 	WHACK(S->metadata);
 
-	segcnt = S->segments->size(S->segments) / sizeof(struct segment);
-	segptr = (struct segment *) S->segments->get(S->segments);
-	for (lp= 0; lp < segcnt; ++lp, ++segptr)
-		WHACK(segptr->data);
-
+	if ( S->segments != NULL ) {
+		segcnt = S->segments->size(S->segments) \
+			/ sizeof(struct segment);
+		segptr = (struct segment *) S->segments->get(S->segments);
+		for (lp= 0; lp < segcnt; ++lp, ++segptr)
+			WHACK(segptr->data);
+	}
 	WHACK(S->segments);
 
 	S->root->whack(S->root, this, S);
