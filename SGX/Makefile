@@ -4,7 +4,7 @@
 
 
 # Variable declarations.
-CSRC = sgx-check.c sgx-test.c sgx-metadata.c SGXmetadata.c
+CSRC = sgx-check.c sgx-test.c sgx-metadata.c SGXmetadata.c SGXloader.c
 
 TOOLS = sgx-check sgx-test sgx-metadata sgx-loader
 
