@@ -73,6 +73,10 @@ struct NAAAIM_SGXmetadata_State
 
 	Buffer patches;
 	Buffer layouts;
+
+	/* SGX attributes and select structure. */
+	uint32_t misc_select;
+	sgx_attributes_t attributes;
 };
 
 
@@ -98,6 +102,9 @@ static void _init_state(CO(SGXmetadata_State, S)) {
 
 	S->patches = NULL;
 	S->layouts = NULL;
+
+	S->misc_select = 0;
+	memset(&S->attributes, '\0', sizeof(S->attributes));
 
 	return;
 }
@@ -292,6 +299,171 @@ static void patch_enclave(CO(SGXmetadata, this), uint8_t *image)
 
 
 /**
+ * External public method.
+ *
+ * This method implements computing the effective attributes which the
+ * enclave will be run under.  It also computes the miscellaneous select
+ * mask which appears to be clear on current, SGX1, processor families.
+ *
+ * \param this		A pointer to the object which represents the
+ *			enclave whose attributes are to be computed.
+ *
+ * \return		A true value is returned if the computed
+ *			attributes are correct and consistent.  A false
+ *			value is returned if there is a functional
+ *			issue with the attribute set.
+ */
+
+static _Bool compute_attributes(CO(SGXmetadata, this))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	uint32_t eax,
+		 ebx,
+		 ecx,
+		 edx;
+
+
+	/* Status check the object. */
+	if ( S->poisoned )
+		return false;
+
+
+	/*
+	 * The following is a sanity check which verifies that the
+	 * minimum required set of attributes are needed.
+	 */
+	if ( (S->metadata.attributes.xfrm & 0x3ULL) != 0x3ULL )
+		goto done;
+
+
+	/*
+	 * The following section of code uses the CPUID instructions
+	 * to determine the type of processor support which is
+	 * available for the various components of the attributes.
+	 *
+	 * First obtain the misc select value from the SGX/Leaf 0
+	 * CPUID instruction.
+	 */
+	__asm("movl %4, %%eax\n\t"
+	      "movl %5, %%ecx\n\t"
+	      "cpuid\n\t"
+	      "movl %%eax, %0\n\t"
+	      "movl %%ebx, %1\n\t"
+	      "movl %%ecx, %2\n\t"
+	      "movl %%edx, %3\n\t"
+	      /* Output. */
+	      : "=r" (eax), "=r" (ebx), "=r" (ecx), "=r" (edx)
+	      /* Input. */
+	      : "r" (0x12), "r" (0)
+	      /* Clobbers. */
+	      : "eax", "ebx", "ecx", "edx");
+
+	S->misc_select  = ebx;
+	S->misc_select &= S->metadata.enclave_css.miscselect;
+
+	/*
+	 * Obtain the attribute flags from the SGX/Leaf1 CPUID instruction
+	 * which detail the enclave capabilities.
+	 */
+	__asm("movl %4, %%eax\n\t"
+	      "movl %5, %%ecx\n\t"
+	      "cpuid\n\t"
+	      "movl %%eax, %0\n\t"
+	      "movl %%ebx, %1\n\t"
+	      "movl %%ecx, %2\n\t"
+	      "movl %%edx, %3\n\t"
+	      /* Output. */
+	      : "=r" (eax), "=r" (ebx), "=r" (ecx), "=r" (edx)
+	      /* Input. */
+	      : "r" (0x12), "r" (1)
+	      /* Clobbers. */
+	      : "eax", "ebx", "ecx", "edx");
+
+	S->attributes.flags = eax | ((uint64_t) ebx << 32ULL);
+
+
+	/*
+	 * Query for the presence of the XSAVE and OSXSAVE instructions.
+	 *	Bit 26 ECX => XSAVE
+	 *	Bit 27 ECX => OXSAVE
+	 */
+	__asm("movl %4, %%eax\n\t"
+	      "movl %5, %%ecx\n\t"
+	      "cpuid\n\t"
+	      "movl %%eax, %0\n\t"
+	      "movl %%ebx, %1\n\t"
+	      "movl %%ecx, %2\n\t"
+	      "movl %%edx, %3\n\t"
+	      /* Output. */
+	      : "=r" (eax), "=r" (ebx), "=r" (ecx), "=r" (edx)
+	      /* Input. */
+	      : "r" (0x0), "r" (0x1)
+	      /* Clobbers. */
+	      : "eax", "ebx", "ecx", "edx");
+
+	if ( (ecx & (1UL << 26)) || (ecx & (1U << 27)) ) {
+		/* Have XSAVE variant. */
+		__asm("movl %2, %%ecx\n\t"
+		      "xgetbv\n\t"
+		      "movl %%eax, %0\n\t"
+		      "movl %%edx, %1\n\t"
+		      /* Output. */
+		      : "=r" (ecx), "=r" (edx)
+		      /* Input. */
+		      : "r" (0x0)
+		      /* Clobbers. */
+		      : "eax", "ecx", "edx");
+		S->attributes.xfrm &= ((uint64_t) edx << 32ULL) | eax;
+	}
+	else
+		S->attributes.xfrm = 0x3ULL;
+
+	/*
+	 * All of Linux enclaves are debug enclaves except the launch
+	 * enclave.
+	 */
+#if 1
+	S->metadata.attributes.flags |= 0x2ULL;
+#endif
+	S->attributes.flags &= S->metadata.attributes.flags;
+	S->attributes.xfrm  &= S->metadata.attributes.xfrm;
+
+
+	/*
+	 * Compare the attributes in the signature structure to the
+         * current attribute set.
+	 */
+	if ( (S->metadata.enclave_css.attribute_mask.xfrm & \
+	      S->metadata.attributes.xfrm) !=		    \
+	     (S->metadata.enclave_css.attribute_mask.xfrm & \
+	      S->metadata.enclave_css.attributes.xfrm) )
+		ERR(goto done);
+
+	if ( (S->metadata.enclave_css.attribute_mask.flags & \
+	      S->metadata.attributes.flags) !=
+	     (S->metadata.enclave_css.attribute_mask.flags & \
+	      S->metadata.enclave_css.attributes.flags) )
+		ERR(goto done);
+
+
+	/* Need section to evaluate launch token attributes. */
+
+	retn = true;
+
+
+done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
  * Internal private function
  *
  * This function implements printing out of a character buffer.  It is
@@ -450,7 +622,7 @@ static void dump(CO(SGXmetadata, this))
 		++layout;
 	}
 
-	
+
 	return;
 }
 
@@ -481,7 +653,7 @@ static void whack(CO(SGXmetadata, this))
 	return;
 }
 
-	
+
 /**
  * External constructor call.
  *
@@ -519,8 +691,9 @@ extern SGXmetadata NAAAIM_SGXmetadata_Init(void)
 	_init_state(this->state);
 
 	/* Method initialization. */
-	this->load	    = load;
-	this->patch_enclave = patch_enclave;
+	this->load		 = load;
+	this->patch_enclave	 = patch_enclave;
+	this->compute_attributes = compute_attributes;
 
 	this->dump  = dump;
 	this->whack = whack;
