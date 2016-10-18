@@ -72,6 +72,9 @@ struct NAAAIM_SGXenclave_State
 
 	/* The SGX Enclave Control Structure. */
 	struct SGX_secs secs;
+
+	/* The enclave start address. */
+	unsigned long int enclave_address;
 };
 
 
@@ -97,6 +100,8 @@ static void _init_state(CO(SGXenclave_State, S)) {
 	S->loader = NULL;
 
 	memset(&S->secs, '\0', sizeof(struct SGX_secs));
+
+	S->enclave_address = 0;
 
 	return;
 }
@@ -189,6 +194,7 @@ static _Bool create_enclave(CO(SGXenclave, this))
 	if ( ioctl(S->fd, SGX_IOCTL_ENCLAVE_CREATE, &create_param) < 0 )
 		ERR(goto done);
 	fprintf(stdout, "OK, start adress=0x%0lx\n", create_param.addr);
+	S->enclave_address = create_param.addr;
 
 	retn = true;
 
@@ -212,6 +218,13 @@ static void whack(CO(SGXenclave, this))
 {
 	STATE(S);
 
+	struct SGX_destroy_param destroy_param;
+
+
+	if ( S->enclave_address != 0 ) {
+		destroy_param.addr = S->enclave_address;
+		ioctl(S->fd, SGX_IOCTL_ENCLAVE_DESTROY, &destroy_param);
+	}
 
 	if ( S->fd != -1 )
 		close(S->fd);
