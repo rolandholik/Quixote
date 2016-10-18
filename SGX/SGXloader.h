@@ -26,8 +26,9 @@ typedef struct NAAAIM_SGXloader_State * SGXloader_State;
 struct NAAAIM_SGXloader
 {
 	/* External methods. */
-	_Bool (*load)(const SGXloader, const char *);
-	_Bool (*load_secs)(const SGXloader, const char *, struct SGX_secs *);
+	_Bool (*load)(const SGXloader, const char *, _Bool);
+	_Bool (*load_secs)(const SGXloader, const char *, struct SGX_secs *, \
+			   _Bool);
 
 	void (*dump)(const SGXloader);
 	void (*whack)(const SGXloader);

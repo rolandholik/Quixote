@@ -308,13 +308,17 @@ static void patch_enclave(CO(SGXmetadata, this), uint8_t *image)
  * \param this		A pointer to the object which represents the
  *			enclave whose attributes are to be computed.
  *
+ * \param debug		A boolean flag used to indicate whether or not
+ *			the debug flag should be set on the functional
+ *			enclave attributes.
+ *
  * \return		A true value is returned if the computed
  *			attributes are correct and consistent.  A false
  *			value is returned if there is a functional
  *			issue with the attribute set.
  */
 
-static _Bool compute_attributes(CO(SGXmetadata, this))
+static _Bool compute_attributes(CO(SGXmetadata, this), const _Bool debug)
 
 {
 	STATE(S);
@@ -433,10 +437,11 @@ static _Bool compute_attributes(CO(SGXmetadata, this))
 
 
 	/*
-	 * All of Linux enclaves are debug enclaves except the launch
-	 * enclave.
+	 * Set the functional attributes which will be used for the enclave.
 	 */
-	S->metadata.attributes.flags |= 0x2ULL;
+	if ( debug )
+		S->metadata.attributes.flags |= 0x2ULL;
+
 	S->attributes.flags &= S->metadata.attributes.flags;
 	S->attributes.xfrm   = S->metadata.attributes.xfrm & hardware_xfrm;
 

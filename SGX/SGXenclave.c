@@ -123,7 +123,9 @@ static void _init_state(CO(SGXenclave_State, S)) {
  * \param enclave	A pointer to a null-terminated buffer which
  *			contains the path specification to the shared
  *			object implementation of the enclave.
-
+ *
+ * \param debug		A boolean flag used to indicate whether or not
+ *			the enclave is to be initialized in debug mode.
  *
  * \return	If an error is encountered while opening the enclave a
  *		false value is returned.   A true value indicates the
@@ -131,7 +133,7 @@ static void _init_state(CO(SGXenclave_State, S)) {
  */
 
 static _Bool open_enclave(CO(SGXenclave, this), CO(char *, device), \
-			  CO(char *, enclave))
+			  CO(char *, enclave), _Bool debug)
 
 {
 	STATE(S);
@@ -145,7 +147,7 @@ static _Bool open_enclave(CO(SGXenclave, this), CO(char *, device), \
 
 	/* Load the SGX metadata and shared object file. */
 	INIT(NAAAIM, SGXloader, S->loader, ERR(goto done));
-	if ( !S->loader->load_secs(S->loader, enclave, &S->secs) )
+	if ( !S->loader->load_secs(S->loader, enclave, &S->secs, debug) )
 		ERR(goto done);
 
 	retn = true;

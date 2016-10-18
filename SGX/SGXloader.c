@@ -283,12 +283,15 @@ static _Bool _build_relocation_map(CO(SGXloader_State, S))
  * \param enclave	A pointer to the null-terminated character
  *			buffer which holds the name of the enclave.
  *
+ * \param debug		A boolean value which indicates whether or not
+ *			the enclave is to be loaded in debug mode.
+ *
  * \return	If an error is encountered while loading the metadata
  *		a false value is returned.  A true value is returned
  *		if the object contains valid metadata.
  */
 
-static _Bool load(CO(SGXloader, this), CO(char *, enclave))
+static _Bool load(CO(SGXloader, this), CO(char *, enclave), const _Bool debug)
 
 {
 	STATE(S);
@@ -315,7 +318,7 @@ static _Bool load(CO(SGXloader, this), CO(char *, enclave))
 	INIT(NAAAIM, SGXmetadata, S->metadata, ERR(goto done));
 	if ( !S->metadata->load(S->metadata, enclave) )
 		ERR(goto done);
-	if ( !S->metadata->compute_attributes(S->metadata) )
+	if ( !S->metadata->compute_attributes(S->metadata, debug) )
 		ERR(goto done);
 
 
@@ -394,13 +397,16 @@ static _Bool load(CO(SGXloader, this), CO(char *, enclave))
  * \param secs		A pointer to the structure which will be loaded
  *			with the SECS information.
  *
+ * \param debug		A boolean value which indicates whether or not
+ *			the enclave is to be loaded in debug mode.
+ *
  * \return	If an error is encountered while loading the enclave
  *		a false value is returned.  A true value is returned
  *		if the object contains valid metadata.
  */
 
 static _Bool load_secs(CO(SGXloader, this), CO(char *, enclave), \
-		       struct SGX_secs *secs)
+		       struct SGX_secs *secs, const _Bool debug)
 
 {
 	STATE(S);
@@ -414,7 +420,7 @@ static _Bool load_secs(CO(SGXloader, this), CO(char *, enclave), \
 
 
 	/* Call the standard load method. */
-	if ( !this->load(this, enclave) )
+	if ( !this->load(this, enclave, debug) )
 		ERR(goto done);
 
 
