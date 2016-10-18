@@ -157,7 +157,7 @@ static Elf64_Dyn *_get_tag(CO(SGXloader_State, S), Elf64_Sxword tag)
 		++dptr;
 	}
 	dptr = NULL;
-		
+
 
  done:
 	return dptr;
@@ -380,6 +380,64 @@ static _Bool load(CO(SGXloader, this), CO(char *, enclave))
 /**
  * External public method.
  *
+ * This method implements the loading of the SGX binary data from the
+ * enclave file with return of the SGX Enclave Control Structure.  This
+ * method allows a single call to load the enclave and return the
+ * information needed to create the enclave.
+ *
+ * \param this		A pointer to the object which is to hold the
+ *			metadata.
+ *
+ * \param enclave	A pointer to the null-terminated character
+ *			buffer which holds the name of the enclave.
+ *
+ * \param secs		A pointer to the structure which will be loaded
+ *			with the SECS information.
+ *
+ * \return	If an error is encountered while loading the enclave
+ *		a false value is returned.  A true value is returned
+ *		if the object contains valid metadata.
+ */
+
+static _Bool load_secs(CO(SGXloader, this), CO(char *, enclave), \
+		       struct SGX_secs *secs)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		return false;
+
+
+	/* Call the standard load method. */
+	if ( !this->load(this, enclave) )
+		ERR(goto done);
+
+
+	/* Get the SECS information from the enclave metadata. */
+	if ( !S->metadata->get_secs(S->metadata, secs) )
+		ERR(goto done);
+	fprintf(stdout, "Loaded secs size: 0x%lx\n", secs->size);
+
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a diagnostic dump of the enclave binaryd ata.
  *
  * \param this		A pointer to the object whose content is to be
@@ -474,7 +532,7 @@ static void whack(CO(SGXloader, this))
 	return;
 }
 
-	
+
 /**
  * External constructor call.
  *
@@ -512,7 +570,8 @@ extern SGXloader NAAAIM_SGXloader_Init(void)
 	_init_state(this->state);
 
 	/* Method initialization. */
-	this->load  = load;
+	this->load	= load;
+	this->load_secs = load_secs;
 
 	this->dump  = dump;
 	this->whack = whack;

@@ -27,6 +27,7 @@ struct NAAAIM_SGXloader
 {
 	/* External methods. */
 	_Bool (*load)(const SGXloader, const char *);
+	_Bool (*load_secs)(const SGXloader, const char *, struct SGX_secs *);
 
 	void (*dump)(const SGXloader);
 	void (*whack)(const SGXloader);
