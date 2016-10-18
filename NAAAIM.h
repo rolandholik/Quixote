@@ -69,3 +69,4 @@
 
 #define NAAAIM_SGXmetadata_OBJID	35
 #define NAAAIM_SGXloader_OBJID		36
+#define NAAAIM_SGXenclave_OBJID		37
