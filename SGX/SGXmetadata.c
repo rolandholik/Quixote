@@ -326,6 +326,8 @@ static _Bool compute_attributes(CO(SGXmetadata, this))
 		 ecx,
 		 edx;
 
+	uint64_t hardware_xfrm;
+
 
 	/* Status check the object. */
 	if ( S->poisoned )
@@ -334,7 +336,9 @@ static _Bool compute_attributes(CO(SGXmetadata, this))
 
 	/*
 	 * The following is a sanity check which verifies that the
-	 * minimum required set of attributes are needed.
+	 * minimum required set of attributes are needed.  The
+	 * target XFRM attributes starts with the XFRM attributes
+	 * which are required by the enclave metadata.
 	 */
 	if ( (S->metadata.attributes.xfrm & 0x3ULL) != 0x3ULL )
 		goto done;
@@ -365,9 +369,13 @@ static _Bool compute_attributes(CO(SGXmetadata, this))
 	S->misc_select  = ebx;
 	S->misc_select &= S->metadata.enclave_css.miscselect;
 
+
 	/*
 	 * Obtain the attribute flags from the SGX/Leaf1 CPUID instruction
-	 * which detail the enclave capabilities.
+	 * which detail the enclave capabilities.  The attributes are
+	 * two 64-bit quantities.  The first 64 bits represents the
+	 * flag values which can be set for the enclave with the second
+	 * 64-bit value representing the xfrm capabilities.
 	 */
 	__asm("movl %4, %%eax\n\t"
 	      "movl %5, %%ecx\n\t"
@@ -384,6 +392,7 @@ static _Bool compute_attributes(CO(SGXmetadata, this))
 	      : "eax", "ebx", "ecx", "edx");
 
 	S->attributes.flags = eax | ((uint64_t) ebx << 32ULL);
+	hardware_xfrm = ((uint64_t) edx << 32ULL) | ecx;
 
 
 	/*
@@ -399,7 +408,7 @@ static _Bool compute_attributes(CO(SGXmetadata, this))
 	      "movl %%ecx, %2\n\t"
 	      "movl %%edx, %3\n\t"
 	      /* Output. */
-	      : "=r" (eax), "=r" (ebx), "=r" (ecx), "=r" (edx)
+	      : "=R" (eax), "=r" (ebx), "=r" (ecx), "=r" (edx)
 	      /* Input. */
 	      : "r" (0x0), "r" (0x1)
 	      /* Clobbers. */
@@ -417,20 +426,19 @@ static _Bool compute_attributes(CO(SGXmetadata, this))
 		      : "r" (0x0)
 		      /* Clobbers. */
 		      : "eax", "ecx", "edx");
-		S->attributes.xfrm &= ((uint64_t) edx << 32ULL) | eax;
+		hardware_xfrm |= ((uint64_t) edx << 32ULL) | eax;
 	}
 	else
-		S->attributes.xfrm = 0x3ULL;
+		hardware_xfrm = 0x3ULL;
+
 
 	/*
 	 * All of Linux enclaves are debug enclaves except the launch
 	 * enclave.
 	 */
-#if 1
 	S->metadata.attributes.flags |= 0x2ULL;
-#endif
 	S->attributes.flags &= S->metadata.attributes.flags;
-	S->attributes.xfrm  &= S->metadata.attributes.xfrm;
+	S->attributes.xfrm   = S->metadata.attributes.xfrm & hardware_xfrm;
 
 
 	/*
@@ -458,6 +466,60 @@ static _Bool compute_attributes(CO(SGXmetadata, this))
 done:
 	if ( !retn )
 		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method is responsible for populating a Software guard Extension
+ * Control Structure (SECS) with information which is abstracted from
+ * the enclave metadata.
+ *
+ * This function assumes that it is initializing the structure and
+ * will clear the structure before populating it.
+ *
+ * \param this		A pointer to the object from which the SECS
+ *			structure information is to be obtained.
+ *
+ * \param secs		A pointer to the structure which will be
+ *			populated.
+ *
+ * \return		A true value is returned if the object has
+ *			been previously poisoned
+ *			attributes are correct and consistent.  A false
+ *			value is returned if there is a functional
+ *			issue with the attribute set.
+ */
+
+static _Bool get_secs(CO(SGXmetadata, this), struct SGX_secs *secs)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		return false;
+
+
+	/* Initialize the SECS structure. */
+	memset(secs, '\0', sizeof(struct SGX_secs));
+
+	secs->size	   = S->metadata.enclave_size;
+	secs->base	   = 0;
+	secs->ssaframesize = S->metadata.ssa_frame_size;
+	secs->miscselect   = S->misc_select;
+	secs->attributes   = S->attributes.flags;
+	secs->xfrm	   = S->attributes.xfrm;
+	secs->isvprodid	   = S->metadata.enclave_css.isv_prodid;
+	secs->isvsvn	   = S->metadata.enclave_css.isv_svn;
+
+	retn = true;
 
 	return retn;
 }
@@ -694,6 +756,7 @@ extern SGXmetadata NAAAIM_SGXmetadata_Init(void)
 	this->load		 = load;
 	this->patch_enclave	 = patch_enclave;
 	this->compute_attributes = compute_attributes;
+	this->get_secs		 = get_secs;
 
 	this->dump  = dump;
 	this->whack = whack;
