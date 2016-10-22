@@ -610,6 +610,22 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
 	 * the physical size of the segment the difference in size
 	 * is added as a series of uninitialized pages.
 	 */
+	if ( r2p(segment->phdr.p_memsz) > r2p(segment->phdr.p_filesz) ) {
+		memset(page, '\0', sizeof(page));
+		secinfo.flags = segment->flags;
+		size = r2p(segment->phdr.p_memsz) - \
+			r2p(segment->phdr.p_filesz);
+
+		build_offset = 0;
+		while ( build_offset < size ) {
+			if ( !enclave->add_page(enclave, page, &secinfo, \
+						true) )
+				ERR(goto done);
+			build_offset += 4096;
+		}
+		fprintf(stdout, "\tAdding unitialized pages: 0x%lx\n", \
+			size / 4096);
+	}
 
 	retn = true;
 
