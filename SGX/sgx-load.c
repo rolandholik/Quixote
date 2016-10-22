@@ -10,6 +10,7 @@
 #include <HurdLib.h>
 
 #include "NAAAIM.h"
+#include "SGX.h"
 #include "SGXenclave.h"
 
 
@@ -40,6 +41,9 @@ extern int main(int argc, char *argv[])
 	}
 
 	if ( !enclave->create_enclave(enclave) )
+		ERR(goto done);
+
+	if ( !enclave->load_enclave(enclave) )
 		ERR(goto done);
 
 

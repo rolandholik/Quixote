@@ -28,6 +28,10 @@ struct NAAAIM_SGXenclave
 	_Bool (*open_enclave)(const SGXenclave, const char *, const char *, \
 			      _Bool);
 	_Bool (*create_enclave)(const SGXenclave);
+	_Bool (*load_enclave)(const SGXenclave);
+
+	_Bool (*add_page)(const SGXenclave, const uint8_t *, \
+			  struct SGX_secinfo *, const _Bool);
 
 	void (*whack)(const SGXenclave);
 

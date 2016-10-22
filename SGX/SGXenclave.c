@@ -32,8 +32,8 @@
 #include "NAAAIM.h"
 #include "SGX.h"
 #include "SGXmetadata.h"
-#include "SGXloader.h"
 #include "SGXenclave.h"
+#include "SGXloader.h"
 
 
 /* Object state extraction macro. */
@@ -75,6 +75,9 @@ struct NAAAIM_SGXenclave_State
 
 	/* The enclave start address. */
 	unsigned long int enclave_address;
+
+	/* Enclave page count .*/
+	uint64_t page_cnt;
 };
 
 
@@ -102,6 +105,7 @@ static void _init_state(CO(SGXenclave_State, S)) {
 	memset(&S->secs, '\0', sizeof(struct SGX_secs));
 
 	S->enclave_address = 0;
+	S->page_cnt	   = 0;
 
 	return;
 }
@@ -210,6 +214,109 @@ static _Bool create_enclave(CO(SGXenclave, this))
 /**
  * External public method.
  *
+ * This method loads a previously created enclave using the contents
+ * of the shared enclave image.
+ *
+ * \param this		A pointer to the object representing the enclave
+ *			which is being loaded.
+ *
+ * \return	If an error is encountered while loading the enclave
+ *		a false value is returned.   A true value indicates the
+ *		enclave was successfully loaded.
+ */
+
+static _Bool load_enclave(CO(SGXenclave, this))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Verify object. */
+	if ( S->poisoned )
+		ERR(goto done);
+
+
+	/* Load the TEXT portion of the enclave. */
+	if ( !S->loader->load_segments(S->loader, this) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method adds a page to the enclave.  The final arguement to the
+ * method call specifies whether or not the enclave measurement is
+ * extended with the contents of the page.
+ * 
+ * \param this		A pointer to the object representing the enclave
+ *			which is having a page added to it.
+ *
+ * \param page		A ponter to a memory buffer containing the
+ *			page which is to be added.
+ *
+ * \param secinfo	A pointer to the data structure which defines
+ *			the security characteristics of the page which
+ *			is to be added.
+ *
+ * \param measure	The flag which indicates whether or not the
+ *			contents of the page is to be used to extend
+ *			the measurement of the enclave.
+ *
+ * \return	If an error is encountered while adding the page a false
+ *		value is returned.   A true value indicates the
+ *		enclave was successfully loaded.
+ */
+
+static _Bool add_page(CO(SGXenclave, this), CO(uint8_t *, page), \
+		      struct SGX_secinfo *secinfo, const _Bool measure)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	struct SGX_add_param add_param;
+
+
+	/* Verify object. */
+	if ( S->poisoned )
+		ERR(goto done);
+
+
+	/* Initialize the page addition parameters and add page. */
+	memset(&add_param, '\0', sizeof(add_param));
+	add_param.addr	    = S->enclave_address + (4096 * S->page_cnt);
+	add_param.user_addr = (unsigned long) page;
+	add_param.secinfo   = secinfo;
+	if ( !measure )
+		add_param.flags |= SGX_SKIP_EXTENSION;
+
+	if ( ioctl(S->fd, SGX_IOCTL_ENCLAVE_ADD_PAGE, &add_param) < 0 ) {
+		perror("page add error");
+		ERR(goto done);
+	}
+	S->page_cnt += 1;
+
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a destructor for an SGXenclave object.
  *
  * \param this	A pointer to the object which is to be destroyed.
@@ -278,6 +385,9 @@ extern SGXenclave NAAAIM_SGXenclave_Init(void)
 	/* Method initialization. */
 	this->open_enclave   = open_enclave;
 	this->create_enclave = create_enclave;
+	this->load_enclave   = load_enclave;
+
+	this->add_page = add_page;
 
 	this->whack = whack;
 
