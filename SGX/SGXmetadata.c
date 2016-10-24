@@ -31,6 +31,7 @@
 
 #include "NAAAIM.h"
 #include "SGX.h"
+#include "SGXenclave.h"
 #include "SGXmetadata.h"
 
 
@@ -533,6 +534,178 @@ static _Bool get_secs(CO(SGXmetadata, this), struct SGX_secs *secs)
 /**
  * Internal private function
  *
+ * This function implements the loading of an individual layout
+ * definition.
+ *
+ * \param layout	A pointer the layout definition which is to
+ *			be loaded.
+ *
+ * \return		A true value is returned if the loading of the
+ *			layout succeeds.  A false value is returned if
+ *			the loading of the layout fails.
+ */
+
+static _Bool _load_layout(CO(struct _layout_entry_t *, layout))
+
+{
+	_Bool retn = false;
+
+
+	switch ( layout->id ) {
+		case 1:
+			fputs("\tHeap\n", stdout);
+			break;
+		case 2:
+			fputs("\tTCS\n", stdout);
+			break;
+		case 3:
+			fputs("\tTD\n", stdout);
+			break;
+		case 4:
+			fputs("\tSSA\n", stdout);
+			break;
+		case 5:
+			fputs("\tStack\n", stdout);
+			break;
+		case 6:
+			fputs("\tThread group\n", stdout);
+			break;
+		case 7:
+			fputs("\tGuard\n", stdout);
+			break;
+	}
+	fprintf(stdout, "\tpages: 0x%x\n", layout->page_count);
+
+	return retn;
+}
+
+
+/**
+ * Internal private function
+ *
+ * This function implements the loading of a layout group definition.  A
+ * group is a previously defined range of individual layout sections
+ * which is repeated a sepcified number of times.
+ *
+ * \param layout	A pointer to the layout definitions.   This
+ *			will be treated as an array which will be
+ *			deferenced over the range specified by the
+ *			group.
+ * *
+ * \param group		The offset within the layout entry of the
+ *			group entry.
+ *
+ * \return		A true value is returned if the loading of the
+ *			group succeeds.  A false value is returned if
+ *			the loading of the group fails.
+ */
+
+static _Bool _load_group(CO(layout_t *, layout), const uint64_t group)
+
+{
+	_Bool retn = false;
+
+	uint32_t lp,
+		 start = group - layout[group].group.entry_count;
+
+
+	for (lp= start; lp < group; ++lp) {
+		fprintf(stdout, "\tGroup layout: %d\n", lp);
+		_load_layout(&layout[lp].entry);
+		fputc('\n', stdout);
+	}
+
+	retn = true;
+
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements loading the page configurations in the
+ * enclave which are specified by the layout structures defined in the
+ * SGX metadata.
+ *
+ * \param this		A pointer to the object which contains the SGX
+ *			layouts which are to be loaded.
+ *
+ * \param enclave	A pointer to the enclave object into which the
+ *			page definitions are to be loaded into.
+ *
+ * \return	If an error is encountered while loading the layou
+ *		definitions a false value is returned.  A true value
+ *		indicates the enclave was successfully loaded.
+ */
+
+static _Bool load_layouts(CO(SGXmetadata, this), CO(SGXenclave, enclave))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	uint32_t lp,
+		 cnt;
+
+	layout_t *layout;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+
+
+	layout = (layout_t *) S->layouts->get(S->layouts);
+	cnt = S->layouts->size(S->layouts) / sizeof(layout_t);
+
+	for (lp= 0; lp < cnt; ++lp) {
+		fprintf(stdout, "Layout %u:\n", lp);
+		if ( (1 << 12) & layout[lp].entry.id ) {
+			_load_group(layout, lp);
+			continue;
+		}
+
+		switch ( layout[lp].entry.id ) {
+			case 1:
+				fputs("\tHeap\n", stdout);
+				break;
+			case 2:
+				fputs("\tTCS\n", stdout);
+				break;
+			case 3:
+				fputs("\tTD\n", stdout);
+				break;
+			case 4:
+				fputs("\tSSA\n", stdout);
+				break;
+			case 5:
+				fputs("\tStack\n", stdout);
+				break;
+			case 6:
+				fputs("\tThread group\n", stdout);
+				break;
+			case 7:
+				fputs("\tGuard\n", stdout);
+				break;
+		}
+		fprintf(stdout, "\tpages: 0x%x\n", \
+			layout[lp].entry.page_count);
+	}
+
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * Internal private function
+ *
  * This function implements printing out of a character buffer.  It is
  * a utility function to simplify output for the ->dump method.
  *
@@ -762,6 +935,8 @@ extern SGXmetadata NAAAIM_SGXmetadata_Init(void)
 	this->patch_enclave	 = patch_enclave;
 	this->compute_attributes = compute_attributes;
 	this->get_secs		 = get_secs;
+
+	this->load_layouts	 = load_layouts;
 
 	this->dump  = dump;
 	this->whack = whack;

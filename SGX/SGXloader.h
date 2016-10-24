@@ -31,6 +31,7 @@ struct NAAAIM_SGXloader
 			   _Bool);
 
 	_Bool (*load_segments)(const SGXloader, const SGXenclave);
+	_Bool (*load_layouts)(const SGXloader, const SGXenclave);
 
 	void (*dump)(const SGXloader);
 	void (*whack)(const SGXloader);

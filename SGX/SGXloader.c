@@ -31,8 +31,8 @@
 
 #include "NAAAIM.h"
 #include "SGX.h"
-#include "SGXmetadata.h"
 #include "SGXenclave.h"
+#include "SGXmetadata.h"
 #include "SGXloader.h"
 
 
@@ -633,7 +633,7 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
  done:
 	return retn;
 }
-	
+
 
 /**
  * External public method.
@@ -710,7 +710,6 @@ static _Bool load_segments(CO(SGXloader, this), CO(SGXenclave, enclave))
 			"vaddr=0x%lx/rva=0x%lx, offset=0x%lx, size=0x%lx "  \
 			"loaded.\n", lp, segptr->phdr.p_vaddr,		    \
 			segptr->phdr.p_vaddr & (~(4096-1)), offset, size);
-		
 
 		/* Build remaining pages. */
 		_build_segment(enclave, segptr, offset);
@@ -727,6 +726,47 @@ static _Bool load_segments(CO(SGXloader, this), CO(SGXenclave, enclave))
 
  done:
 
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method is an interface method which requests that the
+ * SGXmetada object load the layout sections of the enclave.
+ *
+ * \param this		A pointer to the object which represents the
+ *			enclave loader data which contains the
+ *			SGX metadata.
+ *
+ * \param enclave	A pointer to the enclave object which the
+ *			layout sections are to be constructed in.
+ *
+ * \return	If an error is encountered while loading the layouts
+ *		a false value is returned.  A true value indicates
+ *		the layouts were loaded.
+ */
+
+static _Bool load_layouts(CO(SGXloader, this), CO(SGXenclave, enclave))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Verify the object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+
+	if ( !S->metadata->load_layouts(S->metadata, enclave) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
 	return retn;
 }
 
@@ -870,6 +910,7 @@ extern SGXloader NAAAIM_SGXloader_Init(void)
 	this->load_secs = load_secs;
 
 	this->load_segments = load_segments;
+	this->load_layouts  = load_layouts;
 
 	this->dump  = dump;
 	this->whack = whack;

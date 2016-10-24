@@ -31,7 +31,6 @@
 
 #include "NAAAIM.h"
 #include "SGX.h"
-#include "SGXmetadata.h"
 #include "SGXenclave.h"
 #include "SGXloader.h"
 
@@ -240,6 +239,10 @@ static _Bool load_enclave(CO(SGXenclave, this))
 
 	/* Load the TEXT portion of the enclave. */
 	if ( !S->loader->load_segments(S->loader, this) )
+		ERR(goto done);
+
+	/* Load the layout portion of the enclave. */
+	if ( !S->loader->load_layouts(S->loader, this) )
 		ERR(goto done);
 
 	retn = true;

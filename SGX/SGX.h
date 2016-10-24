@@ -167,6 +167,22 @@ struct _layout_entry_t {
 	uint64_t si_flags;
 } __attribute__((packed));
 
+struct _layout_group_t
+{
+    uint16_t    id;
+    uint16_t    entry_count;
+    uint32_t    load_times;
+    uint64_t    load_step;
+    uint32_t    reserved[4];
+} __attribute__((packed));
+
+typedef union _layout_t
+{
+	struct _layout_entry_t entry;
+	struct _layout_group_t group;
+} layout_t;
+
+
 typedef struct _data_directory_t {
 	uint32_t offset;
 	uint32_t size;
