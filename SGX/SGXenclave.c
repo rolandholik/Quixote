@@ -259,7 +259,7 @@ static _Bool load_enclave(CO(SGXenclave, this))
  * This method adds a page to the enclave.  The final arguement to the
  * method call specifies whether or not the enclave measurement is
  * extended with the contents of the page.
- * 
+ *
  * \param this		A pointer to the object representing the enclave
  *			which is having a page added to it.
  *
@@ -314,6 +314,72 @@ static _Bool add_page(CO(SGXenclave, this), CO(uint8_t *, page), \
 
  done:
 	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method adds a 'hole' in the enclave.  Its implementation was
+ * inspired by the fact that the Intel SDK uses a sparse virtual
+ * memory map to implement 'guard' pages between the memory arenas.
+ *
+ * A 'hole' is a page in the enclave which does not have its virtual
+ * address mapped to a page in the Enclave Page Cache.  References to
+ * any addresses in this page range generate the equivalent of a page
+ * fault which generates an asynchronous enclave exit event.
+ *
+ * \param this	The object representing the enclave which is to have
+ *		a hole punched into it.
+
+ * \return	If an error is encountered while adding the hole a false
+ *		value is returned.   A true value indicates the
+ *		hole was successfully punched.
+ */
+
+static _Bool add_hole(CO(SGXenclave, this))
+
+{
+	STATE(S);
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(return false);
+
+	++S->page_cnt;
+
+	return true;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method returns the current relative virtual address of the
+ * enclave represented by this object.  The relative virtual address
+ * is the byte displacement from the start of the enclave to the
+ * next page which will be added to enclave.
+ *
+ * \param this	The object representing the enclave whose
+ *		a hole punched into it.
+
+ * \return	The functions returns the current size of the enclave
+ *		which is the allocated page count of the enclave
+ *		multipled by the page size of the enclave.
+ */
+
+static unsigned long int get_address(CO(SGXenclave, this))
+
+{
+	STATE(S);
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(return false);
+
+	return S->page_cnt * 4096;
 }
 
 
@@ -391,6 +457,9 @@ extern SGXenclave NAAAIM_SGXenclave_Init(void)
 	this->load_enclave   = load_enclave;
 
 	this->add_page = add_page;
+	this->add_hole = add_hole;
+
+	this->get_address = get_address;
 
 	this->whack = whack;
 
