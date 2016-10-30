@@ -532,23 +532,46 @@ static _Bool get_secs(CO(SGXmetadata, this), struct SGX_secs *secs)
 
 
 /**
- * Internal private function
+ * Internal private method.
  *
- * This function implements the loading of an individual layout
+ * This method implements the loading of an individual layout
  * definition.
  *
+ * \param S		The state of the object whose layout is being
+ *			generated.
+
  * \param layout	A pointer the layout definition which is to
  *			be loaded.
+ *
+ * \param enclave	The object representing the enclave into which
+ *			the layout definition will be loaded.
  *
  * \return		A true value is returned if the loading of the
  *			layout succeeds.  A false value is returned if
  *			the loading of the layout fails.
  */
 
-static _Bool _load_layout(CO(struct _layout_entry_t *, layout))
+static _Bool _load_layout(CO(SGXmetadata_State, S),		\
+			  CO(struct _layout_entry_t *, layout), \
+			  CO(SGXenclave, enclave))
 
 {
 	_Bool retn = false;
+
+	uint8_t *offset,
+		page[4096];
+
+	uint32_t lp,
+		 content_count;
+
+	struct SGX_tcs *tcs;
+
+	struct SGX_secinfo secinfo;
+
+
+	/* Verify object state. */
+	if ( S->poisoned )
+		ERR(goto done);
 
 
 	switch ( layout->id ) {
@@ -574,18 +597,115 @@ static _Bool _load_layout(CO(struct _layout_entry_t *, layout))
 			fputs("\tGuard\n", stdout);
 			break;
 	}
+	fprintf(stdout, "\tattributes: 0x%x\n", layout->attributes);
 	fprintf(stdout, "\tpages: 0x%x\n", layout->page_count);
+	fprintf(stdout, "\trva: 0x%lx\n", layout->rva);
+	fprintf(stdout, "\tcontent_size: 0x%x\n", layout->content_size);
+	fprintf(stdout, "\tcontent_offset: 0x%x\n", layout->content_offset);
+	fprintf(stdout, "\tflags: 0x%lx\n", layout->si_flags);
+
+
+	/*
+	 * Address each layout type as a separate build unit.
+	 *
+	 * Start with the Task Control Structure.
+	 */
+	if ( layout->id == 2 ) {
+		if ( layout->content_size > sizeof(page) )
+			ERR(goto done);
+		memset(page, '\0', sizeof(page));
+
+		offset  = (uint8_t *) &S->metadata;
+		offset += layout->content_offset;
+		memcpy(page, offset, layout->content_size);
+
+		tcs = (struct SGX_tcs *) page;
+		tcs->ossa    += enclave->get_address(enclave);
+		tcs->ofsbase += enclave->get_address(enclave);
+		tcs->ogsbase += enclave->get_address(enclave);
+
+		memset(&secinfo, '\0', sizeof(struct SGX_secinfo));
+		secinfo.flags = layout->si_flags;
+
+		if ( !enclave->add_page(enclave, page, &secinfo, true) )
+			ERR(goto done);
+
+		retn = true;
+		goto done;
+	}
+
+
+	/* If this is a guard page a hole is punched in the enclave. */
+	if ( layout->id == 7 ) {
+		if ( !enclave->add_hole(enclave) )
+			ERR(goto done);
+
+		retn = true;
+		goto done;
+	}
+
+
+	/*
+	 * For current purposes we will treat any enclaves with permissions
+	 * as pages to be loaded.
+	 *
+	 * Secondly there are no layouts other then the TCS which have
+	 * both a non-zero content offset and size.
+	 */
+	if ( layout->si_flags == 0 ) {
+		retn = true;
+		goto done;
+	}
+
+	if ( (layout->content_size > 0) && (layout->content_offset > 0) )
+		ERR(goto done);
+
+
+	/*
+	 * If the content layout size is non-zero the byte contents of
+	 * the size are used to fill the page.
+	 */
+	memset(page, '\0', sizeof(page));
+
+	if ( layout->content_size > 0 ) {
+		offset = page;
+		content_count = sizeof(page) / sizeof(layout->content_size);
+
+		for (lp= 0; lp < content_count; ++lp) {
+			memcpy(offset, &layout->content_size, \
+			       sizeof(layout->content_size));
+			offset += sizeof(layout->content_size);
+		}
+	}
+
+	memset(&secinfo, '\0', sizeof(struct SGX_secinfo));
+	secinfo.flags = layout->si_flags;
+
+	for (lp= 0; lp < layout->page_count; ++lp) {
+		if ( !enclave->add_page(enclave, page, &secinfo, true) )
+			ERR(goto done);
+	}
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
 
 	return retn;
 }
 
 
 /**
- * Internal private function
+ * Internal private method.
  *
  * This function implements the loading of a layout group definition.  A
  * group is a previously defined range of individual layout sections
  * which is repeated a sepcified number of times.
+ *
+ * \param S		The state of the object whose group is to be
+ *			loaded.
  *
  * \param layout	A pointer to the layout definitions.   This
  *			will be treated as an array which will be
@@ -595,24 +715,32 @@ static _Bool _load_layout(CO(struct _layout_entry_t *, layout))
  * \param group		The offset within the layout entry of the
  *			group entry.
  *
+ * \param enclave	The object representing the enclave into which
+ *			the group definition will be loaded.
+ *
  * \return		A true value is returned if the loading of the
  *			group succeeds.  A false value is returned if
  *			the loading of the group fails.
  */
 
-static _Bool _load_group(CO(layout_t *, layout), const uint64_t group)
+static _Bool _load_group(CO(SGXmetadata_State, S), CO(layout_t *, layout), \
+			 const uint64_t group, CO(SGXenclave, enclave))
 
 {
 	_Bool retn = false;
 
 	uint32_t lp,
-		 start = group - layout[group].group.entry_count;
+		 lp1,
+		 start = group - layout[group].group.entry_count,
+		 replicates = layout[group].group.load_times;
 
 
-	for (lp= start; lp < group; ++lp) {
-		fprintf(stdout, "\tGroup layout: %d\n", lp);
-		_load_layout(&layout[lp].entry);
-		fputc('\n', stdout);
+	for (lp= 0; lp < replicates; ++lp) {
+		for (lp1= start; lp1 < group; ++lp1) {
+			fprintf(stdout, "\tGroup layout: %d\n", lp);
+			_load_layout(S, &layout[lp1].entry, enclave);
+			fputc('\n', stdout);
+		}
 	}
 
 	retn = true;
@@ -664,35 +792,13 @@ static _Bool load_layouts(CO(SGXmetadata, this), CO(SGXenclave, enclave))
 	for (lp= 0; lp < cnt; ++lp) {
 		fprintf(stdout, "Layout %u:\n", lp);
 		if ( (1 << 12) & layout[lp].entry.id ) {
-			_load_group(layout, lp);
-			continue;
+			if ( !_load_group(S, layout, lp, enclave) )
+				ERR(goto done);
 		}
-
-		switch ( layout[lp].entry.id ) {
-			case 1:
-				fputs("\tHeap\n", stdout);
-				break;
-			case 2:
-				fputs("\tTCS\n", stdout);
-				break;
-			case 3:
-				fputs("\tTD\n", stdout);
-				break;
-			case 4:
-				fputs("\tSSA\n", stdout);
-				break;
-			case 5:
-				fputs("\tStack\n", stdout);
-				break;
-			case 6:
-				fputs("\tThread group\n", stdout);
-				break;
-			case 7:
-				fputs("\tGuard\n", stdout);
-				break;
+		else {
+			if ( !_load_layout(S, &layout[lp].entry, enclave) )
+				ERR(goto done);
 		}
-		fprintf(stdout, "\tpages: 0x%x\n", \
-			layout[lp].entry.page_count);
 	}
 
 	retn = true;
