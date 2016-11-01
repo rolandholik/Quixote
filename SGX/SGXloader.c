@@ -539,11 +539,17 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
 {
 	_Bool retn = false;
 
-	uint8_t *build_ptr,
+	unsigned long int vaddr;
+
+	uint8_t *data_ptr,
 		page[4096];
 
-	uint64_t size	      = 4096 - offset,
-		 build_offset = 0;
+	uint32_t lp,
+		 page_cnt,
+		 residual;
+
+	uint64_t build_offset,
+		 size = 4096 - offset;
 
 	struct SGX_secinfo secinfo;
 
@@ -570,19 +576,29 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
 
 	memset(&secinfo, '\0', sizeof(struct SGX_secinfo));
 
-	while ( build_offset < (size & ~(4096-1)) ) {
-		build_ptr  = (uint8_t *) segment->data->get(segment->data);
-		build_ptr += build_offset;
+	data_ptr = (uint8_t *) segment->data->get(segment->data);
+	if ( offset == 0 )
+		data_ptr += 4096;
+	else
+		data_ptr += 4096 - offset;
 
+	page_cnt = size / 4096;
+	residual = size % 4096;
+	fprintf(stdout, "Iteration size: %lx, pages = 0x%x, " \
+		"residual = 0x%x\n", (size & ~(4096-1)), page_cnt, residual);
+
+	for (lp= 0; lp < page_cnt; ++lp) {
 		/* Need flags write bitmap adjustment when available. */
 		secinfo.flags = segment->flags;
 
-		if ( !enclave->add_page(enclave, build_ptr, &secinfo, true) )
+		vaddr = enclave->get_address(enclave);
+		if ( !enclave->add_page(enclave, data_ptr, &secinfo, true) ) {
+			fprintf(stdout, "Err on page: %x\n", lp);
 			ERR(goto done);
-		fprintf(stdout, "\tAdded page: %p/0x%lx\n", build_ptr, \
-			build_offset);
-
-		build_offset += 4096;
+		}
+		data_ptr += 4096;
+		fprintf(stdout, "\tAdded page: 0x%lx/0x%lx/0x%lx\n", vaddr, \
+			segment->flags, *((uint64_t *) data_ptr));
 	}
 
 
@@ -591,17 +607,17 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
 	 * a page the residual amount of data needs to be loaded as
 	 * an independent page.
 	 */
-	if ( (size & (4096-1)) != 0 ) {
+	if ( residual > 0 ) {
 		secinfo.flags = segment->flags;
-		build_ptr  = (uint8_t *) segment->data->get(segment->data);
-		build_ptr += build_offset;
-		memset(page, '\0', sizeof(page));
-		memcpy(page, build_ptr, (size & (4096-1)));
 
+		memset(page, '\0', sizeof(page));
+		memcpy(page, data_ptr, residual);
+
+		vaddr = enclave->get_address(enclave);
 		if ( !enclave->add_page(enclave, page, &secinfo, true) )
 			ERR(goto done);
-		fprintf(stdout, "\tAdded residual data: 0x%lx\n", \
-			size & (4096-1));
+		fprintf(stdout, "\tAdded residual: 0x%lx/0x%lx/0x%lx\n", \
+			vaddr, segment->flags, *((uint64_t *) data_ptr));
 	}
 
 
@@ -613,8 +629,7 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
 	if ( r2p(segment->phdr.p_memsz) > r2p(segment->phdr.p_filesz) ) {
 		memset(page, '\0', sizeof(page));
 		secinfo.flags = segment->flags;
-		size = r2p(segment->phdr.p_memsz) - \
-			r2p(segment->phdr.p_filesz);
+		size = r2p(segment->phdr.p_memsz - segment->phdr.p_filesz);
 
 		build_offset = 0;
 		while ( build_offset < size ) {
@@ -659,13 +674,16 @@ static _Bool load_segments(CO(SGXloader, this), CO(SGXenclave, enclave))
 
 	_Bool retn = false;
 
+	unsigned long int vaddr;
+
 	uint8_t *data,
 		page[4096];
 
 	uint32_t lp,
 		 segcnt;
 
-	uint64_t offset,
+	uint64_t *payload,
+		 offset,
 		 size,
 		 max_rva = 0;
 
@@ -702,17 +720,36 @@ static _Bool load_segments(CO(SGXloader, this), CO(SGXenclave, enclave))
 		memset(page, '\0', 4096);
 		memcpy(&page[offset], data, size);
 
+		/*
+		 * Advance the enclave virtual address until it matches
+		 * the start address of the segment.
+		 */
+		fprintf(stdout, "Enclave address: 0x%lx, vaddr: 0x%lx\n", \
+			enclave->get_address(enclave),			  \
+			segptr->phdr.p_vaddr & (~(4096-1)));
+		while ( enclave->get_address(enclave) <
+			(segptr->phdr.p_vaddr & (~(4096-1))) ) {
+			if ( !enclave->add_hole(enclave) )
+				ERR(goto done);
+		}
+
 		memset(&secinfo, '\0', sizeof(struct SGX_secinfo));
 		secinfo.flags = segptr->flags;
+		vaddr = enclave->get_address(enclave);
 		if ( !enclave->add_page(enclave, page, &secinfo, true) )
 			ERR(goto done);
-		fprintf(stdout, "Segment: %u, First page: "		    \
-			"vaddr=0x%lx/rva=0x%lx, offset=0x%lx, size=0x%lx "  \
-			"loaded.\n", lp, segptr->phdr.p_vaddr,		    \
+		fprintf(stdout, "Segment: %u\n", lp);
+		fprintf(stdout, "\tFirst page: vaddr=0x%lx/rva=0x%lx, " \
+			"offset=0x%lx, size=0x%lx loaded.\n",		\
+			segptr->phdr.p_vaddr,			        \
 			segptr->phdr.p_vaddr & (~(4096-1)), offset, size);
+		payload = (uint64_t *) page;
+		fprintf(stdout, "\tAdded page: 0x%lx/0x%lx/0x%lx\n", \
+			vaddr, secinfo.flags, *payload);
 
 		/* Build remaining pages. */
-		_build_segment(enclave, segptr, offset);
+		if ( !_build_segment(enclave, segptr, offset) )
+			ERR(goto done);
 	}
 
 
