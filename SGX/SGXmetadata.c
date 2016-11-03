@@ -532,6 +532,49 @@ static _Bool get_secs(CO(SGXmetadata, this), struct SGX_secs *secs)
 
 
 /**
+ * External public method.
+ *
+ * This method is an accessor method which is responsible for
+ * populating an enclave signature provided by the caller with the
+ * contents of the signature which is in the SGX metadata
+ * structure.
+ *
+ * \param this		A pointer to the object which represents the
+ *			metadata holding the signature structure to
+ *			be returned.
+ *
+ * \param sigstruct	A pointer to the structure which will be
+ *			populated.
+ *
+ * \return		A true value is returned if a valid signature
+ *			structure has been returned.  A false value
+ *			is returned if the object is poisoned.
+ */
+
+static _Bool get_sigstruct(CO(SGXmetadata, this), \
+			   struct SGX_sigstruct *sigstruct)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		return false;
+
+
+	/* Copy metadata structure to the user supplied structure. */
+	*sigstruct = S->metadata.enclave_css;
+
+	retn = true;
+
+	return retn;
+}
+
+
+/**
  * Internal private method.
  *
  * This method implements the loading of an individual layout
@@ -1041,6 +1084,7 @@ extern SGXmetadata NAAAIM_SGXmetadata_Init(void)
 	this->patch_enclave	 = patch_enclave;
 	this->compute_attributes = compute_attributes;
 	this->get_secs		 = get_secs;
+	this->get_sigstruct	 = get_sigstruct;
 
 	this->load_layouts	 = load_layouts;
 

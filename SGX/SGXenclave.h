@@ -29,11 +29,11 @@ struct NAAAIM_SGXenclave
 			      _Bool);
 	_Bool (*create_enclave)(const SGXenclave);
 	_Bool (*load_enclave)(const SGXenclave);
+	_Bool (*init_enclave)(const SGXenclave);
 
 	_Bool (*add_page)(const SGXenclave, const uint8_t *, \
 			  struct SGX_secinfo *, const _Bool);
 	_Bool (*add_hole)(const SGXenclave);
-
 	unsigned long int (*get_address)(const SGXenclave);
 
 	void (*whack)(const SGXenclave);

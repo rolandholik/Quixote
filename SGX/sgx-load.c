@@ -46,6 +46,9 @@ extern int main(int argc, char *argv[])
 	if ( !enclave->load_enclave(enclave) )
 		ERR(goto done);
 
+	if ( !enclave->init_enclave(enclave) )
+		ERR(goto done);
+
 
  done:
 	WHACK(enclave);

@@ -340,6 +340,25 @@ struct SGX_add_param {
 
 
 /**
+ * Definitions and structures used to initialize an enclave.
+ */
+#define ISGX_IOCTL_ENCLAVE_INIT		_IOW('p', 0x04, struct isgx_init_param)
+
+struct SGX_einittoken {
+	uint32_t valid;
+	uint8_t	reserved1[206];
+	uint16_t isvsvnle;
+	uint8_t	reserved2[92];
+} __attribute__((aligned(512)));
+
+struct SGX_init_param {
+	unsigned long addr;
+	void *sigstruct;
+	struct SGX_einittoken *einittoken;
+};
+
+
+/**
  * Definitions and structures used to destroy an enclave.
  */
 #define SGX_IOCTL_ENCLAVE_DESTROY  _IOW('p', 0x06, struct SGX_destroy_param)
