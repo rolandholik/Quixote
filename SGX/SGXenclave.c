@@ -33,6 +33,7 @@
 #include "SGX.h"
 #include "SGXenclave.h"
 #include "SGXloader.h"
+#include "SGXsigstruct.h"
 
 
 /* Object state extraction macro. */
@@ -278,11 +279,15 @@ static _Bool init_enclave(CO(SGXenclave, this))
 
 	_Bool retn = false;
 
+	int rc;
+
 	struct SGX_sigstruct sigstruct;
 
 	struct SGX_einittoken einittoken;
 
 	struct SGX_init_param init_param;
+
+	SGXsigstruct LEsigstruct = NULL;
 
 
 	/* Verify object. */
@@ -303,16 +308,22 @@ static _Bool init_enclave(CO(SGXenclave, this))
 	/* Populate the initialization control structure. */
 	memset(&init_param, '\0', sizeof(struct SGX_init_param));
 	init_param.addr	      = S->enclave_address;
-	init_param.sigstruct  = &sigstruct;
 	init_param.einittoken = &einittoken;
 
-	if ( ioctl(S->fd, SGX_IOCTL_ENCLAVE_INIT, &init_param) < 0 )
+	INIT(NAAAIM, SGXsigstruct, LEsigstruct, ERR(goto done));
+	if ( !LEsigstruct->get_LE(LEsigstruct, &sigstruct) )
+		ERR(goto done);
+	init_param.sigstruct  = &sigstruct;
+
+	if ( (rc = ioctl(S->fd, SGX_IOCTL_ENCLAVE_INIT, &init_param)) != 0 )
 		ERR(goto done);
 
 	retn = true;
 
 
  done:
+	WHACK(LEsigstruct);
+
 	return retn;
 }
 

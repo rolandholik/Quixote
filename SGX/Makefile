@@ -5,9 +5,9 @@
 
 # Variable declarations.
 CSRC = sgx-check.c sgx-test.c sgx-metadata.c SGXmetadata.c SGXloader.c \
-	SGXenclave.c
+	SGXenclave.c SGXsigstruct.c
 
-TOOLS = sgx-check sgx-test sgx-metadata sgx-loader sgx-load
+TOOLS = sgx-check sgx-test sgx-metadata sgx-loader sgx-load sgx-sigstruct
 
 CC = musl-gcc
 
@@ -68,10 +68,16 @@ sgx-loader: sgx-loader.o SGXloader.o SGXmetadata.o
 sgx-loader.o: sgx-loader.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
 
-sgx-load: sgx-load.o SGXenclave.o SGXloader.o SGXmetadata.o
+sgx-load: sgx-load.o SGXenclave.o SGXloader.o SGXmetadata.o SGXsigstruct.o
 	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB};
 
 sgx-load.o: sgx-load.c
+	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
+
+sgx-sigstruct: sgx-sigstruct.o SGXsigstruct.o
+	${CC} ${LDFLAGS} -o $@ $^ ${HURDLIB};
+
+sgx-sigstruct.o: sgx-sigstruct.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
 
 tags:
@@ -88,3 +94,4 @@ sgx-load.o: SGXenclave.h
 SGXmetadata.o: SGX.h SGXmetadata.h
 SGXloader.o: SGX.h SGXloader.h
 SGXenclave.o: SGX.h SGXenclave.h SGXmetadata.h SGXloader.h
+SGXsigstruct.o: SGX.h SGXsigstruct.h
