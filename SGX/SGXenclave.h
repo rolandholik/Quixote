@@ -32,7 +32,7 @@ struct NAAAIM_SGXenclave
 	_Bool (*init_enclave)(const SGXenclave);
 
 	_Bool (*add_page)(const SGXenclave, const uint8_t *, \
-			  struct SGX_secinfo *, const _Bool);
+			  struct SGX_secinfo *, const uint8_t);
 	_Bool (*add_hole)(const SGXenclave);
 	unsigned long int (*get_address)(const SGXenclave);
 

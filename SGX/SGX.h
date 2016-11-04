@@ -272,7 +272,8 @@ struct SGX_create_param {
  * The following definition is used to indicate the contents of the
  * page should NOT be extended into the measurement of the enclave.
  */
-#define SGX_SKIP_EXTENSION 0x1
+#define SGX_PAGE_ADD	0x1
+#define SGX_PAGE_EXTEND	0x2
 
 #define SGX_IOCTL_ENCLAVE_ADD_PAGE _IOW('p', 0x03, struct SGX_add_param)
 
@@ -346,16 +347,22 @@ struct SGX_add_param {
 
 struct SGX_einittoken {
 	uint32_t valid;
-	uint8_t	reserved1[206];
+	uint32_t reserved1[11];
+	sgx_attributes_t attributes;
+	sgx_measurement_t mr_enclave;
+	uint8_t reserved2[32];
+	sgx_measurement_t mr_signer;
+	uint8_t reserved3[32];
+
 	uint16_t isvsvnle;
-	uint8_t	reserved2[92];
+	uint8_t	reserved4[92];
 } __attribute__((aligned(512)));
 
 struct SGX_init_param {
 	unsigned long addr;
 	void *sigstruct;
 	struct SGX_einittoken *einittoken;
-};
+} __attribute__((packed));
 
 
 /**

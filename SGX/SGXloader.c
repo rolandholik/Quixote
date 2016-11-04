@@ -592,7 +592,8 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
 		secinfo.flags = segment->flags;
 
 		vaddr = enclave->get_address(enclave);
-		if ( !enclave->add_page(enclave, data_ptr, &secinfo, true) ) {
+		if ( !enclave->add_page(enclave, data_ptr, &secinfo,
+					SGX_PAGE_EXTEND) ) {
 			fprintf(stdout, "Err on page: %x\n", lp);
 			ERR(goto done);
 		}
@@ -614,7 +615,8 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
 		memcpy(page, data_ptr, residual);
 
 		vaddr = enclave->get_address(enclave);
-		if ( !enclave->add_page(enclave, page, &secinfo, true) )
+		if ( !enclave->add_page(enclave, page, &secinfo, \
+					SGX_PAGE_EXTEND) )
 			ERR(goto done);
 		fprintf(stdout, "\tAdded residual: 0x%lx/0x%lx/0x%lx\n", \
 			vaddr, segment->flags, *((uint64_t *) data_ptr));
@@ -634,7 +636,7 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
 		build_offset = 0;
 		while ( build_offset < size ) {
 			if ( !enclave->add_page(enclave, page, &secinfo, \
-						true) )
+						SGX_PAGE_EXTEND) )
 				ERR(goto done);
 			build_offset += 4096;
 		}
@@ -736,7 +738,8 @@ static _Bool load_segments(CO(SGXloader, this), CO(SGXenclave, enclave))
 		memset(&secinfo, '\0', sizeof(struct SGX_secinfo));
 		secinfo.flags = segptr->flags;
 		vaddr = enclave->get_address(enclave);
-		if ( !enclave->add_page(enclave, page, &secinfo, true) )
+		if ( !enclave->add_page(enclave, page, &secinfo, \
+					SGX_PAGE_EXTEND) )
 			ERR(goto done);
 		fprintf(stdout, "Segment: %u\n", lp);
 		fprintf(stdout, "\tFirst page: vaddr=0x%lx/rva=0x%lx, " \

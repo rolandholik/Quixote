@@ -670,7 +670,8 @@ static _Bool _load_layout(CO(SGXmetadata_State, S),		\
 		memset(&secinfo, '\0', sizeof(struct SGX_secinfo));
 		secinfo.flags = layout->si_flags;
 
-		if ( !enclave->add_page(enclave, page, &secinfo, true) )
+		if ( !enclave->add_page(enclave, page, &secinfo, \
+					layout->attributes) )
 			ERR(goto done);
 
 		retn = true;
@@ -725,7 +726,8 @@ static _Bool _load_layout(CO(SGXmetadata_State, S),		\
 	secinfo.flags = layout->si_flags;
 
 	for (lp= 0; lp < layout->page_count; ++lp) {
-		if ( !enclave->add_page(enclave, page, &secinfo, true) )
+		if ( !enclave->add_page(enclave, page, &secinfo, \
+					layout->attributes) )
 			ERR(goto done);
 	}
 

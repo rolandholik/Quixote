@@ -306,10 +306,8 @@ static _Bool init_enclave(CO(SGXenclave, this))
 	init_param.sigstruct  = &sigstruct;
 	init_param.einittoken = &einittoken;
 
-	if ( ioctl(S->fd, SGX_IOCTL_ENCLAVE_INIT, &init_param) < 0 ) {
-		perror("Failed enclave initialization");
+	if ( ioctl(S->fd, SGX_IOCTL_ENCLAVE_INIT, &init_param) < 0 )
 		ERR(goto done);
-	}
 
 	retn = true;
 
@@ -326,19 +324,29 @@ static _Bool init_enclave(CO(SGXenclave, this))
  * method call specifies whether or not the enclave measurement is
  * extended with the contents of the page.
  *
+ * The nature of the flags which define whether or not the contents of
+ * the page should be extended into the enclave measurement is
+ * confusing.  The Intel SDK assigns meaning to two bit positions in
+ * the flags arguement.  One bit indicates the page is to be added and
+ * the second indicates whether the contents of the page should be
+ * extended into the enclave measurement.
+ *
+ * In contrast the kernel driver only acts on the page addition flag
+ * and treats this as an indication the contents of the page is NOT to
+ * be extended into the enclave measurement.
+ *
  * \param this		A pointer to the object representing the enclave
  *			which is having a page added to it.
  *
- * \param page		A ponter to a memory buffer containing the
+ * \param page		A pointer to a memory buffer containing the
  *			page which is to be added.
  *
  * \param secinfo	A pointer to the data structure which defines
  *			the security characteristics of the page which
  *			is to be added.
  *
- * \param measure	The flag which indicates whether or not the
- *			contents of the page is to be used to extend
- *			the measurement of the enclave.
+ * \param flags		A bit encoding of the flags which define the type
+ *			of page insertion which will be carried out.
  *
  * \return	If an error is encountered while adding the page a false
  *		value is returned.   A true value indicates the
@@ -346,7 +354,7 @@ static _Bool init_enclave(CO(SGXenclave, this))
  */
 
 static _Bool add_page(CO(SGXenclave, this), CO(uint8_t *, page), \
-		      struct SGX_secinfo *secinfo, const _Bool measure)
+		      struct SGX_secinfo *secinfo, const uint8_t flags)
 
 {
 	STATE(S);
@@ -366,8 +374,8 @@ static _Bool add_page(CO(SGXenclave, this), CO(uint8_t *, page), \
 	add_param.addr	    = S->enclave_address + (4096 * S->page_cnt);
 	add_param.user_addr = (unsigned long) page;
 	add_param.secinfo   = secinfo;
-	if ( !measure )
-		add_param.flags |= SGX_SKIP_EXTENSION;
+	if ( !(flags & SGX_PAGE_EXTEND) )
+		add_param.flags |= SGX_PAGE_ADD;
 
 	if ( ioctl(S->fd, SGX_IOCTL_ENCLAVE_ADD_PAGE, &add_param) < 0 ) {
 		perror("page add error");
