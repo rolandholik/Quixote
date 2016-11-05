@@ -28,6 +28,7 @@
 
 #include <Origin.h>
 #include <HurdLib.h>
+#include <Buffer.h>
 
 #include "NAAAIM.h"
 #include "SGX.h"
@@ -73,11 +74,21 @@ struct NAAAIM_SGXenclave_State
 	/* The SGX Enclave Control Structure. */
 	struct SGX_secs secs;
 
-	/* The enclave start address. */
+	/* The enclave start address and the virtual page count. */
 	unsigned long int enclave_address;
-
-	/* Enclave page count .*/
 	uint64_t page_cnt;
+
+	/*
+	 * The set of available execution threads are stored as TCS
+	 * pages in the following Buffer object.  The thread_cnt
+	 * variable holds the current slot which is available.
+	 *
+	 * Support will need to be integrated for implementing binding
+	 * policies which 'lock' a particular thread to a specific
+	 * context of execution in the enclave.
+	 */
+	size_t thread_cnt;
+	Buffer threads;
 };
 
 
@@ -100,12 +111,16 @@ static void _init_state(CO(SGXenclave_State, S)) {
 	S->poisoned = false;
 
 	S->fd = -1;
-	S->loader = NULL;
+
+	S->loader  = NULL;
 
 	memset(&S->secs, '\0', sizeof(struct SGX_secs));
 
 	S->enclave_address = 0;
 	S->page_cnt	   = 0;
+
+	S->thread_cnt = 0;
+	S->threads    = NULL;
 
 	return;
 }
@@ -153,6 +168,9 @@ static _Bool open_enclave(CO(SGXenclave, this), CO(char *, device), \
 	INIT(NAAAIM, SGXloader, S->loader, ERR(goto done));
 	if ( !S->loader->load_secs(S->loader, enclave, &S->secs, debug) )
 		ERR(goto done);
+
+	/* Initialize the thread control arena. */
+	INIT(HurdLib, Buffer, S->threads, ERR(goto done));
 
 	retn = true;
 
@@ -287,8 +305,6 @@ static _Bool init_enclave(CO(SGXenclave, this))
 
 	struct SGX_init_param init_param;
 
-	SGXsigstruct LEsigstruct = NULL;
-
 
 	/* Verify object. */
 	if ( S->poisoned )
@@ -309,10 +325,78 @@ static _Bool init_enclave(CO(SGXenclave, this))
 	memset(&init_param, '\0', sizeof(struct SGX_init_param));
 	init_param.addr	      = S->enclave_address;
 	init_param.einittoken = &einittoken;
+	init_param.sigstruct  = &sigstruct;
 
+	if ( (rc = ioctl(S->fd, SGX_IOCTL_ENCLAVE_INIT, &init_param)) != 0 )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements the initialization of the Intel Launch
+ * Enclave (LE) which is distributed in binary form only.  The ability
+ * to load and seal the LE is a necessary pre-requisite for support of
+ * loading independently developed enclaves.  These enclaves require
+ * an processor specific EINITTOKEN which the LE is used to generate.
+ *
+ * \param this		A pointer to the object representing the
+ *			launch enclave which is to be loaded.
+ *
+ * \return		If an error is encountered while initializing
+ *			the launch enclave a false value is returned.
+ *			A true value indicates the enclave was
+ *			successfully loaded.
+ */
+
+static _Bool init_launch_enclave(CO(SGXenclave, this))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	int rc;
+
+	struct SGX_sigstruct sigstruct;
+
+	struct SGX_einittoken einittoken;
+
+	struct SGX_init_param init_param;
+
+	SGXsigstruct LEsigstruct = NULL;
+
+
+	/* Verify object. */
+	if ( S->poisoned )
+		ERR(goto done);
+
+
+	/*
+	 * Use the binary SIGSTRUCT provided by Intel to support
+	 * loading of the Launch Enclave.
+	 */
 	INIT(NAAAIM, SGXsigstruct, LEsigstruct, ERR(goto done));
 	if ( !LEsigstruct->get_LE(LEsigstruct, &sigstruct) )
 		ERR(goto done);
+
+	memset(&einittoken, '\0', sizeof(struct SGX_einittoken));
+
+
+	/* Populate the initialization control structure. */
+	memset(&init_param, '\0', sizeof(struct SGX_init_param));
+	init_param.addr	      = S->enclave_address;
+	init_param.einittoken = &einittoken;
 	init_param.sigstruct  = &sigstruct;
 
 	if ( (rc = ioctl(S->fd, SGX_IOCTL_ENCLAVE_INIT, &init_param)) != 0 )
@@ -471,6 +555,118 @@ static unsigned long int get_address(CO(SGXenclave, this))
 /**
  * External public method.
  *
+ * This method adds a thread entry to the enclave.  The total number
+ * of execution threads which are supported by an enclave are defined
+ * when the layout metadata is built during the signing process.
+ *
+ * There is one Task Control Structure (TCS) defined for each each
+ * execution thread.  The SGXloader object calls back into this method
+ * which stores the TCS definition page in the context of the enclave
+ * object.
+ *
+ * \param this		A pointer to the object representing the enclave
+ *			which is having a thread added to it.
+ *
+ * \param tcs		The task control page to be added.
+ *
+ * \return	If an error is encountered while adding the thread a
+ *		false value is returned.  A true value indicates the
+ *		thread was successfully added.
+ */
+
+static _Bool add_thread(CO(SGXenclave, this), CO(uint8_t *, tcs))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Object verification. */
+	if ( S->poisoned )
+		ERR(goto done);
+
+
+	if ( !S->threads->add(S->threads, (unsigned char *) tcs, 4096) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements an accessor method for returning an
+ * available thread slot.
+ *
+ * \param this		A pointer to the object representing the enclave
+ *			which which a thread is being requested from.
+ *
+ * \param tcs		A pointer to a task control structure which
+ *			will be loaded with the definition of the
+ *			thread being made available.
+ *
+ * \return	If a thread is not available a false value is
+ *		returned.  A true value indicates the supplied
+ *		structure contains a valid thread definition.
+ */
+
+static _Bool get_thread(CO(SGXenclave, this), struct SGX_tcs *tcs)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	uint8_t *tp;
+
+	size_t num_threads;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+
+
+	/*
+	 * Verify a thread slot is available.  A lack of slots is
+	 * not treated as a condition to poison the enclave since the
+	 * caller may elect to wait for a slot to become available.
+	 */
+	num_threads = S->threads->size(S->threads) / 4096;
+	if ( S->thread_cnt >= num_threads )
+		return false;
+
+
+	/* Copy the TCS into the caller supplied buffer. */
+	tp  = (uint8_t *) S->threads->get(S->threads);
+	tp += (S->thread_cnt * 4096);
+	memcpy(tcs, tp, sizeof(struct SGX_tcs));
+
+	++S->thread_cnt;
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a destructor for an SGXenclave object.
  *
  * \param this	A pointer to the object which is to be destroyed.
@@ -492,6 +688,7 @@ static void whack(CO(SGXenclave, this))
 	if ( S->fd != -1 )
 		close(S->fd);
 
+	WHACK(S->threads);
 	WHACK(S->loader);
 
 
@@ -540,11 +737,16 @@ extern SGXenclave NAAAIM_SGXenclave_Init(void)
 	this->open_enclave   = open_enclave;
 	this->create_enclave = create_enclave;
 	this->load_enclave   = load_enclave;
-	this->init_enclave   = init_enclave;
+
+	this->init_enclave	  = init_enclave;
+	this->init_launch_enclave = init_launch_enclave;
 
 	this->add_page	  = add_page;
 	this->add_hole	  = add_hole;
 	this->get_address = get_address;
+
+	this->add_thread = add_thread;
+	this->get_thread = get_thread;
 
 	this->whack = whack;
 

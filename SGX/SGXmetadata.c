@@ -673,6 +673,8 @@ static _Bool _load_layout(CO(SGXmetadata_State, S),		\
 		if ( !enclave->add_page(enclave, page, &secinfo, \
 					layout->attributes) )
 			ERR(goto done);
+		if ( !enclave->add_thread(enclave, page) )
+			ERR(goto done);
 
 		retn = true;
 		goto done;
