@@ -41,6 +41,8 @@ struct NAAAIM_SGXenclave
 	_Bool (*add_thread)(const SGXenclave);
 	_Bool (*get_thread)(const SGXenclave, unsigned long int *);
 
+	_Bool (*get_attributes)(const SGXenclave, sgx_attributes_t *);
+
 	void (*whack)(const SGXenclave);
 
 	/* Private state. */

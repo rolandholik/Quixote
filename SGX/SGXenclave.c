@@ -673,6 +673,50 @@ static _Bool get_thread(CO(SGXenclave, this), unsigned long int *tcs)
 /**
  * External public method.
  *
+ * This method implements the retrieval of the SGX attributes from the
+ * enclave represented by the object.  This is a passthrough accessor
+ * call to the SGX loader object.
+ *
+ * \param this	A pointer to the object representing the enclave
+ *		whose attributes are to be returned.
+ *
+ * \return	If an error is encountered while retrieving the attributes
+ *		a false value is returned.  A true value is returned
+ *		if a valid attribute structure is being returned to the
+ *		caller.
+ */
+
+static _Bool get_attributes(CO(SGXenclave, this), sgx_attributes_t *attributes)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+
+
+	/* Get the signature structure from the enclave metadata. */
+	if ( !S->loader->get_attributes(S->loader, attributes) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a destructor for an SGXenclave object.
  *
  * \param this	A pointer to the object which is to be destroyed.
@@ -753,6 +797,8 @@ extern SGXenclave NAAAIM_SGXenclave_Init(void)
 
 	this->add_thread = add_thread;
 	this->get_thread = get_thread;
+
+	this->get_attributes = get_attributes;
 
 	this->whack = whack;
 

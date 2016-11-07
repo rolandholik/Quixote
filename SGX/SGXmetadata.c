@@ -575,6 +575,49 @@ static _Bool get_sigstruct(CO(SGXmetadata, this), \
 
 
 /**
+ * External public method.
+ *
+ * This method is an accessor method which is responsible for
+ * populating an enclave attribute structure with the functional security
+ * attributes which have been computed for this enclave.
+ *
+ * \param this		A pointer to the object which represents the
+ *			metadata from which the enclave attributes have
+ *			been computed.
+ *
+ * \param attributes	A pointer to the attributes structure which will
+ *			be populated.
+ *
+ * \return		A true value is returned if a valid attributes
+ *			structure has been returned.  A false value
+ *			is returned if the object is poisoned.
+ */
+
+static _Bool get_attributes(CO(SGXmetadata, this), \
+			    sgx_attributes_t *attributes)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+
+
+	/* Copy metadata structure to the user supplied structure. */
+	*attributes = S->attributes;
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
  * Internal private method.
  *
  * This method implements the loading of an individual layout
@@ -1090,6 +1133,7 @@ extern SGXmetadata NAAAIM_SGXmetadata_Init(void)
 	this->compute_attributes = compute_attributes;
 	this->get_secs		 = get_secs;
 	this->get_sigstruct	 = get_sigstruct;
+	this->get_attributes	 = get_attributes;
 
 	this->load_layouts	 = load_layouts;
 

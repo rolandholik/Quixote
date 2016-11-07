@@ -858,6 +858,50 @@ static _Bool get_sigstruct(CO(SGXloader, this), \
 /**
  * External public method.
  *
+ * This method implements the loading of the SGX attributes from the
+ * enclave represented by the object.  This is a passthrough accessor
+ * call to the SGX metadata object.
+ *
+ * \param this	A pointer to the object representing the enclave
+ *		whose attributes are to be returned.
+ *
+ * \return	If an error is encountered while retrieving the attributes
+ *		a false value is returned.  A true value is returned
+ *		if a valid attribute structure is being returned to the
+ *		caller.
+ */
+
+static _Bool get_attributes(CO(SGXloader, this), sgx_attributes_t *attributes)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+
+
+	/* Get the signature structure from the enclave metadata. */
+	if ( !S->metadata->get_attributes(S->metadata, attributes) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a diagnostic dump of the enclave binaryd ata.
  *
  * \param this		A pointer to the object whose content is to be
@@ -996,7 +1040,8 @@ extern SGXloader NAAAIM_SGXloader_Init(void)
 	this->load_segments = load_segments;
 	this->load_layouts  = load_layouts;
 
-	this->get_sigstruct = get_sigstruct;
+	this->get_sigstruct  = get_sigstruct;
+	this->get_attributes = get_attributes;
 
 	this->dump  = dump;
 	this->whack = whack;
