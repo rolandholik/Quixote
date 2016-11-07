@@ -7,7 +7,8 @@
 CSRC = sgx-check.c sgx-test.c sgx-metadata.c SGXmetadata.c SGXloader.c \
 	SGXenclave.c SGXsigstruct.c
 
-TOOLS = sgx-check sgx-test sgx-metadata sgx-loader sgx-load sgx-sigstruct
+TOOLS = sgx-check sgx-test sgx-metadata sgx-loader sgx-load sgx-sigstruct \
+	sgx-gen-token
 
 CC = musl-gcc
 
@@ -78,6 +79,13 @@ sgx-sigstruct: sgx-sigstruct.o SGXsigstruct.o
 	${CC} ${LDFLAGS} -o $@ $^ ${HURDLIB};
 
 sgx-sigstruct.o: sgx-sigstruct.c
+	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
+
+sgx-gen-token: sgx-gen-token.o SGXenclave.o SGXloader.o SGXmetadata.o \
+	SGXsigstruct.o enter_enclave.o
+	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB};
+
+sgx-gen-token.o: sgx-gen-token.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
 
 tags:
