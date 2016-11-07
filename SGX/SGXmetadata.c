@@ -667,13 +667,14 @@ static _Bool _load_layout(CO(SGXmetadata_State, S),		\
 		tcs->ofsbase += enclave->get_address(enclave);
 		tcs->ogsbase += enclave->get_address(enclave);
 
+		if ( !enclave->add_thread(enclave) )
+			ERR(goto done);
+
 		memset(&secinfo, '\0', sizeof(struct SGX_secinfo));
 		secinfo.flags = layout->si_flags;
 
 		if ( !enclave->add_page(enclave, page, &secinfo, \
 					layout->attributes) )
-			ERR(goto done);
-		if ( !enclave->add_thread(enclave, page) )
 			ERR(goto done);
 
 		retn = true;

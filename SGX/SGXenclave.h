@@ -38,8 +38,8 @@ struct NAAAIM_SGXenclave
 	_Bool (*add_hole)(const SGXenclave);
 	unsigned long int (*get_address)(const SGXenclave);
 
-	_Bool (*add_thread)(const SGXenclave, const uint8_t *);
-	_Bool (*get_thread)(const SGXenclave, struct SGX_tcs *);
+	_Bool (*add_thread)(const SGXenclave);
+	_Bool (*get_thread)(const SGXenclave, unsigned long int *);
 
 	void (*whack)(const SGXenclave);
 

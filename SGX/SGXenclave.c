@@ -559,27 +559,29 @@ static unsigned long int get_address(CO(SGXenclave, this))
  * of execution threads which are supported by an enclave are defined
  * when the layout metadata is built during the signing process.
  *
- * There is one Task Control Structure (TCS) defined for each each
- * execution thread.  The SGXloader object calls back into this method
- * which stores the TCS definition page in the context of the enclave
- * object.
+ * There is one Task Control Structure (TCS) defined for each exection
+ * thread.  The SGXloader object calls back into this method to
+ * designate that the next page added will be a TCS definition page.
+ * This function captures the virtual address of this incoming page
+ * as a TCS definition page.  This virtual address is used in the
+ * dispatch function which generates the ECALL into the enclave.
  *
- * \param this		A pointer to the object representing the enclave
- *			which is having a thread added to it.
- *
- * \param tcs		The task control page to be added.
+ * \param this		A pointer to the object representing the
+ *			enclave which is having a thread added to it.
  *
  * \return	If an error is encountered while adding the thread a
  *		false value is returned.  A true value indicates the
  *		thread was successfully added.
  */
 
-static _Bool add_thread(CO(SGXenclave, this), CO(uint8_t *, tcs))
+static _Bool add_thread(CO(SGXenclave, this))
 
 {
 	STATE(S);
 
 	_Bool retn = false;
+
+	unsigned long int addr;
 
 
 	/* Object verification. */
@@ -587,7 +589,9 @@ static _Bool add_thread(CO(SGXenclave, this), CO(uint8_t *, tcs))
 		ERR(goto done);
 
 
-	if ( !S->threads->add(S->threads, (unsigned char *) tcs, 4096) )
+	addr = S->enclave_address + (S->page_cnt * 4096);
+	if ( !S->threads->add(S->threads, (unsigned char *) &addr, \
+			      sizeof(unsigned long int)) )
 		ERR(goto done);
 
 	retn = true;
@@ -610,23 +614,24 @@ static _Bool add_thread(CO(SGXenclave, this), CO(uint8_t *, tcs))
  * \param this		A pointer to the object representing the enclave
  *			which which a thread is being requested from.
  *
- * \param tcs		A pointer to a task control structure which
- *			will be loaded with the definition of the
- *			thread being made available.
+ * \param tcs		A pointer to a variable which will be loaded with
+ *			the virtual address of a candidate task control
+ *			structure.
  *
  * \return	If a thread is not available a false value is
  *		returned.  A true value indicates the supplied
  *		structure contains a valid thread definition.
  */
 
-static _Bool get_thread(CO(SGXenclave, this), struct SGX_tcs *tcs)
+static _Bool get_thread(CO(SGXenclave, this), unsigned long int *tcs)
 
 {
 	STATE(S);
 
 	_Bool retn = false;
 
-	uint8_t *tp;
+	unsigned long int *ap,
+			  addr;
 
 	size_t num_threads;
 
@@ -641,15 +646,16 @@ static _Bool get_thread(CO(SGXenclave, this), struct SGX_tcs *tcs)
 	 * not treated as a condition to poison the enclave since the
 	 * caller may elect to wait for a slot to become available.
 	 */
-	num_threads = S->threads->size(S->threads) / 4096;
+	num_threads = S->threads->size(S->threads) / sizeof(unsigned long int);
 	if ( S->thread_cnt >= num_threads )
 		return false;
 
 
 	/* Copy the TCS into the caller supplied buffer. */
-	tp  = (uint8_t *) S->threads->get(S->threads);
-	tp += (S->thread_cnt * 4096);
-	memcpy(tcs, tp, sizeof(struct SGX_tcs));
+	ap   = (unsigned long int *) S->threads->get(S->threads);
+	ap  += (S->thread_cnt * sizeof(unsigned long int));
+	addr = *ap;
+	memcpy(tcs, &addr, sizeof(unsigned long int));
 
 	++S->thread_cnt;
 
