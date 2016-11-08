@@ -17,6 +17,8 @@
 
 #include <NAAAIM.h>
 
+#include "SGX.h"
+#include "SGXenclave.h"
 #include "SGXmetadata.h"
 
 
