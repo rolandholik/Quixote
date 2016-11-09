@@ -8,7 +8,7 @@ CSRC = sgx-check.c sgx-test.c sgx-metadata.c SGXmetadata.c SGXloader.c \
 	SGXenclave.c SGXsigstruct.c
 
 TOOLS = sgx-check sgx-test sgx-metadata sgx-loader sgx-load sgx-sigstruct \
-	sgx-gen-token
+	sgx-gen-token gen-white-list
 
 CC = musl-gcc
 
@@ -18,6 +18,9 @@ CDEBUG = -O2 -fomit-frame-pointer -march=core2
 CFLAGS = -Wall ${CDEBUG}
 
 LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib -L../lib -L../HurdLib
+
+# OpenSSL crypto library
+SSL_CRYPTO  = -L /usr/local/musl/lib -lcrypto
 
 
 #
@@ -82,11 +85,18 @@ sgx-sigstruct.o: sgx-sigstruct.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
 
 sgx-gen-token: sgx-gen-token.o SGXenclave.o SGXloader.o SGXmetadata.o \
-	SGXsigstruct.o enter_enclave.o
-	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB};
+	SGXsigstruct.o enter_enclave.o ../SHA256.o
+	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB} ${SSL_CRYPTO};
 
 sgx-gen-token.o: sgx-gen-token.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
+
+gen-white-list: gen-white-list.o
+	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB} ${SSL_CRYPTO};
+
+gen-white-list.o: gen-white-list.c
+	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
+
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};
