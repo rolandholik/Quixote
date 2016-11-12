@@ -133,18 +133,10 @@ static _Bool init_ecall0(char *enclave,
 		ERR(goto done);
 	if ( !init_enclave->get_attributes(init_enclave, attributes) )
 		ERR(goto done);
-	fprintf(stdout, "flags: 0x%lx, xfrm: 0x%lx\n", attributes->flags, \
-		attributes->xfrm);
 
 	if ( !init_enclave->get_sigstruct(init_enclave, &sigstruct) )
 		ERR(goto done);
 	memcpy(mrenclave, sigstruct.enclave_hash, SGX_HASH_SIZE);
-
-	fputs("MRENCLAVE:\n", stdout);
-	if ( !bufr->add(bufr, (unsigned char *) mrenclave, SGX_HASH_SIZE) )
-		ERR(goto done);
-	bufr->hprint(bufr);
-	bufr->reset(bufr);
 
 
 	/* Compute the hash of the signature modulus. */
@@ -156,19 +148,9 @@ static _Bool init_ecall0(char *enclave,
 	sha256->add(sha256, bufr);
 	if ( !sha256->compute(sha256) )
 		ERR(goto done);
-
 	memcpy(mrsigner, sha256->get(sha256), SGX_HASH_SIZE);
-	bufr->reset(bufr);
-	if ( !bufr->add(bufr, (unsigned char *) mrsigner, SGX_HASH_SIZE) )
-		ERR(goto done);
-	fputs("MRSIGNER:\n", stdout);
-	bufr->hprint(bufr);
 
 	memset(token, '\0', sizeof(struct SGX_einittoken));
-	token->valid = 1;
-	token->attributes = *attributes;
-	memcpy(&token->mr_enclave, mrenclave, SGX_HASH_SIZE);
-	memcpy(&token->mr_signer, mrsigner, SGX_HASH_SIZE);
 
 	ecall->ms_retval	  = 0;
 	ecall->ms_mrenclave	  = mrenclave;
@@ -312,7 +294,6 @@ static _Bool load_white_list(struct SGX_tcs *tcs)
 	int rc;
 
 
-	fputs("Load white list:\n", stdout);
 	/* Save the floating point processor state. */
 	save_fp_state(xsave_buffer);
 
@@ -320,14 +301,86 @@ static _Bool load_white_list(struct SGX_tcs *tcs)
 	memset(&ecall1_table, '\0', sizeof(ecall1_table));
 	ecall1_table.ms_wl_cert_chain	   = LE_white_list;
 	ecall1_table.ms_wl_cert_chain_size = sizeof(LE_white_list);
-	fprintf(stdout, "chain size: 0x%x\n", \
-		ecall1_table.ms_wl_cert_chain_size);
 
 	rc = enter_enclave(tcs, 1, &LE_ocall_table, &ecall1_table, \
 			   thread_manager);
-	fprintf(stdout, "Enter return: %d, Enclave return: %d\n", rc, \
-		ecall1_table.ms_retval);
 	if ( (rc != 0) || (ecall1_table.ms_retval != 0) )
+		retn = false;
+
+	/* Restore the floating point state. */
+	restore_fp_state(xsave_buffer);
+
+	return retn;
+}
+
+static uint64_t _cpu_info(void)
+
+{
+	uint32_t eax,
+		 ebx,
+		 ecx,
+		 edx;
+
+	uint64_t cpu_info = 0x00000001ULL;
+
+
+	/* Determine if this is an Intel CPU. */
+	__asm("movl %4, %%eax\n\t"
+	      "cpuid\n\t"
+	      "movl %%eax, %0\n\t"
+	      "movl %%ebx, %1\n\t"
+	      "movl %%ecx, %2\n\t"
+	      "movl %%edx, %3\n\t"
+	      /* Output. */
+	      : "=r" (eax), "=r" (ebx), "=r" (ecx), "=r" (edx)
+	      /* Input. */
+	      : "r" (0x0)
+	      /* Clobbers. */
+	      : "eax", "ebx", "ecx", "edx");
+	if ( eax == 0 )
+		return cpu_info;
+	if ( !((ebx == 0x756e6547) && (ecx == 0x6c65746e) && \
+	       (edx == 0x49656e69)) )
+		return cpu_info;
+
+
+	/*
+	 * If this is an Intel processor and an enclave has been loaded
+	 * assume a basic Skylake feature set.
+	 */
+	return 0xe9fffff;
+}
+
+
+static _Bool init_enclave(struct SGX_tcs *tcs)
+
+{
+	_Bool retn = true;
+
+	int rc;
+
+	uint8_t xsave_buffer[528];
+
+
+	struct sgx_sdk_info {
+		uint64_t cpu_features;
+		int version;
+	} info;
+
+
+	/*
+	 * Setup the CPU features which the enclave will assume.  An SGX
+	 * version of 0 indicates conformance with the SGX 1.5.
+	 */
+	info.version	  = 0;
+	info.cpu_features = _cpu_info();
+
+	/* Save the floating point processor state. */
+	save_fp_state(xsave_buffer);
+
+	/* Call the enclave initialization slot. */
+	rc = enter_enclave(tcs, -1, NULL, &info, thread_manager);
+	if ( rc != 0 )
 		retn = false;
 
 	/* Restore the floating point state. */
@@ -381,7 +434,13 @@ extern int main(int argc, char *argv[])
 	if ( !enclave->get_thread(enclave, (unsigned long int *) &tcs) )
 		ERR(goto done);
 
+	/* Initialize the enclave for execution. */
+	fputs("Initializing enclave.\n", stdout);
+	if ( !init_enclave(tcs) )
+		ERR(goto done);
+
 	/* Load the white list. */
+	fputs("Loading white list.\n", stdout);
 	if ( !load_white_list(tcs) )
 		ERR(goto done);
 
@@ -393,19 +452,22 @@ extern int main(int argc, char *argv[])
 	/* Save the floating point processor state. */
 	save_fp_state(xsave_buffer);
 
+	fputs("Generating token.\n", stdout);
 	rc = enter_enclave(tcs, 0, &LE_ocall_table, &ecall0_table, \
 			   thread_manager);
-	fprintf(stdout, "Enter return: %d, Enclave return: %d\n", rc, \
-		ecall0_table.ms_retval);
+	if ( (rc != 0) || (ecall0_table.ms_retval != 0) )
+		retn = false;
+
+	fputs("EINITTOKEN generated.\n", stdout);
 	fprintf(stdout, "Token status: %u\n", token.valid);
 	fputs("Attributes:\n", stdout);
 	fprintf(stdout, "\tflags: 0x%lx\n", token.attributes.flags);
-	fprintf(stdout, "\tflags: 0x%lx\n", token.attributes.xfrm);
+	fprintf(stdout, "\txfrm: 0x%lx\n", token.attributes.xfrm);
 	fprintf(stdout, "isvsvnle: %u\n", token.isvsvnle);
 
 	/* Restore the floating point state. */
 	restore_fp_state(xsave_buffer);
-	
+
 
  done:
 	WHACK(enclave);
