@@ -175,6 +175,7 @@ static _Bool load_white_list(SGXenclave enclave)
 
 {
 	_Bool retn = false;
+
 	int rc;
 
 
@@ -187,77 +188,6 @@ static _Bool load_white_list(SGXenclave enclave)
 				 thread_manager, &rc) )
 		ERR(goto done);
 	if ( ecall1_table.ms_retval != 0 )
-		ERR(goto done);
-
-	retn = true;
-
-
- done:
-	return retn;
-}
-
-static uint64_t _cpu_info(void)
-
-{
-	uint32_t eax,
-		 ebx,
-		 ecx,
-		 edx;
-
-	uint64_t cpu_info = 0x00000001ULL;
-
-
-	/* Determine if this is an Intel CPU. */
-	__asm("movl %4, %%eax\n\t"
-	      "cpuid\n\t"
-	      "movl %%eax, %0\n\t"
-	      "movl %%ebx, %1\n\t"
-	      "movl %%ecx, %2\n\t"
-	      "movl %%edx, %3\n\t"
-	      /* Output. */
-	      : "=r" (eax), "=r" (ebx), "=r" (ecx), "=r" (edx)
-	      /* Input. */
-	      : "r" (0x0)
-	      /* Clobbers. */
-	      : "eax", "ebx", "ecx", "edx");
-	if ( eax == 0 )
-		return cpu_info;
-	if ( !((ebx == 0x756e6547) && (ecx == 0x6c65746e) && \
-	       (edx == 0x49656e69)) )
-		return cpu_info;
-
-
-	/*
-	 * If this is an Intel processor and an enclave has been loaded
-	 * assume a basic Skylake feature set.
-	 */
-	return 0xe9fffff;
-}
-
-
-static _Bool init_enclave(SGXenclave enclave)
-
-{
-	_Bool retn = false;
-
-	int rc;
-
-	struct sgx_sdk_info {
-		uint64_t cpu_features;
-		int version;
-	} info;
-
-
-	/*
-	 * Setup the CPU features which the enclave will assume.  An SGX
-	 * version of 0 indicates conformance with the SGX 1.5.
-	 */
-	info.version	  = 0;
-	info.cpu_features = _cpu_info();
-
-	/* Call the enclave initialization slot. */
-	if ( !enclave->boot_slot(enclave, -1, NULL, &info, thread_manager, \
-				 &rc) )
 		ERR(goto done);
 
 	retn = true;
@@ -304,22 +234,16 @@ extern int main(int argc, char *argv[])
 		ERR(goto done);
 
 
-	/* Initialize the enclave for execution. */
-	fputs("Initializing enclave.\n", stdout);
-	if ( !init_enclave(enclave) )
-		ERR(goto done);
-
 	/* Load the white list. */
 	fputs("Loading white list.\n", stdout);
 	if ( !load_white_list(enclave) )
 		ERR(goto done);
 
-	/* Initialize the ecall table. */
+
+	/* Generate the launch token. */
 	if ( !init_ecall0(argv[3], &ecall0_table, &attributes, &mrenclave, \
 			  &mrsigner, &token) )
 		ERR(goto done);
-
-	/* Save the floating point processor state. */
 
 	fputs("Generating token.\n", stdout);
 	if ( !enclave->boot_slot(enclave, 0, &LE_ocall_table, &ecall0_table, \

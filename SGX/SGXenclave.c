@@ -312,6 +312,116 @@ static _Bool load_enclave(CO(SGXenclave, this))
 
 
 /**
+ * Internal private function.
+ *
+ * This function implements the computation of the set of processor
+ * features which will be available to the enclave.
+ *
+ * The processor capabilities are encoded into a 64-bit vector using
+ * bit positions which are agreed to between the Trusted Enclave code
+ * and this code.
+ *
+ * The original Intel code used what appeared to be boilerplate code
+ * to compute the feature set from scratch.  This seemed to be
+ * unnecessarily redundant since at a minimum this code will be
+ * running on a processor with Skylake or better capabilities.  If the
+ * processor is a 'GenuineIntel' processor a value consistent with our
+ * Skylake reference platforms is returned.
+ *
+ * No arguments are specified.
+ *
+ * \return	This function returns the set of processor
+ *		capabilities encoded in bit positions which are
+ *		interrogated by the trusted enclave code.
+ */
+
+static uint64_t _cpu_info(void)
+
+{
+	uint32_t eax,
+		 ebx,
+		 ecx,
+		 edx;
+
+	uint64_t cpu_info = 0x00000001ULL;
+
+
+	/* Determine if this is an Intel CPU. */
+	__asm("movl %4, %%eax\n\t"
+	      "cpuid\n\t"
+	      "movl %%eax, %0\n\t"
+	      "movl %%ebx, %1\n\t"
+	      "movl %%ecx, %2\n\t"
+	      "movl %%edx, %3\n\t"
+	      /* Output. */
+	      : "=r" (eax), "=r" (ebx), "=r" (ecx), "=r" (edx)
+	      /* Input. */
+	      : "r" (0x0)
+	      /* Clobbers. */
+	      : "eax", "ebx", "ecx", "edx");
+	if ( eax == 0 )
+		return cpu_info;
+	if ( !((ebx == 0x756e6547) && (ecx == 0x6c65746e) && \
+	       (edx == 0x49656e69)) )
+		return cpu_info;
+
+
+	/*
+	 * If this is an Intel processor and an enclave has been loaded
+	 * assume a basic Skylake feature set.
+	 */
+	return 0xe9fffff;
+}
+
+
+/**
+ * Internal private method.
+ *
+ * This method is responsible for executing the enclave initialize
+ * code.  This code is implemented in the -1 enclave execution slot
+ * and implements basic initialization of the enclave.
+ *
+ * \param this	A pointer to the enclave whose initialization thread
+ *		is to be run.
+ *
+ * \param rc	A pointer to an integer variable which will hold
+ *		the return value from the enclave bootstrap code.
+ *
+ * \return	If a failure is detected in the initialization process
+ *		a false value is returned.  A true value indicates the
+ *		enclave was initialized.
+ */
+
+static _Bool _init_enclave(CO(SGXenclave, this), int *rc)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	struct SGX_sdk_info {
+		uint64_t cpu_features;
+		int version;
+	} info;
+
+
+	info.version	  = 0;
+	info.cpu_features = _cpu_info();
+
+	if ( !this->boot_slot(this, -1, NULL, &info, NULL, rc) )
+		ERR(goto done);
+
+	retn = true;
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
  * External public method.
  *
  * This method initializes an enclave which has previously been
@@ -367,6 +477,11 @@ static _Bool init_enclave(CO(SGXenclave, this))
 	init_param.sigstruct  = &sigstruct;
 
 	if ( (rc = ioctl(S->fd, SGX_IOCTL_ENCLAVE_INIT, &init_param)) != 0 )
+		ERR(goto done);
+
+
+	/* Run the enclave initialization routine. */
+	if ( !_init_enclave(this, &rc) )
 		ERR(goto done);
 
 	retn = true;
@@ -439,6 +554,11 @@ static _Bool init_launch_enclave(CO(SGXenclave, this))
 	init_param.sigstruct  = &sigstruct;
 
 	if ( (rc = ioctl(S->fd, SGX_IOCTL_ENCLAVE_INIT, &init_param)) != 0 )
+		ERR(goto done);
+
+
+	/* Run the enclave initialization routine. */
+	if ( !_init_enclave(this, &rc) )
 		ERR(goto done);
 
 	retn = true;
@@ -888,8 +1008,10 @@ static _Bool boot_slot(CO(SGXenclave, this), int slot, CO(void *, ocall), \
 	_restore_fp_state(xsave_buffer);
 	*retc = rc;
 	--S->thread_cnt;
-	if ( rc != 0 )
+	if ( rc != 0 ) {
+		fprintf(stderr, "Enter enclave returns: %d\n", rc);
 		ERR(goto done);
+	}
 
 	retn = true;
 
