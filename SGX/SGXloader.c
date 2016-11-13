@@ -77,6 +77,9 @@ struct NAAAIM_SGXloader_State
 	/* Object status. */
 	_Bool poisoned;
 
+	/* Debug status. */
+	_Bool debug;
+
 	/* Enclave file descriptor. */
 	int fd;
 
@@ -116,8 +119,8 @@ static void _init_state(CO(SGXloader_State, S)) {
 	S->libid = NAAAIM_LIBID;
 	S->objid = NAAAIM_SGXloader_OBJID;
 
-
 	S->poisoned = false;
+	S->debug    = false;
 
 	S->soimage = NULL;
 	S->sosize  = 0;
@@ -317,6 +320,8 @@ static _Bool load(CO(SGXloader, this), CO(char *, enclave), const _Bool debug)
 
 	/* Load the SGA metadata. */
 	INIT(NAAAIM, SGXmetadata, S->metadata, ERR(goto done));
+	if ( S->debug )
+		S->metadata->debug(S->metadata, true);
 	if ( !S->metadata->load(S->metadata, enclave) )
 		ERR(goto done);
 	if ( !S->metadata->compute_attributes(S->metadata, debug) )
@@ -369,7 +374,7 @@ static _Bool load(CO(SGXloader, this), CO(char *, enclave), const _Bool debug)
 
 	if ( _build_relocation_map(S) ) {
 		fputs("Writable TEXT relocations present but not " \
-		      "supported.\n", stdout);
+		      "supported.\n", stderr);
 		goto done;
 	}
 
@@ -428,7 +433,8 @@ static _Bool load_secs(CO(SGXloader, this), CO(char *, enclave), \
 	/* Get the SECS information from the enclave metadata. */
 	if ( !S->metadata->get_secs(S->metadata, secs) )
 		ERR(goto done);
-	fprintf(stdout, "Loaded secs size: 0x%lx\n", secs->size);
+	if ( S->debug )
+		fprintf(stdout, "Loaded SECS size: 0x%lx\n", secs->size);
 
 
 	retn = true;
@@ -485,15 +491,6 @@ static _Bool _finish_segment(CO(SGXenclave, enclave), \
 	_Bool retn = false;
 
 
-#if 0
-	fprintf(stdout, "Finishing segment vaddr: 0x%lx\n", \
-		segment->phdr.p_vaddr);
-	fprintf(stdout, "cond 1: 0x%lx\n", \
-		r2p(segment->phdr.p_memsz + segment->phdr.p_vaddr));
-	fprintf(stdout, "cond 2: 0x%lx\n", \
-		r2p(r2p(segment->phdr.p_memsz + segment->phdr.p_vaddr)));
-#endif
-
 	if ( (r2p(segment->phdr.p_memsz + segment->phdr.p_vaddr) < 	  \
 	      r2p(r2p(segment->phdr.p_memsz + segment->phdr.p_vaddr))) && \
 	     (r2p(segment->phdr.p_vaddr + segment->phdr.p_memsz) <	  \
@@ -526,6 +523,9 @@ static _Bool _finish_segment(CO(SGXenclave, enclave), \
  *			page boundary alignment for the first page of
  *			the segment.
  *
+ * \param debug		A flag used to indicate whether debug
+ *			information is to be generated.
+ *
  *
  * \return	A boolean value is returned to indicate whether or not
  *		building the segment pages has succeeded.  A true
@@ -535,7 +535,7 @@ static _Bool _finish_segment(CO(SGXenclave, enclave), \
 
 static _Bool _build_segment(CO(SGXenclave, enclave),	   \
 			    CO(struct segment *, segment), \
-			    const uint64_t offset)
+			    const uint64_t offset, const _Bool debug)
 {
 	_Bool retn = false;
 
@@ -570,9 +570,11 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
 	 * Iterate through the pages in the segment and add them to
 	 * the enclave.
 	 */
-	fprintf(stdout, "Building segment, vaddr=0x%lx, hdr size=0x%lx, " \
-		"offset=0x%lx, size=0x%lx\n", segment->phdr.p_vaddr,	  \
-		segment->phdr.p_filesz, offset, size);
+	if ( debug )
+	     fprintf(stdout, "Building segment, vaddr=0x%lx, "	    \
+		     "hdr size=0x%lx, offset=0x%lx, size=0x%lx\n",  \
+		     segment->phdr.p_vaddr, segment->phdr.p_filesz, \
+		     offset, size);
 
 	memset(&secinfo, '\0', sizeof(struct SGX_secinfo));
 
@@ -584,8 +586,10 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
 
 	page_cnt = size / 4096;
 	residual = size % 4096;
-	fprintf(stdout, "Iteration size: %lx, pages = 0x%x, " \
-		"residual = 0x%x\n", (size & ~(4096-1)), page_cnt, residual);
+	if ( debug )
+		fprintf(stdout, "Iteration size: %lx, pages = 0x%x, "	   \
+			"residual = 0x%x\n", (size & ~(4096-1)), page_cnt, \
+			residual);
 
 	for (lp= 0; lp < page_cnt; ++lp) {
 		/* Need flags write bitmap adjustment when available. */
@@ -593,13 +597,13 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
 
 		vaddr = enclave->get_address(enclave);
 		if ( !enclave->add_page(enclave, data_ptr, &secinfo,
-					SGX_PAGE_EXTEND) ) {
-			fprintf(stdout, "Err on page: %x\n", lp);
+					SGX_PAGE_EXTEND) )
 			ERR(goto done);
-		}
 		data_ptr += 4096;
-		fprintf(stdout, "\tAdded page: 0x%lx/0x%lx/0x%lx\n", vaddr, \
-			segment->flags, *((uint64_t *) data_ptr));
+		if ( debug )
+			fprintf(stdout, "\tAdded page: 0x%lx/0x%lx/0x%lx\n", \
+				vaddr, segment->flags,			     \
+				*((uint64_t *) data_ptr));
 	}
 
 
@@ -618,117 +622,121 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
 		if ( !enclave->add_page(enclave, page, &secinfo, \
 					SGX_PAGE_EXTEND) )
 			ERR(goto done);
-		fprintf(stdout, "\tAdded residual: 0x%lx/0x%lx/0x%lx\n", \
-			vaddr, segment->flags, *((uint64_t *) data_ptr));
-	}
+		if ( debug )
+			fprintf(stdout, "\tAdded residual: "	\
+				 "0x%lx/0x%lx/0x%lx\n", vaddr,	\
+				segment->flags, *((uint64_t *) data_ptr));
+	 }
 
 
-	/*
-	 * If the virtual memory size of the segment is larger then
-	 * the physical size of the segment the difference in size
-	 * is added as a series of uninitialized pages.
-	 */
-	if ( r2p(segment->phdr.p_memsz) > r2p(segment->phdr.p_filesz) ) {
-		memset(page, '\0', sizeof(page));
-		secinfo.flags = segment->flags;
-		size = r2p(segment->phdr.p_memsz - segment->phdr.p_filesz);
+	 /*
+	  * If the virtual memory size of the segment is larger then
+	  * the physical size of the segment the difference in size
+	  * is added as a series of uninitialized pages.
+	  */
+	 if ( r2p(segment->phdr.p_memsz) > r2p(segment->phdr.p_filesz) ) {
+		 memset(page, '\0', sizeof(page));
+		 secinfo.flags = segment->flags;
+		 size = r2p(segment->phdr.p_memsz - segment->phdr.p_filesz);
 
-		build_offset = 0;
-		while ( build_offset < size ) {
-			if ( !enclave->add_page(enclave, page, &secinfo, \
-						SGX_PAGE_EXTEND) )
-				ERR(goto done);
-			build_offset += 4096;
-		}
-		fprintf(stdout, "\tAdding unitialized pages: 0x%lx\n", \
-			size / 4096);
-	}
+		 build_offset = 0;
+		 while ( build_offset < size ) {
+			 if ( !enclave->add_page(enclave, page, &secinfo, \
+						 SGX_PAGE_EXTEND) )
+				 ERR(goto done);
+			 build_offset += 4096;
+		 }
+		 if ( debug )
+			 fprintf(stdout, "\tAdding unitialized pages: " \
+				 "0x%lx\n", size / 4096);
+	 }
 
-	retn = true;
-
-
- done:
-	return retn;
-}
+	 retn = true;
 
 
-/**
- * External public method.
- *
- * This method implements loading the TEXT segments of the shared
- * enclave object file into the enclave.
- *
- * \param this		A pointer to the object which represents the
- *			enclave binary data.
- *
- * \param enclave	A pointer to the enclave object into which the
- *			pages are to be loaded.
- *
- * \return	If an error is encountered while loading segments
- *		a false value is returned.  A true value indicates the
- *		enclave was successfully loaded.
- */
-
-static _Bool load_segments(CO(SGXloader, this), CO(SGXenclave, enclave))
-
-{
-	STATE(S);
-
-	_Bool retn = false;
-
-	unsigned long int vaddr;
-
-	uint8_t *data,
-		page[4096];
-
-	uint32_t lp,
-		 segcnt;
-
-	uint64_t *payload,
-		 offset,
-		 size,
-		 max_rva = 0;
-
-	struct segment *segptr;
-
-	struct SGX_secinfo secinfo;
+  done:
+	 return retn;
+ }
 
 
-	/* Verify object status. */
-	if ( S->poisoned )
-		ERR(goto done);
+ /**
+  * External public method.
+  *
+  * This method implements loading the TEXT segments of the shared
+  * enclave object file into the enclave.
+  *
+  * \param this		A pointer to the object which represents the
+  *			enclave binary data.
+  *
+  * \param enclave	A pointer to the enclave object into which the
+  *			pages are to be loaded.
+  *
+  * \return	If an error is encountered while loading segments
+  *		a false value is returned.  A true value indicates the
+  *		enclave was successfully loaded.
+  */
+
+ static _Bool load_segments(CO(SGXloader, this), CO(SGXenclave, enclave))
+
+ {
+	 STATE(S);
+
+	 _Bool retn = false;
+
+	 unsigned long int vaddr;
+
+	 uint8_t *data,
+		 page[4096];
+
+	 uint32_t lp,
+		  segcnt;
+
+	 uint64_t *payload,
+		  offset,
+		  size,
+		  max_rva = 0;
+
+	 struct segment *segptr;
+
+	 struct SGX_secinfo secinfo;
 
 
-	/* Iterate through the list of segments loading each one. */
-	segcnt = S->segments->size(S->segments) / sizeof(struct segment);
-	segptr = (struct segment *) S->segments->get(S->segments);
+	 /* Verify object status. */
+	 if ( S->poisoned )
+		 ERR(goto done);
 
-	for (lp= 0; lp < segcnt; ++lp, ++segptr) {
-		data = segptr->data->get(segptr->data);
 
-		if ( segptr->phdr.p_vaddr > max_rva )
-			max_rva = segptr->phdr.p_vaddr;
+	 /* Iterate through the list of segments loading each one. */
+	 segcnt = S->segments->size(S->segments) / sizeof(struct segment);
+	 segptr = (struct segment *) S->segments->get(S->segments);
 
-		if ( lp > 0 ) {
-			if ( !_finish_segment(enclave, segptr-1) )
-				ERR(goto done);
-		}
+	 for (lp= 0; lp < segcnt; ++lp, ++segptr) {
+		 data = segptr->data->get(segptr->data);
 
-		/* Build the first page of the enclave. */
-		offset = segptr->phdr.p_vaddr & (4096-1);
-		size = 4096 - offset;
-		if( segptr->phdr.p_filesz < size)
-			size = segptr->phdr.p_filesz;
-		memset(page, '\0', 4096);
-		memcpy(&page[offset], data, size);
+		 if ( segptr->phdr.p_vaddr > max_rva )
+			 max_rva = segptr->phdr.p_vaddr;
 
-		/*
-		 * Advance the enclave virtual address until it matches
-		 * the start address of the segment.
-		 */
-		fprintf(stdout, "Enclave address: 0x%lx, vaddr: 0x%lx\n", \
-			enclave->get_address(enclave),			  \
-			segptr->phdr.p_vaddr & (~(4096-1)));
+		 if ( lp > 0 ) {
+			 if ( !_finish_segment(enclave, segptr-1) )
+				 ERR(goto done);
+		 }
+
+		 /* Build the first page of the enclave. */
+		 offset = segptr->phdr.p_vaddr & (4096-1);
+		 size = 4096 - offset;
+		 if( segptr->phdr.p_filesz < size)
+			 size = segptr->phdr.p_filesz;
+		 memset(page, '\0', 4096);
+		 memcpy(&page[offset], data, size);
+
+		 /*
+		  * Advance the enclave virtual address until it matches
+		  * the start address of the segment.
+		  */
+		 if ( S->debug )
+			 fprintf(stdout, "Enclave address: 0x%lx, vaddr: " \
+				 "0x%lx\n", enclave->get_address(enclave),  \
+				 segptr->phdr.p_vaddr & (~(4096-1)));
 		while ( enclave->get_address(enclave) <
 			(segptr->phdr.p_vaddr & (~(4096-1))) ) {
 			if ( !enclave->add_hole(enclave) )
@@ -741,17 +749,21 @@ static _Bool load_segments(CO(SGXloader, this), CO(SGXenclave, enclave))
 		if ( !enclave->add_page(enclave, page, &secinfo, \
 					SGX_PAGE_EXTEND) )
 			ERR(goto done);
-		fprintf(stdout, "Segment: %u\n", lp);
-		fprintf(stdout, "\tFirst page: vaddr=0x%lx/rva=0x%lx, " \
-			"offset=0x%lx, size=0x%lx loaded.\n",		\
-			segptr->phdr.p_vaddr,			        \
-			segptr->phdr.p_vaddr & (~(4096-1)), offset, size);
+		if ( S->debug ) {
+			fprintf(stdout, "Segment: %u\n", lp);
+			fprintf(stdout, "\tFirst page: "		      \
+				"vaddr=0x%lx/rva=0x%lx offset=0x%lx, "	      \
+				"size=0x%lx loaded.\n", segptr->phdr.p_vaddr, \
+				segptr->phdr.p_vaddr & (~(4096-1)), offset,   \
+				size);
+		}
 		payload = (uint64_t *) page;
-		fprintf(stdout, "\tAdded page: 0x%lx/0x%lx/0x%lx\n", \
-			vaddr, secinfo.flags, *payload);
+		if ( S->debug )
+			fprintf(stdout, "\tAdded page: 0x%lx/0x%lx/0x%lx\n", \
+				vaddr, secinfo.flags, *payload);
 
 		/* Build remaining pages. */
-		if ( !_build_segment(enclave, segptr, offset) )
+		if ( !_build_segment(enclave, segptr, offset, S->debug) )
 			ERR(goto done);
 	}
 
@@ -902,6 +914,28 @@ static _Bool get_attributes(CO(SGXloader, this), sgx_attributes_t *attributes)
 /**
  * External public method.
  *
+ * This method implements setting the debug status of the loader.
+ *
+ * \param this		A pointer to the object whose debug status is
+ *			to be modified.
+ *
+ * \return	No return value is defined.
+ */
+
+static void debug(CO(SGXloader, this), const _Bool debug)
+
+{
+	STATE(S);
+
+
+	S->debug = debug;
+	return;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a diagnostic dump of the enclave binaryd ata.
  *
  * \param this		A pointer to the object whose content is to be
@@ -1043,6 +1077,7 @@ extern SGXloader NAAAIM_SGXloader_Init(void)
 	this->get_sigstruct  = get_sigstruct;
 	this->get_attributes = get_attributes;
 
+	this->debug = debug;
 	this->dump  = dump;
 	this->whack = whack;
 

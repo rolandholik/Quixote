@@ -65,6 +65,9 @@ struct NAAAIM_SGXenclave_State
 	/* Object status. */
 	_Bool poisoned;
 
+	/* Debug status. */
+	_Bool debug;
+
 	/* Enclave file descriptor. */
 	int fd;
 
@@ -166,6 +169,8 @@ static _Bool open_enclave(CO(SGXenclave, this), CO(char *, device), \
 
 	/* Load the SGX metadata and shared object file. */
 	INIT(NAAAIM, SGXloader, S->loader, ERR(goto done));
+	if ( S->debug )
+		S->loader->debug(S->loader, true);
 	if ( !S->loader->load_secs(S->loader, enclave, &S->secs, debug) )
 		ERR(goto done);
 
@@ -213,11 +218,13 @@ static _Bool create_enclave(CO(SGXenclave, this))
 	create_param.secs = &S->secs;
 	create_param.addr = 0;
 
-	fprintf(stdout, "Size: 0x%lx\n", S->secs.size);
-	fprintf(stdout, "Using secs xfrm: 0x%lx\n", S->secs.xfrm);
 	if ( ioctl(S->fd, SGX_IOCTL_ENCLAVE_CREATE, &create_param) < 0 )
 		ERR(goto done);
-	fprintf(stdout, "OK, start adress=0x%0lx\n", create_param.addr);
+	if ( S->debug ) {
+		fputs("Enclave created:\n", stdout);
+		fprintf(stdout, "\tSize: 0x%lx\n", S->secs.size);
+		fprintf(stdout, "\tStart: 0x%lx\n", create_param.addr);
+	}
 	S->enclave_address = create_param.addr;
 
 	retn = true;
@@ -717,6 +724,32 @@ static _Bool get_attributes(CO(SGXenclave, this), sgx_attributes_t *attributes)
 /**
  * External public method.
  *
+ * This method implements setting the debug status of the enclave.
+ * Enabling debug in the enclave also causes debug status to be set
+ * on the metadata manager and the loader.
+ *
+ * \param this		A pointer to the object whose debug status is
+ *			to be modified.
+ *
+ * \param debug		The debug status to be set for the object.
+ *
+ * \return	No return value is defined.
+ */
+
+static void debug(CO(SGXenclave, this), const _Bool debug)
+
+{
+	STATE(S);
+
+
+	S->debug = debug;
+	return;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a destructor for an SGXenclave object.
  *
  * \param this	A pointer to the object which is to be destroyed.
@@ -800,6 +833,7 @@ extern SGXenclave NAAAIM_SGXenclave_Init(void)
 
 	this->get_attributes = get_attributes;
 
+	this->debug = debug;
 	this->whack = whack;
 
 	return this;

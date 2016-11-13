@@ -43,6 +43,7 @@ struct NAAAIM_SGXenclave
 
 	_Bool (*get_attributes)(const SGXenclave, sgx_attributes_t *);
 
+	void (*debug)(const SGXenclave, const _Bool);
 	void (*whack)(const SGXenclave);
 
 	/* Private state. */

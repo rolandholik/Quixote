@@ -63,6 +63,9 @@ struct NAAAIM_SGXmetadata_State
 	/* Object status. */
 	_Bool poisoned;
 
+	/* Debug status. */
+	_Bool debug;
+
 	/* Enclave file descriptor. */
 	int fd;
 
@@ -95,6 +98,9 @@ static void _init_state(CO(SGXmetadata_State, S)) {
 
 	S->libid = NAAAIM_LIBID;
 	S->objid = NAAAIM_SGXmetadata_OBJID;
+
+	S->poisoned = false;
+	S->debug    = false;
 
 	S->fd  = -1;
 	S->elf = NULL;
@@ -660,7 +666,8 @@ static _Bool _load_layout(CO(SGXmetadata_State, S),		\
 		ERR(goto done);
 
 
-	switch ( layout->id ) {
+	if ( S->debug ) {
+		switch ( layout->id ) {
 		case 1:
 			fputs("\tHeap\n", stdout);
 			break;
@@ -682,13 +689,16 @@ static _Bool _load_layout(CO(SGXmetadata_State, S),		\
 		case 7:
 			fputs("\tGuard\n", stdout);
 			break;
+		}
+		fprintf(stdout, "\tattributes: 0x%x\n", layout->attributes);
+		fprintf(stdout, "\tpages: 0x%x\n", layout->page_count);
+		fprintf(stdout, "\trva: 0x%lx\n", layout->rva);
+		fprintf(stdout, "\tcontent_size: 0x%x\n", \
+			layout->content_size);
+		fprintf(stdout, "\tcontent_offset: 0x%x\n", \
+			layout->content_offset);
+		fprintf(stdout, "\tflags: 0x%lx\n", layout->si_flags);
 	}
-	fprintf(stdout, "\tattributes: 0x%x\n", layout->attributes);
-	fprintf(stdout, "\tpages: 0x%x\n", layout->page_count);
-	fprintf(stdout, "\trva: 0x%lx\n", layout->rva);
-	fprintf(stdout, "\tcontent_size: 0x%x\n", layout->content_size);
-	fprintf(stdout, "\tcontent_offset: 0x%x\n", layout->content_offset);
-	fprintf(stdout, "\tflags: 0x%lx\n", layout->si_flags);
 
 
 	/*
@@ -828,7 +838,8 @@ static _Bool _load_group(CO(SGXmetadata_State, S), CO(layout_t *, layout), \
 
 	for (lp= 0; lp < replicates; ++lp) {
 		for (lp1= start; lp1 < group; ++lp1) {
-			fprintf(stdout, "\tGroup layout: %d\n", lp);
+			if ( S->debug )
+				fprintf(stdout, "\tGroup layout: %d\n", lp);
 			_load_layout(S, &layout[lp1].entry, enclave);
 			fputc('\n', stdout);
 		}
@@ -881,7 +892,8 @@ static _Bool load_layouts(CO(SGXmetadata, this), CO(SGXenclave, enclave))
 	cnt = S->layouts->size(S->layouts) / sizeof(layout_t);
 
 	for (lp= 0; lp < cnt; ++lp) {
-		fprintf(stdout, "Layout %u:\n", lp);
+		if ( S->debug )
+			fprintf(stdout, "Layout %u:\n", lp);
 		if ( (1 << 12) & layout[lp].entry.id ) {
 			if ( !_load_group(S, layout, lp, enclave) )
 				ERR(goto done);
@@ -897,6 +909,31 @@ static _Bool load_layouts(CO(SGXmetadata, this), CO(SGXenclave, enclave))
 
  done:
 	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements setting the debug status of the metadata
+ * manager.
+ *
+ * \param this		A pointer to the object whose debug status is
+ *			to be modified.
+ *
+ * \param debug		The debug status to be set for the object.
+ *
+ * \return	No return value is defined.
+ */
+
+static void debug(CO(SGXmetadata, this), const _Bool debug)
+
+{
+	STATE(S);
+
+
+	S->debug = debug;
+	return;
 }
 
 
@@ -1137,6 +1174,7 @@ extern SGXmetadata NAAAIM_SGXmetadata_Init(void)
 
 	this->load_layouts	 = load_layouts;
 
+	this->debug = debug;
 	this->dump  = dump;
 	this->whack = whack;
 

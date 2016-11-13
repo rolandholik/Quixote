@@ -36,6 +36,7 @@ struct NAAAIM_SGXloader
 	_Bool (*get_sigstruct)(const SGXloader, struct SGX_sigstruct *);
 	_Bool (*get_attributes)(const SGXloader, sgx_attributes_t *);
 
+	void (*debug)(const SGXloader, const _Bool);
 	void (*dump)(const SGXloader);
 	void (*whack)(const SGXloader);
 

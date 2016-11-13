@@ -37,6 +37,7 @@ struct NAAAIM_SGXmetadata
 
 	_Bool (*load_layouts)(const SGXmetadata, const SGXenclave);
 
+	void (*debug)(const SGXmetadata, const _Bool);
 	void (*dump)(const SGXmetadata);
 	void (*whack)(const SGXmetadata);
 
