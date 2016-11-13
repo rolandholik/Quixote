@@ -50,6 +50,13 @@
 #endif
 
 
+/* Prototype for SGX bootstrap function. */
+#define enter_enclave __morestack
+
+extern int enter_enclave(struct SGX_tcs *, long fn, const void *, \
+			 void *, void *);
+
+
 /** SGXenclave private state information. */
 struct NAAAIM_SGXenclave_State
 {
@@ -93,6 +100,31 @@ struct NAAAIM_SGXenclave_State
 	size_t thread_cnt;
 	Buffer threads;
 };
+
+
+/*
+ * The following functions are 'bridge' functions which are used to
+ * handle OCALL events.  They are currently located here in order to
+ * simplify testing and implementation of enclave functionality.
+ */
+void push_ocall_frame(unsigned int *frame_ptr)
+
+{
+	return;
+}
+void pop_ocall_frame()
+
+{
+	return;
+}
+
+int sgx_ocall(unsigned int ocall_slot, void *ocall_table, void *ocall_data, \
+	      void *thread)
+
+{
+	fprintf(stdout, "Enclave requested OCALL slot: %i\n", ocall_slot);
+	return 0;
+}
 
 
 /**
@@ -678,6 +710,199 @@ static _Bool get_thread(CO(SGXenclave, this), unsigned long int *tcs)
 
 
 /**
+ * Internal private function.
+ *
+ * This function is responsible for saving the current floating point
+ * state of the processor.  It is called immediately before enclave
+ * execution is requested.
+ *
+ * \param save_area	A pointer to a user supplied byte buffer which
+ *			will be loaded with the floating point state.
+ *
+ * \return	No return value is defined.
+ */
+
+
+static void _save_fp_state(uint8_t *save_area)
+
+{
+	uint8_t *save;
+
+	uint32_t eax,
+		 ebx,
+		 ecx,
+		 edx;
+
+	uint64_t hardware_xfrm;
+
+
+	/* Obtain the platform XFRM status. */
+	__asm("movl %4, %%eax\n\t"
+	      "movl %5, %%ecx\n\t"
+	      "cpuid\n\t"
+	      "movl %%eax, %0\n\t"
+	      "movl %%ebx, %1\n\t"
+	      "movl %%ecx, %2\n\t"
+	      "movl %%edx, %3\n\t"
+	      /* Output. */
+	      : "=R" (eax), "=r" (ebx), "=r" (ecx), "=r" (edx)
+	      /* Input. */
+	      : "r" (0x0), "r" (0x1)
+	      /* Clobbers. */
+	      : "eax", "ebx", "ecx", "edx");
+
+	if ( (ecx & (1UL << 26)) || (ecx & (1U << 27)) ) {
+		/* Have XSAVE variant. */
+		__asm("movl %2, %%ecx\n\t"
+		      "xgetbv\n\t"
+		      "movl %%eax, %0\n\t"
+		      "movl %%edx, %1\n\t"
+		      /* Output. */
+		      : "=r" (ecx), "=r" (edx)
+		      /* Input. */
+		      : "r" (0x0)
+		      /* Clobbers. */
+		      : "eax", "ecx", "edx");
+		hardware_xfrm = ((uint64_t) edx << 32ULL) | eax;
+	}
+	else
+		hardware_xfrm = 0x3ULL;
+
+
+	/* Flush floating point exceptions. */
+	__asm("fwait");
+
+
+	/* Save the floating point status in the supplied buffer. */
+	save = (uint8_t *) (((size_t) save_area + (16-1)) & ~(16-1));
+	__asm("fxsaveq (%0)\n\t"
+	      /* Output. */
+	      :
+	      /* Input. */
+	      : "r" (save)
+	      /* Clobbers. */
+	      : "memory");
+
+
+	/* Clear the YMM registers if needed. */
+	if ( hardware_xfrm & 0x4 )
+		__asm("vzeroupper\n\t");
+
+	return;
+}
+
+
+/**
+ * Internal private function.
+ *
+ * This function is responsible for restoring the floating point state
+ * of the processor which was previously saved by the _save_fp_state
+ * function.
+ *
+ * \param save_area	A pointer to a user supplied byte buffer which
+ *			contains the floating point state to be
+ *			restored.
+ *
+ * \return	No return value is defined.
+ */
+
+
+static void _restore_fp_state(uint8_t *save_area)
+
+{
+	uint8_t *sp = (uint8_t *) (((size_t) save_area + (16-1)) & ~(16-1));
+
+
+	__asm("fxsaveq (%0)\n\t"
+	      /* Output. */
+	      :
+	      /* Input. */
+	      : "r" (sp));
+
+	return;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements calling an enclave execution slot.
+ * When an enclave is constructed a series of execution 'slots' are
+ * defined which contain points to the ECALL routines which are
+ * defined for this enclave.  The enclave defined routines begin
+ * number with slot 0.
+ *
+ * In addition there are three default execution slots which implement
+ * the following:
+ *
+ *	-1 -> Enclave initialization.
+ *	-2 -> Enclave OCALL return.
+ *	-3 -> Enclave exception handling.
+ *
+ * \param this		A pointer to the object representing the enclave
+ *			whose execution slot is to be called.
+ *
+ * \param slot		The number of the execution slot which is to
+ *			be invoked.
+ *
+ * \param ocall		A pointer to the OCALL API definition table
+ *			for the slot which will be called.
+ *
+ * \param ecall		A pointer to the ECALL API definition table
+ *			for the slot which will be called.
+ *
+ * \param thread	A pointer to the function which will handle
+ *			OCALL's which emanate from this enclave call.
+ *
+ * \return	If execution of a slot fails a false value is returned
+ *		and the enclave is poisoned.  A true value indicates
+ *		the execution was successful.
+ */
+
+static _Bool boot_slot(CO(SGXenclave, this), int slot, CO(void *, ocall), \
+		       void * ecall, void * thread, int *retc)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	uint8_t xsave_buffer[528];
+
+	int rc;
+
+	struct SGX_tcs *tcs = NULL;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+
+	/* Get an available thread slot. */
+	if ( !this->get_thread(this, (unsigned long int *) &tcs) )
+		ERR(goto done);
+
+	/* Invoke the enclave slot. */
+	_save_fp_state(xsave_buffer);
+	rc = enter_enclave(tcs, slot, ocall, ecall, thread);
+	_restore_fp_state(xsave_buffer);
+	*retc = rc;
+	--S->thread_cnt;
+	if ( rc != 0 )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
  * External public method.
  *
  * This method implements the retrieval of the SGX attributes from the
@@ -830,6 +1055,8 @@ extern SGXenclave NAAAIM_SGXenclave_Init(void)
 
 	this->add_thread = add_thread;
 	this->get_thread = get_thread;
+
+	this->boot_slot	= boot_slot;
 
 	this->get_attributes = get_attributes;
 

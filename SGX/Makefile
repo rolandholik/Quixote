@@ -72,7 +72,8 @@ sgx-loader: sgx-loader.o SGXloader.o SGXmetadata.o
 sgx-loader.o: sgx-loader.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
 
-sgx-load: sgx-load.o SGXenclave.o SGXloader.o SGXmetadata.o SGXsigstruct.o
+sgx-load: sgx-load.o SGXenclave.o SGXloader.o SGXmetadata.o SGXsigstruct.o \
+	enter_enclave.o
 	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB};
 
 sgx-load.o: sgx-load.c
