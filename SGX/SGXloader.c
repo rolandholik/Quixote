@@ -329,7 +329,7 @@ static _Bool load(CO(SGXloader, this), CO(char *, enclave), const _Bool debug)
 
 
 	/* Open the shared object enclave and memory map the file. */
-	if ( (S->fd = open(enclave, O_RDWR, 0)) < 0 )
+	if ( (S->fd = open(enclave, O_RDONLY, 0)) < 0 )
 		ERR(goto done);
 
 	if ( fstat(S->fd, &statbuf) == -1 )
