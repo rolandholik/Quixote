@@ -9,6 +9,8 @@
 #include <Origin.h>
 #include <HurdLib.h>
 #include <Buffer.h>
+#include <String.h>
+#include <File.h>
 
 #include "NAAAIM.h"
 #include "SHA256.h"
@@ -198,20 +200,55 @@ static _Bool load_white_list(SGXenclave enclave)
 }
 
 
-extern int main(int argc, char *argv[])
+static _Bool generate_token(SGXenclave enclave, char *init_enclave, \
+			    struct SGX_einittoken *token)
 
 {
-	int rc,
-	    retn = 1;
+	_Bool retn = false;
+
+	int rc;
 
 	sgx_attributes_t attributes;
 
 	sgx_measurement_t mrenclave,
 			  mrsigner;
 
+
+	if ( !init_ecall0(init_enclave, &ecall0_table, &attributes, \
+			  &mrenclave, &mrsigner, token) )
+		ERR(goto done);
+
+	if ( !enclave->boot_slot(enclave, 0, &LE_ocall_table, &ecall0_table, \
+				 thread_manager, &rc) )
+		ERR(goto done);
+
+	if ( ecall0_table.ms_retval != 0 ) {
+		fprintf(stderr, "LE returned: %d\n", ecall0_table.ms_retval);
+		goto done;
+	}
+
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+extern int main(int argc, char *argv[])
+
+{
+	int retn = 1;
+
+	uint8_t token_buffer[1024];
+
 	struct SGX_einittoken token;
 
 	SGXenclave enclave = NULL;
+
+	Buffer bufr = NULL;
+
+	File token_file = NULL;
 
 
 	if (argc != 4) {
@@ -241,22 +278,12 @@ extern int main(int argc, char *argv[])
 
 
 	/* Generate the launch token. */
-	if ( !init_ecall0(argv[3], &ecall0_table, &attributes, &mrenclave, \
-			  &mrsigner, &token) )
+	fputs("Generating token.\n", stdout);
+	if ( !generate_token(enclave, argv[3], &token) )
 		ERR(goto done);
 
-	fputs("Generating token.\n", stdout);
-	if ( !enclave->boot_slot(enclave, 0, &LE_ocall_table, &ecall0_table, \
-				 thread_manager, &rc) ) {
-		fprintf(stderr, "Enclave entry returned: %d\n", rc);
-		goto done;
-	}
-	if ( ecall0_table.ms_retval != 0 ) {
-		fprintf(stderr, "LE returned: %d\n", \
-			ecall0_table.ms_retval);
-		goto done;
-	}
 
+	/* Output debug information and token. */
 	fputs("EINITTOKEN generated.\n", stdout);
 	fprintf(stdout, "Token status: %u\n", token.valid);
 	fputs("Attributes:\n", stdout);
@@ -264,9 +291,26 @@ extern int main(int argc, char *argv[])
 	fprintf(stdout, "\txfrm: 0x%lx\n", token.attributes.xfrm);
 	fprintf(stdout, "isvsvnle: %u\n", token.isvsvnle);
 
+	INIT(HurdLib, File, token_file, ERR(goto done));
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+
+	if ( !token_file->open_rw(token_file, "enclave.token") )
+		ERR(goto done);
+
+	memset(token_buffer, '\0', sizeof(token_buffer));
+	bufr->add(bufr, (void *) token_buffer, sizeof(token_buffer));
+	memcpy(bufr->get(bufr), &token, sizeof(struct SGX_einittoken));
+
+	if ( !token_file->write_Buffer(token_file, bufr) )
+		ERR(goto done);
+
+	retn = 0;
+
 
  done:
 	WHACK(enclave);
+	WHACK(bufr);
+	WHACK(token_file);
 
 	return retn;
 }
