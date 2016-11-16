@@ -19,6 +19,10 @@
 #include "SGXmetadata.h"
 
 
+/* Definitions local to this file. */
+#define PGM "sgx-gen-token"
+
+
 /**
  * The following array is an encoding of the Intel certificate white
  * list.  This white list is a requirement for operation of the Launch
@@ -95,6 +99,28 @@ static struct LE_ecall1_table {
 	uint8_t *ms_wl_cert_chain;
 	uint32_t ms_wl_cert_chain_size;
 } ecall1_table;
+
+
+static void usage(char *err)
+
+{
+	fprintf(stdout, "%s: SGX EINIT token generator.\n", PGM);
+	fprintf(stdout, "%s: (C)IDfusion, LLC\n", PGM);
+
+	if ( err != NULL )
+		fprintf(stdout, "\n%s: %s\n", PGM, err);
+
+	fputc('\n', stdout);
+	fprintf(stdout, "%s: Usage:\n", PGM);
+	fputs("\t-d:\tEnable debug mode.\n", stdout);
+	fputs("\t-e:\tEnclave to generate token for.\n", stdout);
+	fputs("\t-l:\tLocation of launch enclave.\n\t\t\tdefault = "	\
+	      "/opt/intel/sgxpsw/aesm/libsgx_le.signed.so\n", stdout);
+	fputs("\t-n:\tSGX device node.\n\t\t\tdefault = /dev/isgx\n", stdout);
+	fputs("\t-o:\tOutput file.\n\t\t\tdefault = stdout\n", stdout);
+
+	return;
+}
 
 
 static _Bool init_ecall0(char *enclave,
@@ -235,12 +261,60 @@ static _Bool generate_token(SGXenclave enclave, char *init_enclave, \
 }
 
 
+static void generate_output(char *output, struct SGX_einittoken *token)
+
+{
+	uint8_t token_buffer[1024];
+
+	Buffer bufr = NULL;
+
+	File token_file = NULL;
+
+
+	/* Load the token buffer with the token. */
+	memset(token_buffer, '\0', sizeof(token_buffer));
+	memcpy(token_buffer, token, sizeof(struct SGX_einittoken));
+
+
+	/* Send output to the standard output. */
+	if ( strcmp(output, "-") == 0 ) {
+		fwrite(token_buffer, sizeof(token_buffer), 1, stdout);
+		return;
+	}
+
+
+	/* Send output to a user specified file. */
+	INIT(HurdLib, File, token_file, ERR(goto done));
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+
+	if ( !token_file->open_rw(token_file, "enclave.token") )
+		ERR(goto done);
+
+	bufr->add(bufr, (void *) token_buffer, sizeof(token_buffer));
+	if ( !token_file->write_Buffer(token_file, bufr) )
+		ERR(goto done);
+
+
+ done:
+	WHACK(bufr);
+	WHACK(token_file);
+
+	return;
+}
+
+
 extern int main(int argc, char *argv[])
 
 {
-	int retn = 1;
+	_Bool debug = false;
 
-	uint8_t token_buffer[1024];
+	char *sgx_device     = "/dev/isgx",
+	     *launch_enclave = "/opt/intel/sgxpsw/aesm/libsgx_le.signed.so",
+	     *output_file    = "-",
+	     *init_enclave   = NULL;
+
+	int opt,
+	    retn = 1;
 
 	struct SGX_einittoken token;
 
@@ -251,17 +325,46 @@ extern int main(int argc, char *argv[])
 	File token_file = NULL;
 
 
-	if (argc != 4) {
-		fprintf(stderr, "%s: Specify enclave device node, "
-			"Launch Enclave and candidate enclave.\n", argv[0]);
-		goto done;
+	/* Parse and verify arguements. */
+	while ( (opt = getopt(argc, argv, "de:l:n:o:")) != EOF )
+		switch ( opt ) {
+			case 'd':
+				debug = true;
+				break;
+
+			case 'e':
+				init_enclave = optarg;
+				break;
+			case 'l':
+				launch_enclave = optarg;
+				break;
+			case 'n':
+				sgx_device = optarg;
+				break;
+			case 'o':
+				output_file = optarg;
+				break;
+		}
+
+
+	if ( init_enclave == NULL ) {
+		usage("No enclave specified.");
+		return 1;
+	}
+
+	if ( debug && (strcmp(output_file, "-") == 0) ) {
+		usage("Debug mode not compatible with stdout output.");
+		return 1;
 	}
 
 
 	/* Setup the Launch Enclave (LE) to generate an EINITTOKEN. */
 	INIT(NAAAIM, SGXenclave, enclave, ERR(goto done));
 
-	if ( !enclave->open_enclave(enclave, argv[1], argv[2], false) )
+	if ( debug )
+		fputs("Setting up launch enclave.\n", stdout);
+	if ( !enclave->open_enclave(enclave, sgx_device, launch_enclave, \
+				    false) )
 		ERR(goto done);
 	if ( !enclave->create_enclave(enclave) )
 		ERR(goto done);
@@ -272,37 +375,30 @@ extern int main(int argc, char *argv[])
 
 
 	/* Load the white list. */
-	fputs("Loading white list.\n", stdout);
+	if ( debug )
+		fputs("Loading white list.\n", stdout);
 	if ( !load_white_list(enclave) )
 		ERR(goto done);
 
 
 	/* Generate the launch token. */
-	fputs("Generating token.\n", stdout);
-	if ( !generate_token(enclave, argv[3], &token) )
+	if ( debug )
+		fputs("Generating token.\n", stdout);
+	if ( !generate_token(enclave, init_enclave, &token) )
 		ERR(goto done);
 
 
 	/* Output debug information and token. */
-	fputs("EINITTOKEN generated.\n", stdout);
-	fprintf(stdout, "Token status: %u\n", token.valid);
-	fputs("Attributes:\n", stdout);
-	fprintf(stdout, "\tflags: 0x%lx\n", token.attributes.flags);
-	fprintf(stdout, "\txfrm: 0x%lx\n", token.attributes.xfrm);
-	fprintf(stdout, "isvsvnle: %u\n", token.isvsvnle);
+	if ( debug ) {
+		fputs("EINITTOKEN generated.\n", stdout);
+		fprintf(stdout, "\tstatus: %u\n", token.valid);
+		fputs("\tattributes:\n", stdout);
+		fprintf(stdout, "\t\tflags: 0x%lx\n", token.attributes.flags);
+		fprintf(stdout, "\t\txfrm: 0x%lx\n", token.attributes.xfrm);
+		fprintf(stdout, "\tisvsvnle: %u\n", token.isvsvnle);
+	}
 
-	INIT(HurdLib, File, token_file, ERR(goto done));
-	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-
-	if ( !token_file->open_rw(token_file, "enclave.token") )
-		ERR(goto done);
-
-	memset(token_buffer, '\0', sizeof(token_buffer));
-	bufr->add(bufr, (void *) token_buffer, sizeof(token_buffer));
-	memcpy(bufr->get(bufr), &token, sizeof(struct SGX_einittoken));
-
-	if ( !token_file->write_Buffer(token_file, bufr) )
-		ERR(goto done);
+	generate_output(output_file, &token);
 
 	retn = 0;
 
