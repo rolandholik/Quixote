@@ -51,10 +51,7 @@
 
 
 /* Prototype for SGX bootstrap function. */
-#define enter_enclave __morestack
-
-extern int enter_enclave(struct SGX_tcs *, long fn, const void *, \
-			 void *, void *);
+extern int boot_sgx(struct SGX_tcs *, long fn, const void *, void *, void *);
 
 
 /** SGXenclave private state information. */
@@ -1004,7 +1001,7 @@ static _Bool boot_slot(CO(SGXenclave, this), int slot, CO(void *, ocall), \
 
 	/* Invoke the enclave slot. */
 	_save_fp_state(xsave_buffer);
-	rc = enter_enclave(tcs, slot, ocall, ecall, thread);
+	rc = boot_sgx(tcs, slot, ocall, ecall, thread);
 	_restore_fp_state(xsave_buffer);
 	*retc = rc;
 	--S->thread_cnt;

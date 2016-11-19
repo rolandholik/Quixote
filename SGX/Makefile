@@ -7,14 +7,17 @@
 CSRC = sgx-check.c sgx-test.c sgx-metadata.c SGXmetadata.c SGXloader.c \
 	SGXenclave.c SGXsigstruct.c
 
+ASRC = boot-sgx.s
+
 TOOLS = sgx-check sgx-test sgx-metadata sgx-loader sgx-load sgx-sigstruct \
 	sgx-gen-token gen-white-list
 
 CC = musl-gcc
+AS = as
 
 MUSL_INCLUDE = /usr/local/musl/include
 
-CDEBUG = -O2 -fomit-frame-pointer -march=core2
+CDEBUG = -g -O2 -fomit-frame-pointer -march=core2
 CFLAGS = -Wall ${CDEBUG}
 
 LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib -L../lib -L../HurdLib
@@ -29,11 +32,15 @@ SSL_CRYPTO  = -L /usr/local/musl/lib -lcrypto
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@;
 
+%.o: %.s
+	${AS} -o $@ $<;
+
 
 #
 # Automatic definition of classes and objects.
 #
 COBJS = ${CSRC:.c=.o}
+AOBJS = ${ASRC:.s=.o}
 
 LIBS = -lNAAAIM -lHurdLib 
 ELFLIB = -Wl,--rpath /usr/local/musl/lib -lelf
@@ -50,7 +57,7 @@ CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I/usr/local/musl/include
 .PHONY: all tools
 
 # Targets
-all: ${COBJS} tools
+all: ${COBJS} ${AOBJS} tools
 
 tools: ${TOOLS}
 
@@ -73,7 +80,7 @@ sgx-loader.o: sgx-loader.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
 
 sgx-load: sgx-load.o SGXenclave.o SGXloader.o SGXmetadata.o SGXsigstruct.o \
-	enter_enclave.o
+	boot-sgx.o	#enter_enclave.o
 	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB};
 
 sgx-load.o: sgx-load.c
@@ -86,7 +93,7 @@ sgx-sigstruct.o: sgx-sigstruct.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
 
 sgx-gen-token: sgx-gen-token.o SGXenclave.o SGXloader.o SGXmetadata.o \
-	SGXsigstruct.o enter_enclave.o ../SHA256.o
+	SGXsigstruct.o ../SHA256.o boot-sgx.o	# enter_enclave.o
 	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB} ${SSL_CRYPTO};
 
 sgx-gen-token.o: sgx-gen-token.c
@@ -97,6 +104,9 @@ gen-white-list: gen-white-list.o
 
 gen-white-list.o: gen-white-list.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
+
+dotest: dotest.o boot-sgx.o
+	${CC} ${CFLAGS} -static -o $@ $^;
 
 
 tags:
