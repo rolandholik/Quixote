@@ -430,13 +430,16 @@ static _Bool _init_enclave(CO(SGXenclave, this), int *rc)
  * \param this		A pointer to the object representing the enclave
  *			which will be initialized.
  *
+ * \param token		A pointer to a launch token which has been
+ *			initialized for this enclave.
+ *
  * \return		If an error is encountered while initializing
  *			the enclave a false value is returned.  A true
  *			value indicates the enclave was successfully
  *			loaded.
  */
 
-static _Bool init_enclave(CO(SGXenclave, this))
+static _Bool init_enclave(CO(SGXenclave, this), struct SGX_einittoken *token)
 
 {
 	STATE(S);
@@ -446,8 +449,6 @@ static _Bool init_enclave(CO(SGXenclave, this))
 	int rc;
 
 	struct SGX_sigstruct sigstruct;
-
-	struct SGX_einittoken einittoken;
 
 	struct SGX_init_param init_param;
 
@@ -464,13 +465,11 @@ static _Bool init_enclave(CO(SGXenclave, this))
 	if ( !S->loader->get_sigstruct(S->loader, &sigstruct) )
 		ERR(goto done);
 
-	memset(&einittoken, '\0', sizeof(struct SGX_einittoken));
-
 
 	/* Populate the initialization control structure. */
 	memset(&init_param, '\0', sizeof(struct SGX_init_param));
 	init_param.addr	      = S->enclave_address;
-	init_param.einittoken = &einittoken;
+	init_param.einittoken = token;
 	init_param.sigstruct  = &sigstruct;
 
 	if ( (rc = ioctl(S->fd, SGX_IOCTL_ENCLAVE_INIT, &init_param)) != 0 )

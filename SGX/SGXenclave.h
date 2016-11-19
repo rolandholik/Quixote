@@ -30,7 +30,7 @@ struct NAAAIM_SGXenclave
 	_Bool (*create_enclave)(const SGXenclave);
 	_Bool (*load_enclave)(const SGXenclave);
 
-	_Bool (*init_enclave)(const SGXenclave);
+	_Bool (*init_enclave)(const SGXenclave, struct SGX_einittoken *);
 	_Bool (*init_launch_enclave)(const SGXenclave);
 
 	_Bool (*add_page)(const SGXenclave, const uint8_t *, \
