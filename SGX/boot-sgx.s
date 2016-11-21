@@ -80,7 +80,7 @@ boot_sgx:
 	pushq	%r13
 	pushq	%r14
 	pushq	%r15
-	sub	$-8, %rsp
+	subq	$8, %rsp
 
 	# The first arguement to this function is the address of the
 	# task control structure.  Move this into the RBX register
@@ -129,10 +129,10 @@ boot_sgx:
 .Ldone:	
 	# Restore the registers which were preserved.
 	movq	 (-0x8)(%rbp), %rbx
-	movq	(-0x20)(%rbp), %r12
-	movq	(-0x28)(%rbp), %r13
-	movq	(-0x30)(%rbp), %r14
-	movq	(-0x38)(%rbp), %r15
+	movq	(-0x10)(%rbp), %r12
+	movq	(-0x18)(%rbp), %r13
+	movq	(-0x20)(%rbp), %r14
+	movq	(-0x28)(%rbp), %r15
 
 	# Restore the stack and base pointer and return to the caller.
 	mov	%rbp, %rsp
