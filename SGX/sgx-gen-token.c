@@ -213,7 +213,7 @@ static _Bool load_white_list(SGXenclave enclave)
 	ecall1_table.ms_wl_cert_chain_size = sizeof(LE_white_list);
 
 	if ( !enclave->boot_slot(enclave, 1, &LE_ocall_table, &ecall1_table, \
-				 thread_manager, &rc) )
+				 &rc) )
 		ERR(goto done);
 	if ( ecall1_table.ms_retval != 0 )
 		ERR(goto done);
@@ -245,7 +245,7 @@ static _Bool generate_token(SGXenclave enclave, char *init_enclave, \
 		ERR(goto done);
 
 	if ( !enclave->boot_slot(enclave, 0, &LE_ocall_table, &ecall0_table, \
-				 thread_manager, &rc) )
+				 &rc) )
 		ERR(goto done);
 
 	if ( ecall0_table.ms_retval != 0 ) {

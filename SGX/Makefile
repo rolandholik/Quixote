@@ -5,12 +5,12 @@
 
 # Variable declarations.
 CSRC = sgx-check.c sgx-test.c sgx-metadata.c SGXmetadata.c SGXloader.c \
-	SGXenclave.c SGXsigstruct.c
+	SGXenclave.c SGXsigstruct.c test-ecall.c sgx-ocall.c
 
 ASRC = boot-sgx.s
 
 TOOLS = sgx-check sgx-test sgx-metadata sgx-loader sgx-load sgx-sigstruct \
-	sgx-gen-token gen-white-list
+	sgx-gen-token gen-white-list test-ecall
 
 CC = musl-gcc
 AS = as
@@ -80,7 +80,7 @@ sgx-loader.o: sgx-loader.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
 
 sgx-load: sgx-load.o SGXenclave.o SGXloader.o SGXmetadata.o SGXsigstruct.o \
-	boot-sgx.o	#enter_enclave.o
+	boot-sgx.o sgx-ocall.o
 	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB};
 
 sgx-load.o: sgx-load.c
@@ -93,7 +93,7 @@ sgx-sigstruct.o: sgx-sigstruct.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
 
 sgx-gen-token: sgx-gen-token.o SGXenclave.o SGXloader.o SGXmetadata.o \
-	SGXsigstruct.o ../SHA256.o boot-sgx.o	# enter_enclave.o
+	SGXsigstruct.o ../SHA256.o boot-sgx.o sgx-ocall.o
 	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB} ${SSL_CRYPTO};
 
 sgx-gen-token.o: sgx-gen-token.c
@@ -105,8 +105,9 @@ gen-white-list: gen-white-list.o
 gen-white-list.o: gen-white-list.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
 
-dotest: dotest.o boot-sgx.o
-	${CC} ${CFLAGS} -static -o $@ $^;
+test-ecall: test-ecall.o SGXenclave.o SGXloader.o SGXmetadata.o \
+	SGXsigstruct.o sgx-ocall.o boot-sgx.o
+	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB};
 
 
 tags:

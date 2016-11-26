@@ -373,3 +373,15 @@ struct SGX_init_param {
 struct SGX_destroy_param {
 	unsigned long addr;
 };
+
+
+/**
+ * The following structure definition is used as the API definition for
+ * OCALL's from an enclave to userspace.  It consists of a list of
+ * function points which referenced by a 'slot' or array index passed
+ * by the OCALL to userspace.
+ */
+struct OCALL_api {
+	size_t nr_ocall;
+	void *table[];
+};

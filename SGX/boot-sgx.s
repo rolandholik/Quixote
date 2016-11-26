@@ -47,8 +47,7 @@
  *	l = long (32 bit) double word
  *	q = quad (64 bit) quad word
  */
-	
-		
+
 	/*
 	 * The following function is the call point for enclave
 	 * entry.
@@ -61,12 +60,12 @@
 	 *	rcx:	Address of ECALL API definition for the API slot.
 	 *	r8:	Pointer to the OCALL handler function.
 	 */
-	
+
 	.text
 
 	.global	boot_sgx
 	.type	boot_sgx,@function
-	
+
 boot_sgx:
 	# Save the base pointer and set the new base pointer.
 	pushq	%rbp
@@ -95,16 +94,25 @@ boot_sgx:
 	# The slot API is the second arguement to the current function
 	# call.
 	mov	%rcx, %rsi
-	
+
 	# The address to be called in the event of an asynchronous
 	# enclave exit event is placed in the RCX register.  RIP based
 	# addressing is used to get the address in a position independent
 	# fashion.
 	lea	.Laep_handler(%rip), %rcx
-	
+
 	# The EENTER leaf code is loaded into the RAX register and
 	# the ENCLU.EENTER instruction is executed via a byte encoded
 	# instruction sequence.
+	#
+	# The arguments passed to this function in the RDX and R8
+	# registers need to be saved across the enclave execution call.
+	# If an ECALL is requested those arguements are needed so we
+	# push them onto the stack in advance of the enclave
+	# execution.
+	pushq	%rdx
+	pushq	%r8
+
 	mov	$2, %rax
 	.byte	0x0f, 0x01, 0xd7
 
@@ -117,16 +125,32 @@ boot_sgx:
 	# the return value from the enclave is in the RSI register.
 	cmp	$-1, %rdi
 	jne	1f
+
 	movq	%rsi, %rax
 	jmp	.Ldone
 
 	# The return value from the enclave indicates that the enclave
-	# is request processing of an OCALL.  We currently return an
-	# error until we can get OCALL processing wired up.
-1:	movq	$-2, %rax
+	# is requesting processing of an OCALL.  The following values
+	# are returned from the enclave:
+	#
+	#	RDI:	Index into OCALL API structures.
+	#	RSI:	Pointer to data marshaling structure.
+	#
+	# The following arguements are needed for the outcall to
+	# the sgx_ocall C interface function:
+	#
+	#	1:	API slot (RDI)
+	#	2:	API table (RSI)
+	#	3:	Data marshaling structure (RDX)
+	#	4:	Trusted thread (RCX)
+	#
+1:	movq	%rsi, %rdx
+	movq	(-7*8)(%rbp), %rsi
+	movq	(-8*8)(%rbp), %rcx
+	call	sgx_ocall
 
-	
-.Ldone:	
+
+.Ldone:
 	# Restore the registers which were preserved.
 	movq	 (-0x8)(%rbp), %rbx
 	movq	(-0x10)(%rbp), %r12
