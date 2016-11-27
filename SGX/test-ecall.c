@@ -48,6 +48,63 @@ static const struct OCALL_api ocall_table = {
 	1, {ocall1_handler}
 };
 
+static struct ecall0_table {
+	uint8_t *buffer;
+	size_t len;
+} ecall0_table;
+
+
+/**
+ * Internal function.
+ *
+ * This function runs in a continuous loop of accepting user input and
+ * echoing it through the enclave.
+ *
+ * \param enclave	The enclave which is to be used to echo user
+ *			input.
+ *
+ * \return		If an error occurs during an enclave call a
+ *			false value is returned.  A true value is
+ *			used to indicate the user has requested
+ *			termination of the loop.
+ */
+
+static _Bool enclave_loop(CO(SGXenclave, enclave))
+
+{
+	_Bool retn = false;
+
+	int rc;
+
+	char inbufr[1024];
+
+
+	memset(inbufr, '\0', sizeof(inbufr));
+	ecall0_table.len    = sizeof(inbufr);
+	ecall0_table.buffer = (uint8_t *) inbufr;
+
+	while ( true ) {
+		fputs("Input>", stdout);
+		fflush(stdout);
+
+		if ( fgets(inbufr, sizeof(inbufr), stdin) == NULL ) {
+			fputc('\n', stdout);
+			retn = true;
+			goto done;
+		}
+
+		if ( !enclave->boot_slot(enclave, 0, &ocall_table, \
+					 &ecall0_table, &rc) ) {
+			fprintf(stderr, "Enclave returned: %d\n", rc);
+			goto done;
+		}
+	}
+
+
+ done:
+	return retn;
+}
+
 
 /**
  * Program entry point.
@@ -137,13 +194,10 @@ extern int main(int argc, char *argv[])
 	if ( !enclave->init_enclave(enclave, einit) )
 		ERR(goto done);
 
-	if ( !enclave->boot_slot(enclave, 0, &ocall_table, NULL, &retn) )
+	if ( !enclave_loop(enclave) )
 		ERR(goto done);
 
-	if ( retn != 0 )
-		fprintf(stderr, "Enclave returned: %d\n", retn);
-	else
-		retn = 0;
+	retn = 0;
 
 
  done:
