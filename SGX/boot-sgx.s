@@ -79,7 +79,14 @@ boot_sgx:
 	pushq	%r13
 	pushq	%r14
 	pushq	%r15
-	subq	$8, %rsp
+
+	# The TCS pointer, the OCALL API table pointer and the address
+	# of the enclave object need to be retained over the enclave
+	# call.  These values are needed if the enclave requests OCALL
+	# processing.
+	pushq	%rdi
+	pushq	%rdx
+	pushq	%r8
 
 	# The first arguement to this function is the address of the
 	# task control structure.  Move this into the RBX register
@@ -104,15 +111,6 @@ boot_sgx:
 	# The EENTER leaf code is loaded into the RAX register and
 	# the ENCLU.EENTER instruction is executed via a byte encoded
 	# instruction sequence.
-	#
-	# The arguments passed to this function in the RDX and R8
-	# registers need to be saved across the enclave execution call.
-	# If an ECALL is requested those arguements are needed so we
-	# push them onto the stack in advance of the enclave
-	# execution.
-	pushq	%rdx
-	pushq	%r8
-
 	mov	$2, %rax
 	.byte	0x0f, 0x01, 0xd7
 
@@ -148,6 +146,23 @@ boot_sgx:
 	movq	(-7*8)(%rbp), %rsi
 	movq	(-8*8)(%rbp), %rcx
 	call	sgx_ocall
+
+	# The return value from the OCALL target function is in RAX.
+	# Two arguements are passed back into the enclave.  The RDI
+	# register carries an indication that this is an OCALL return.
+	# The RSI register is loaded with the return value from the
+	# OCALL target function.
+	movq	$-2, %rdi
+	movq	%rax, %rsi
+
+	# Load the EENTER leaf instruction value into RAX, the
+	# trusted thread (enclave) pointer into RBX and the asynchronous
+	# event handler into RCX before issueing the ENCLU.EENTER
+	# instruction.
+	movq	$2, %rax
+	movq	(-6*8)(%rbp), %rbx
+	lea	.Laep_handler(%rip), %rcx
+	.byte	0x0f, 0x01, 0xd7
 
 
 .Ldone:
