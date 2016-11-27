@@ -287,7 +287,7 @@ static void generate_output(char *output, struct SGX_einittoken *token)
 	INIT(HurdLib, File, token_file, ERR(goto done));
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 
-	if ( !token_file->open_rw(token_file, "enclave.token") )
+	if ( !token_file->open_rw(token_file, output) )
 		ERR(goto done);
 
 	bufr->add(bufr, (void *) token_buffer, sizeof(token_buffer));
