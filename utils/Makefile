@@ -32,7 +32,7 @@ CDEBUG = -g ${DMALLOC}
 CFLAGS = -Wall ${CDEBUG}
 
 # LDFLAGS = -s -L/usr/local/krb5/lib 
-LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib -L../lib -L../HurdLib
+LDFLAGS = -g -Wl,--rpath /usr/local/musl/lib -L../lib -L../HurdLib
 
 
 #
@@ -68,7 +68,7 @@ gen-image: gen-image.o
 		../RandomBuffer.o ${LIBS} ${SSL_CRYPTO};
 
 load-image: load-image.o
-	${CC} ${LDFLAGS} -o $@ $^ ../AES256_cbc.o ../SHA256_hmac.o ${LIBS} \
+	${CC} ${LDFLAGS} -Wl,-rpath-link /usr/local/musl/lib -o $@ $^ ../AES256_cbc.o ../SHA256_hmac.o ${LIBS} \
 		-ltpm_unseal ${SSL_CRYPTO};
 
 boot: boot.o Netconfig.o ../SHA256.o
@@ -126,7 +126,7 @@ mgmt-set-key: mgmt-set-key.o MGMTsupvr.o ../RandomBuffer.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO} ${PCSC_LIBRARY};
 
 tpm2-cmd: tpm2-cmd.o ../RandomBuffer.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltse ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltss ${SSL_CRYPTO};
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};

@@ -19,7 +19,7 @@
 #include <string.h>
 #include <errno.h>
 
-#include <tse/tse.h>
+#include <tss2/tss.h>
 
 #include <Origin.h>
 #include <HurdLib.h>

@@ -18,7 +18,7 @@
 /* Local defines. */
 
 /*
- * The following define configures the TSE library to build on POSIX
+ * The following define configures the TSS library to build on POSIX
  * based systems.
  */
 #define TPM_POSIX
@@ -41,9 +41,9 @@
 #include <HurdLib.h>
 #include <Buffer.h>
 
-#include <tse/tse.h>
-#include <tse/tseproperties.h>
-#include <tse/tseresponsecode.h>
+#include <tss2/tss.h>
+#include <tss2/tssproperties.h>
+#include <tss2/tssresponsecode.h>
 
 #include "NAAAIM.h"
 #include "TPM2cmd.h"
@@ -80,7 +80,7 @@ struct NAAAIM_TPM2cmd_State
 	TPMI_ALG_HASH hash_type;
 
 	/* TPM2 context. */
-	TSE_CONTEXT *context;
+	TSS_CONTEXT *context;
 };
 
 
@@ -121,7 +121,7 @@ static _Bool _init_tpm_state(CO(TPM2cmd_State, S)) {
 	_Bool retn = false;
 
 
-	if ( TSE_Create(&S->context) != 0 )
+	if ( TSS_Create(&S->context) != 0 )
 		ERR(goto done);
 
 	retn = true;
@@ -175,7 +175,7 @@ static _Bool hash(CO(TPM2cmd, this), CO(Buffer, bufr))
 	in.data.t.size = bufr->size(bufr);
 	memcpy(in.data.t.buffer, bufr->get(bufr), in.data.t.size);
 
-	if ( TSE_Execute(S->context, (RESPONSE_PARAMETERS *) &out, \
+	if ( TSS_Execute(S->context, (RESPONSE_PARAMETERS *) &out, \
 			 (COMMAND_PARAMETERS *) &in, NULL, TPM_CC_Hash, \
 			 TPM_RH_NULL, NULL, 0) != 0 )
 		ERR(goto done);
@@ -240,13 +240,13 @@ static _Bool pcr_read(CO(TPM2cmd, this), const TPMI_DH_PCR index, \
 	in.pcrSelectionIn.pcrSelections[0].pcrSelect[index / 8] = \
 		1 << (index % 8);
 
-	tpm_retn = TSE_Execute(S->context, (RESPONSE_PARAMETERS *) &out, \
+	tpm_retn = TSS_Execute(S->context, (RESPONSE_PARAMETERS *) &out, \
 			       (COMMAND_PARAMETERS *) &in, NULL,	 \
 			       TPM_CC_PCR_Read, TPM_RH_NULL, NULL, 0);
 	if ( tpm_retn != 0 ) {
 		const char *msg, *submsg, *num;
 	      
-		TSEResponseCode_toString(&msg, &submsg, &num, tpm_retn);
+		TSS_ResponseCode_toString(&msg, &submsg, &num, tpm_retn);
 		fprintf(stderr, "TPM error, code=%08x, reason=%s,%s,%s\n", \
 			tpm_retn, msg, submsg, num);
 		goto done;
@@ -313,7 +313,7 @@ static _Bool pcr_extend(CO(TPM2cmd, this), const uint32_t index, \
 	memcpy(&in.digests.digests[0].digest, pcr_input->get(pcr_input), \
 	       pcr_input->size(pcr_input));
 
-	if ( TSE_Execute(S->context, NULL, (COMMAND_PARAMETERS *) &in,	\
+	if ( TSS_Execute(S->context, NULL, (COMMAND_PARAMETERS *) &in,	\
 			 NULL, TPM_CC_PCR_Extend, TPM_RS_PW, NULL, 0,	\
 			 TPM_RH_NULL, NULL, 0) != 0 )
 		ERR(goto done);
@@ -398,7 +398,7 @@ static _Bool nv_define(CO(TPM2cmd, this), const uint32_t index,	 \
 	nvdef.auth.b.size = 0;
 
 	/* Add support for authorization policy. */
-	nvdef.publicInfo.t.nvPublic.authPolicy.t.size = 0;
+	nvdef.publicInfo.nvPublic.authPolicy.t.size = 0;
 
 #if 1
 	nvdef.authHandle = TPM_RH_OWNER;
@@ -406,22 +406,22 @@ static _Bool nv_define(CO(TPM2cmd, this), const uint32_t index,	 \
 	nvdef.authHandle = index;
 #endif
 
-	nvdef.publicInfo.t.nvPublic.nameAlg = S->hash_type;
-	nvdef.publicInfo.t.nvPublic.nvIndex = index;
-	nvdef.publicInfo.t.nvPublic.dataSize = size;
+	nvdef.publicInfo.nvPublic.nameAlg = S->hash_type;
+	nvdef.publicInfo.nvPublic.nvIndex = index;
+	nvdef.publicInfo.nvPublic.dataSize = size;
 
 	nvattr.val  = TPMA_NVA_ORDINARY;
 	nvattr.val |= auth;
-	nvdef.publicInfo.t.nvPublic.attributes = nvattr;
+	nvdef.publicInfo.nvPublic.attributes = nvattr;
 
 	if ( pwd != NULL )
 		lpwd = (char *) pwd->get(pwd);
 
-	if ( (rc = TSE_Execute(S->context, NULL, (COMMAND_PARAMETERS *) &nvdef, \
+	if ( (rc = TSS_Execute(S->context, NULL, (COMMAND_PARAMETERS *) &nvdef, \
 			 NULL, TPM_CC_NV_DefineSpace, TPM_RS_PW, lpwd, 0, \
 			       TPM_RH_NULL, NULL, 0)) != 0 ) {
 		const char *msg, *submsg, *num;
-		TSEResponseCode_toString(&msg, &submsg, &num, rc);
+		TSS_ResponseCode_toString(&msg, &submsg, &num, rc);
 		fprintf(stderr, "%s: %s%s%s\n", __func__, msg, submsg, num);
 		ERR(goto done);
 	}
@@ -433,22 +433,22 @@ static _Bool nv_define(CO(TPM2cmd, this), const uint32_t index,	 \
 	 */
 	pubin.nvIndex = index;
 
-	if ( TSE_Execute(S->context, (RESPONSE_PARAMETERS *) &pubout, \
+	if ( TSS_Execute(S->context, (RESPONSE_PARAMETERS *) &pubout, \
 			 (COMMAND_PARAMETERS *) &pubin, NULL, 	      \
 			 TPM_CC_NV_ReadPublic, TPM_RH_NULL, NULL, 0) != 0 )
 		ERR(goto done);
 
-	if ( pubout.nvPublic.t.nvPublic.nameAlg != S->hash_type )
+	if ( pubout.nvPublic.nvPublic.nameAlg != S->hash_type )
 		ERR(goto done);
 
 	memcpy(&name_type, pubout.nvName.t.name, sizeof(uint16_t));
 	if ( ntohs(name_type) != S->hash_type )
 		ERR(goto done);
 
-	if ( pubout.nvPublic.t.nvPublic.nvIndex != index )
+	if ( pubout.nvPublic.nvPublic.nvIndex != index )
 		ERR(goto done);
 
-	if ( pubout.nvPublic.t.nvPublic.dataSize != size )
+	if ( pubout.nvPublic.nvPublic.dataSize != size )
 		ERR(goto done);
 									     
 	retn = true;
@@ -509,16 +509,16 @@ static _Bool nv_read(CO(TPM2cmd, this), uint32_t index, CO(Buffer, bufr))
 	 */
 	pubin.nvIndex = index;
 
-	if ( ( rc = TSE_Execute(S->context, (RESPONSE_PARAMETERS *) &pubout, \
+	if ( ( rc = TSS_Execute(S->context, (RESPONSE_PARAMETERS *) &pubout, \
 				(COMMAND_PARAMETERS *) &pubin, NULL,	     \
 				TPM_CC_NV_ReadPublic, TPM_RH_NULL, NULL, 0)) \
 	     != 0 ) {
 		const char *msg, *submsg, *num;
-		TSEResponseCode_toString(&msg, &submsg, &num, rc);
+		TSS_ResponseCode_toString(&msg, &submsg, &num, rc);
 		fprintf(stderr, "%s: %s%s%s\n", __func__, msg, submsg, num);
 		ERR(goto done);
 	}
-	a = pubout.nvPublic.t.nvPublic.attributes.val;
+	a = pubout.nvPublic.nvPublic.attributes.val;
 	fprintf(stderr, "Attributes: 0x%08x\n", a);
 	
 	if ( a & TPMA_NVA_PPWRITE )
@@ -576,9 +576,9 @@ static _Bool nv_read(CO(TPM2cmd, this), uint32_t index, CO(Buffer, bufr))
 	nvin.authHandle = index;
 	nvin.nvIndex	= index;
 	nvin.offset	= 0;
-	nvin.size	= pubout.nvPublic.t.nvPublic.dataSize;
+	nvin.size	= pubout.nvPublic.nvPublic.dataSize;
 
-	if ( TSE_Execute(S->context, (RESPONSE_PARAMETERS *) &nvout,	  \
+	if ( TSS_Execute(S->context, (RESPONSE_PARAMETERS *) &nvout,	  \
 			 (COMMAND_PARAMETERS *) &nvin, NULL,		  \
 			 TPM_CC_NV_Read, TPM_RS_PW, NULL, 0, TPM_RH_NULL, \
 			 NULL, 0) != 0 )
@@ -651,7 +651,7 @@ static _Bool nv_write(CO(TPM2cmd, this), uint32_t index, CO(Buffer, bufr), \
 	if ( pwd != NULL )
 		lpwd = (char *) pwd->get(pwd);
 
-	if ( TSE_Execute(S->context, NULL, (COMMAND_PARAMETERS *) &nvin, \
+	if ( TSS_Execute(S->context, NULL, (COMMAND_PARAMETERS *) &nvin, \
 			 NULL, TPM_CC_NV_Write, TPM_RS_PW, lpwd, 0,	 \
 			 TPM_RH_NULL, NULL, 0) != 0 )
 		ERR(goto done);
@@ -707,7 +707,7 @@ static _Bool nv_remove(CO(TPM2cmd, this), uint32_t index, CO(Buffer, pwd))
 	if ( pwd != NULL )
 		lpwd = (char *) pwd->get(pwd);
 
-	if ( TSE_Execute(S->context, NULL, (COMMAND_PARAMETERS *) &nvin,    \
+	if ( TSS_Execute(S->context, NULL, (COMMAND_PARAMETERS *) &nvin,    \
 			 NULL, TPM_CC_NV_UndefineSpace, TPM_RS_PW, lpwd, 0, \
 			 TPM_RH_NULL, NULL, 0) != 0 )
 		ERR(goto done);
@@ -1645,7 +1645,7 @@ static void get_error(CO(TPM2cmd, this), const uint32_t error)
 		   *sub_message,
 		   *number;
 	      
-	TSEResponseCode_toString(&message, &sub_message, &number, error);
+	TSS_ResponseCode_toString(&message, &sub_message, &number, error);
 	fprintf(stdout, "TPM error, code=%08x, reason=%s,%s,%s\n", \
 		error, message, sub_message, number);
 
@@ -1667,7 +1667,7 @@ static void whack(CO(TPM2cmd, this))
 	STATE(S);
 
 
-	TSE_Delete(S->context);
+	TSS_Delete(S->context);
 
 	S->root->whack(S->root, this, S);
 	return;
