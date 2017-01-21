@@ -1,0 +1,104 @@
+From b0bda71b539c0dddaba592e47d955644c4f26830 Mon Sep 17 00:00:00 2001
+From: "Dr. Greg Wettstein" <gw@idfusion.org>
+Date: Fri, 30 Dec 2016 11:51:30 -0600
+Subject: [PATCH 1/5] Add IMA_CAPABILITY support.
+
+The new ISO_IDENTITY which will be added in a subsequent patch
+makes use of a capability check to determine whether or not a
+file should be 'mapped'.  This is a superior check to the
+super-user check since it can be used to verify whether or not an
+executing process has any elevated security privileges or
+characteristics.
+---
+ security/integrity/ima/ima_policy.c | 26 +++++++++++++++++++++++---
+ 1 file changed, 23 insertions(+), 3 deletions(-)
+
+diff --git a/security/integrity/ima/ima_policy.c b/security/integrity/ima/ima_policy.c
+index 3997e206f82d..49f5f93a8b2d 100644
+--- a/security/integrity/ima/ima_policy.c
++++ b/security/integrity/ima/ima_policy.c
+@@ -29,6 +29,7 @@
+ #define IMA_FSUUID	0x0020
+ #define IMA_INMASK	0x0040
+ #define IMA_EUID	0x0080
++#define IMA_CAPABILITY	0x0100
+ 
+ #define UNKNOWN		0
+ #define MEASURE		0x0001	/* same as IMA_MEASURE */
+@@ -55,6 +56,7 @@ struct ima_rule_entry {
+ 	unsigned long fsmagic;
+ 	u8 fsuuid[16];
+ 	kuid_t uid;
++	kernel_cap_t capability;
+ 	kuid_t fowner;
+ 	struct {
+ 		void *rule;	/* LSM file metadata specific */
+@@ -213,6 +215,7 @@ static bool ima_match_rules(struct ima_rule_entry *rule,
+ {
+ 	struct task_struct *tsk = current;
+ 	const struct cred *cred = current_cred();
++	kernel_cap_t mcap, eff, per, inh;
+ 	int i;
+ 
+ 	if ((rule->flags & IMA_FUNC) &&
+@@ -241,7 +244,14 @@ static bool ima_match_rules(struct ima_rule_entry *rule,
+ 		} else if (!uid_eq(rule->uid, cred->euid))
+ 			return false;
+ 	}
+-
++	if ((rule->flags & IMA_CAPABILITY)) {
++		if (security_capget(tsk, &eff, &inh, &per))
++			return false;
++		mcap = cap_combine(eff, per);
++		mcap = cap_intersect(rule->capability, mcap);
++		if (cap_isclear(mcap))
++			return false;
++	}
+ 	if ((rule->flags & IMA_FOWNER) && !uid_eq(rule->fowner, inode->i_uid))
+ 		return false;
+ 	for (i = 0; i < MAX_LSM_RULES; i++) {
+@@ -436,7 +446,7 @@ enum {
+ 	Opt_obj_user, Opt_obj_role, Opt_obj_type,
+ 	Opt_subj_user, Opt_subj_role, Opt_subj_type,
+ 	Opt_func, Opt_mask, Opt_fsmagic,
+-	Opt_uid, Opt_euid, Opt_fowner,
++	Opt_uid, Opt_euid, Opt_capability, Opt_fowner,
+ 	Opt_appraise_type, Opt_fsuuid, Opt_permit_directio
+ };
+ 
+@@ -458,6 +468,7 @@ static match_table_t policy_tokens = {
+ 	{Opt_fsuuid, "fsuuid=%s"},
+ 	{Opt_uid, "uid=%s"},
+ 	{Opt_euid, "euid=%s"},
++	{Opt_capability, "capability=%s"},
+ 	{Opt_fowner, "fowner=%s"},
+ 	{Opt_appraise_type, "appraise_type=%s"},
+ 	{Opt_permit_directio, "permit_directio"},
+@@ -501,7 +512,7 @@ static int ima_parse_rule(char *rule, struct ima_rule_entry *entry)
+ 	struct audit_buffer *ab;
+ 	char *from;
+ 	char *p;
+-	int result = 0;
++	int result = 0, lp;
+ 
+ 	ab = audit_log_start(NULL, GFP_KERNEL, AUDIT_INTEGRITY_RULE);
+ 
+@@ -657,6 +668,15 @@ static int ima_parse_rule(char *rule, struct ima_rule_entry *entry)
+ 					    ? IMA_UID : IMA_EUID;
+ 			}
+ 			break;
++		case Opt_capability:
++			ima_log_string(ab, "capability", args[0].from);
++			if ( strcmp(args[0].from, "any") == 0 )
++				entry->capability = CAP_FULL_SET;
++			CAP_FOR_EACH_U32(lp)
++				pr_cont("%d: 0x%x ", lp, entry->capability.cap[lp]);
++			pr_cont("\n");
++			entry->flags |= IMA_CAPABILITY;
++			break;
+ 		case Opt_fowner:
+ 			ima_log_string(ab, "fowner", args[0].from);
+ 
+-- 
+2.11.0
+
