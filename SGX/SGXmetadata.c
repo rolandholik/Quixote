@@ -262,6 +262,147 @@ static _Bool load(CO(SGXmetadata, this), CO(char *, enclave))
 /**
  * External public method.
  *
+ * This method implements the loading of the SGX metadata from an
+ * enclave which has been preloaded into memory.
+ *
+ * \param this		A pointer to the object which is to hold the
+ *			metadata.
+ *
+ * \param enclave	A pointer to the memory buffer which holds
+ *			the enclave image.
+ *
+ * \param enclave_size	The size of the enclave memory image.
+ *
+ * \return	If an error is encountered while loading the metadata
+ *		a false value is returned.  A true value is returned
+ *		if the object contains valid metadata.
+ */
+
+static _Bool load_memory(CO(SGXmetadata, this), char * enclave, \
+			 const size_t enclave_size)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	uint8_t *dirp;
+
+	uint32_t cnt;
+
+	int index;
+
+	size_t name_index,
+	       offset;
+
+	uint32_t name_size,
+		 desc_size;
+
+	Elf64_Ehdr *ehdr;
+
+	Elf_Scn *section,
+		*section_names;
+
+	Elf64_Shdr *shdr;
+
+	Elf_Data *data,
+		 *name_data;
+
+	struct _patch_entry_t *patch;
+	struct _layout_entry_t *layout;
+
+
+	/* Sanity check the object. */
+	if ( S->poisoned )
+		goto done;
+
+
+	/* Setup and initialize ELF access to the enclave. */
+	if ( elf_version(EV_CURRENT) == EV_NONE )
+		ERR(goto done);
+	if ( (S->elf = elf_memory(enclave, enclave_size)) == NULL )
+		ERR(goto done);
+	if ( (ehdr = elf64_getehdr(S->elf)) == NULL )
+		ERR(goto done);
+
+
+	/* Setup access to the ELF section names. */
+	if (elf_getshdrstrndx(S->elf, &name_index) != 0)
+		ERR(goto done);
+	if ( (section_names = elf_getscn(S->elf, name_index)) == NULL )
+		ERR(goto done);
+	if ( (name_data = elf_getdata(section_names, NULL)) == NULL )
+		ERR(goto done);
+
+
+	/* Iterate through the sections looking for the metadata section.. */
+	for (index= 1; index < ehdr->e_shnum; index++) {
+		if ( (section = elf_getscn(S->elf, index)) == NULL )
+			ERR(goto done);
+		if ( (shdr = elf64_getshdr(section)) == NULL )
+			ERR(goto done);
+		if ( (data = elf_getdata(section, NULL)) == NULL )
+			ERR(goto done);
+
+		if ( strcmp((char *) (name_data->d_buf + shdr->sh_name),
+			    ".note.sgxmeta") == 0 ) {
+			name_size = *((uint32_t *) data->d_buf);
+			desc_size = *((uint32_t *) (data->d_buf + \
+						    sizeof(uint32_t)));
+			offset = (3 * sizeof(uint32_t)) + name_size;
+
+			memcpy(&S->metadata, \
+			       (uint8_t *) (data->d_buf + offset), desc_size);
+			retn = true;
+		}
+	}
+
+
+	/* Load the patch data. */
+	INIT(HurdLib, Buffer, S->patches, ERR(goto done));
+
+	dirp = (uint8_t *) &S->metadata;
+	dirp += S->metadata.dirs[DIR_PATCH].offset;
+	patch = (struct _patch_entry_t *) dirp;
+	cnt = S->metadata.dirs[DIR_PATCH].size / \
+		sizeof(struct _patch_entry_t);
+
+	for (index= 0; index < cnt; ++index) {
+		S->patches->add(S->patches, (unsigned char *) patch, \
+				sizeof(struct _patch_entry_t));
+		++patch;
+	}
+
+
+	/* Load the layout data. */
+	INIT(HurdLib, Buffer, S->layouts, ERR(goto done));
+
+	dirp = (uint8_t *) &S->metadata;
+	dirp += S->metadata.dirs[DIR_LAYOUT].offset;
+	layout = (struct _layout_entry_t *) dirp;
+	cnt = S->metadata.dirs[DIR_LAYOUT].size / \
+		sizeof(struct _layout_entry_t);
+
+	for (index= 0; index < cnt; ++index) {
+		S->layouts->add(S->layouts, (unsigned char *) layout, \
+				sizeof(struct _layout_entry_t));
+		++layout;
+	}
+
+
+ done:
+	if ( !retn ) {
+		if ( S->elf != NULL )
+			elf_end(S->elf);
+	}
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements the patching of an enclave shared object
  * which has been previously memory mapped.  Patching the enclave
  * involves interating through the array of _patch_entry_t structures
@@ -1166,6 +1307,7 @@ extern SGXmetadata NAAAIM_SGXmetadata_Init(void)
 
 	/* Method initialization. */
 	this->load		 = load;
+	this->load_memory	 = load_memory;
 	this->patch_enclave	 = patch_enclave;
 	this->compute_attributes = compute_attributes;
 	this->get_secs		 = get_secs;
