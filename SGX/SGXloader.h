@@ -29,6 +29,9 @@ struct NAAAIM_SGXloader
 	_Bool (*load)(const SGXloader, const char *, _Bool);
 	_Bool (*load_secs)(const SGXloader, const char *, struct SGX_secs *, \
 			   _Bool);
+	_Bool (*load_memory)(const SGXloader, const char *, size_t, _Bool);
+	_Bool (*load_secs_memory)(const SGXloader, const char *, size_t, \
+				  struct SGX_secs *, _Bool);
 
 	_Bool (*load_segments)(const SGXloader, const SGXenclave);
 	_Bool (*load_layouts)(const SGXloader, const SGXenclave);

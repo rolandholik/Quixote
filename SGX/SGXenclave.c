@@ -219,6 +219,66 @@ static _Bool open_enclave(CO(SGXenclave, this), CO(char *, device), \
 /**
  * External public method.
  *
+ * This method opens the SGX interface device and loads the SGX
+ * metadata and program segment data from a memory image.
+ *
+ * \param this		A pointer to the object which is to hold the
+ *			metadata.
+ *
+ * \param device	A pointer to a null-terminated buffer which
+ *			contains the path specification for the SGX
+ *			device node.
+ *
+ * \param enclave	A pointer to a memory buffer which contains
+ *			the enclave image.
+ *
+ * \param enclave_size	The size of the membory buffer containing
+ *			the enclave image.
+ *
+ * \param debug		A boolean flag used to indicate whether or not
+ *			the enclave is to be initialized in debug mode.
+ *
+ * \return	If an error is encountered while opening the enclave a
+ *		false value is returned.   A true value indicates the
+ *		enclave is ready for creation.
+ */
+
+static _Bool open_enclave_memory(CO(SGXenclave, this), CO(char *, device),  \
+				 const char * enclave, size_t enclave_size, \
+				 _Bool debug)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Open the SGX device node. */
+	if ( (S->fd = open(device, O_RDWR)) < 0 )
+		ERR(goto done);
+
+	/* Load the SGX metadata and shared object file. */
+	INIT(NAAAIM, SGXloader, S->loader, ERR(goto done));
+	if ( S->debug )
+		S->loader->debug(S->loader, true);
+	if ( !S->loader->load_secs_memory(S->loader, enclave, enclave_size, \
+					  &S->secs, debug) )
+		ERR(goto done);
+
+	/* Initialize the thread control arena. */
+	INIT(HurdLib, Buffer, S->threads, ERR(goto done));
+
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method creates the SGX enclave based on information in the
  * SGX Enclave Control Structure (SECS).
  *
@@ -1205,7 +1265,8 @@ extern SGXenclave NAAAIM_SGXenclave_Init(void)
 	_init_state(this->state);
 
 	/* Method initialization. */
-	this->open_enclave   = open_enclave;
+	this->open_enclave	  = open_enclave;
+	this->open_enclave_memory = open_enclave_memory;
 	this->create_enclave = create_enclave;
 	this->load_enclave   = load_enclave;
 

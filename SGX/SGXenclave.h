@@ -27,6 +27,9 @@ struct NAAAIM_SGXenclave
 	/* External methods. */
 	_Bool (*open_enclave)(const SGXenclave, const char *, const char *, \
 			      _Bool);
+	_Bool (*open_enclave_memory)(const SGXenclave, const char *, \
+				     const char *, size_t, _Bool);
+
 	_Bool (*create_enclave)(const SGXenclave);
 	_Bool (*load_enclave)(const SGXenclave);
 

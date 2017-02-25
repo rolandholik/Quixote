@@ -449,6 +449,178 @@ static _Bool load_secs(CO(SGXloader, this), CO(char *, enclave), \
 
 
 /**
+ * External public method.
+ *
+ * This method implements the loading of the SGX binary data from a
+ * memory image of the enclave.
+ *
+ * \param this		A pointer to the object which is to hold the
+ *			metadata.
+ *
+ * \param enclave	A pointer to the memory buffer which holds
+ *			the enclave image.
+ *
+ * \param enclave_size	The size of the memory image.
+ *
+ * \param debug		A boolean value which indicates whether or not
+ *			the enclave is to be loaded in debug mode.
+ *
+ * \return	If an error is encountered while loading the metadata
+ *		a false value is returned.  A true value is returned
+ *		if the object contains valid metadata.
+ */
+
+static _Bool load_memory(CO(SGXloader, this), const char * enclave, \
+			 const size_t enclave_size, const _Bool debug)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	uint32_t segindex;
+
+	size_t phnum;
+
+	Elf64_Ehdr *ehdr;
+
+	Elf64_Phdr *phdr;
+
+
+	/* Sanity check the object. */
+	if ( S->poisoned )
+		goto done;
+
+
+	/* Load the SGA metadata. */
+	INIT(NAAAIM, SGXmetadata, S->metadata, ERR(goto done));
+	if ( S->debug )
+		S->metadata->debug(S->metadata, true);
+	if ( !S->metadata->load_memory(S->metadata, (char *) enclave, \
+				       enclave_size) )
+		ERR(goto done);
+	if ( !S->metadata->compute_attributes(S->metadata, debug) )
+		ERR(goto done);
+
+
+	/*
+	 * Set the shared object pointer to the supplied buffer.  This
+	 * should be dynamically allocated in order to avoid changes
+	 * to the memory region by the caller.
+	 */
+	S->sosize  = enclave_size;
+	S->soimage = (char *) enclave;
+
+
+	/* Patch the enclave shared image. */
+	S->metadata->patch_enclave(S->metadata, S->soimage);
+
+
+	/* Setup and initialize ELF access to the enclave. */
+	if ( elf_version(EV_CURRENT) == EV_NONE )
+		ERR(goto done);
+	if ( (S->elf = elf_memory(S->soimage, S->sosize)) == NULL )
+		ERR(goto done);
+	if ( (ehdr = elf64_getehdr(S->elf)) == NULL )
+		ERR(goto done);
+
+
+	/*
+	 * Iterate through the program segments and save references to
+	 * relevant segments.
+	 */
+	if ( elf_getphdrnum(S->elf, &phnum) == -1 )
+		ERR(goto done);
+	if ( (phdr = elf64_getphdr(S->elf)) == NULL )
+		ERR(goto done);
+
+	for(segindex= 0; segindex < phnum; ++segindex, ++phdr) {
+		if ( phdr->p_type == PT_LOAD ) {
+			if ( !_pt_load_segment(S, phdr) )
+				ERR(goto done);
+		}
+		if ( phdr->p_type == PT_DYNAMIC )
+			S->dynptr = (Elf64_Dyn *) (S->soimage + \
+						   phdr->p_offset);
+	}
+
+	if ( _build_relocation_map(S) ) {
+		fputs("Writable TEXT relocations present but not " \
+		      "supported.\n", stderr);
+		goto done;
+	}
+
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements the loading of the SGX binary data from a
+ * memory image of an enclave with return of the SGX Enclave Control
+ * Structure.  This method implements a single call to load the
+ * encalve and return the information needed to create the enclave.
+ *
+ * \param this		A pointer to the object which is to hold the
+ *			metadata.
+ *
+ * \param enclave	A pointer to the memory buffer holding the
+ *			image of the enclave.
+ *
+ * \param enclave_size	The size of the enclave image.
+ *
+ * \param debug		A boolean value which indicates whether or not
+ *			the enclave is to be loaded in debug mode.
+ *
+ * \return	If an error is encountered while loading the enclave
+ *		a false value is returned.  A true value is returned
+ *		if the object contains valid metadata.
+ */
+
+static _Bool load_secs_memory(CO(SGXloader, this), const char * enclave,  \
+			      size_t enclave_size, struct SGX_secs *secs, \
+			      const _Bool debug)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		return false;
+
+
+	/* Call the standard load method. */
+	if ( !this->load_memory(this, enclave, enclave_size, debug) )
+		ERR(goto done);
+
+
+	/* Get the SECS information from the enclave metadata. */
+	if ( !S->metadata->get_secs(S->metadata, secs) )
+		ERR(goto done);
+	if ( S->debug )
+		fprintf(stdout, "Loaded SECS size: 0x%lx\n", secs->size);
+
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
  * Internal private function.
  *
  * This is an inline function which rounds the provided value up to
@@ -1070,6 +1242,9 @@ extern SGXloader NAAAIM_SGXloader_Init(void)
 	/* Method initialization. */
 	this->load	= load;
 	this->load_secs = load_secs;
+
+	this->load_memory      = load_memory;
+	this->load_secs_memory = load_secs_memory;
 
 	this->load_segments = load_segments;
 	this->load_layouts  = load_layouts;
