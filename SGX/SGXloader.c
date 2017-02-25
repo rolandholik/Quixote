@@ -122,6 +122,8 @@ static void _init_state(CO(SGXloader_State, S)) {
 	S->poisoned = false;
 	S->debug    = false;
 
+	S->fd = -1;
+
 	S->soimage = NULL;
 	S->sosize  = 0;
 

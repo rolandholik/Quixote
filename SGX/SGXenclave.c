@@ -143,6 +143,7 @@ static void _init_state(CO(SGXenclave_State, S)) {
 
 
 	S->poisoned = false;
+	S->debug    = false;
 
 	S->fd = -1;
 
