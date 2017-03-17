@@ -61,6 +61,8 @@ all: ${COBJS} ${AOBJS} tools
 
 tools: ${TOOLS}
 
+demos: idf-sgx-fandf idf-sgx-fandf-unibin
+
 sgx-check: sgx-check.o
 	${CC} ${LDFLAGS} -o $@ $^;
 
@@ -108,6 +110,14 @@ gen-white-list.o: gen-white-list.c
 test-ecall: test-ecall.o SGXenclave.o SGXloader.o SGXmetadata.o \
 	SGXsigstruct.o sgx-ocall.o boot-sgx.o
 	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB};
+
+idf-sgx-fandf: idf-sgx-fandf.o SGXenclave.o SGXloader.o SGXmetadata.o \
+	SGXsigstruct.o sgx-ocall.o boot-sgx.o ../SHA256.o
+	${CC} -static ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB} ${SSL_CRYPTO};
+
+idf-sgx-fandf-unibin: idf-sgx-fandf-unibin.o SGXenclave.o SGXloader.o \
+	SGXmetadata.o SGXsigstruct.o sgx-ocall.o boot-sgx.o ../SHA256.o
+	${CC} -static ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB} ${SSL_CRYPTO};
 
 
 tags:
