@@ -71,3 +71,5 @@
 #define NAAAIM_SGXloader_OBJID		36
 #define NAAAIM_SGXenclave_OBJID		37
 #define NAAAIM_SGXsigstruct_OBJID	38
+
+#define NAAAIM_Actor_OBJID		39

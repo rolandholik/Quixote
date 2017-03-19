@@ -1,0 +1,74 @@
+# ***************************************************************************
+# (C)Copyright 2017, IDfusion, LLC. All rights reserved.
+# ***************************************************************************
+
+
+# Variable declarations.
+CSRC = Actor.c
+
+TOOLS = test-actor
+
+CC = musl-gcc
+
+MUSL_INCLUDE = /usr/local/musl/include
+
+CDEBUG = -g -O2 -fomit-frame-pointer -march=core2
+CFLAGS = -Wall ${CDEBUG}
+
+LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib -L../lib -L../HurdLib
+
+# OpenSSL crypto library
+SSL_CRYPTO  = -L /usr/local/musl/lib -lcrypto
+
+
+#
+# Compilation directives.
+#
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@;
+
+%.o: %.s
+	${AS} -o $@ $<;
+
+
+#
+# Automatic definition of classes and objects.
+#
+COBJS = ${CSRC:.c=.o}
+AOBJS = ${ASRC:.s=.o}
+
+LIBS = -lNAAAIM -lHurdLib 
+
+HURDLIB = -L../lib -lHurdLib
+
+CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I/usr/local/musl/include
+
+
+#
+# Target directives.
+#
+.PHONY: all tools
+
+# Targets
+all: ${COBJS} tools
+
+tools: ${TOOLS}
+
+test-actor: test-actor.o Actor.o
+	${CC} ${LDFLAGS} -o $@ $^ ../SHA256.o ${HURDLIB} ${SSL_CRYPTO};
+tags:
+	/opt/emacs/bin/etags *.{h,c};
+clean:
+	rm -f *.o *~ TAGS;
+	rm -f ${TOOLS};
+
+
+# Source dependencies.
+# sgx-metadata.o: SGX.h
+# sgx-load.o: SGXenclave.h
+
+Actor.o: Actor.h
+# SGXmetadata.o: SGX.h SGXmetadata.h
+# SGXloader.o: SGX.h SGXloader.h
+# SGXenclave.o: SGX.h SGXenclave.h SGXmetadata.h SGXloader.h
+# SGXsigstruct.o: SGX.h SGXsigstruct.h
