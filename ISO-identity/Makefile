@@ -4,9 +4,9 @@
 
 
 # Variable declarations.
-CSRC = Actor.c
+CSRC = Actor.c Subject.c
 
-TOOLS = test-actor
+TOOLS = test-actor test-subject
 
 CC = musl-gcc
 
@@ -56,6 +56,10 @@ tools: ${TOOLS}
 
 test-actor: test-actor.o Actor.o
 	${CC} ${LDFLAGS} -o $@ $^ ../SHA256.o ${HURDLIB} ${SSL_CRYPTO};
+
+test-subject: test-subject.o Subject.o
+	${CC} ${LDFLAGS} -o $@ $^ ../SHA256.o ${HURDLIB} ${SSL_CRYPTO};
+
 tags:
 	/opt/emacs/bin/etags *.{h,c};
 clean:

@@ -73,3 +73,4 @@
 #define NAAAIM_SGXsigstruct_OBJID	38
 
 #define NAAAIM_Actor_OBJID		39
+#define NAAAIM_Subject_OBJID		40
