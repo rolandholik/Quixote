@@ -6,7 +6,7 @@
 # Variable declarations.
 CSRC = Actor.c Subject.c
 
-TOOLS = test-actor test-subject
+TOOLS = test-actor test-subject generate-contours
 
 CC = musl-gcc
 
@@ -58,6 +58,9 @@ test-actor: test-actor.o Actor.o
 	${CC} ${LDFLAGS} -o $@ $^ ../SHA256.o ${HURDLIB} ${SSL_CRYPTO};
 
 test-subject: test-subject.o Subject.o
+	${CC} ${LDFLAGS} -o $@ $^ ../SHA256.o ${HURDLIB} ${SSL_CRYPTO};
+
+generate-contours: generate-contours.o Actor.o Subject.o
 	${CC} ${LDFLAGS} -o $@ $^ ../SHA256.o ${HURDLIB} ${SSL_CRYPTO};
 
 tags:
