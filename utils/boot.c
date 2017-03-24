@@ -61,23 +61,21 @@ static _Bool Debug = false;
  * This function is responsible for terminating the boot process.  It
  * requests a reboot of the system.
  *
- * No arguements are expected by this function.
+ * \param boot	A boolean variable which specifies whether the system
+ *		is to reboot or halt.  A true value requests that the
+ *		system should halt while a true value indictes the
+ *		system should reboot.
  *
  * This function does not return.
  */
 
-static void do_reboot(void)
+static void do_reboot(const _Bool boot)
 
 {
-	if ( Debug ) {
-		fputs("Reboot requested.\n", stderr);
-		return;
-	}
-
-#if 0
-	fputs("Rebooting.\n", stderr);
-	reboot(RB_AUTOBOOT);
-#endif
+	if ( boot )
+		reboot(RB_AUTOBOOT);
+	else
+		reboot(RB_HALT_SYSTEM);
 }
 
 
@@ -165,26 +163,33 @@ static _Bool tpm_daemon(const _Bool start)
 static _Bool do_mounts(const _Bool mode)
 
 {
-	_Bool sysfs = false,
-	      proc  = false,
-	      retn = false;
+	_Bool sysfs	 = false,
+	      securityfs = false,
+	      proc	 = false,
+	      retn	 = false;
 
 
 	if ( mode ) {
 		if ( mount("sysfs", "/sys", "sysfs", 0, NULL) == 0 )
 			sysfs = true;
+		if ( mount("securityfs", "/sys/kernel/security", \
+			   "securityfs", 0, NULL) == 0 )
+			securityfs = true;
 		if ( mount("proc", "/proc", "proc", 0, NULL) == 0 )
 			proc = true;
 		retn = true;
 	}
 	else {
 		umount("/proc");
+		umount("/sys/kernel/security");
 		umount("/sys");
 		retn = true;
 	}
 
 
 	if ( !retn ) {
+		if ( securityfs )
+			umount("/sys/kernel/security");
 		if ( sysfs )
 			umount("/sys");
 		if ( proc )
@@ -346,8 +351,12 @@ static _Bool seal_pwd(void)
 
 	if ( unlink(ROOT_PWD) == 0 )
 		retn = true;
-	if ( retn )
+	if ( retn ) {
 		fputs("Sealed root and config passwords.\n", stderr);
+		sync();
+		sleep(5);
+		do_reboot(false);
+	}
 
 
  done:
@@ -559,9 +568,6 @@ static void switch_root(void)
 
 	do_mounts(true);
 
-	if ( mount("securityfs", "/sys/kernel/security", "securityfs", 0, \
-		   NULL) == -1 )
-		return;
 	if ( mount("shm", "/dev/shm", "tmpfs", 0, NULL) == -1 )
 		return;
 
@@ -623,6 +629,6 @@ extern int main(int argc, char *argv[])
 	
  done: 
 	do_mounts(false);
-	do_reboot();
+	do_reboot(false);
 	return 0;
 }
