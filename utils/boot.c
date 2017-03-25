@@ -41,6 +41,7 @@
 #include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 
 #include <HurdLib.h>
 #include <Buffer.h>
@@ -104,6 +105,9 @@ static void do_reboot(const _Bool boot)
 static _Bool tpm_daemon(const _Bool start)
 
 {
+	int lp,
+	    status;
+
 	static pid_t tpm_pid = 0;
 
 	Netconfig netconfig = NULL;
@@ -111,10 +115,19 @@ static _Bool tpm_daemon(const _Bool start)
 
 	/* Shutdown daemon. */
 	if ( !start ) {
-		fputs("Shutting down daemon.\n", stderr);
 		if ( kill(tpm_pid, SIGTERM) == -1 )
 			return false;
-		return true;
+		for (lp= 0; lp < 5; ++lp) {
+			waitpid(tpm_pid, &status, WNOHANG);
+			if ( WIFEXITED(status) ) {
+				fprintf(stderr, "TPM daemon %d shutdown, " \
+					"code=%d\n", tpm_pid,		   \
+					WEXITSTATUS(status));
+				return true;
+			}
+			sleep(1);
+		}
+		return false;
 	}
 
 	/* Startup daemon. */
@@ -627,12 +640,12 @@ extern int main(int argc, char *argv[])
 	if ( !load_root() )
 		goto done;
 
-	fputs("Releasing mounts.\n", stderr);
-	if ( !do_mounts(false) )
-		goto done;
-
 	fputs("Shutting down TPM daemon.\n", stderr);
 	if ( !tpm_daemon(false) )
+		goto done;
+
+	fputs("Releasing mounts.\n", stderr);
+	if ( !do_mounts(false) )
 		goto done;
 
 	fputs("Changing root.\n", stderr);
