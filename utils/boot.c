@@ -17,7 +17,8 @@
 #define TCSD_PATH "/usr/local/sbin/tcsd"
 
 /* Location of manifest file. */
-#define MANIFEST "/boot/manifest"
+#define MAPFILE	 "/sys/kernel/security/ima/iso-identity/map"
+#define CONTOURS "/mnt/boot/contours"
 
 /* Locations of root password and seal files. */
 #define ROOT_PWD    "/mnt/boot/root.pwd"
@@ -45,6 +46,8 @@
 #include <Buffer.h>
 #include <String.h>
 #include <File.h>
+
+#include <NAAAIM.h>
 
 #include <SoftwareStatus.h>
 
@@ -113,7 +116,7 @@ static _Bool tpm_daemon(const _Bool start)
 			return false;
 		return true;
 	}
-		
+
 	/* Startup daemon. */
 	fputs("Configuring loopback.\n", stderr);
 	INIT(NAAAIM, Netconfig, netconfig, return false);
@@ -140,8 +143,8 @@ static _Bool tpm_daemon(const _Bool start)
 
 	return true;
 }
-	
-	
+
+
 /**
  * Private function.
  *
@@ -199,7 +202,7 @@ static _Bool do_mounts(const _Bool mode)
 	return retn;
 }
 
-	
+
 /**
  * Private function.
  *
@@ -288,7 +291,7 @@ static _Bool seal_pwd(void)
 	_Bool retn	  = false,
 	      have_pwd	  = false,
 	      have_sealed = false;
-	
+
 	struct stat seal_stat;
 
 	const char * const seal_root_cmd = "tpm_sealdata -z -i " ROOT_PWD    \
@@ -443,64 +446,72 @@ static _Bool load_root(void)
 /**
  * Private function.
  *
- * This function is responsible for initializing the Integrity Management
- * Architecture (IMA) by reading the filesystem manifest list and
- * reading each file in the manifest in order to have the kernel
- * initialize an IMA entry for the file.
+ * This function is responsible for initializing the iso-identity
+ * behavior map for the system being booted.  Initialization of
+ * the system behavior map is triggered by the presence of a
+ * contours file in the system boot directory.
  *
  * No arguements are specified.
- *			
+ *
  * \return	No return value is specified.
  */
 
-static void initialize_ima(void)
+static void initialize_behavior_map(void)
 
 {
-	char *p,
-	     bufr[PATH_MAX];
+	char inbufr[NAAAIM_IDSIZE * 2 + 2];
 
-	Buffer b;
+	FILE *contours = NULL;
 
-	FILE *manifest = NULL;
+	struct stat contour_stat;
 
-	File file = NULL;
+	Buffer bufr = NULL;
 
-	SoftwareStatus software = NULL;
+	File mapfile = NULL;
 
 
-	if ( (manifest = fopen(MANIFEST, "r")) == NULL )
+	/* Check for presence of contours file. */
+	if ( stat(CONTOURS, &contour_stat) != 0 )
 		return;
-	INIT(HurdLib, File, file, goto done);
 
-	while ( fgets(bufr, sizeof(bufr), manifest) != NULL ) {
-		if ( (p = strchr(bufr, '\n')) != NULL )
-			*p = '\0';
-		file->open_ro(file, bufr);
-		file->reset(file);
+
+	/* Read contours file and map the entries. */
+	INIT(HurdLib, Buffer, bufr, goto done);
+
+	INIT(HurdLib, File, mapfile, goto done);
+	if ( !mapfile->open_wo(mapfile, MAPFILE) )
+		goto done;
+
+	if ( (contours = fopen(CONTOURS, "r")) == NULL )
+		goto done;
+
+	fputs("Loading contours.\n", stdout);
+	while ( fgets(inbufr, sizeof(inbufr), contours) != NULL ) {
+		if ( strchr(inbufr, '\n') == NULL )
+			continue;
+
+		if ( !bufr->add(bufr, (unsigned char *) inbufr, \
+				strlen(inbufr)) )
+			goto done;
+
+		if ( !mapfile->write_Buffer(mapfile, bufr) )
+			goto done;
+		bufr->reset(bufr);
 	}
-
-	INIT(NAAAIM, SoftwareStatus, software, goto done);
-	if ( !software->open(software) )
-		goto done;
-	if ( !software->measure(software) )
-		goto done;
-	fputs("Software status:\n", stdout);
-	b = software->get_template_hash(software);
-	b->print(b);
 
 
  done:
-	memset(bufr, sizeof(bufr), '\0');
+	memset(inbufr, '\0', sizeof(bufr));
 
-	if ( manifest != NULL )
-		fclose(manifest);
+	if ( contours != NULL )
+		fclose(contours);
 
-	WHACK(file);
-	WHACK(software);
-	
+	WHACK(bufr);
+	WHACK(mapfile);
+
 	return;
 }
-	
+
 
 /**
  * Private function.
@@ -509,7 +520,7 @@ static void initialize_ima(void)
  * the loaded filesystem.
  *
  * No arguements are specified.
- *			
+ *
  * \return              This function returns if switching to the new
  *			root fails.  Otherwise the initial process
  *			is started on the new root filesystem.
@@ -545,7 +556,7 @@ static void switch_root(void)
 	tpm_state->open_rw(tpm_state, "/mnt/var/lib/tpm/system.data");
 	if ( !tpm_state->write_Buffer(tpm_state, state) )
 		goto done;
-			   
+
 	if ( setreuid(geteuid(), -1) == -1 )
 		goto done;
 	changed_uid = false;
@@ -571,7 +582,7 @@ static void switch_root(void)
 	if ( mount("shm", "/dev/shm", "tmpfs", 0, NULL) == -1 )
 		return;
 
-	initialize_ima();
+	initialize_behavior_map();
 
 	execl("/sbin/init", "/sbin/init", NULL);
 	return;
@@ -585,7 +596,7 @@ static void switch_root(void)
 
 	return;
 }
-     
+
 /*
  * Program entry point begins here.
  */
@@ -626,8 +637,8 @@ extern int main(int argc, char *argv[])
 
 	fputs("Changing root.\n", stderr);
 	switch_root();
-	
- done: 
+
+ done:
 	do_mounts(false);
 	do_reboot(false);
 	return 0;
