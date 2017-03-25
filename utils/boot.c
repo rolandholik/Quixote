@@ -566,7 +566,7 @@ static void switch_root(void)
 		goto done;
 
 	tpm_state->reset(tpm_state);
-	tpm_state->open_rw(tpm_state, "/mnt/var/lib/tpm/system.data");
+	tpm_state->open_wo(tpm_state, "/mnt/var/lib/tpm/system.data");
 	if ( !tpm_state->write_Buffer(tpm_state, state) )
 		goto done;
 
