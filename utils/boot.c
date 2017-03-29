@@ -17,8 +17,11 @@
 #define TCSD_PATH "/usr/local/sbin/tcsd"
 
 /* Location of manifest file. */
+#define PSEUDOMAP  "/sys/kernel/security/ima/iso-identity/pseudonym"
+#define PSEUDONYMS "/boot/pseudonyms"
+
 #define MAPFILE	 "/sys/kernel/security/ima/iso-identity/map"
-#define CONTOURS "/mnt/boot/contours"
+#define CONTOURS "/boot/contours"
 
 /* Locations of root password and seal files. */
 #define ROOT_PWD    "/mnt/boot/root.pwd"
@@ -457,6 +460,73 @@ static _Bool load_root(void)
 
 
 /**
+ * Internal private function.
+ *
+ * This function is a helper function for the
+ * initialize_behavior_map() function.  It is responsible for reading
+ * a behavioral configuration file and writing the contents of it to
+ * the designed pseudo-file.
+ *
+ * \param config	A pointer to the null-terminated character
+ * 			array containing the configuration entries.
+ *
+ * \param map		A ponter to the null-terminated character
+ *			array containing the pseudo-file which
+ *			accepts the configuration entries.
+ *
+ * \return	No return value is specified.
+ */
+
+static void _init_behavior(CO(char *, config), CO(char *, map))
+
+{
+	char inbufr[NAAAIM_IDSIZE * 2 + 2];
+
+	FILE *config_file = NULL;
+
+	Buffer bufr = NULL;
+
+	File map_file = NULL;
+
+
+	INIT(HurdLib, Buffer, bufr, goto done);
+
+	INIT(HurdLib, File, map_file, goto done);
+	if ( !map_file->open_wo(map_file, map) )
+		goto done;
+
+	if ( (config_file = fopen(config, "r")) == NULL )
+		goto done;
+
+	while ( fgets(inbufr, sizeof(inbufr), config_file) != NULL ) {
+		if ( strchr(inbufr, '\n') == NULL )
+			continue;
+		fprintf(stdout, "%s", inbufr);
+
+		if ( !bufr->add(bufr, (unsigned char *) inbufr, \
+				strlen(inbufr)) )
+			goto done;
+
+		if ( !map_file->write_Buffer(map_file, bufr) )
+			goto done;
+		bufr->reset(bufr);
+	}
+
+
+ done:
+	memset(inbufr, '\0', sizeof(bufr));
+
+	if ( config_file != NULL )
+		fclose(config_file);
+
+	WHACK(bufr);
+	WHACK(map_file);
+
+	return;
+}
+
+
+/**
  * Private function.
  *
  * This function is responsible for initializing the iso-identity
@@ -469,58 +539,38 @@ static _Bool load_root(void)
  * \return	No return value is specified.
  */
 
-static void initialize_behavior_map(void)
+static void initialize_behavior(void)
 
 {
-	char inbufr[NAAAIM_IDSIZE * 2 + 2];
-
-	FILE *contours = NULL;
-
-	struct stat contour_stat;
-
-	Buffer bufr = NULL;
-
-	File mapfile = NULL;
+	struct stat statbufr;
 
 
-	/* Check for presence of contours file. */
-	if ( stat(CONTOURS, &contour_stat) != 0 )
-		return;
-
-
-	/* Read contours file and map the entries. */
-	INIT(HurdLib, Buffer, bufr, goto done);
-
-	INIT(HurdLib, File, mapfile, goto done);
-	if ( !mapfile->open_wo(mapfile, MAPFILE) )
-		goto done;
-
-	if ( (contours = fopen(CONTOURS, "r")) == NULL )
-		goto done;
-
-	fputs("Loading contours.\n", stdout);
-	while ( fgets(inbufr, sizeof(inbufr), contours) != NULL ) {
-		if ( strchr(inbufr, '\n') == NULL )
-			continue;
-
-		if ( !bufr->add(bufr, (unsigned char *) inbufr, \
-				strlen(inbufr)) )
-			goto done;
-
-		if ( !mapfile->write_Buffer(mapfile, bufr) )
-			goto done;
-		bufr->reset(bufr);
+	/* Map pseudonyms. */
+	if ( stat(PSEUDONYMS, &statbufr) == 0 ) {
+		fputs("Loading pseudonyms.\n", stdout);
+		_init_behavior(PSEUDONYMS, PSEUDOMAP);
 	}
 
 
- done:
-	memset(inbufr, '\0', sizeof(bufr));
+	/* Read contours file and map the entries. */
+	if ( stat(CONTOURS, &statbufr) == 0 ) {
+		fputs("Loading contours.\n", stdout);
+		_init_behavior(CONTOURS, MAPFILE);
+	}
 
-	if ( contours != NULL )
-		fclose(contours);
 
-	WHACK(bufr);
-	WHACK(mapfile);
+	/*
+	 * Writes to sysfs files do not have support for
+	 * synchronization barriers.  The following sleep attempts
+	 * to delay further execution until the kernel manages to
+	 * flush the I/O which has been committed to the
+	 * pseudo-files.  This is decidedly imprecise and in absence
+	 * of the ability to issue a barrier primitive the writing of
+	 * this configuration information needs to be converted to
+	 * a system call.
+	 */
+	sleep(5);
+
 
 	return;
 }
@@ -595,7 +645,7 @@ static void switch_root(void)
 	if ( mount("shm", "/dev/shm", "tmpfs", 0, NULL) == -1 )
 		return;
 
-	initialize_behavior_map();
+	initialize_behavior();
 
 	execl("/sbin/init", "/sbin/init", NULL);
 	return;
@@ -631,6 +681,9 @@ extern int main(int argc, char *argv[])
 	fputs("Doing mount.\n", stderr);
 	if ( !do_mounts(true) )
 		goto done;
+
+	fputs("Initializing behavior.\n", stderr);
+	initialize_behavior();
 
 	fputs("Starting TPM daemon.\n", stderr);
 	if ( !tpm_daemon(true) )
