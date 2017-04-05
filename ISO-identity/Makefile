@@ -6,7 +6,7 @@
 # Variable declarations.
 CSRC = Actor.c Subject.c
 
-TOOLS = test-actor test-subject generate-contours
+TOOLS = test-actor test-subject generate-contours sha-tool
 
 CC = musl-gcc
 
@@ -62,6 +62,9 @@ test-subject: test-subject.o Subject.o
 
 generate-contours: generate-contours.o Actor.o Subject.o
 	${CC} ${LDFLAGS} -o $@ $^ ../SHA256.o ${HURDLIB} ${SSL_CRYPTO};
+
+sha-tool: sha-tool.o ../SHA256.o
+	${CC} ${LDFLAGS} -o $@ $^ ${HURDLIB} ${SSL_CRYPTO};
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};
