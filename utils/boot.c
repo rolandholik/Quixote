@@ -28,6 +28,12 @@
 #define ROOT_SEAL   "/mnt/boot/root.seal"
 #define CONFIG_SEAL "/mnt/boot/config.seal"
 
+/* System call flag defines. */
+#define SYS_set_behavior 326
+
+#define IMA_SET_CONTOUR		0x1
+#define IMA_SET_PSEUDONYM	0x2
+
 
 /* Include files. */
 #include <stdio.h>
@@ -458,6 +464,11 @@ static _Bool load_root(void)
 	return retn;
 }
 
+static inline int sys_behavior(unsigned char *bufr, size_t cnt, \
+			       unsigned long flags)
+{
+	return syscall(SYS_set_behavior, bufr, cnt, flags);
+}
 
 /**
  * Internal private function.
@@ -470,57 +481,39 @@ static _Bool load_root(void)
  * \param config	A pointer to the null-terminated character
  * 			array containing the configuration entries.
  *
- * \param map		A ponter to the null-terminated character
- *			array containing the pseudo-file which
- *			accepts the configuration entries.
+ * \param flag		The ISO_identity system call flag of the
+ *			behavior which is to be set.
  *
  * \return	No return value is specified.
  */
 
-static void _init_behavior(CO(char *, config), CO(char *, map))
+static void _init_behavior(CO(char *, config), const unsigned long flag)
 
 {
 	char inbufr[NAAAIM_IDSIZE * 2 + 2];
 
 	FILE *config_file = NULL;
 
-	Buffer bufr = NULL;
-
-	File map_file = NULL;
-
-
-	INIT(HurdLib, Buffer, bufr, goto done);
-
-	INIT(HurdLib, File, map_file, goto done);
-	if ( !map_file->open_wo(map_file, map) )
-		goto done;
 
 	if ( (config_file = fopen(config, "r")) == NULL )
 		goto done;
 
 	while ( fgets(inbufr, sizeof(inbufr), config_file) != NULL ) {
-		if ( strchr(inbufr, '\n') == NULL )
-			continue;
 		fprintf(stdout, "%s", inbufr);
-
-		if ( !bufr->add(bufr, (unsigned char *) inbufr, \
-				strlen(inbufr)) )
+		if ( sys_behavior((unsigned char *) inbufr, strlen(inbufr), \
+				  flag) < 0 ) {
+			fprintf(stderr, "Behavior %lu, returned %s\n", \
+				flag, strerror(errno));
 			goto done;
-
-		if ( !map_file->write_Buffer(map_file, bufr) )
-			goto done;
-		bufr->reset(bufr);
+		}
 	}
 
 
  done:
-	memset(inbufr, '\0', sizeof(bufr));
+	memset(inbufr, '\0', sizeof(inbufr));
 
 	if ( config_file != NULL )
 		fclose(config_file);
-
-	WHACK(bufr);
-	WHACK(map_file);
 
 	return;
 }
@@ -548,28 +541,15 @@ static void initialize_behavior(void)
 	/* Map pseudonyms. */
 	if ( stat(PSEUDONYMS, &statbufr) == 0 ) {
 		fputs("Loading pseudonyms.\n", stdout);
-		_init_behavior(PSEUDONYMS, PSEUDOMAP);
+		_init_behavior(PSEUDONYMS, IMA_SET_PSEUDONYM);
 	}
 
 
 	/* Read contours file and map the entries. */
 	if ( stat(CONTOURS, &statbufr) == 0 ) {
 		fputs("Loading contours.\n", stdout);
-		_init_behavior(CONTOURS, MAPFILE);
+		_init_behavior(CONTOURS, IMA_SET_CONTOUR);
 	}
-
-
-	/*
-	 * Writes to sysfs files do not have support for
-	 * synchronization barriers.  The following sleep attempts
-	 * to delay further execution until the kernel manages to
-	 * flush the I/O which has been committed to the
-	 * pseudo-files.  This is decidedly imprecise and in absence
-	 * of the ability to issue a barrier primitive the writing of
-	 * this configuration information needs to be converted to
-	 * a system call.
-	 */
-	sleep(5);
 
 
 	return;

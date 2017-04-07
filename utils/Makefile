@@ -78,7 +78,7 @@ sboot: sboot.o Netconfig.o SoftwareTPM.o ../SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 init: init.o Netconfig.o SoftwareTPM.o ../SHA256.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl -ltspi ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl -ltspi ${SSL_CRYPTO} -lssl;
 
 possum: possum.o Netconfig.o IPsec.o
 	${CC} ${LDFLAGS} -o $@ $^ ../IDtoken.o ../SHA256_hmac.o ../SHA256.o \
