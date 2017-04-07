@@ -6,7 +6,8 @@
 # Variable declarations.
 CSRC = Actor.c Subject.c
 
-TOOLS = test-actor test-subject generate-contours sha-tool compute-measurement
+TOOLS = test-actor test-subject generate-contours sha-tool \
+	compute-measurement set-behavior
 
 CC = musl-gcc
 
@@ -68,6 +69,9 @@ compute-measurement: compute-measurement.o Actor.o Subject.o ../SHA256.o
 
 sha-tool: sha-tool.o ../SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${HURDLIB} ${SSL_CRYPTO};
+
+set-behavior: set-behavior.o
+	${CC} ${LDFLAGS} -o $@ $^ ${HURDLIB}
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};
