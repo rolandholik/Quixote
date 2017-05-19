@@ -191,7 +191,8 @@ static _Bool do_mounts(const _Bool mode)
 	_Bool sysfs	 = false,
 	      securityfs = false,
 	      proc	 = false,
-	      retn	 = false;
+	      retn	 = false,
+	      devpts	 = false;
 
 
 	if ( mode ) {
@@ -202,9 +203,12 @@ static _Bool do_mounts(const _Bool mode)
 			securityfs = true;
 		if ( mount("proc", "/proc", "proc", 0, NULL) == 0 )
 			proc = true;
+		if ( mount("devpts", "/dev/pts", "devpts", 0, NULL) == 0 )
+			devpts = true;
 		retn = true;
 	}
 	else {
+		umount("/dev/pts");
 		umount("/proc");
 		umount("/sys/kernel/security");
 		umount("/sys");
@@ -219,6 +223,8 @@ static _Bool do_mounts(const _Bool mode)
 			umount("/sys");
 		if ( proc )
 			umount("/proc");
+		if ( devpts )
+			umount("/dev/pts");
 	}
 
 	return retn;
@@ -623,6 +629,8 @@ static void switch_root(void)
 	do_mounts(true);
 
 	if ( mount("shm", "/dev/shm", "tmpfs", 0, NULL) == -1 )
+		return;
+	if ( mount("cgroup", "/sys/fs/cgroup", "cgroup", 0, NULL) == -1 )
 		return;
 
 	initialize_behavior();
