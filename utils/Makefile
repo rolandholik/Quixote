@@ -5,12 +5,13 @@
 
 # Variable declarations.
 CSRC = gen-image.c load-image.c boot.c Netconfig.c IPsec.c SoftwareTPM.c \
-	device-supvr.c mgmt-supvr.c MGMTsupvr.c vm-supvr.c copy-edid.c
+	device-supvr.c mgmt-supvr.c MGMTsupvr.c vm-supvr.c copy-edid.c	 \
+	cboot.c
 
 TOOLS = gen-image load-image boot sboot init possum gen-id-verifier	\
 	software-status software-tpm tpm-cmd id-set idmgr net-config	\
 	idtest device-supvr mgmt-supvr mgmt-set-key vm-supvr copy-edid	\
-	tpm2-cmd
+	tpm2-cmd cboot
 
 CC = musl-gcc
 
@@ -127,6 +128,9 @@ mgmt-set-key: mgmt-set-key.o MGMTsupvr.o ../RandomBuffer.o
 
 tpm2-cmd: tpm2-cmd.o ../RandomBuffer.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltss ${SSL_CRYPTO};
+
+cboot: cboot.o
+	${CC} ${LDFLAGS} -o $@ $^ ${HURDLIB}
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};
