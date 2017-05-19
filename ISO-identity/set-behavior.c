@@ -24,6 +24,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <sched.h>
 #include <asm/unistd.h>
 
 #include <HurdLib.h>
@@ -38,6 +39,9 @@
 
 #define IMA_SET_CONTOUR		0x1
 #define IMA_SET_PSEUDONYM	0x2
+
+/* Flag for cloning the system behavior. */
+#define CLONE_BEHAVIOR		0x00001000
 
 #if 1
 static inline int sys_behavior(unsigned char *bufr, size_t cnt, \
@@ -66,8 +70,11 @@ static __inline long sys_behavior(unsigned char * a1, size_t a2, \
 extern int main(int argc, char *argv[])
 
 {
+	_Bool namespace = false;
+
 	char *contour	= NULL,
-	     *pseudonym = NULL;
+	     *pseudonym = NULL,
+	     *command	= NULL;
 
 	unsigned char *p;
 
@@ -78,8 +85,11 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "c:p:")) != EOF )
+	while ( (opt = getopt(argc, argv, "nc:p:r:")) != EOF )
 		switch ( opt ) {
+			case 'n':
+				namespace = true;
+				break;
 			case 'c':
 				contour = optarg;
 				break;
@@ -87,8 +97,38 @@ extern int main(int argc, char *argv[])
 			case 'p':
 				pseudonym = optarg;
 				break;
+			case 'r':
+				command = optarg;
+				break;
 		}
 
+
+	/* Unshare the behavior space. */
+	if ( namespace ) {
+		if ( unshare(CLONE_BEHAVIOR) < 0 )
+			perror("Unshare returns");
+		else {
+			fputs("Spawning behavior shell.\n", stdout);
+			system("/bin/sh");
+			fputs("Behavior shell terminated.\n", stdout);
+		}
+		goto done;
+	}
+
+
+	/* Run a command in an independent behavior domain. */
+	if ( command ) {
+		if ( unshare(CLONE_BEHAVIOR) < 0 )
+			perror("Unshare returns");
+		else {
+			fprintf(stdout, "Running command: %s\n", command);
+			system(command);
+		}
+		goto done;
+	}
+
+
+	/* Load either a contour point or define a pseudonym. */
 	if ( (contour == NULL) && (pseudonym == NULL) ) {
 		fputs("Specify either a pseudonym (-p), or contour (-c)\n", \
 		      stderr);
@@ -125,7 +165,7 @@ extern int main(int argc, char *argv[])
 	}
 
 	retn = 0;
-		
+
 
  done:
 	WHACK(value);
