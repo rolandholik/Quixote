@@ -10,7 +10,8 @@ CSRC = sgx-check.c sgx-test.c sgx-metadata.c SGXmetadata.c SGXloader.c \
 ASRC = boot-sgx.s
 
 TOOLS = sgx-check sgx-test sgx-metadata sgx-loader sgx-load sgx-sigstruct \
-	sgx-gen-token gen-white-list test-ecall
+	sgx-gen-token gen-white-list test-ecall test-pcr idf-sgx-fandf	  \
+	idf-sgx-fandf-unibin
 
 CC = musl-gcc
 AS = as
@@ -110,6 +111,10 @@ gen-white-list.o: gen-white-list.c
 test-ecall: test-ecall.o SGXenclave.o SGXloader.o SGXmetadata.o \
 	SGXsigstruct.o sgx-ocall.o boot-sgx.o
 	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB};
+
+test-pcr: test-pcr.o SGXenclave.o SGXloader.o SGXmetadata.o \
+	SGXsigstruct.o sgx-ocall.o boot-sgx.o
+	${CC} ${LDFLAGS} -static -o $@ $^ ${ELFLIB} ${HURDLIB};
 
 idf-sgx-fandf: idf-sgx-fandf.o SGXenclave.o SGXloader.o SGXmetadata.o \
 	SGXsigstruct.o sgx-ocall.o boot-sgx.o ../SHA256.o
