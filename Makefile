@@ -14,7 +14,7 @@ CSRC = 	SHA256.c SHA256_hmac.c OrgID.c PatientID.c RandomBuffer.c  \
 # 	provider-server
 SERVERS = root-referral device-broker user-broker
 
-SUBDIRS = lib idgine utils edi SGX ISO-identity # client
+SUBDIRS = idgine utils edi SGX ISO-identity # client
 
 # CC = gcc
 CC = musl-gcc
@@ -71,12 +71,12 @@ CFLAGS := ${CFLAGS} -I./HurdLib -I${SSL_INCLUDE} -I./lib
 #
 # Target directives.
 #
-.PHONY: client ${SUBDIRS}
+.PHONY: client lib ${SUBDIRS}
 
 
 # Targets
 # all: ${COBJS} genrandom genid query-client servers ${SUBDIRS}
-all: ${COBJS} genrandom query-client servers ${SUBDIRS}
+all: lib ${COBJS} genrandom query-client servers ${SUBDIRS}
 
 servers: ${SERVERS} ${TOOLS}
 
@@ -150,6 +150,9 @@ lib:
 utils:
 	${MAKE} -C $@;
 
+SGX:
+	${MAKE} -C $@;
+
 ISO-identity:
 	${MAKE} -C $@;
 
@@ -157,6 +160,7 @@ tags:
 	/opt/emacs/bin/etags *.{h,c};
 
 clean:
+	${MAKE} -C lib clean;
 	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i clean; done
 	rm -f *.o *~ TAGS;
 	rm -f query-client
