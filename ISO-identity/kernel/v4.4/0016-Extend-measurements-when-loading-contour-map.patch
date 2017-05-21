@@ -1,0 +1,258 @@
+From f75a23bc0b93e99e30b4bad0382519606153fc25 Mon Sep 17 00:00:00 2001
+From: "Dr. Greg Wettstein" <greg@enjellic.com>
+Date: Sat, 25 Mar 2017 07:38:59 -0500
+Subject: [PATCH 16/24] Extend measurements when loading contour map.
+
+The loading of a pre-computed behavior contour map was not
+extending the soft measurement nor carrying out extension of the
+IMA PCR register.  This update modifies the ima_write_map()
+function to properly carry out these actions.
+
+In order to avoid dupling code the ima_extend_pcr() function was
+made globally visible since the ima_write_map() function needs to
+call that function in order to propagate a contour into the
+hardware measurement state of the platform.
+
+A debug print was commented out in order to avoid noise in the
+debugging of the measurement code moving forward.
+---
+ security/integrity/ima/ima.h          |   1 +
+ security/integrity/ima/ima_identity.c | 155 +++++++++++++++++++++-------------
+ security/integrity/ima/ima_queue.c    |   2 +-
+ 3 files changed, 96 insertions(+), 62 deletions(-)
+
+diff --git a/security/integrity/ima/ima.h b/security/integrity/ima/ima.h
+index 34b08dcf2c8e..44d0b506fbeb 100644
+--- a/security/integrity/ima/ima.h
++++ b/security/integrity/ima/ima.h
+@@ -109,6 +109,7 @@ extern struct list_head ima_measurements;	/* list of all measurements */
+ /* Internal IMA function definitions */
+ int ima_init(void);
+ int ima_fs_init(void);
++int ima_pcr_extend(const u8 *hash);
+ int ima_add_template_entry(struct ima_template_entry *entry, int violation,
+ 			   const char *op, struct inode *inode,
+ 			   const unsigned char *filename);
+diff --git a/security/integrity/ima/ima_identity.c b/security/integrity/ima/ima_identity.c
+index f39ea50b897c..36e10a979c11 100644
+--- a/security/integrity/ima/ima_identity.c
++++ b/security/integrity/ima/ima_identity.c
+@@ -259,6 +259,63 @@ static int add_trajectory_point(const char *filename,
+ 	return retn;
+ }
+ 
++static int get_host_measurement(struct crypto_shash *tfm, char *id,
++				size_t idlength, char *digest)
++{
++	int retn;
++	struct {
++		struct shash_desc shash;
++		char ctx[crypto_shash_descsize(tfm)];
++	} desc;
++
++	desc.shash.tfm = tfm;
++	desc.shash.flags = 0;
++	retn = crypto_shash_init(&desc.shash);
++	if (retn != 0)
++		goto done;
++	retn = crypto_shash_update(&desc.shash, hostid, WP256_DIGEST_SIZE);
++	if (retn != 0)
++		goto done;
++	retn = crypto_shash_finup(&desc.shash, id, idlength, digest);
++	if (retn != 0)
++		goto done;
++
++ done:
++	return retn;
++}
++
++static int update_behavior_measurement(struct crypto_shash *tfm, char *id)
++{
++	int retn;
++	char digest[crypto_shash_digestsize(tfm)];
++	struct {
++		struct shash_desc shash;
++		char ctx[crypto_shash_descsize(tfm)];
++	} desc;
++
++	retn = get_host_measurement(tfm, id, WP256_DIGEST_SIZE, digest);
++	if (retn != 0)
++		goto done;
++
++	/* Extend soft state measurement. */
++	desc.shash.tfm = tfm;
++	desc.shash.flags = 0;
++	retn = crypto_shash_init(&desc.shash);
++	if (retn != 0)
++		goto done;
++	retn = crypto_shash_update(&desc.shash, measurement,
++				   WP256_DIGEST_SIZE);
++	if (retn != 0)
++		goto done;
++	retn = crypto_shash_finup(&desc.shash, digest, sizeof(digest),
++				  measurement);
++	if (retn != 0)
++		goto done;
++
++ done:
++	return retn;
++}
++
+ static void *ima_trajectory_start(struct seq_file *c, loff_t *pos)
+ {
+ 	if (*pos >= trajectory_count)
+@@ -375,8 +432,10 @@ static int ima_open_map(struct inode * inode, struct file * filp)
+ static ssize_t ima_write_map(struct file *file, const char __user *buf,
+ 			     size_t datalen, loff_t *ppos)
+ {
+-	char *p, idbufr[WP256_DIGEST_SIZE*2 + 1], mapping[WP256_DIGEST_SIZE];
++	char *p, idbufr[WP256_DIGEST_SIZE*2 + 1], mapping[WP256_DIGEST_SIZE],
++		tpm_digest[SHA1_DIGEST_SIZE];
+ 	ssize_t retn;
++	struct crypto_shash *tfmsha1 = NULL, *tfmsha256 = NULL;
+ 
+ 	if (datalen != sizeof(idbufr)) {
+ 		retn = -EINVAL;
+@@ -413,9 +472,39 @@ static ssize_t ima_write_map(struct file *file, const char __user *buf,
+ 		retn = -ENOMEM;
+ 		goto done;
+ 	}
++
++	/* Add the contour point measurement. */
++	tfmsha1 = crypto_alloc_shash("sha1", 0, 0);
++	if (IS_ERR(tfmsha1)) {
++		retn = PTR_ERR(tfmsha1);
++		goto done;
++	}
++	tfmsha256 = crypto_alloc_shash("sha256", 0, 0);
++	if (IS_ERR(tfmsha256)) {
++		retn = PTR_ERR(tfmsha256);
++		goto done;
++	}
++
++        retn = update_behavior_measurement(tfmsha256, mapping);
++	if (retn != 0)
++		goto done;
++
++	retn = get_host_measurement(tfmsha1, mapping, WP256_DIGEST_SIZE,
++				    tpm_digest);
++	if (retn != 0)
++		goto done;
++	retn = ima_pcr_extend(tpm_digest);
++	if (retn != 0)
++		goto done;
++
+ 	retn = datalen;
+ 
+ done:
++	if (tfmsha1)
++		crypto_free_shash(tfmsha1);
++	if (tfmsha256)
++		crypto_free_shash(tfmsha256);
++
+ 	return retn;
+ }
+ 
+@@ -788,64 +877,6 @@ static int have_violation(struct file *file, struct integrity_iint_cache *iint,
+ 	return tomtou || writers;
+ }
+ 
+-
+-static int get_host_measurement(struct crypto_shash *tfm, char *id,
+-				size_t idlength, char *digest)
+-{
+-	int retn;
+-	struct {
+-		struct shash_desc shash;
+-		char ctx[crypto_shash_descsize(tfm)];
+-	} desc;
+-
+-	desc.shash.tfm = tfm;
+-	desc.shash.flags = 0;
+-	retn = crypto_shash_init(&desc.shash);
+-	if (retn != 0)
+-		goto done;
+-	retn = crypto_shash_update(&desc.shash, hostid, WP256_DIGEST_SIZE);
+-	if (retn != 0)
+-		goto done;
+-	retn = crypto_shash_finup(&desc.shash, id, idlength, digest);
+-	if (retn != 0)
+-		goto done;
+-
+- done:
+-	return retn;
+-}
+-
+-static int update_identity_state(struct crypto_shash *tfm, char *id)
+-{
+-	int retn;
+-	char digest[crypto_shash_digestsize(tfm)];
+-	struct {
+-		struct shash_desc shash;
+-		char ctx[crypto_shash_descsize(tfm)];
+-	} desc;
+-
+-	retn = get_host_measurement(tfm, id, WP256_DIGEST_SIZE, digest);
+-	if (retn != 0)
+-		goto done;
+-
+-	/* Extend soft state measurement. */
+-	desc.shash.tfm = tfm;
+-	desc.shash.flags = 0;
+-	retn = crypto_shash_init(&desc.shash);
+-	if (retn != 0)
+-		goto done;
+-	retn = crypto_shash_update(&desc.shash, measurement,
+-				   WP256_DIGEST_SIZE);
+-	if (retn != 0)
+-		goto done;
+-	retn = crypto_shash_finup(&desc.shash, digest, sizeof(digest),
+-				  measurement);
+-	if (retn != 0)
+-		goto done;
+-
+- done:
+-	return retn;
+-}
+-
+ int ima_identity_genhash(struct ima_template_entry *entry, char *tpm_digest)
+ {
+ 	int retn;
+@@ -870,7 +901,7 @@ int ima_identity_genhash(struct ima_template_entry *entry, char *tpm_digest)
+ 		retn = PTR_ERR(tfm);
+ 		goto done;
+ 	}
+-	retn = update_identity_state(tfm, identity.hdr.digest);
++        retn = update_behavior_measurement(tfm, identity.hdr.digest);
+ 	if (retn != 0)
+ 		goto done;
+ 	crypto_free_shash(tfm);
+@@ -1179,9 +1210,11 @@ int ima_identity_is_mapped(int function, struct integrity_iint_cache *iint,
+ 			retn = add_trajectory_point(pathname, &actor,
+ 						    &subject);
+ 	}
++	if (retn != 0 )
++		retn = 0;
+ 
+ 
+-#if 1
++#if 0
+ 	if (!retn)
+ 		pr_info("[%s]: Mapped entry=%d, comm=%s, pid=%d, func=%d, pathname=%s, fsmagic=%lx, inum=%lu, identity=%*phN\n",
+ 			__func__, contour_count, current->comm, current->pid,
+diff --git a/security/integrity/ima/ima_queue.c b/security/integrity/ima/ima_queue.c
+index 552705d5a78d..ecb0df245a0c 100644
+--- a/security/integrity/ima/ima_queue.c
++++ b/security/integrity/ima/ima_queue.c
+@@ -89,7 +89,7 @@ static int ima_add_digest_entry(struct ima_template_entry *entry)
+ 	return 0;
+ }
+ 
+-static int ima_pcr_extend(const u8 *hash)
++int ima_pcr_extend(const u8 *hash)
+ {
+ 	int result = 0;
+ 
+-- 
+2.11.0
+

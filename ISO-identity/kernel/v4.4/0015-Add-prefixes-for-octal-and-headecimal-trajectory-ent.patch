@@ -1,0 +1,36 @@
+From ce07f83ec05ce2fdc6be994bef8897e3a026300e Mon Sep 17 00:00:00 2001
+From: "Dr. Greg Wettstein" <greg@enjellic.com>
+Date: Tue, 21 Mar 2017 18:56:38 -0500
+Subject: [PATCH 15/24] Add prefixes for octal and headecimal trajectory
+ entries.
+
+The mode entry in the subject field had a 0 prepended to its
+value so that it would be interpreted as an octal value by the
+trajectory processing routines.
+
+Similarily the caps entry in the actor field had a 0x prefix
+prepended to it so its value would be interpreted as hexadecimal
+by the routines.
+
+These prepend values are the prefix specifiers which are used by
+the strtol[l] routines when the special base of 0 is used.
+---
+ security/integrity/ima/ima_identity.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/security/integrity/ima/ima_identity.c b/security/integrity/ima/ima_identity.c
+index 7ecf37297876..f39ea50b897c 100644
+--- a/security/integrity/ima/ima_identity.c
++++ b/security/integrity/ima/ima_identity.c
+@@ -284,7 +284,7 @@ static int ima_trajectory_show(struct seq_file *c, void *trajectory)
+ 
+ 	pt = list_entry(trajectory, struct trajectory, list);
+ 
+-	seq_printf(c, "event{%s:%s} actor{uid=%d, euid=%d, suid=%d, gid=%d, egid=%d, sgid=%d, fsuid=%d, fsgid=%d, cap=%llx} subject{uid=%d, gid=%d, mode=o%o, name_length=%u, name=%*phN, s_id=%s, s_uuid=%*phN, digest=%*phN}\n",
++	seq_printf(c, "event{%s:%s} actor{uid=%d, euid=%d, suid=%d, gid=%d, egid=%d, sgid=%d, fsuid=%d, fsgid=%d, cap=0x%llx} subject{uid=%d, gid=%d, mode=0%o, name_length=%u, name=%*phN, s_id=%s, s_uuid=%*phN, digest=%*phN}\n",
+ 		   pt->process, pt->filename, pt->actor.uid, pt->actor.euid,
+ 		   pt->actor.suid, pt->actor.gid, pt->actor.egid,
+ 		   pt->actor.sgid, pt->actor.fsuid, pt->actor.fsgid,
+-- 
+2.11.0
+

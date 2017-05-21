@@ -1,0 +1,192 @@
+From c11ed14497728f421f9d6b6cf6816ccc306f5b97 Mon Sep 17 00:00:00 2001
+From: "Dr. Greg Wettstein" <greg@enjellic.com>
+Date: Fri, 24 Feb 2017 03:20:16 -0600
+Subject: [PATCH 08/24] Implement initial support for subject generation.
+
+This update implements the encapsulation of the generation of the
+subject identity into a single function which is supplied from
+the ima_identity.c file.  The SHA256 mapping of the identity is
+placed into a character buffer supplied by the caller which in
+turn is copied into the template field.
+
+All of the identity components relevant to a subject identity are
+placed into a packed structure named subject_identity.  The
+mapping of this structure is the SHA256 checksum over the
+structure.
+
+At the current time the subject identity does not include the
+checksum over the file contents.  That will be added in a
+subsequent update to the code.
+---
+ security/integrity/ima/ima.h              |  1 +
+ security/integrity/ima/ima_identity.c     | 66 +++++++++++++++++++++++++++++++
+ security/integrity/ima/ima_template_lib.c | 41 +++++++++++++++++--
+ 3 files changed, 105 insertions(+), 3 deletions(-)
+
+diff --git a/security/integrity/ima/ima.h b/security/integrity/ima/ima.h
+index 1659b8e3a38d..fed46fd498a7 100644
+--- a/security/integrity/ima/ima.h
++++ b/security/integrity/ima/ima.h
+@@ -127,6 +127,7 @@ int ima_init_template(void);
+ int ima_identity_init(void);
+ int ima_identity_genhash(struct ima_template_entry *, char *);
+ int ima_get_actor(char *);
++int ima_get_subject(struct ima_event_data *, char *);
+ int ima_map_identity(int, struct integrity_iint_cache *iint,
+ 		     struct file *file, const char *pathname, char *mapping);
+ int ima_identity_is_mapped(int, struct integrity_iint_cache *iint,
+diff --git a/security/integrity/ima/ima_identity.c b/security/integrity/ima/ima_identity.c
+index 3058ec01e441..2b7145322f2b 100644
+--- a/security/integrity/ima/ima_identity.c
++++ b/security/integrity/ima/ima_identity.c
+@@ -39,6 +39,16 @@ struct identity_elements {
+ 	} capability;
+ } __packed;
+ 
++/* Structure defining subject identity elements. */
++struct subject_identity {
++	uid_t uid;
++	gid_t gid;
++	umode_t mode;
++
++	u32 name_length;
++	char name[WP256_DIGEST_SIZE];
++} __attribute__((__packed__));
++
+ /*
+  * Root dentry for the 'iso-identity' directory and dentries for the
+  * pseudo-files in that directory.
+@@ -784,6 +794,7 @@ static int ima_get_actor_identity(struct crypto_shash *tfm, char *mapping)
+ 	return retn;
+ }
+ 
++
+ int ima_get_actor(char *actor)
+ {
+ 	int retn;
+@@ -798,6 +809,61 @@ int ima_get_actor(char *actor)
+ 	return retn;
+ }
+ 
++static int ima_get_subject_identity(struct crypto_shash *tfm,
++				    struct subject_identity subject,
++				    char *identity)
++{
++	int retn = 0;
++	struct {
++		struct shash_desc shash;
++		char ctx[crypto_shash_descsize(tfm)];
++	} desc;
++
++	desc.shash.tfm = tfm;
++	desc.shash.flags = 0;
++	retn = crypto_shash_init(&desc.shash);
++	if (retn != 0)
++		goto done;
++
++	retn = crypto_shash_finup(&desc.shash, (char *) &subject,
++				  sizeof(struct subject_identity), identity);
++
++ done:
++	return retn;
++}
++
++int ima_get_subject(struct ima_event_data *event_data, char *subject)
++{
++	const char *filename;
++	int retn=0;
++	struct crypto_shash *tfm;
++	struct subject_identity identity;
++	struct inode *inode;
++
++	tfm = crypto_alloc_shash("sha256", 0, 0);
++	if (IS_ERR(tfm))
++		return PTR_ERR(tfm);
++
++	filename = event_data->filename;
++
++	memset(&identity, '\0', sizeof(struct subject_identity));
++	if (event_data->file) {
++		inode = file_inode(event_data->file);
++		identity.uid = from_kuid(&init_user_ns, inode->i_uid);
++		identity.gid = from_kgid(&init_user_ns, inode->i_gid);
++		identity.mode = inode->i_mode;
++	}
++
++	retn = ima_get_subject_identity(tfm, identity, subject);
++	pr_info("[%s]: mode=o%o, uid=%u, gid=%u, name=%s, subject=%*phN\n",
++		__func__, identity.mode, identity.uid, identity.gid,
++		filename == NULL ? "no path" : filename,
++		WP256_DIGEST_SIZE, subject);
++
++	crypto_free_shash(tfm);
++	return retn;
++}
++
+ int ima_map_identity(int function, struct integrity_iint_cache *iint,
+ 		     struct file *file, const char *pathname, char *mapping)
+ {
+diff --git a/security/integrity/ima/ima_template_lib.c b/security/integrity/ima/ima_template_lib.c
+index f4a8c237acc0..e22a7a475bba 100644
+--- a/security/integrity/ima/ima_template_lib.c
++++ b/security/integrity/ima/ima_template_lib.c
+@@ -349,18 +349,53 @@ int ima_event_actor_init(struct ima_event_data *event_data,
+ }
+ 
+ /*
+- *  ima_event_subject_init - Generate identity of subjdct involved in event.
++ *  ima_event_subject_init - Generate identity of subject involved in event.
+  */
+ int ima_event_subject_init(struct ima_event_data *event_data,
+ 			   struct ima_field_data *field_data)
+ {
++	char subject[WP256_DIGEST_SIZE];
+ 	int rc = 0;
++	enum data_formats fmt = DATA_FMT_HEX;
++
++	rc = ima_get_subject(event_data, subject);
++	if (rc!=0)
++		return rc;
++
++	rc = ima_write_template_field_data(subject, sizeof(subject), fmt,
++					   field_data);
++	return rc;
++
++
++#if 0
++	u8 *digest;
++	u32 digest_size;
++	int rc = 0;
++	uid_t uid;
++	gid_t gid;
++	struct inode *inode;
++
++	char actor[WP256_DIGEST_SIZE];
++	enum data_formats fmt = DATA_FMT_HEX;
++	int rc = 0;
++
+ 
+ 	if (event_data->file) {
+-		pr_info("[%s]: inode=%s\n", __func__,
+-			event_data->file->f_path.dentry->d_name.name);
++		inode = file_inode(event_data->file);
++		uid = from_kuid(&init_user_ns, inode->i_uid);
++		gid = from_kgid(&init_user_ns, inode->i_gid);
++		pr_info("[%s]: inode=%s, mode=o%o, uid=%x, gid=%x\n", __func__,
++			event_data->file->f_path.dentry->d_name.name,
++			inode->i_mode, uid, gid);
++
+ 	}
+ 
++	digest = event_data->iint->ima_hash->digest;
++	digest_size = event_data->iint->ima_hash->length;
++	pr_info("[%s]: field length=%u, hash=%*phN\n", __func__,
++		digest_size, digest_size, digest);
++
+ 	rc = ima_eventdigest_ng_init(event_data, field_data);
+ 	return rc;
++#endif
+ }
+-- 
+2.11.0
+

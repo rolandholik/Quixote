@@ -1,0 +1,66 @@
+From d19ee0287835074076416f808c8ff3a322088dd8 Mon Sep 17 00:00:00 2001
+From: "Dr. Greg Wettstein" <greg@enjellic.com>
+Date: Fri, 31 Mar 2017 19:07:56 -0500
+Subject: [PATCH 18/24] Use dynamic memory allocation for pseudonym
+ configuration.
+
+The sysfs code which was responsible for handling writes to the
+following pseudo-file:
+
+/sys/kernel/security/ima/iso-identity/pseudonym
+
+Which causes a file to be registered as a pseudonym was
+allocating a PATH_MAX size buffer on the stack.  Since this was
+using needless amounts of stack space and generating a compiler
+warning the on stack buffer for the filename was converted to use
+a dynamically allocated buffer.
+---
+ security/integrity/ima/ima_identity.c | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/security/integrity/ima/ima_identity.c b/security/integrity/ima/ima_identity.c
+index bf9a44fbd21d..4bf88ded3580 100644
+--- a/security/integrity/ima/ima_identity.c
++++ b/security/integrity/ima/ima_identity.c
+@@ -590,13 +590,13 @@ static ssize_t ima_write_pseudonym(struct file *file, const char __user *buf,
+ 				   size_t datalen, loff_t *ppos)
+ {
+ 	size_t amt;
+-	char *p, bufr[PATH_MAX];
++	char *p, *bufr = NULL;
+ 	ssize_t retn;
+ 	struct inode *inode;
+ 	struct path path;
+ 	struct integrity_iint_cache *iint;
+ 
+-	if (datalen > sizeof(bufr)) {
++	if (datalen > PAGE_SIZE) {
+ 		retn = -EINVAL;
+ 		goto done;
+ 	}
+@@ -606,7 +606,12 @@ static ssize_t ima_write_pseudonym(struct file *file, const char __user *buf,
+ 		goto done;
+ 	}
+ 
+-	memset(bufr, '\0', sizeof(bufr));
++	bufr = kzalloc(datalen, GFP_KERNEL);
++	if (!bufr) {
++		retn = -ENOMEM;
++		goto done;
++	}
++
+ 	if (copy_from_user(bufr, buf, datalen)) {
+ 		retn = -EFAULT;
+ 		goto done;
+@@ -648,6 +653,8 @@ static ssize_t ima_write_pseudonym(struct file *file, const char __user *buf,
+ 	retn = datalen;
+ 
+ done:
++	kfree(bufr);
++
+ 	return retn;
+ }
+ 
+-- 
+2.11.0
+

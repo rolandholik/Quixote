@@ -1,0 +1,101 @@
+From 860b0a9f2e4be4404d3286b3026527366d8117f1 Mon Sep 17 00:00:00 2001
+From: "Dr. Greg Wettstein" <gw@idfusion.org>
+Date: Fri, 30 Dec 2016 12:24:27 -0600
+Subject: [PATCH 05/24] Add iso-identity template infrastructure.
+
+This update add the template definitions which implement the
+iso-identity policy.
+
+More specifically this implements the following template definition:
+
+ima-identity
+
+Which in turn specifies the following fields.
+
+n-ng|id|d-ng
+
+The id field is the identity of the actor subject which operates
+on the subject whose measurement value is included with the d-ng
+filed.
+---
+ security/integrity/ima/ima_template.c     |  4 ++++
+ security/integrity/ima/ima_template_lib.c | 19 +++++++++++++++++++
+ security/integrity/ima/ima_template_lib.h |  8 ++++++++
+ 3 files changed, 31 insertions(+)
+
+diff --git a/security/integrity/ima/ima_template.c b/security/integrity/ima/ima_template.c
+index 0b7404ebfa80..1011317c3eab 100644
+--- a/security/integrity/ima/ima_template.c
++++ b/security/integrity/ima/ima_template.c
+@@ -24,6 +24,8 @@ static struct ima_template_desc defined_templates[] = {
+ 	{.name = IMA_TEMPLATE_IMA_NAME, .fmt = IMA_TEMPLATE_IMA_FMT},
+ 	{.name = "ima-ng", .fmt = "d-ng|n-ng"},
+ 	{.name = "ima-sig", .fmt = "d-ng|n-ng|sig"},
++	{.name = "ima-identity",.fmt = "n-ng|id|d-ng",
++	 .genhash = ima_identity_genhash},
+ 	{.name = "", .fmt = ""},	/* placeholder for a custom format */
+ };
+ 
+@@ -38,6 +40,8 @@ static struct ima_template_field supported_fields[] = {
+ 	 .field_show = ima_show_template_string},
+ 	{.field_id = "sig", .field_init = ima_eventsig_init,
+ 	 .field_show = ima_show_template_sig},
++	{.field_id = "id",.field_init = ima_eventid_init,
++	 .field_show = ima_show_template_digest}
+ };
+ 
+ static struct ima_template_desc *ima_template;
+diff --git a/security/integrity/ima/ima_template_lib.c b/security/integrity/ima/ima_template_lib.c
+index 2934e3d377f1..dc2492dd6658 100644
+--- a/security/integrity/ima/ima_template_lib.c
++++ b/security/integrity/ima/ima_template_lib.c
+@@ -328,3 +328,22 @@ int ima_eventsig_init(struct ima_event_data *event_data,
+ out:
+ 	return rc;
+ }
++
++/*
++ *  ima_eventid_init - Include identity of event in template.
++ */
++int ima_eventid_init(struct ima_event_data *event_data,
++		     struct ima_field_data *field_data)
++{
++	char actor[WP256_DIGEST_SIZE];
++	enum data_formats fmt = DATA_FMT_HEX;
++	int rc = 0;
++
++	rc = ima_get_actor(actor);
++	if (rc!=0)
++		return rc;
++
++	rc = ima_write_template_field_data(actor, sizeof(actor),
++					   fmt, field_data);
++	return rc;
++}
+diff --git a/security/integrity/ima/ima_template_lib.h b/security/integrity/ima/ima_template_lib.h
+index c344530c1d69..81c5453bee53 100644
+--- a/security/integrity/ima/ima_template_lib.h
++++ b/security/integrity/ima/ima_template_lib.h
+@@ -26,6 +26,8 @@ void ima_show_template_string(struct seq_file *m, enum ima_show_type show,
+ 			      struct ima_field_data *field_data);
+ void ima_show_template_sig(struct seq_file *m, enum ima_show_type show,
+ 			   struct ima_field_data *field_data);
++void ima_show_hostid(struct seq_file *m, enum ima_show_type show,
++		     struct ima_field_data *field_data);
+ int ima_eventdigest_init(struct ima_event_data *event_data,
+ 			 struct ima_field_data *field_data);
+ int ima_eventname_init(struct ima_event_data *event_data,
+@@ -36,4 +38,10 @@ int ima_eventname_ng_init(struct ima_event_data *event_data,
+ 			  struct ima_field_data *field_data);
+ int ima_eventsig_init(struct ima_event_data *event_data,
+ 		      struct ima_field_data *field_data);
++int ima_eventid_init(struct ima_event_data *event_data,
++		      struct ima_field_data *field_data);
++int ima_hostid_init(struct integrity_iint_cache *iint, struct file *file,
++		    const unsigned char *filename,
++		    struct evm_ima_xattr_data *xattr_value, int xattr_len,
++		    struct ima_field_data *field_data);
+ #endif /* __LINUX_IMA_TEMPLATE_LIB_H */
+-- 
+2.11.0
+

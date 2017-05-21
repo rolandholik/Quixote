@@ -1,0 +1,108 @@
+From 67c7054704e263838dfb643e5a760594ff7ba9dd Mon Sep 17 00:00:00 2001
+From: "Dr. Greg Wettstein" <greg@enjellic.com>
+Date: Tue, 7 Mar 2017 20:22:48 -0600
+Subject: [PATCH 10/24] Integrate hash of filename into subject identity.
+
+This update removes the name field from the iso-identity template
+and integrates the hash of the filename into the subject
+identity.  Also included in the subject identity is the length of
+the filename to further constrain the requirement for a valid
+name.
+---
+ security/integrity/ima/ima_identity.c | 47 +++++++++++++++++++++++++++++++----
+ security/integrity/ima/ima_template.c |  2 +-
+ 2 files changed, 43 insertions(+), 6 deletions(-)
+
+diff --git a/security/integrity/ima/ima_identity.c b/security/integrity/ima/ima_identity.c
+index 7f9fba3e603d..720dcb428a13 100644
+--- a/security/integrity/ima/ima_identity.c
++++ b/security/integrity/ima/ima_identity.c
+@@ -811,6 +811,37 @@ int ima_get_actor(char *actor)
+ 	return retn;
+ }
+ 
++static int ima_add_subject_name(struct crypto_shash *tfm,
++				struct subject_identity *subject,
++				struct ima_event_data *event_data)
++{
++	const char *filename;
++	int retn;
++	struct {
++		struct shash_desc shash;
++		char ctx[crypto_shash_descsize(tfm)];
++	} desc;
++
++
++	if (event_data->filename)
++		filename = event_data->filename;
++	else
++		filename = event_data->file->f_path.dentry->d_name.name;
++
++	desc.shash.tfm = tfm;
++	desc.shash.flags = 0;
++	retn = crypto_shash_init(&desc.shash);
++	if (retn != 0)
++		goto done;
++
++	retn = crypto_shash_finup(&desc.shash, filename, strlen(filename),
++				  subject->name);
++	subject->name_length = strlen(filename);
++
++ done:
++	return retn;
++}
++
+ static int ima_get_subject_identity(struct crypto_shash *tfm,
+ 				    struct subject_identity subject,
+ 				    char *identity)
+@@ -849,6 +880,14 @@ int ima_get_subject(struct ima_event_data *event_data, char *subject)
+ 	filename = event_data->filename;
+ 	memset(&identity, '\0', sizeof(struct subject_identity));
+ 
++	/* Add hash of subject name. */
++	if (ima_add_subject_name(tfm, &identity, event_data) != 0)
++		goto done;
++
++	/* Add the digest of the subject. */
++	memcpy(identity.digest, event_data->iint->ima_hash->digest,
++	       sizeof(identity.digest));
++
+ 	/* Add subject characteristics. */
+ 	if (event_data->file) {
+ 		inode = file_inode(event_data->file);
+@@ -857,16 +896,14 @@ int ima_get_subject(struct ima_event_data *event_data, char *subject)
+ 		identity.mode = inode->i_mode;
+ 	}
+ 
+-	/* Add the digest of the subject. */
+-	memcpy(identity.digest, event_data->iint->ima_hash->digest,
+-	       sizeof(identity.digest));
+-
+ 	retn = ima_get_subject_identity(tfm, identity, subject);
+-	pr_info("[%s]: mode=o%o, uid=%u, gid=%u, name=%s, subject=%*phN\n",
++	pr_info("[%s]: mode=o%o, uid=%u, gid=%u, filename=%s, name/size=%*phN/%u, subject=%*phN\n",
+ 		__func__, identity.mode, identity.uid, identity.gid,
+ 		filename == NULL ? "no path" : filename,
++		WP256_DIGEST_SIZE, identity.name, identity.name_length,
+ 		WP256_DIGEST_SIZE, subject);
+ 
++ done:
+ 	crypto_free_shash(tfm);
+ 	return retn;
+ }
+diff --git a/security/integrity/ima/ima_template.c b/security/integrity/ima/ima_template.c
+index 4ef93ec89993..9233a7cc72ec 100644
+--- a/security/integrity/ima/ima_template.c
++++ b/security/integrity/ima/ima_template.c
+@@ -24,7 +24,7 @@ static struct ima_template_desc defined_templates[] = {
+ 	{.name = IMA_TEMPLATE_IMA_NAME, .fmt = IMA_TEMPLATE_IMA_FMT},
+ 	{.name = "ima-ng", .fmt = "d-ng|n-ng"},
+ 	{.name = "ima-sig", .fmt = "d-ng|n-ng|sig"},
+-	{.name = "ima-identity",.fmt = "n-ng|actor|subject",
++	{.name = "ima-identity",.fmt = "actor|subject",
+ 	 .genhash = ima_identity_genhash},
+ 	{.name = "", .fmt = ""},	/* placeholder for a custom format */
+ };
+-- 
+2.11.0
+

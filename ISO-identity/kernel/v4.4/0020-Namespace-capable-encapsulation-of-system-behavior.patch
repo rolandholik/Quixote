@@ -1,0 +1,477 @@
+From 22c4c44906cd901bc2fdd2a0b6d1230d65a73ec4 Mon Sep 17 00:00:00 2001
+From: "Dr. Greg Wettstein" <greg@enjellic.com>
+Date: Sat, 8 Apr 2017 08:30:02 -0500
+Subject: [PATCH 20/24] Namespace capable encapsulation of system behavior.
+
+This update introduces infrastructure support which is a preamble
+to implementing namespace support for iso-identity behavioral
+models.
+
+The iso_identity_namespace structure is introduced to encapsulate
+the information which will be needed to support namespacing of
+the operating system resource.  The iso_identity_map structure is
+also created to encapsulate all of the information needed for
+implementing a behavior field.  This structure is imbedded in the
+namespace structure which reduces the visibility requirements
+needed for managing the namespace at the fork/unshare level.
+
+The current_map() function call was implemented to test whether
+or not the current process is executing in a behavioral namespace
+or the initial system namespace.  This function returns a pointer
+to the iso_identity_map structure which defines the behavior
+dimensionality for the process.
+---
+ include/linux/nsproxy.h               |   2 +
+ security/integrity/ima/ima_identity.c | 191 +++++++++++++++++++++-------------
+ 2 files changed, 121 insertions(+), 72 deletions(-)
+
+diff --git a/include/linux/nsproxy.h b/include/linux/nsproxy.h
+index 35fa08fd7739..df63b33730fc 100644
+--- a/include/linux/nsproxy.h
++++ b/include/linux/nsproxy.h
+@@ -9,6 +9,7 @@ struct uts_namespace;
+ struct ipc_namespace;
+ struct pid_namespace;
+ struct fs_struct;
++struct iso_identity_namespace;
+ 
+ /*
+  * A structure to contain pointers to all per-process
+@@ -33,6 +34,7 @@ struct nsproxy {
+ 	struct mnt_namespace *mnt_ns;
+ 	struct pid_namespace *pid_ns_for_children;
+ 	struct net 	     *net_ns;
++	struct iso_identity_namespace *behavior_ns;
+ };
+ extern struct nsproxy init_nsproxy;
+ 
+diff --git a/security/integrity/ima/ima_identity.c b/security/integrity/ima/ima_identity.c
+index bac4c5745d91..e58719a7764a 100644
+--- a/security/integrity/ima/ima_identity.c
++++ b/security/integrity/ima/ima_identity.c
+@@ -73,23 +73,13 @@ static struct dentry *forensics;
+ static struct dentry *measurement_file;
+ static struct dentry *trajectory;
+ 
+-/* Identity of host. */
+-static char host_id[WP256_DIGEST_SIZE];
+-char *hostid = host_id;
+-
+-/*
+- * Definitions, locks and variables for the linked lists implementing
+- * the iso-identity contour points.
+- */
++/* Structure defining a behavior contour point. */
+ struct contour {
+ 	struct list_head list;
+ 	char identity[WP256_DIGEST_SIZE];
+ };
+ 
+-static DEFINE_MUTEX(contour_list_mutex);
+-static LIST_HEAD(contour_list);
+-static unsigned int contour_count;
+-
++/* Structure defining an execution trajectory point. */
+ struct trajectory {
+ 	struct list_head list;
+ 	char *filename;
+@@ -98,27 +88,59 @@ struct trajectory {
+ 	struct subject_identity subject;
+ };
+ 
+-static DEFINE_MUTEX(trajectory_list_mutex);
+-static LIST_HEAD(trajectory_list);
+-static unsigned int trajectory_count;
+-
+ /*
+- * Variables for managing and providing forensic information on the
+- * sealed dimensionality of the system measurement state.
++ * The following structure encapsulates all of the information needed
++ * to support a behavior namespace.
+  */
+-static bool domain_sealed;
+-
+-static unsigned int forensics_count;
+-static unsigned int max_forensics_count = 5;
++struct iso_identity_map {
++	char hostid[WP256_DIGEST_SIZE];
++	char measurement [WP256_DIGEST_SIZE];
++
++	struct contour cp;
++	unsigned int contour_count;
++	struct mutex contour_list_mutex;
++	struct list_head contour_list;
++
++	unsigned int trajectory_count;
++	struct mutex trajectory_list_mutex;
++	struct list_head trajectory_list;
++
++	bool domain_sealed;
++	unsigned int forensics_count;
++	unsigned int max_forensics_count;
++	struct list_head forensic_event_list;
++} init_iso_identity_map = {
++	.contour_list_mutex = __MUTEX_INITIALIZER(init_iso_identity_map.contour_list_mutex),
++	.contour_list = LIST_HEAD_INIT(init_iso_identity_map.contour_list),
++
++	.trajectory_list_mutex = __MUTEX_INITIALIZER(init_iso_identity_map.trajectory_list_mutex),
++	.trajectory_list = LIST_HEAD_INIT(init_iso_identity_map.trajectory_list),
++	.forensic_event_list = LIST_HEAD_INIT(init_iso_identity_map.forensic_event_list),
++};
+ 
+-static DEFINE_MUTEX(forensic_event_list_mutex);
+-static LIST_HEAD(forensic_event_list);
++struct iso_identity_namespace {
++	struct iso_identity_map *map;
++};
+ 
+-/* Iso-identity measurement value. */
+-static char measurement[WP256_DIGEST_SIZE];
++struct iso_identity_namespace init_iso_identity_ns = {
++	.map = &init_iso_identity_map,
++};
+ 
+ static atomic_t map_opencount = ATOMIC_INIT(1);
+ 
++/**
++ *	current_map - This function returns the currently active
++ *	behavior behavior namespace.
++ *
++ *	Returns a a pointer to the currently active behavioral map.
++ */
++
++static struct iso_identity_map *current_map(void)
++{
++	if (current->nsproxy->behavior_ns)
++		return current->nsproxy->behavior_ns->map;
++	return init_iso_identity_ns.map;
++}
+ 
+ /**
+  *	get_identity - Obtain user identity factors.
+@@ -166,9 +188,10 @@ static int have_contour(char *point)
+ {
+ 	int retn = 0;
+ 	struct contour *entry;
++	struct iso_identity_map *map = current_map();
+ 
+-	mutex_lock(&contour_list_mutex);
+-	list_for_each_entry(entry, &contour_list, list) {
++	mutex_lock(&map->contour_list_mutex);
++	list_for_each_entry(entry, &map->contour_list, list) {
+ 		if (memcmp(entry->identity, point, WP256_DIGEST_SIZE) == 0) {
+ 			retn = 1;
+ 			goto done;
+@@ -176,7 +199,7 @@ static int have_contour(char *point)
+ 	}
+ 
+  done:
+-	mutex_unlock(&contour_list_mutex);
++	mutex_unlock(&map->contour_list_mutex);
+ 	return retn;
+ }
+ 
+@@ -191,16 +214,17 @@ static int add_contour_point(char *point)
+ {
+ 	int retn = 1;
+ 	struct contour *entry;
++	struct iso_identity_map *map = current_map();
+ 
+ 	entry = kzalloc(sizeof(*entry), GFP_KERNEL);
+ 	if (!entry)
+ 		goto done;
+ 
+-	mutex_lock(&contour_list_mutex);
++	mutex_lock(&map->contour_list_mutex);
+ 	memcpy(entry->identity, point, WP256_DIGEST_SIZE);
+-	list_add_tail(&entry->list, &contour_list);
+-	++contour_count;
+-	mutex_unlock(&contour_list_mutex);
++	list_add_tail(&entry->list, &map->contour_list);
++	++map->contour_count;
++	mutex_unlock(&map->contour_list_mutex);
+ 	retn = 0;
+ 
+  done:
+@@ -265,15 +289,16 @@ static int add_trajectory_point(const char *filename,
+ 	int retn = 1;
+ 	char *fname = NULL, *process = NULL;
+ 	struct trajectory *entry;
++	struct iso_identity_map *map= current_map();
+ 
+ 	entry = create_point(filename, actor, subject);
+ 	if ( !entry )
+ 		goto done;
+ 
+-	mutex_lock(&trajectory_list_mutex);
+-	list_add_tail(&entry->list, &trajectory_list);
+-	++trajectory_count;
+-	mutex_unlock(&trajectory_list_mutex);
++	mutex_lock(&map->trajectory_list_mutex);
++	list_add_tail(&entry->list, &map->trajectory_list);
++	++map->trajectory_count;
++	mutex_unlock(&map->trajectory_list_mutex);
+ 	retn = 0;
+ 
+  done:
+@@ -301,18 +326,19 @@ static int add_forensic_point(const char *filename,
+ {
+ 	int retn = 1;
+ 	struct trajectory *entry;
++	struct iso_identity_map *map = current_map();
+ 
+-	if (forensics_count == max_forensics_count)
++	if (map->forensics_count == map->max_forensics_count)
+ 		return 1;
+ 
+ 	entry = create_point(filename, actor, subject);
+ 	if ( !entry )
+ 		goto done;
+ 
+-	mutex_lock(&forensic_event_list_mutex);
+-	list_add_tail(&entry->list, &forensic_event_list);
+-	++forensics_count;
+-	mutex_unlock(&forensic_event_list_mutex);
++	mutex_lock(&map->trajectory_list_mutex);
++	list_add_tail(&entry->list, &map->forensic_event_list);
++	++map->forensics_count;
++	mutex_unlock(&map->trajectory_list_mutex);
+ 
+ 	pr_info("[%s]: Registered forensic violation for path=%s\n",
+ 		__func__, filename);
+@@ -330,13 +356,15 @@ static int get_host_measurement(struct crypto_shash *tfm, char *id,
+ 		struct shash_desc shash;
+ 		char ctx[crypto_shash_descsize(tfm)];
+ 	} desc;
++	struct iso_identity_map *map = current_map();
+ 
+ 	desc.shash.tfm = tfm;
+ 	desc.shash.flags = 0;
+ 	retn = crypto_shash_init(&desc.shash);
+ 	if (retn != 0)
+ 		goto done;
+-	retn = crypto_shash_update(&desc.shash, hostid, WP256_DIGEST_SIZE);
++	retn = crypto_shash_update(&desc.shash, map->hostid,
++				   WP256_DIGEST_SIZE);
+ 	if (retn != 0)
+ 		goto done;
+ 	retn = crypto_shash_finup(&desc.shash, id, idlength, digest);
+@@ -355,6 +383,7 @@ static int update_behavior_measurement(struct crypto_shash *tfm, char *id)
+ 		struct shash_desc shash;
+ 		char ctx[crypto_shash_descsize(tfm)];
+ 	} desc;
++	struct iso_identity_map *map = current_map();
+ 
+ 	retn = get_host_measurement(tfm, id, WP256_DIGEST_SIZE, digest);
+ 	if (retn != 0)
+@@ -366,12 +395,12 @@ static int update_behavior_measurement(struct crypto_shash *tfm, char *id)
+ 	retn = crypto_shash_init(&desc.shash);
+ 	if (retn != 0)
+ 		goto done;
+-	retn = crypto_shash_update(&desc.shash, measurement,
++	retn = crypto_shash_update(&desc.shash, map->measurement,
+ 				   WP256_DIGEST_SIZE);
+ 	if (retn != 0)
+ 		goto done;
+ 	retn = crypto_shash_finup(&desc.shash, digest, sizeof(digest),
+-				  measurement);
++				  map->measurement);
+ 	if (retn != 0)
+ 		goto done;
+ 
+@@ -540,21 +569,25 @@ done:
+ 
+ static void *ima_trajectory_start(struct seq_file *c, loff_t *pos)
+ {
+-	if (*pos >= trajectory_count)
++	struct iso_identity_map *map = current_map();
++
++	if (*pos >= map->trajectory_count)
+ 		return NULL;
+ 
+-	mutex_lock(&trajectory_list_mutex);
+-	return seq_list_start(&trajectory_list, *pos);
++	mutex_lock(&map->trajectory_list_mutex);
++	return seq_list_start(&map->trajectory_list, *pos);
+ }
+ 
+ static void *ima_trajectory_next(struct seq_file *c, void *p, loff_t *pos)
+ {
+-	return seq_list_next(p, &trajectory_list, pos);
++	struct iso_identity_map *map = current_map();
++	return seq_list_next(p, &map->trajectory_list, pos);
+ }
+ 
+ static void ima_trajectory_stop(struct seq_file *c, void *pos)
+ {
+-	mutex_unlock(&trajectory_list_mutex);
++	struct iso_identity_map *map = current_map();
++	mutex_unlock(&map->trajectory_list_mutex);
+ }
+ 
+ static int ima_trajectory_show(struct seq_file *c, void *trajectory)
+@@ -597,21 +630,24 @@ static const struct file_operations ima_trajectory_ops = {
+ 
+ static void *ima_contours_start(struct seq_file *c, loff_t *pos)
+ {
+-	if (*pos >= contour_count)
++	struct iso_identity_map *map = current_map();
++	if (*pos >= map->contour_count)
+ 		return NULL;
+ 
+-	mutex_lock(&contour_list_mutex);
+-	return seq_list_start(&contour_list, *pos);
++	mutex_lock(&map->contour_list_mutex);
++	return seq_list_start(&map->contour_list, *pos);
+ }
+ 
+ static void *ima_contours_next(struct seq_file *c, void *p, loff_t *pos)
+ {
+-	return seq_list_next(p, &contour_list, pos);
++	struct iso_identity_map *map = current_map();
++	return seq_list_next(p, &map->contour_list, pos);
+ }
+ 
+ static void ima_contours_stop(struct seq_file *c, void *pos)
+ {
+-	mutex_unlock(&contour_list_mutex);
++	struct iso_identity_map *map = current_map();
++	mutex_unlock(&map->contour_list_mutex);
+ }
+ 
+ static int ima_contours_show(struct seq_file *c, void *identity)
+@@ -741,6 +777,7 @@ static ssize_t ima_write_host_identity(struct file *file,
+ {
+ 	char *p, id[WP256_DIGEST_SIZE*2 + 1];
+ 	ssize_t retn;
++	struct iso_identity_map *map = current_map();
+ 
+ 	if (datalen != sizeof(id)) {
+ 		retn = -EINVAL;
+@@ -764,17 +801,12 @@ static ssize_t ima_write_host_identity(struct file *file,
+ 	}
+ 	*p = '\0';
+ 
+-	hostid = kzalloc(WP256_DIGEST_SIZE, GFP_KERNEL);
+-	if (hostid == NULL) {
+-		retn = -ENOMEM;
+-		goto done;
+-	}
+-	if (hex2bin(hostid, id, WP256_DIGEST_SIZE)) {
++	if (hex2bin(map->hostid, id, WP256_DIGEST_SIZE)) {
+ 		retn = -EINVAL;
+ 		goto done;
+ 	}
+ 	pr_info("[%s]: Setting host identity to %*phN\n", __func__,
+-		(int) WP256_DIGEST_SIZE, hostid);
++		(int) WP256_DIGEST_SIZE, map->hostid);
+ 	retn = datalen;
+ 
+ done:
+@@ -806,6 +838,7 @@ static ssize_t ima_write_sealed(struct file *file,
+ {
+ 	char sealed[2];
+ 	ssize_t retn;
++	struct iso_identity_map *map = current_map();
+ 
+ 	if (datalen != 2) {
+ 		retn = -EINVAL;
+@@ -830,7 +863,7 @@ static ssize_t ima_write_sealed(struct file *file,
+ 		retn = -EINVAL;
+ 		goto done;
+ 	}
+-	domain_sealed = true;
++	map->domain_sealed = true;
+ 	pr_info("[%s]: Sealed identity domain.\n", __func__);
+ 	retn = datalen;
+ 
+@@ -840,7 +873,9 @@ done:
+ 
+ static int ima_release_sealed(struct inode *inode, struct file *file)
+ {
+-	if (domain_sealed) {
++	struct iso_identity_map *bmap = current_map();
++
++	if (bmap->domain_sealed) {
+ 		securityfs_remove(contours);
+ 		securityfs_remove(map);
+ 		securityfs_remove(pseudonym);
+@@ -858,21 +893,27 @@ static const struct file_operations ima_sealed_ops = {
+ 
+ static void *ima_forensics_start(struct seq_file *c, loff_t *pos)
+ {
+-	if (*pos >= forensics_count)
++	struct iso_identity_map *map = current_map();
++
++	if (*pos >= map->forensics_count)
+ 		return NULL;
+ 
+-	mutex_lock(&forensic_event_list_mutex);
+-	return seq_list_start(&forensic_event_list, *pos);
++	mutex_lock(&map->trajectory_list_mutex);
++	return seq_list_start(&map->forensic_event_list, *pos);
+ }
+ 
+ static void *ima_forensics_next(struct seq_file *c, void *p, loff_t *pos)
+ {
+-	return seq_list_next(p, &forensic_event_list, pos);
++	struct iso_identity_map *map = current_map();
++
++	return seq_list_next(p, &map->forensic_event_list, pos);
+ }
+ 
+ static void ima_forensics_stop(struct seq_file *c, void *pos)
+ {
+-	mutex_unlock(&forensic_event_list_mutex);
++	struct iso_identity_map *map = current_map();
++
++	mutex_unlock(&map->trajectory_list_mutex);
+ }
+ 
+ static int ima_forensics_show(struct seq_file *c, void *event)
+@@ -915,10 +956,12 @@ static const struct file_operations ima_forensics_ops = {
+ 
+ static void *ima_measurement_start(struct seq_file *c, loff_t *pos)
+ {
++	struct iso_identity_map *map = current_map();
++
+ 	if (*pos > 0)
+ 		return NULL;
+ 
+-	return measurement;
++	return map->measurement;
+ }
+ 
+ static void *ima_measurement_next(struct seq_file *c, void *p, loff_t *pos)
+@@ -933,7 +976,10 @@ static void ima_measurement_stop(struct seq_file *c, void *pos)
+ 
+ static int ima_measurement_show(struct seq_file *c, void *event)
+ {
+-	seq_printf(c, "%*phN\n", (int) sizeof(measurement), measurement);
++	struct iso_identity_map *map = current_map();
++
++	seq_printf(c, "%*phN\n", (int) sizeof(map->measurement),
++		   map->measurement);
+ 	return 0;
+ }
+ 
+@@ -1250,6 +1296,7 @@ int ima_identity_is_mapped(int function, struct integrity_iint_cache *iint,
+ 	char mapping[WP256_DIGEST_SIZE];
+ 	struct actor_identity actor;
+ 	struct subject_identity subject;
++	struct iso_identity_map *map = current_map();
+ 
+ 	if (have_violation(file, iint, pathname))
+ 		return 1;
+@@ -1277,7 +1324,7 @@ int ima_identity_is_mapped(int function, struct integrity_iint_cache *iint,
+ 		WP256_DIGEST_SIZE, subject.digest);
+ #endif
+ 
+-	if (domain_sealed) {
++	if (map->domain_sealed) {
+ 		retn = add_forensic_point(pathname, &actor, &subject);
+ 		if (retn == 0 )
+ 			retn = add_contour_point(mapping);
+-- 
+2.11.0
+

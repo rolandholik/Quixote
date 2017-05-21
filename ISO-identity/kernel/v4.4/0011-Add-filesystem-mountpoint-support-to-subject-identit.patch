@@ -1,0 +1,53 @@
+From 435966526ea89bb74ed1f214698f6fdfbf818629 Mon Sep 17 00:00:00 2001
+From: "Dr. Greg Wettstein" <greg@enjellic.com>
+Date: Fri, 10 Mar 2017 13:54:02 -0600
+Subject: [PATCH 11/24] Add filesystem mountpoint support to subject identity.
+
+This modification adds the mountpoint information from the
+superblock description which is tied to the subject identity
+inode to the subject identity description structure.  Two data
+elements are added which are as follows:
+
+device name
+
+filesystem UUID
+
+This is designed to capture the measurement gap where a binary,
+for example, at the /sbin/init location in the initramfs
+filesystem will yield an identical measurement to the same binary
+in the final root filesystem.
+---
+ security/integrity/ima/ima_identity.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/security/integrity/ima/ima_identity.c b/security/integrity/ima/ima_identity.c
+index 720dcb428a13..4fd90d8121de 100644
+--- a/security/integrity/ima/ima_identity.c
++++ b/security/integrity/ima/ima_identity.c
+@@ -48,6 +48,9 @@ struct subject_identity {
+ 	u32 name_length;
+ 	char name[WP256_DIGEST_SIZE];
+ 
++	char s_id[32];
++	u8 s_uuid[16];
++
+ 	char digest[WP256_DIGEST_SIZE];
+ } __attribute__((__packed__));
+ 
+@@ -894,6 +897,13 @@ int ima_get_subject(struct ima_event_data *event_data, char *subject)
+ 		identity.uid = from_kuid(&init_user_ns, inode->i_uid);
+ 		identity.gid = from_kgid(&init_user_ns, inode->i_gid);
+ 		identity.mode = inode->i_mode;
++		memcpy(identity.s_id, inode->i_sb->s_id,
++		       sizeof(identity.s_id));
++		memcpy(identity.s_uuid, inode->i_sb->s_uuid,
++		       sizeof(identity.s_uuid));
++		pr_info("[%s]: name=%s, uuid=%*phN\n", __func__,
++			identity.s_id, (int) sizeof(identity.s_uuid),
++			identity.s_uuid);
+ 	}
+ 
+ 	retn = ima_get_subject_identity(tfm, identity, subject);
+-- 
+2.11.0
+

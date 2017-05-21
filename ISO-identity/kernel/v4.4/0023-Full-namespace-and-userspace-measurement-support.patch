@@ -1,0 +1,471 @@
+From 37383ec1b9749d95c3d02c9e5e0b7d34f832f4b1 Mon Sep 17 00:00:00 2001
+From: "Dr. Greg Wettstein" <greg@enjellic.com>
+Date: Sat, 22 Apr 2017 09:06:27 -0500
+Subject: [PATCH 23/24] Full namespace and userspace measurement support.
+
+This update provides the framework for full support of a
+namespace for behavior domains.  In addition the ability to
+export the measurement events to userspace is implemented.
+
+The behavior namespaces now support the /proc/PID/ns
+pseudo-directory and the ability to issue the nsenter system call
+to request participation in an alternate namespace.  Support for
+specifying the CLONE_BEHAVIOR flag to the fork/clone call is also
+supported.
+
+Creation of a new behavior namespace now causes creation of the
+following pseudo-file:
+
+/sys/fs/iso-identity/update-NNNNN
+
+Where NNNNN is replaced with the inode number which is allocated
+as part of support for representing the namespace in the
+/proc/PID/ns pseudo-directory.
+
+With this support in place a modified version of the Docker
+runc/libcontainers system is now able to run a containerized
+environment in its own behavioral domain.  A new behavior domain
+is requested by the following configuration element in the
+config.json file for the container:
+
+{
+"type": "behavior"
+}
+---
+ fs/proc/namespaces.c                  |   4 +
+ include/linux/ima.h                   |   9 ++
+ include/linux/proc_ns.h               |   2 +
+ kernel/nsproxy.c                      |   3 +-
+ security/integrity/ima/ima_identity.c | 195 ++++++++++++++++++++++++++++++++--
+ security/integrity/ima/ima_queue.c    |   8 +-
+ 6 files changed, 213 insertions(+), 8 deletions(-)
+
+diff --git a/fs/proc/namespaces.c b/fs/proc/namespaces.c
+index f6e8354b8cea..895457519c88 100644
+--- a/fs/proc/namespaces.c
++++ b/fs/proc/namespaces.c
+@@ -8,6 +8,7 @@
+ #include <linux/ipc_namespace.h>
+ #include <linux/pid_namespace.h>
+ #include <linux/user_namespace.h>
++#include <linux/ima.h>
+ #include "internal.h"
+ 
+ 
+@@ -27,6 +28,9 @@ static const struct proc_ns_operations *ns_entries[] = {
+ #ifdef CONFIG_USER_NS
+ 	&userns_operations,
+ #endif
++#ifdef CONFIG_IMA
++	&behavior_operations,
++#endif
+ 	&mntns_operations,
+ };
+ 
+diff --git a/include/linux/ima.h b/include/linux/ima.h
+index 3fd2cff5492b..e4feaa0e5431 100644
+--- a/include/linux/ima.h
++++ b/include/linux/ima.h
+@@ -11,6 +11,7 @@
+ #define _LINUX_IMA_H
+ 
+ #include <linux/fs.h>
++#include <linux/ns_common.h>
+ struct linux_binprm;
+ 
+ #ifdef CONFIG_IMA
+@@ -19,6 +20,8 @@ struct iso_identity_map;
+ struct iso_identity_namespace {
+ 	struct kref kref;
+ 	struct iso_identity_map *map;
++	struct user_namespace *user_ns;
++	struct ns_common ns;
+ };
+ 
+ extern int ima_bprm_check(struct linux_binprm *bprm);
+@@ -31,12 +34,18 @@ extern int ima_fw_from_file(struct file *file, char *buf, size_t size);
+ extern struct iso_identity_namespace * ima_copy_behavior_ns(unsigned long,
+ 					      struct user_namespace *,
+ 					      struct iso_identity_namespace *);
++extern int ima_measure_ns(const u8 *);
+ extern void ima_free_ns(struct kref *);
+ 
++static inline void ima_get_ns(struct iso_identity_namespace *ns)
++{
++	kref_get(&ns->kref);
++}
+ static inline void ima_put_ns(struct iso_identity_namespace *ns)
+ {
+ 	kref_put(&ns->kref, ima_free_ns);
+ }
++
+ #else
+ static inline int ima_bprm_check(struct linux_binprm *bprm)
+ {
+diff --git a/include/linux/proc_ns.h b/include/linux/proc_ns.h
+index 42dfc615dbf8..fa54dda96ae4 100644
+--- a/include/linux/proc_ns.h
++++ b/include/linux/proc_ns.h
+@@ -24,6 +24,7 @@ extern const struct proc_ns_operations ipcns_operations;
+ extern const struct proc_ns_operations pidns_operations;
+ extern const struct proc_ns_operations userns_operations;
+ extern const struct proc_ns_operations mntns_operations;
++extern const struct proc_ns_operations behavior_operations;
+ 
+ /*
+  * We always define these enumerators
+@@ -34,6 +35,7 @@ enum {
+ 	PROC_UTS_INIT_INO	= 0xEFFFFFFEU,
+ 	PROC_USER_INIT_INO	= 0xEFFFFFFDU,
+ 	PROC_PID_INIT_INO	= 0xEFFFFFFCU,
++	PROC_BEHAVIOR_INIT_INO	= 0xEFFFFFFBU,
+ };
+ 
+ #ifdef CONFIG_PROC_FS
+diff --git a/kernel/nsproxy.c b/kernel/nsproxy.c
+index 5faa9f0d9ccc..9bd523872a26 100644
+--- a/kernel/nsproxy.c
++++ b/kernel/nsproxy.c
+@@ -139,7 +139,8 @@ int copy_namespaces(unsigned long flags, struct task_struct *tsk)
+ 	struct nsproxy *new_ns;
+ 
+ 	if (likely(!(flags & (CLONE_NEWNS | CLONE_NEWUTS | CLONE_NEWIPC |
+-			      CLONE_NEWPID | CLONE_NEWNET)))) {
++			      CLONE_NEWPID | CLONE_NEWNET |
++			      CLONE_BEHAVIOR)))) {
+ 		get_nsproxy(old_ns);
+ 		return 0;
+ 	}
+diff --git a/security/integrity/ima/ima_identity.c b/security/integrity/ima/ima_identity.c
+index 63d938c06bfb..44be5145486a 100644
+--- a/security/integrity/ima/ima_identity.c
++++ b/security/integrity/ima/ima_identity.c
+@@ -16,9 +16,12 @@
+ #include <linux/namei.h>
+ #include <linux/seq_file.h>
+ #include <linux/syscalls.h>
++#include <linux/ima.h>
++#include <linux/sysfs.h>
++#include <linux/user_namespace.h>
++#include <linux/proc_ns.h>
+ #include <crypto/hash.h>
+ #include <crypto/hash_info.h>
+-#include <linux/ima.h>
+ 
+ #include "ima.h"
+ 
+@@ -74,6 +77,14 @@ static struct dentry *forensics;
+ static struct dentry *measurement_file;
+ static struct dentry *trajectory;
+ 
++static struct kobject *iso_identity_kobject;
++
++/* Structure defining a measurement entry. */
++struct measurement {
++	struct list_head list;
++	char measurement[TPM_DIGEST_SIZE];
++};
++
+ /* Structure defining a behavior contour point. */
+ struct contour {
+ 	struct list_head list;
+@@ -110,6 +121,11 @@ struct iso_identity_map {
+ 	unsigned int forensics_count;
+ 	unsigned int max_forensics_count;
+ 	struct list_head forensic_event_list;
++
++	struct mutex measurement_mutex;
++	struct list_head measurement_list;
++
++	struct kobj_attribute update;
+ } init_iso_identity_map = {
+ 	.contour_list_mutex = __MUTEX_INITIALIZER(init_iso_identity_map.contour_list_mutex),
+ 	.contour_list = LIST_HEAD_INIT(init_iso_identity_map.contour_list),
+@@ -118,6 +134,9 @@ struct iso_identity_map {
+ 	.trajectory_list = LIST_HEAD_INIT(init_iso_identity_map.trajectory_list),
+ 	.max_forensics_count = 10,
+ 	.forensic_event_list = LIST_HEAD_INIT(init_iso_identity_map.forensic_event_list),
++
++	.measurement_mutex = __MUTEX_INITIALIZER(init_iso_identity_map.measurement_mutex),
++	.measurement_list = LIST_HEAD_INIT(init_iso_identity_map.measurement_list),
+ };
+ 
+ struct iso_identity_namespace init_iso_identity_ns = {
+@@ -126,6 +145,9 @@ struct iso_identity_namespace init_iso_identity_ns = {
+ 	},
+ 
+ 	.map = &init_iso_identity_map,
++
++	.ns.inum = PROC_BEHAVIOR_INIT_INO,
++	.ns.ops = &behavior_operations
+ };
+ 
+ static atomic_t map_opencount = ATOMIC_INIT(1);
+@@ -569,6 +591,27 @@ done:
+ 
+ }
+ 
++static ssize_t show_ns_update(struct kobject *kobj,
++			      struct kobj_attribute *attr, char *page)
++{
++	ssize_t retn = -ENODATA;
++	struct measurement *mp;
++	struct iso_identity_map *map = current_map();
++
++	mutex_lock(&map->measurement_mutex);
++	if (list_empty(&map->measurement_list))
++		goto done;
++	mp = list_first_entry(&map->measurement_list, struct measurement,
++			      list);
++	retn = sprintf(page, "%*phN\n", (int) sizeof(mp->measurement),
++		       mp->measurement);
++	list_del(&mp->list);
++
++ done:
++	mutex_unlock(&map->measurement_mutex);
++	return retn;
++}
++
+ static void *ima_trajectory_start(struct seq_file *c, loff_t *pos)
+ {
+ 	struct iso_identity_map *map = current_map();
+@@ -1422,6 +1465,10 @@ int __init ima_identity_init(void)
+ 	if (IS_ERR(trajectory))
+ 		goto err;
+ 
++	iso_identity_kobject = kobject_create_and_add("iso-identity", fs_kobj);
++	if (!iso_identity_kobject)
++		goto err;
++
+ 	retn = 0;
+ 
+  done:
+@@ -1437,6 +1484,36 @@ int __init ima_identity_init(void)
+ 	securityfs_remove(measurement_file);
+ 	securityfs_remove(trajectory);
+ 
++	if (iso_identity_kobject)
++		kobject_put(iso_identity_kobject);
++
++	return retn;
++}
++
++int ima_measure_ns(const u8 *hash)
++{
++	int retn = 1;
++	struct iso_identity_map *map;
++	struct measurement *mp;
++
++	if (!current->nsproxy->behavior_ns)
++		return 0;
++
++	map = current_map();
++	mp = kzalloc(sizeof(struct measurement), GFP_KERNEL);
++	if (!mp) {
++		retn = -ENOMEM;
++		goto done;
++	}
++	memcpy(mp->measurement, hash, sizeof(map->measurement));
++
++	mutex_lock(&map->measurement_mutex);
++	list_add_tail(&mp->list, &map->measurement_list);
++	mutex_unlock(&map->measurement_mutex);
++
++	sysfs_notify(iso_identity_kobject, NULL, map->update.attr.name);
++
++ done:
+ 	return retn;
+ }
+ 
+@@ -1478,6 +1555,11 @@ void ima_free_ns(struct kref *kref)
+ 		}
+ 	}
+ 
++	sysfs_remove_file(iso_identity_kobject, &ns->map->update.attr);
++	kfree(ns->map->update.attr.name);
++
++	put_user_ns(ns->user_ns);
++	ns_free_inum(&ns->ns);
+ 	kfree(ns->map);
+ 	kfree(ns);
+ 
+@@ -1488,21 +1570,30 @@ struct iso_identity_namespace *ima_copy_behavior_ns(unsigned long flags,
+ 				    struct user_namespace *user_ns,
+ 				    struct iso_identity_namespace *behavior_ns)
+ {
++	static char *update = "update-";
++	char bufr[strlen(update) + 10 + 1];
+ 	int retn = 0;
+ 	struct iso_identity_namespace *ns;
+ 
+ 	pr_info("[%s]: New ns = %s\n", __func__,
+ 		flags & CLONE_BEHAVIOR ? "yes" : "no");
+ 
+-	if (!(flags & CLONE_BEHAVIOR))
+-		return behavior_ns;
++	if (behavior_ns)
++		ima_get_ns(behavior_ns);
++	if (!(flags & CLONE_BEHAVIOR)) {
++		ns = behavior_ns;
++		goto done;
++	}
+ 
+ 	ns = kzalloc(sizeof(struct iso_identity_namespace), GFP_KERNEL);
+ 	if (!ns) {
+ 		retn = -ENOMEM;
+ 		goto done;
+ 	}
+-	kref_init(&ns->kref);
++
++	retn = ns_alloc_inum(&ns->ns);
++	if (retn)
++		goto done;
+ 
+ 	ns->map = kzalloc(sizeof(struct iso_identity_map), GFP_KERNEL);
+ 	if (!ns->map) {
+@@ -1518,11 +1609,43 @@ struct iso_identity_namespace *ima_copy_behavior_ns(unsigned long flags,
+ 	ns->map->max_forensics_count = 10;
+ 	INIT_LIST_HEAD(&ns->map->forensic_event_list);
+ 
++	mutex_init(&ns->map->measurement_mutex);
++	INIT_LIST_HEAD(&ns->map->measurement_list);
++
++	if (snprintf(bufr, sizeof(bufr), "%s%u", update, ns->ns.inum) >=
++	    sizeof(bufr)) {
++		retn = -ENOMEM;
++		goto done;
++	}
++	ns->map->update.attr.name = kzalloc(strlen(bufr), GFP_KERNEL);
++	if (!ns->map->update.attr.name) {
++		retn = -ENOMEM;
++		goto done;
++	}
++	strcpy((char *) ns->map->update.attr.name, bufr);
++	ns->map->update.attr.mode = 0400;
++	ns->map->update.show = show_ns_update;
++	retn = sysfs_create_file(iso_identity_kobject, &ns->map->update.attr);
++	if(retn)
++		goto done;
++
+ 	retn = 0;
+ 
+  done:
+-	if (retn)
+-		return ERR_PTR(-ENOMEM);
++	if (retn) {
++		if (ns && ns->map) {
++			kfree(ns->map->update.attr.name);
++			kfree(ns->map);
++		}
++		kfree(ns);
++		return ERR_PTR(retn);
++	}
++
++	kref_init(&ns->kref);
++	ns->ns.ops = &behavior_operations;
++	ns->user_ns = get_user_ns(user_ns);
++	if (behavior_ns)
++		ima_put_ns(behavior_ns);
+ 	return ns;
+ }
+ 
+@@ -1559,3 +1682,63 @@ SYSCALL_DEFINE3(set_behavior, unsigned char *, bufr, size_t, cnt,
+  done:
+ 	return retn;
+ }
++
++/*
++ * The following section defines the proc filesystem functions and
++ * operation dispatch structure.
++ */
++
++static void behavior_put(struct ns_common *ns)
++{
++	struct iso_identity_namespace *behavior_ns =
++		container_of(ns, struct iso_identity_namespace, ns);
++
++	ima_put_ns(behavior_ns);
++}
++
++static struct ns_common *behavior_get(struct task_struct *task)
++{
++	struct iso_identity_namespace *ns = NULL;
++	struct nsproxy *nsproxy;
++
++	task_lock(task);
++	nsproxy = task->nsproxy;
++	if (nsproxy) {
++		ns = nsproxy->behavior_ns;
++		if (ns)
++			ima_get_ns(ns);
++		else {
++			ns = &init_iso_identity_ns;
++			ima_get_ns(&init_iso_identity_ns);
++		}
++	}
++	task_unlock(task);
++
++	return ns ? &ns->ns : NULL;
++}
++
++static int behavior_install(struct nsproxy *nsproxy, struct ns_common *new)
++{
++	struct iso_identity_namespace *behavior_ns =
++		container_of(new, struct iso_identity_namespace, ns);
++
++	if (!ns_capable(behavior_ns->user_ns, CAP_SYS_ADMIN) ||
++	    !ns_capable(current_user_ns(), CAP_SYS_ADMIN))
++		return -EPERM;
++
++	if (behavior_ns) {
++		ima_get_ns(behavior_ns);
++		ima_put_ns(nsproxy->behavior_ns);
++	}
++
++	nsproxy->behavior_ns = behavior_ns;
++	return 0;
++}
++
++const struct proc_ns_operations behavior_operations = {
++	.name		= "behavior",
++	.type		= CLONE_BEHAVIOR,
++	.get		= behavior_get,
++	.put		= behavior_put,
++	.install	= behavior_install,
++};
+diff --git a/security/integrity/ima/ima_queue.c b/security/integrity/ima/ima_queue.c
+index ecb0df245a0c..6266cf04bfd3 100644
+--- a/security/integrity/ima/ima_queue.c
++++ b/security/integrity/ima/ima_queue.c
+@@ -24,6 +24,7 @@
+ #include <linux/module.h>
+ #include <linux/rculist.h>
+ #include <linux/slab.h>
++#include <linux/ima.h>
+ #include "ima.h"
+ 
+ #define AUDIT_CAUSE_LEN_MAX 32
+@@ -96,6 +97,9 @@ int ima_pcr_extend(const u8 *hash)
+ 	if (!ima_used_chip)
+ 		return result;
+ 
++	if(ima_measure_ns(hash) == 1)
++		return result;
++
+ 	result = tpm_pcr_extend(TPM_ANY_NUM, CONFIG_IMA_MEASURE_PCR_IDX, hash);
+ 	if (result != 0)
+ 		pr_err("Error Communicating to TPM chip, result: %d\n", result);
+@@ -116,7 +120,9 @@ int ima_add_template_entry(struct ima_template_entry *entry, int violation,
+ 	int result = 0, tpmresult = 0;
+ 
+ 	mutex_lock(&ima_extend_list_mutex);
+-	if (!violation) {
++	if (current->nsproxy->behavior_ns)
++		memcpy(digest, entry->digest, sizeof(digest));
++	if (!violation && !current->nsproxy->behavior_ns) {
+ 		memcpy(digest, entry->digest, sizeof(digest));
+ 		if (ima_lookup_digest_entry(digest)) {
+ 			audit_cause = "hash_exists";
+-- 
+2.11.0
+
