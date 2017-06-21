@@ -248,18 +248,17 @@ struct SGX_secs {
  * SGX driver ioctl which implements access to the privileged ENCLS
  * instructions.
  */
-#define SGX_IOCTL_ENCLAVE_INIT	    _IOW('p', 0x04, struct SGX_init_param)
+#define SGX_IOCTL_ENCLAVE_INIT	    _IOW(0xa4, 0x02, struct SGX_init_param)
 
 
 /**
  * Structure used as the arguement to the ioctl which creates an
  * SGX enclave.
  */
-#define SGX_IOCTL_ENCLAVE_CREATE   _IOWR('p', 0x02, struct SGX_create_param)
+#define SGX_IOCTL_ENCLAVE_CREATE   _IOW(0xa4, 0x00, struct SGX_create_param)
 
 struct SGX_create_param {
 	void *secs;
-	unsigned long addr;
 };
 
 
@@ -275,7 +274,7 @@ struct SGX_create_param {
 #define SGX_PAGE_ADD	0x1
 #define SGX_PAGE_EXTEND	0x2
 
-#define SGX_IOCTL_ENCLAVE_ADD_PAGE _IOW('p', 0x03, struct SGX_add_param)
+#define SGX_IOCTL_ENCLAVE_ADD_PAGE _IOW(0xa4, 0x01, struct SGX_add_param)
 
 /**
  * The following defines an enumeration which indicate the access
@@ -336,8 +335,8 @@ struct SGX_add_param {
 	unsigned long addr;
 	unsigned long user_addr;
 	struct SGX_secinfo *secinfo;
-	unsigned int flags;
-};
+	uint16_t mrmask;
+} __attribute__((packed));
 
 
 /**
@@ -363,16 +362,6 @@ struct SGX_init_param {
 	void *sigstruct;
 	struct SGX_einittoken *einittoken;
 } __attribute__((packed));
-
-
-/**
- * Definitions and structures used to destroy an enclave.
- */
-#define SGX_IOCTL_ENCLAVE_DESTROY  _IOW('p', 0x06, struct SGX_destroy_param)
-
-struct SGX_destroy_param {
-	unsigned long addr;
-};
 
 
 /**

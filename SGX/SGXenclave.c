@@ -298,6 +298,11 @@ static _Bool create_enclave(CO(SGXenclave, this))
 
 	_Bool retn = false;
 
+	void *address;
+
+	uint64_t addr,
+		 base;
+
 	struct SGX_create_param create_param;
 
 
@@ -305,19 +310,33 @@ static _Bool create_enclave(CO(SGXenclave, this))
 	if ( S->poisoned )
 		ERR(goto done);
 
+	/* Create an appropriate memory mapping for the enclave. */
+	if ( (address = mmap(NULL, S->secs.size * 2,		 \
+			     PROT_READ | PROT_WRITE | PROT_EXEC, \
+			     MAP_SHARED, S->fd, 0)) == NULL )
+		ERR(goto done);
+
+	addr = (uint64_t) address;
+	base = addr + (S->secs.size - (addr % S->secs.size));
+	S->secs.base = base;
+
+	munmap(address, S->secs.base - addr);
+	if ( (addr + S->secs.size*2) != (S->secs.base + S->secs.size) )
+		munmap((void *) (S->secs.base + S->secs.size), \
+		       addr + S->secs.size - S->secs.base);
+
 
 	/* Create the enclave based on the SECS parameters. */
 	create_param.secs = &S->secs;
-	create_param.addr = 0;
 
 	if ( ioctl(S->fd, SGX_IOCTL_ENCLAVE_CREATE, &create_param) < 0 )
 		ERR(goto done);
 	if ( S->debug ) {
 		fputs("Enclave created:\n", stdout);
 		fprintf(stdout, "\tSize: 0x%lx\n", S->secs.size);
-		fprintf(stdout, "\tStart: 0x%lx\n", create_param.addr);
+		fprintf(stdout, "\tStart: 0x%lx\n", S->secs.base);
 	}
-	S->enclave_address = create_param.addr;
+	S->enclave_address = S->secs.base;
 
 	retn = true;
 
@@ -688,8 +707,9 @@ static _Bool add_page(CO(SGXenclave, this), CO(uint8_t *, page), \
 	add_param.addr	    = S->enclave_address + (4096 * S->page_cnt);
 	add_param.user_addr = (unsigned long) page;
 	add_param.secinfo   = secinfo;
-	if ( !(flags & SGX_PAGE_EXTEND) )
-		add_param.flags |= SGX_PAGE_ADD;
+
+	if ( flags & SGX_PAGE_EXTEND )
+		add_param.mrmask |= 0xFFFF;
 
 	if ( ioctl(S->fd, SGX_IOCTL_ENCLAVE_ADD_PAGE, &add_param) < 0 ) {
 		perror("page add error");
@@ -1209,14 +1229,9 @@ static void whack(CO(SGXenclave, this))
 {
 	STATE(S);
 
-	struct SGX_destroy_param destroy_param;
 
-
-	if ( S->enclave_address != 0 ) {
-		destroy_param.addr = S->enclave_address;
-		ioctl(S->fd, SGX_IOCTL_ENCLAVE_DESTROY, &destroy_param);
-	}
-
+	if ( S->enclave_address != 0 )
+		munmap((void *) S->enclave_address, S->secs.size);
 	if ( S->fd != -1 )
 		close(S->fd);
 
