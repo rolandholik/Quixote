@@ -4,12 +4,12 @@
 
 
 # Variable declarations.
-CSRC = sgx-check.c sgx-test.c sgx-metadata.c SGXmetadata.c SGXloader.c \
+CSRC = sgx-check.c sgx-metadata.c SGXmetadata.c SGXloader.c \
 	SGXenclave.c SGXsigstruct.c test-ecall.c sgx-ocall.c
 
 ASRC = boot-sgx.s
 
-TOOLS = sgx-check sgx-test sgx-metadata sgx-loader sgx-load sgx-sigstruct \
+TOOLS = sgx-check sgx-metadata sgx-loader sgx-load sgx-sigstruct \
 	sgx-gen-token gen-white-list test-ecall test-pcr idf-sgx-fandf	  \
 	idf-sgx-fandf-unibin
 
@@ -65,9 +65,6 @@ tools: ${TOOLS}
 demos: idf-sgx-fandf idf-sgx-fandf-unibin
 
 sgx-check: sgx-check.o
-	${CC} ${LDFLAGS} -o $@ $^;
-
-sgx-test: sgx-test.o
 	${CC} ${LDFLAGS} -o $@ $^;
 
 sgx-metadata: sgx-metadata.o SGXmetadata.o
