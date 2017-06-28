@@ -64,11 +64,13 @@ static _Bool enclave_loop(CO(SGXenclave, enclave))
 {
 	_Bool retn = false;
 
+	char *p;
+
 	uint8_t lp;
 
-	int rc;
-
 	uint8_t inbufr[1024];
+
+	int rc;
 
 
 	while ( true ) {
@@ -80,10 +82,15 @@ static _Bool enclave_loop(CO(SGXenclave, enclave))
 			retn = true;
 			goto done;
 		}
+		if ( (p = strrchr((char *) inbufr, '\n')) != NULL )
+			*p = '\0';
+		if ( strcmp((char *) inbufr, "quit") == 0 ) {
+			retn = true;
+			goto done;
+		}
 
 		ecall0_table.len    = strlen((char *) inbufr);
 		ecall0_table.buffer = (uint8_t *) inbufr;
-
 		if ( !enclave->boot_slot(enclave, 0, &ocall_table, \
 					 &ecall0_table, &rc) ) {
 			fprintf(stderr, "Enclave returned: %d\n", rc);
@@ -92,17 +99,17 @@ static _Bool enclave_loop(CO(SGXenclave, enclave))
 
 		memset(inbufr, '\0', sizeof(inbufr));
 		ecall1_table.len    = sizeof(inbufr);
-		ecall1_table.buffer = inbufr;
+		ecall1_table.buffer = (uint8_t *) inbufr;
 		if ( !enclave->boot_slot(enclave, 1, &ocall_table, \
 					 &ecall1_table, &rc) ) {
 			fprintf(stderr, "Enclave returned: %d\n", rc);
 			goto done;
 		}
 
-		fputs("PCR:\n", stdout);
+		fputs("Measurement:\n", stdout);
 		for (lp= 0; lp < 32; ++lp)
 			fprintf(stdout, "%02x", inbufr[lp]);
-		fputc('\n', stdout);
+		fputs("\n\n", stdout);
 	}
 
 
@@ -146,6 +153,16 @@ extern int main(int argc, char *argv[])
 
 	File token_file = NULL;
 
+
+	/* Output header. */
+	fprintf(stdout, "%s: IDfusion SGX enclave PCR test utility.\n", \
+		"test-pcr");
+	fprintf(stdout, "%s: (C)Copyright 2017, IDfusion, LLC. All rights "
+		"reserved.\n\n", "test-pcr");
+	fputs("Typed input will added to a SHA256 based measurement value "
+	      "maintained\n", stdout);
+	fputs("in an enclave.\n", stdout);
+	fputs("Type 'quit' to terminate.\n\n", stdout);
 
 	/* Parse and verify arguements. */
 	while ( (opt = getopt(argc, argv, "dne:t:")) != EOF )
