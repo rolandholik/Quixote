@@ -41,7 +41,9 @@ extern int main(int argc, char *argv[])
 	    retn = 1;
 
 	char *infile = NULL,
-	     *string = NULL;
+	     *string = NULL,
+	     *base   = NULL,
+	     *extend = NULL;
 
 	Buffer bufr = NULL;
 
@@ -51,15 +53,24 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "nf:s:")) != EOF )
+	while ( (opt = getopt(argc, argv, "nb:e:f:s:")) != EOF )
 		switch ( opt ) {
 			case 'n':
 				null = true;
-			
+				break;
+
+			case 'b':
+				base = optarg;
+				break;
+
+			case 'e':
+				extend = optarg;
+				break;
+
 			case 'f':
 				infile = optarg;
 				break;
-			
+
 			case 's':
 				string = optarg;
 				break;
@@ -106,7 +117,24 @@ extern int main(int argc, char *argv[])
 			ERR(goto done);
 		sha256->print(sha256);
 	}
-		
+
+	/* Compute the value of a base and extension. */
+	if ( (base != NULL) && (extend != NULL) ) {
+		INIT(HurdLib, Buffer, bufr, ERR(goto done));
+		INIT(NAAAIM, SHA256, sha256, ERR(goto done));
+
+		bufr->add_hexstring(bufr, base);
+		sha256->add(sha256, bufr);
+
+		bufr->reset(bufr);
+		bufr->add_hexstring(bufr, extend);
+		sha256->add(sha256, bufr);
+
+		if ( !sha256->compute(sha256) )
+			ERR(goto done);
+		sha256->print(sha256);
+	}
+
 
  done:
 	WHACK(bufr);
