@@ -4,11 +4,12 @@
 
 
 # Variable declarations.
-CSRC = Duct.c OTEDKS.c Curve25519.c IPC.c SoftwareStatus.c Ivy.c IDmgr.c \
-	TPMcmd.c TPM2cmd.c PossumPacket.c PossumPipe.c RSAkey.c SmartCard.c
+CSRC = Duct.c OTEDKS.c Curve25519.c IPC.c SoftwareStatus.c Ivy.c IDmgr.c    \
+	TPMcmd.c TPM2cmd.c PossumPacket.c PossumPipe.c RSAkey.c SmartCard.c \
+	LocalDuct.c
 
 TESTS = Duct_test OTEDKS_test Curve25519_test IPC_test PossumPipe_test \
-	RSAkey_test SmartCard_test
+	RSAkey_test LocalDuct_test #SmartCard_test
 
 CC = musl-gcc
 
@@ -64,6 +65,9 @@ ${LIBRARY}: ${COBJS}
 tests: ${TESTS} ${COBJS}
 
 Duct_test: Duct_test.o Duct.o
+	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib
+
+LocalDuct_test: LocalDuct_test.o LocalDuct.o
 	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib
 
 OTEDKS_test: OTEDKS_test.o OTEDKS.o ../SHA256.o ../IDtoken.o ../SHA256_hmac.o

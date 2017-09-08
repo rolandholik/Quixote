@@ -58,19 +58,20 @@
 #define NAAAIM_TPMcmd_OBJID		25
 #define NAAAIM_PossumPipe_OBJID		26
 #define NAAAIM_TPM2cmd_OBJID		27
+#define NAAAIM_LocalDuct_OBJID		28
 
-#define NAAAIM_Netconfig_OBJID		28
-#define NAAAIM_IPsec_OBJID		29
-#define NAAAIM_SoftwareTPM_OBJID	30
-#define NAAAIM_IDengine_OBJID		31
-#define NAAAIM_Identity_OBJID		32
-#define NAAAIM_EDIpacket_OBJID		33
-#define NAAAIM_MGMTsupvr_OBJID		34
+#define NAAAIM_Netconfig_OBJID		29
+#define NAAAIM_IPsec_OBJID		30
+#define NAAAIM_SoftwareTPM_OBJID	31
+#define NAAAIM_IDengine_OBJID		32
+#define NAAAIM_Identity_OBJID		33
+#define NAAAIM_EDIpacket_OBJID		34
+#define NAAAIM_MGMTsupvr_OBJID		35
 
-#define NAAAIM_SGXmetadata_OBJID	35
-#define NAAAIM_SGXloader_OBJID		36
-#define NAAAIM_SGXenclave_OBJID		37
-#define NAAAIM_SGXsigstruct_OBJID	38
+#define NAAAIM_SGXmetadata_OBJID	36
+#define NAAAIM_SGXloader_OBJID		37
+#define NAAAIM_SGXenclave_OBJID		38
+#define NAAAIM_SGXsigstruct_OBJID	39
 
-#define NAAAIM_Actor_OBJID		39
-#define NAAAIM_Subject_OBJID		40
+#define NAAAIM_Actor_OBJID		40
+#define NAAAIM_Subject_OBJID		41
