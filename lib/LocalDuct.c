@@ -519,6 +519,69 @@ static _Bool eof(CO(LocalDuct, this))
 /**
  * External public method.
  *
+ * This method implements querying for the socket file descriptor
+ * of the socket.  This is to faciliate polling of the socket for
+ * connection requests.
+ *
+ * \param this		The LocalDuct object whose client status is to
+ *			be determined.
+ *
+ * \return		A false value indicates that an error was
+ *			encountered while obtaining the file descriptor.
+ *			A true value indicates a valid file descriptor
+ *			has been returned to the location specified by
+ *			the pointer arguement to this method.
+ */
+
+static _Bool get_socket(CO(LocalDuct, this), int *fd)
+
+{
+	STATE(S);
+
+
+	if ( S->poisoned ) {
+		fprintf(stderr, "%s: Poisoned.\n", __func__);
+		return false;
+	}
+
+	*fd = S->sockt;
+	return true;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements querying for the file descriptor used for
+ * communications with a client.
+ *
+ * \param this		The LocalDuct object whose file descriptor is
+ *			to be returned.
+ *
+ * \return		A false value indicates that a file descriptor
+ *			could not be retrieved.  A true value means a
+ *			valid file descriptor has been placed in the
+ *			location pointed to by the arguement to the
+ *			function.
+ */
+
+static _Bool get_fd(CO(LocalDuct, this), int *fd)
+
+{
+	STATE(S);
+
+
+	if ( S->poisoned )
+		return false;
+
+	*fd = S->fd;
+	return true;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements resetting of a LocalDuct object.  Its primary use
  * is in a server object to reset the accepted file descriptor.
  *
@@ -635,6 +698,8 @@ extern LocalDuct NAAAIM_LocalDuct_Init(void)
 	this->send_Buffer	= send_Buffer;
 	this->receive_Buffer	= receive_Buffer;
 
+	this->get_socket	= get_socket;
+	this->get_fd		= get_fd;
 	this->eof		= eof;
 
 	this->reset		= reset;

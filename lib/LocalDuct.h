@@ -35,6 +35,9 @@ struct NAAAIM_LocalDuct
 	_Bool (*send_Buffer)(const LocalDuct, const Buffer);
 	_Bool (*receive_Buffer)(const LocalDuct, const Buffer);
 
+	_Bool (*get_socket)(const LocalDuct, int *);
+	_Bool (*get_fd)(const LocalDuct, int *);
+
 	_Bool (*eof)(const LocalDuct);
 	void (*reset)(const LocalDuct);
 	_Bool (*whack_connection)(const LocalDuct);
