@@ -634,15 +634,15 @@ static void whack(CO(LocalDuct, this))
 	/* Close the I/O socket. */
 	if ( S->fd != -1 ) {
 		shutdown(S->fd, SHUT_RDWR);
-		if ( S->type == server )
-			close(S->fd);
+		close(S->fd);
 	}
 	shutdown(S->sockt, SHUT_RDWR);
 	close(S->sockt);
 
-	/* Unlink the socket if it is present. */
+	/* Unlink the socket if this is a server instance.. */
 	if ( S->path != NULL ) {
-		unlink(S->path->get(S->path));
+		if ( S->type == server )
+			unlink(S->path->get(S->path));
 		S->path->whack(S->path);
 	}
 
