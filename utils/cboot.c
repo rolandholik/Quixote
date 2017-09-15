@@ -32,6 +32,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <poll.h>
+#include <signal.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -54,6 +55,37 @@
  * The following variable holds the current measurement.
  */
 static unsigned char Measurement[32];
+
+/**
+ * The following variable holds booleans which describe signals
+ * which were received.
+ */
+struct {
+	_Bool sigint;
+} Signals;
+
+
+/**
+ * Private function.
+ *
+ * This function implements the signal handler for the utility.  It
+ * sets the signal type in the Signals structure.
+ *
+ * \param signal	The number of the signal which caused the
+ *			handler to execute.
+ */
+
+void signal_handler(int signal)
+
+{
+	switch ( signal ) {
+		case SIGINT:
+			Signals.sigint = true;
+			break;
+	}
+
+	return;
+}
 
 
 /**
@@ -192,6 +224,8 @@ extern int main(int argc, char *argv[])
 
 	struct pollfd poll_data[2];
 
+	struct sigaction signal_action;
+
 	Buffer cmdbufr = NULL;
 
 	LocalDuct mgmt = NULL;
@@ -203,6 +237,16 @@ extern int main(int argc, char *argv[])
 				update_file = optarg;
 				break;
 		}
+
+
+	/* Setup signal handling. */
+	if ( sigemptyset(&signal_action.sa_mask) == -1 )
+		ERR(goto done);
+
+	signal_action.sa_flags = 0;
+	signal_action.sa_handler = signal_handler;
+	if ( sigaction(SIGINT, &signal_action, NULL) == -1 )
+		goto done;
 
 
 	/* Open a connection to the update file. */
@@ -261,6 +305,8 @@ extern int main(int argc, char *argv[])
 		fprintf(stderr, "Poll cycle: %d\n", ++opt);
 		retn = poll(poll_data, 2, -1);
 		if ( retn < 0 ) {
+			if ( Signals.sigint )
+				break;
 			fprintf(stderr, "Poll error: cause=%s\n", \
 				strerror(errno));
 			goto done;
