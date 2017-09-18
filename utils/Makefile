@@ -129,8 +129,11 @@ mgmt-set-key: mgmt-set-key.o MGMTsupvr.o ../RandomBuffer.o
 tpm2-cmd: tpm2-cmd.o ../RandomBuffer.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltss ${SSL_CRYPTO};
 
-cboot: cboot.o ../SHA256.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
+cboot: cboot.o ../SHA256.o ../SGX/SGXenclave.o ../SGX/SGXloader.o	\
+	../SGX/SGXmetadata.o ../SGX/SGXsigstruct.o ../SGX/boot-sgx.o	\
+	../SGX/sgx-ocall.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO} \
+		-Wl,--rpath /usr/local/musl/lib -lelf
 
 cboot-mgr: cboot-mgr.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS}
