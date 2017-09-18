@@ -70,6 +70,11 @@ static unsigned char Measurement[32];
  */
 struct {
 	_Bool sigint;
+	_Bool sigterm;
+	_Bool sighup;
+	_Bool sigquit;
+
+	_Bool stop;
 } Signals;
 
 /**
@@ -131,7 +136,16 @@ void signal_handler(int signal)
 {
 	switch ( signal ) {
 		case SIGINT:
-			Signals.sigint = true;
+			Signals.stop = true;
+			break;
+		case SIGTERM:
+			Signals.stop = true;
+			break;
+		case SIGHUP:
+			Signals.stop = true;
+			break;
+		case SIGQUIT:
+			Signals.stop = true;
 			break;
 	}
 
@@ -441,6 +455,12 @@ extern int main(int argc, char *argv[])
 	signal_action.sa_handler = signal_handler;
 	if ( sigaction(SIGINT, &signal_action, NULL) == -1 )
 		goto done;
+	if ( sigaction(SIGTERM, &signal_action, NULL) == -1 )
+		goto done;
+	if ( sigaction(SIGHUP, &signal_action, NULL) == -1 )
+		goto done;
+	if ( sigaction(SIGQUIT, &signal_action, NULL) == -1 )
+		goto done;
 
 
 	/* Setup measurement enclave if SGX is being used. */
@@ -513,7 +533,7 @@ extern int main(int argc, char *argv[])
 		fprintf(stderr, "Poll cycle: %d\n", ++opt);
 		retn = poll(poll_data, 2, -1);
 		if ( retn < 0 ) {
-			if ( Signals.sigint )
+			if ( Signals.stop )
 				break;
 			fprintf(stderr, "Poll error: cause=%s\n", \
 				strerror(errno));
