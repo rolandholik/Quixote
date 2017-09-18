@@ -272,7 +272,8 @@ static _Bool add_measurement(CO(char *, bufr))
 			ERR(goto done);
 		}
 
-		return true;
+		retn = true;
+		goto done;
 	}
 
 
@@ -603,6 +604,7 @@ extern int main(int argc, char *argv[])
  done:
 	WHACK(cmdbufr);
 	WHACK(mgmt);
+	WHACK(Enclave);
 
 	if ( fd > 0 )
 		close(fd);
