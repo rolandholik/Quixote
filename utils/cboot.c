@@ -28,18 +28,26 @@
 #define SGX_DEVICE "/dev/isgx"
 #define SGX_ENCLAVE "/lib/sgx-pcr.signed.so"
 
+#define CLONE_BEHAVIOR 0x00001000
+
+#define _GNU_SOURCE
+
 
 /* Include files. */
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
 #include <poll.h>
 #include <signal.h>
+#include <limits.h>
+#include <sched.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <fcntl.h>
 #include <linux/un.h>
 
@@ -73,8 +81,9 @@ struct {
 	_Bool sigterm;
 	_Bool sighup;
 	_Bool sigquit;
-
 	_Bool stop;
+
+	_Bool sigchild;
 } Signals;
 
 /**
@@ -147,9 +156,40 @@ void signal_handler(int signal)
 		case SIGQUIT:
 			Signals.stop = true;
 			break;
+		case SIGCHLD:
+			Signals.sigchild = true;
+			break;
 	}
 
 	return;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function implements checking for whether or not the canister
+ * process has terminated.
+ *
+ * \param canister_pid	The pid of the canister.
+ *
+ *
+ * \return		A boolean value is used to indicate whether
+ *			or not the designed process has exited.  A
+ *			false value indicates it has not while a
+ *			true value indicates it has.
+ */
+
+static _Bool child_exited(const pid_t canister)
+
+{
+	int status;
+
+
+	if ( waitpid(canister, &status, WNOHANG) != canister )
+		return false;
+
+	return true;
 }
 
 
@@ -404,6 +444,63 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 }
 
 
+/**
+ * Private function.
+ *
+ * This function sets up a namespace and returns a file descriptor
+ * to the caller which references the namespace specific /sysfs
+ * measurement file.
+ *
+ * \param fdptr		A pointer to the variable which will hold the
+ *			file descriptor for the canister measurement
+ *			file.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not the the creation of the namespace was
+ *			successful.  A false value indicates setup of
+ *			the namespace was unsuccessful while a true
+ *			value indicates the namespace is setup and
+ *			ready to be measured.
+ */
+
+static _Bool setup_namespace(int *fdptr)
+
+{
+	_Bool retn = false;
+
+	char fname[PATH_MAX];
+
+	int fd;
+
+	struct stat statbuf;
+
+
+	if ( unshare(CLONE_BEHAVIOR) < 0 ) {
+		perror("Unsharing behavior domain");
+		ERR(goto done);
+	}
+
+	if ( stat("/proc/self/ns/behavior", &statbuf) < 0 )
+		ERR(goto done);
+
+	memset(fname, '\0', sizeof(fname));
+	if ( snprintf(fname, sizeof(fname), "/sys/fs/iso-identity/update-%u", \
+		      (unsigned int) statbuf.st_ino) >= sizeof(fname) )
+		ERR(goto done);
+	fprintf(stderr, "Update file: %s\n", fname);
+
+	if ( (fd = open(fname, O_RDONLY)) < 0 )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	if ( retn )
+		*fdptr = fd;
+	return retn;
+}
+
+
 /*
  * Program entry point begins here.
  */
@@ -413,8 +510,9 @@ extern int main(int argc, char *argv[])
 {
 	_Bool connected = false;
 
-	char *token	  = NULL,
-	     *update_file = NULL,
+	char *token	    = NULL,
+	     *bundle	    = NULL,
+	     *canister_name = NULL,
 	     bufr[20 * 2 + 2],
 	     sockname[UNIX_PATH_MAX];
 
@@ -422,24 +520,29 @@ extern int main(int argc, char *argv[])
 	    fd	 = 0,
 	    retn = 1;
 
+	pid_t canister_pid;
+
 	struct pollfd poll_data[2];
 
 	struct sigaction signal_action;
-
 
 	Buffer cmdbufr = NULL;
 
 	LocalDuct mgmt = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "Sf:t:")) != EOF )
+	while ( (opt = getopt(argc, argv, "Sb:n:t:")) != EOF )
 		switch ( opt ) {
 			case 'S':
 				Mode = sgx;
 				break;
 
-			case 'f':
-				update_file = optarg;
+			case 'b':
+				bundle = optarg;
+				break;
+
+			case 'n':
+				canister_name = optarg;
 				break;
 
 			case 't':
@@ -448,7 +551,14 @@ extern int main(int argc, char *argv[])
 		}
 
 
-	/* Setup signal handling. */
+	/* Verify we have a canister name. */
+	if ( canister_name == NULL ) {
+		fputs("No canister name specified.\n", stderr);
+		goto done;
+	}
+
+
+	/* Setup signal handlers. */
 	if ( sigemptyset(&signal_action.sa_mask) == -1 )
 		ERR(goto done);
 
@@ -478,21 +588,6 @@ extern int main(int argc, char *argv[])
 	}
 
 
-	/* Open a connection to the update file. */
-	if ( update_file == NULL ) {
-		fputs("No update file specified.\n", stderr);
-		goto done;
-	}
-
-	if ( (fd = open(update_file, O_RDONLY)) < 0 ) {
-		fprintf(stderr, "Cannot open update file: errno=%d - %s\n", \
-			errno, strerror(errno));
-		goto done;
-	}
-	poll_data[0].fd = fd;
-	poll_data[0].events = POLLPRI;
-
-
 	/* Setup the management socket. */
 	if ( snprintf(sockname, sizeof(sockname), "%s.%u", SOCKNAME, getpid())
 	     >= sizeof(sockname) ) {
@@ -515,6 +610,52 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
+
+	/* Setup the behavior namespace. */
+	if ( !setup_namespace(&fd) )
+		ERR(goto done);
+
+
+	/*
+	 * At this point in time we will create a subordinate process
+	 * from which we will start the canister.
+	 */
+	canister_pid = fork();
+	if ( canister_pid == -1 ) {
+		fputs("Error creating canister process.\n", stderr);
+		goto done;
+	}
+
+
+	/* Child process - start the canister process. */
+	if ( canister_pid == 0 ) {
+		close(fd);
+		mgmt->get_socket(mgmt, &fd);
+		close(fd);
+
+		if ( bundle == NULL )
+			execlp("runc", "runc", "run", canister_name, NULL);
+		else
+			execlp("runc", "runc", "run", "-b", bundle, \
+			       canister_name, NULL);
+
+		fputs("Canister execution failed.\n", stderr);
+		exit(1);
+	}
+
+
+	/*
+	 * Parent process - install a SIGCHLD handler to monitor for
+	 * canister exit.
+	 */
+	if ( sigaction(SIGCHLD, &signal_action, NULL) == -1 )
+		goto done;
+
+
+	/* Poll for measurement and/or management requests. */
+	poll_data[0].fd = fd;
+	poll_data[0].events = POLLPRI;
+
 	if ( !mgmt->get_socket(mgmt, &poll_data[1].fd) ) {
 		fputs("Error setting up polling data.\n", stderr);
 		goto done;
@@ -536,6 +677,12 @@ extern int main(int argc, char *argv[])
 		if ( retn < 0 ) {
 			if ( Signals.stop )
 				break;
+			if ( Signals.sigchild ) {
+				if ( !child_exited(canister_pid) )
+					continue;
+				fputs("Canister exited.\n", stdout);
+				goto done;
+			}
 			fprintf(stderr, "Poll error: cause=%s\n", \
 				strerror(errno));
 			goto done;
