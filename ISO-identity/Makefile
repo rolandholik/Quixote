@@ -4,10 +4,10 @@
 
 
 # Variable declarations.
-CSRC = Actor.c Subject.c
+CSRC = Actor.c Subject.c cboot.c cboot-mgr.c
 
 TOOLS = test-actor test-subject generate-contours sha-tool \
-	compute-measurement set-behavior
+	compute-measurement set-behavior cboot cboot-mgr
 
 CC = musl-gcc
 
@@ -73,6 +73,15 @@ sha-tool: sha-tool.o ../SHA256.o
 set-behavior: set-behavior.o
 	${CC} ${LDFLAGS} -o $@ $^ ${HURDLIB}
 
+cboot: cboot.o ../SHA256.o ../SGX/SGXenclave.o ../SGX/SGXloader.o	\
+	../SGX/SGXmetadata.o ../SGX/SGXsigstruct.o ../SGX/boot-sgx.o	\
+	../SGX/sgx-ocall.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO} \
+		-Wl,--rpath /usr/local/musl/lib -lelf
+
+cboot-mgr: cboot-mgr.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS}
+
 tags:
 	/opt/emacs/bin/etags *.{h,c};
 clean:
@@ -89,3 +98,7 @@ Actor.o: Actor.h
 # SGXloader.o: SGX.h SGXloader.h
 # SGXenclave.o: SGX.h SGXenclave.h SGXmetadata.h SGXloader.h
 # SGXsigstruct.o: SGX.h SGXsigstruct.h
+
+cboot.o: cboot.h
+
+cboot-mgr.o: cboot.h

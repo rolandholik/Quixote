@@ -5,13 +5,13 @@
 
 # Variable declarations.
 CSRC = gen-image.c load-image.c boot.c Netconfig.c IPsec.c SoftwareTPM.c \
-	device-supvr.c mgmt-supvr.c MGMTsupvr.c vm-supvr.c copy-edid.c	 \
-	cboot.c cboot-mgr.c
+	device-supvr.c mgmt-supvr.c MGMTsupvr.c vm-supvr.c copy-edid.c
+
 
 TOOLS = gen-image load-image boot sboot init possum gen-id-verifier	\
 	software-status software-tpm tpm-cmd id-set idmgr net-config	\
 	idtest device-supvr mgmt-supvr mgmt-set-key vm-supvr copy-edid	\
-	tpm2-cmd cboot cboot-mgr
+	tpm2-cmd
 
 CC = musl-gcc
 
@@ -129,15 +129,6 @@ mgmt-set-key: mgmt-set-key.o MGMTsupvr.o ../RandomBuffer.o
 tpm2-cmd: tpm2-cmd.o ../RandomBuffer.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltss ${SSL_CRYPTO};
 
-cboot: cboot.o ../SHA256.o ../SGX/SGXenclave.o ../SGX/SGXloader.o	\
-	../SGX/SGXmetadata.o ../SGX/SGXsigstruct.o ../SGX/boot-sgx.o	\
-	../SGX/sgx-ocall.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO} \
-		-Wl,--rpath /usr/local/musl/lib -lelf
-
-cboot-mgr: cboot-mgr.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS}
-
 tags:
 	/opt/emacs/bin/etags *.{h,c};
 clean:
@@ -155,7 +146,3 @@ possum.o: Netconfig.h IPsec.h ../IDtoken.h ../SHA256_hmac.h \
 mgmt-supvr.o: MGMTsupvr.h
 
 gen-id-verifier.o:
-
-cboot.o: cboot.h
-
-cboot-mgr.o: cboot.h
