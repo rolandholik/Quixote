@@ -73,9 +73,9 @@ sha-tool: sha-tool.o ../SHA256.o
 set-behavior: set-behavior.o
 	${CC} ${LDFLAGS} -o $@ $^ ${HURDLIB}
 
-cboot: cboot.o ../SHA256.o ../SGX/SGXenclave.o ../SGX/SGXloader.o	\
-	../SGX/SGXmetadata.o ../SGX/SGXsigstruct.o ../SGX/boot-sgx.o	\
-	../SGX/sgx-ocall.o
+cboot: cboot.o ../SHA256.o Actor.o Subject.o ../SGX/SGXenclave.o	\
+	../SGX/SGXloader.o ../SGX/SGXmetadata.o ../SGX/SGXsigstruct.o	\
+	../SGX/boot-sgx.o ../SGX/sgx-ocall.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO} \
 		-Wl,--rpath /usr/local/musl/lib -lelf
 
