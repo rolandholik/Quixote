@@ -70,13 +70,16 @@
 
 
 /**
+ * The trajectory list for the canister.
+ */
+static Buffer Trajectory = NULL;
+
+/**
  * Event objects are declared statically to avoid the overhead of
  * object construction/destruction at potentially high event rates.
  */
 static Actor ActorID     = NULL;
 static Subject SubjectID = NULL;
-
-static String Event = NULL;
 
 
 /**
@@ -361,6 +364,8 @@ static _Bool add_measurement(CO(char *, bufr))
 		ERR(goto done);
 
 	memcpy(Measurement, bf->get(bf), bf->size(bf));
+	fprintf(stderr, "Add measurement: %s\n", bufr);
+
 	retn = true;
 
 
@@ -387,7 +392,7 @@ static _Bool add_measurement(CO(char *, bufr))
  *			a true value indicates the addition succeeded.
  */
 
-static _Bool add_event(CO(char *, event))
+static _Bool add_event(CO(char *, inbufr))
 
 {
 	_Bool retn = false;
@@ -396,26 +401,35 @@ static _Bool add_event(CO(char *, event))
 
 	Buffer bufr = NULL;
 
+	String event = NULL;
+
 
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 
 
-	if ( !Event->add(Event, event) )
+	/* Add the event to the trajectory list. */
+	INIT(HurdLib, String, event, ERR(goto done));
+	if ( !event->add(event, inbufr) )
+		ERR(goto done);
+	if ( !Trajectory->add(Trajectory, (unsigned char *) &event, \
+			      sizeof(String)) )
 		ERR(goto done);
 
-	ActorID->parse(ActorID, Event);
+
+	/* Parse the event into its component and output them. */
+	ActorID->parse(ActorID, event);
 	if ( !ActorID->measure(ActorID) )
 		ERR(goto done);
 
-	SubjectID->parse(SubjectID, Event);
+	SubjectID->parse(SubjectID, event);
 	if ( !SubjectID->measure(SubjectID) )
 		ERR(goto done);
 
-	if ( (p = strchr(Event->get(Event), ' ')) == NULL )
+	if ( (p = strchr(event->get(event), ' ')) == NULL )
 		ERR(goto done);
 	*p = '\0';
-
-	fprintf(stderr, "%s:\n", Event->get(Event));
+	fprintf(stdout, "%s:\n", event->get(event));
+	*p = ' ';
 
 	ActorID->get_measurement(ActorID, bufr);
 	bufr->print(bufr);
@@ -424,15 +438,16 @@ static _Bool add_event(CO(char *, event))
 	SubjectID->get_measurement(SubjectID, bufr);
 	bufr->print(bufr);
 
+	fflush(stdout);
 	retn = true;
 
 
  done:
-	Event->reset(Event);
 	ActorID->reset(ActorID);
 	SubjectID->reset(SubjectID);
 
 	WHACK(bufr);
+
 	return retn;
 }
 
@@ -549,6 +564,72 @@ static _Bool get_enclave_measurement(CO(Buffer, bufr))
 /**
  * Private function.
  *
+ * This function is responsible for returning the current trajectory
+ * list to the caller.  The protocol used is to send the number of
+ * elements in the list followed by each point as an ASCII string.
+ *
+ * \param mgmt		The socket object used to communicate with
+ *			the canister management instance.
+ *
+ * \param cmdbufr	The object which will be used to hold the
+ *			information which will be transmitted.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not the command was processed.  A false value
+ *			indicates the processing of commands should be
+ *			terminated while a true value indicates an
+ *			additional command cycle should be processed.
+ */
+
+static _Bool send_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
+
+{
+	_Bool retn = false;
+
+	unsigned char *member;
+
+	unsigned int cnt;
+
+	String point;
+
+
+	/*
+	 * Compute the number of elements in the list and send it to
+	 * the client.
+	 */
+	cnt = Trajectory->size(Trajectory) / sizeof(String);
+	cmdbufr->reset(cmdbufr);
+	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
+	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
+		ERR(goto done);
+	fprintf(stderr, "Sent trajectory size: %u\n", cnt);
+
+
+	/* Send each trajectory point. */
+	member = Trajectory->get(Trajectory);
+	while ( cnt > 0 ) {
+		memcpy(&point, member, sizeof(point));
+
+		cmdbufr->reset(cmdbufr);
+		cmdbufr->add(cmdbufr, (unsigned char *) point->get(point), \
+			     point->size(point) + 1);
+		if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
+			ERR(goto done);
+
+		member += sizeof(point);
+		--cnt;
+	}
+
+	retn = true;
+
+ done:
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
  * This function implements the processing of a command from the
  * canister management utility.  This command comes in the form
  * of a binary encoding of the desired command to be run.
@@ -590,6 +671,10 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 			if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
 				ERR(goto done);
 			retn = true;
+			break;
+
+		case show_trajectory:
+			retn = send_trajectory(mgmt, cmdbufr);
 			break;
 	}
 
@@ -790,6 +875,7 @@ extern int main(int argc, char *argv[])
 		mgmt->get_socket(mgmt, &fd);
 		close(fd);
 
+
 		if ( bundle == NULL )
 			execlp("runc", "runc", "run", canister_name, NULL);
 		else
@@ -810,7 +896,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Initialize the event objects. */
-	INIT(HurdLib, String, Event, ERR(goto done));
+	INIT(HurdLib, Buffer, Trajectory, ERR(goto done));
 	INIT(NAAAIM, Actor, ActorID, ERR(goto done));
 	INIT(NAAAIM, Subject, SubjectID, ERR(goto done));
 
@@ -859,15 +945,15 @@ extern int main(int argc, char *argv[])
 			retn, poll_data[0].revents, poll_data[1].revents);
 
 		if ( poll_data[0].revents & POLLPRI ) {
-			do {
+			while ( 1 ) {
 				memset(bufr, '\0', sizeof(bufr));
 				retn = read(fd, bufr, sizeof(bufr));
 				if ( retn < 0 ) {
-					if ( errno == ENODATA )
-						continue;
-					fprintf(stderr, "Have error: "	     \
-						"retn=%d, error=%s\n", retn, \
-						strerror(errno));
+					if ( errno != ENODATA )
+						fprintf(stderr, "Have "	    \
+							"error: retn=%d, "  \
+							"error=%s\n", retn, \
+							strerror(errno));
 					break;
 				}
 
@@ -879,7 +965,7 @@ extern int main(int argc, char *argv[])
 				}
 				else
 					ERR(goto done);
-			} while ( errno != ENODATA );
+			}
 		}
 
 		if ( poll_data[1].revents & POLLIN ) {
@@ -918,9 +1004,9 @@ extern int main(int argc, char *argv[])
 	WHACK(cmdbufr);
 	WHACK(mgmt);
 	WHACK(Enclave);
+	WHACK(Trajectory);
 	WHACK(ActorID);
 	WHACK(SubjectID);
-	WHACK(Event);
 
 	if ( fd > 0 )
 		close(fd);
