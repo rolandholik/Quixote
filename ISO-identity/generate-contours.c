@@ -33,9 +33,7 @@
 #include <NAAAIM.h>
 #include <SHA256.h>
 
-#include "Actor.h"
-#include "Subject.h"
-
+#include "ExchangeEvent.h"
 
 
 /*
@@ -52,19 +50,13 @@ extern int main(int argc, char *argv[])
 	int opt,
 	    retn = 1;
 
-	uint32_t length;
-
 	Buffer bufr = NULL;
-
-	SHA256 sha256 = NULL;
-
-	Actor actor = NULL;
-
-	Subject subject = NULL;
 
 	File trajectory = NULL;
 
 	String entry = NULL;
+
+	ExchangeEvent event = NULL;
 
 
 	/* Parse and verify arguements. */
@@ -87,10 +79,8 @@ extern int main(int argc, char *argv[])
 
 	/* Read and process file. */
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	INIT(NAAAIM, SHA256, sha256, ERR(goto done));
 
-	INIT(NAAAIM, Actor, actor, ERR(goto done));
-	INIT(NAAAIM, Subject, subject, ERR(goto done));
+	INIT(NAAAIM, ExchangeEvent, event, ERR(goto done));
 
 	INIT(HurdLib, String, entry, ERR(goto done));
 
@@ -98,48 +88,27 @@ extern int main(int argc, char *argv[])
 	if ( !trajectory->open_ro(trajectory, input_file) )
 		ERR(goto done);
 
-	length = NAAAIM_IDSIZE;
 	while ( trajectory->read_String(trajectory, entry) ) {
-		actor->parse(actor, entry);
-		if ( !actor->measure(actor) )
-			ERR(goto done);
-		if ( !bufr->add(bufr, (unsigned char * ) &length, \
-				sizeof(length)) )
-			ERR(goto done);
-		if ( !actor->get_measurement(actor, bufr) )
-			ERR(goto done);
-
-		subject->parse(subject, entry);
-		if ( !subject->measure(subject) )
-			ERR(goto done);
-		if ( !bufr->add(bufr, (unsigned char *) &length, \
-				sizeof(length)) )
-			ERR(goto done);
-		if ( !subject->get_measurement(subject, bufr) )
-			ERR(goto done);
-
-		sha256->add(sha256, bufr);
-		if ( !sha256->compute(sha256) )
+		event->parse(event, entry);
+		if ( !event->measure(event) )
 			ERR(goto done);
 
 		if ( verbose ) {
 			entry->print(entry);
 			fputc('\n', stdout);
-			actor->dump(actor);
+			event->dump(event);
 			fputc('\n', stdout);
-			subject->dump(subject);
-			fputc('\n', stdout);
-			bufr->print(bufr);
-			fputs("\nContour: ", stdout);
+			fputs("Contour: ", stdout);
 		}
-		sha256->print(sha256);
-		if ( verbose)
-			fputc('\n', stdout);
 
-		actor->reset(actor);
-		subject->reset(subject);
 		bufr->reset(bufr);
-		sha256->reset(sha256);
+		event->get_identity(event, bufr);
+		bufr->print(bufr);
+		if ( verbose)
+			fputs("\n\n", stdout);
+
+		event->reset(event);
+		bufr->reset(bufr);
 		entry->reset(entry);
 	}
 	retn = 0;
@@ -147,10 +116,8 @@ extern int main(int argc, char *argv[])
 
  done:
 	WHACK(bufr);
-	WHACK(sha256);
-	WHACK(actor);
-	WHACK(subject);
 	WHACK(entry);
+	WHACK(event);
 	WHACK(trajectory);
 
 	return retn;
