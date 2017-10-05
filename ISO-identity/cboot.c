@@ -831,8 +831,8 @@ extern int main(int argc, char *argv[])
 
 
 	/* Setup the management socket. */
-	if ( snprintf(sockname, sizeof(sockname), "%s.%u", SOCKNAME, getpid())
-	     >= sizeof(sockname) ) {
+	if ( snprintf(sockname, sizeof(sockname), "%s.%s", SOCKNAME, \
+		      canister_name) >= sizeof(sockname) ) {
 		fputs("Socket name overflow.\n", stderr);
 		goto done;
 	}

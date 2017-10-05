@@ -211,8 +211,9 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(char *, cmd))
 extern int main(int argc, char *argv[])
 
 {
-	char *sockname,
-	     *p,
+	char *p,
+	     *canister = NULL,
+	     sockname[UNIX_PATH_MAX],
 	     inbufr[1024];
 
 	int opt,
@@ -223,27 +224,38 @@ extern int main(int argc, char *argv[])
 	LocalDuct mgmt = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "f:")) != EOF )
+	while ( (opt = getopt(argc, argv, "n:")) != EOF )
 		switch ( opt ) {
-			case 'f':
-				sockname = optarg;
+			case 'n':
+				canister = optarg;
 				break;
 		}
 
+	if ( canister == NULL ) {
+		fputs("No canister name specified.\n", stderr);
+		goto done;
+	}
+
 
 	/* Setup the management socket. */
+	if ( snprintf(sockname, sizeof(sockname), "%s.%s", SOCKNAME, canister)
+	     >= sizeof(sockname) ) {
+		fputs("Socket name overflow.\n", stderr);
+		goto done;
+	}
+
 	if ( (mgmt = NAAAIM_LocalDuct_Init()) == NULL ) {
 		fputs("Error creating management socket.\n", stderr);
 		goto done;
 	}
 
 	if ( !mgmt->init_client(mgmt) ) {
-		fputs("Cannot set server mode.\n", stderr);
+		fputs("Cannot set socket client mode.\n", stderr);
 		goto done;
 	}
 
 	if ( !mgmt->init_port(mgmt, sockname) ) {
-		fputs("Cannot initialize port.\n", stderr);
+		fputs("Cannot initialize management port.\n", stderr);
 		goto done;
 	}
 
