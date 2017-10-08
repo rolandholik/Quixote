@@ -76,3 +76,4 @@
 #define NAAAIM_Actor_OBJID		40
 #define NAAAIM_Subject_OBJID		41
 #define NAAAIM_ExchangeEvent_OBJID	42
+#define NAAAIM_ISOidentity_OBJID	43

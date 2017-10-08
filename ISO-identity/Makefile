@@ -4,10 +4,10 @@
 
 
 # Variable declarations.
-CSRC = Actor.c Subject.c ExchangeEvent.c cboot.c cboot-mgr.c
+CSRC = Actor.c Subject.c ExchangeEvent.c ISOidentity.c cboot.c cboot-mgr.c
 
-TOOLS = test-actor test-subject generate-contours sha-tool \
-	compute-measurement set-behavior cboot cboot-mgr
+TOOLS = test-actor test-subject generate-contours sha-tool		  \
+	compute-measurement set-behavior cboot cboot-mgr test-ISOidentity
 
 CC = musl-gcc
 
@@ -61,6 +61,10 @@ test-actor: test-actor.o Actor.o
 test-subject: test-subject.o Subject.o
 	${CC} ${LDFLAGS} -o $@ $^ ../SHA256.o ${HURDLIB} ${SSL_CRYPTO};
 
+test-ISOidentity: test-ISOidentity.o ISOidentity.o ExchangeEvent.o \
+	Actor.o Subject.o
+	${CC} ${LDFLAGS} -o $@ $^ ../SHA256.o ${HURDLIB} ${SSL_CRYPTO};
+
 generate-contours: generate-contours.o ExchangeEvent.o Actor.o Subject.o
 	${CC} ${LDFLAGS} -o $@ $^ ../SHA256.o ${HURDLIB} ${SSL_CRYPTO};
 
@@ -95,6 +99,7 @@ clean:
 
 Actor.o: Actor.h
 ExchangeEvent.o: ExchangeEvent.h
+ISOidentity.o: ISOidentity.h
 # SGXmetadata.o: SGX.h SGXmetadata.h
 # SGXloader.o: SGX.h SGXloader.h
 # SGXenclave.o: SGX.h SGXenclave.h SGXmetadata.h SGXloader.h
