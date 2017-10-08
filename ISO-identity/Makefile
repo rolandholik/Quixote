@@ -4,10 +4,12 @@
 
 
 # Variable declarations.
-CSRC = Actor.c Subject.c ExchangeEvent.c ISOidentity.c cboot.c cboot-mgr.c
+CSRC = Actor.c Subject.c ExchangeEvent.c ISOidentity.c cboot.c cboot-mgr.c \
+	compute-aggregate.c
 
 TOOLS = test-actor test-subject generate-contours sha-tool		  \
-	compute-measurement set-behavior cboot cboot-mgr test-ISOidentity
+	compute-measurement set-behavior cboot cboot-mgr test-ISOidentity \
+	compute-aggregate
 
 CC = musl-gcc
 
@@ -69,6 +71,9 @@ generate-contours: generate-contours.o ExchangeEvent.o Actor.o Subject.o
 	${CC} ${LDFLAGS} -o $@ $^ ../SHA256.o ${HURDLIB} ${SSL_CRYPTO};
 
 compute-measurement: compute-measurement.o Actor.o Subject.o ../SHA256.o
+	${CC} ${LDFLAGS} -o $@ $^ ${HURDLIB} ${SSL_CRYPTO};
+
+compute-aggregate: compute-aggregate.o ../SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${HURDLIB} ${SSL_CRYPTO};
 
 sha-tool: sha-tool.o ../SHA256.o
