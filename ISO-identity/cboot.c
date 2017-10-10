@@ -32,6 +32,15 @@
 
 #define _GNU_SOURCE
 
+#define GWHACK(type, var) {			\
+	size_t i=var->size(var) / sizeof(type);	\
+	type *o=(type *) var->get(var);		\
+	while ( i-- ) {				\
+		(*o)->whack((*o));		\
+		o+=1;				\
+	}					\
+}
+
 
 /* Include files. */
 #include <stdio.h>
@@ -64,8 +73,8 @@
 #include "../SGX/SGX.h"
 #include "../SGX/SGXenclave.h"
 
-#include "Actor.h"
-#include "Subject.h"
+#include "ExchangeEvent.h"
+#include "ISOidentity.h"
 #include "cboot.h"
 
 
@@ -75,11 +84,9 @@
 static Buffer Trajectory = NULL;
 
 /**
- * Event objects are declared statically to avoid the overhead of
- * object construction/destruction at potentially high event rates.
+ * The modeling object for the canister.
  */
-static Actor ActorID     = NULL;
-static Subject SubjectID = NULL;
+static ISOidentity Model = NULL;
 
 
 /**
@@ -395,59 +402,51 @@ static _Bool add_measurement(CO(char *, bufr))
 static _Bool add_event(CO(char *, inbufr))
 
 {
-	_Bool retn = false;
+	_Bool status,
+	      retn = false;
 
-	char *p;
+	String update = NULL;
 
-	Buffer bufr = NULL;
-
-	String event = NULL;
-
-
-	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	ExchangeEvent event = NULL;
 
 
-	/* Add the event to the trajectory list. */
-	INIT(HurdLib, String, event, ERR(goto done));
-	if ( !event->add(event, inbufr) )
+	INIT(HurdLib, String, update, ERR(goto done));
+	if ( !update->add(update, inbufr) )
 		ERR(goto done);
-	if ( !Trajectory->add(Trajectory, (unsigned char *) &event, \
+
+	INIT(NAAAIM, ExchangeEvent, event, ERR(goto done));
+	if ( !event->parse(event, update) )
+		ERR(goto done);
+	if ( !event->measure(event) )
+		ERR(goto done);
+	if ( !Model->update(Model, event, &status) )
+		ERR(goto done);
+	if ( !status ) {
+		retn = true;
+		WHACK(update);
+		WHACK(event);
+		goto done;
+	}
+
+
+	/*
+	 * This section of code is only reached if the status of the
+	 * model update event is true.  This indicates the event was
+	 * not a duplicate of a previous event and thus needs to be
+	 * registered in the trajectory map.
+	 *
+	 * This code will go away in a subsequent iteration of the
+	 * code which is capable of generating the trajectory map
+	 * from the model object itself.
+	 */
+	if ( !Trajectory->add(Trajectory, (unsigned char *) &update, \
 			      sizeof(String)) )
 		ERR(goto done);
 
-
-	/* Parse the event into its component and output them. */
-	ActorID->parse(ActorID, event);
-	if ( !ActorID->measure(ActorID) )
-		ERR(goto done);
-
-	SubjectID->parse(SubjectID, event);
-	if ( !SubjectID->measure(SubjectID) )
-		ERR(goto done);
-
-	if ( (p = strchr(event->get(event), ' ')) == NULL )
-		ERR(goto done);
-	*p = '\0';
-	fprintf(stdout, "%s:\n", event->get(event));
-	*p = ' ';
-
-	ActorID->get_measurement(ActorID, bufr);
-	bufr->print(bufr);
-
-	bufr->reset(bufr);
-	SubjectID->get_measurement(SubjectID, bufr);
-	bufr->print(bufr);
-
-	fflush(stdout);
 	retn = true;
 
 
  done:
-	ActorID->reset(ActorID);
-	SubjectID->reset(SubjectID);
-
-	WHACK(bufr);
-
 	return retn;
 }
 
@@ -897,8 +896,7 @@ extern int main(int argc, char *argv[])
 
 	/* Initialize the event objects. */
 	INIT(HurdLib, Buffer, Trajectory, ERR(goto done));
-	INIT(NAAAIM, Actor, ActorID, ERR(goto done));
-	INIT(NAAAIM, Subject, SubjectID, ERR(goto done));
+	INIT(NAAAIM, ISOidentity, Model, ERR(goto done));
 
 
 	/* Poll for measurement and/or management requests. */
@@ -1004,9 +1002,10 @@ extern int main(int argc, char *argv[])
 	WHACK(cmdbufr);
 	WHACK(mgmt);
 	WHACK(Enclave);
+	WHACK(Model);
+
+	GWHACK(String, Trajectory)
 	WHACK(Trajectory);
-	WHACK(ActorID);
-	WHACK(SubjectID);
 
 	if ( fd > 0 )
 		close(fd);
