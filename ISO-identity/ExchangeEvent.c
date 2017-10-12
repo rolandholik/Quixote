@@ -17,6 +17,9 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <regex.h>
+#include <string.h>
+#include <errno.h>
+#include <sys/types.h>
 
 #include <Origin.h>
 #include <HurdLib.h>
@@ -57,6 +60,9 @@ struct NAAAIM_ExchangeEvent_State
 	/* Object status. */
 	_Bool poisoned;
 
+	/* The process id involved in the event. */
+	pid_t pid;
+
 	/* Event description .*/
 	String event;
 
@@ -90,12 +96,90 @@ static void _init_state(CO(ExchangeEvent_State, S))
 
 	S->poisoned = false;
 
+	S->pid = 0;
+
 	S->event       = NULL;
 	S->actor       = NULL;
 	S->subject     = NULL;
 	S->identity    = NULL;
 
 	return;
+}
+
+
+/**
+ * Internal private method.
+ *
+ * This method is responsible for parsing the pid component of an
+ * information exchange event.  The pid description is in the
+ * following clause of the event:
+ *
+ *	pid{NN}
+ *
+ * Where NN is the numeric identifier of the process which executed
+ * the information exchange event.
+ *
+ *
+ * \param S	A pointer to the state information for the information
+ *		exchange event.
+ *
+ * \param event	The object containing the event.
+ *
+ * \return	A boolean value is used to indicate the success or
+ *		failure of parsing the event definition.  A false
+ *		value indicates the parsing failed and the object.
+ *		A true value indicates the object has been successfully
+ *		populated.
+ */
+
+static _Bool _parse_pid(CO(ExchangeEvent_State, S), CO(String, event))
+
+{
+	_Bool retn       = false,
+	      have_regex = false;
+
+	char *fp,
+	     match[11];
+
+	long int vl;
+
+	size_t len;
+
+	regex_t regex;
+
+	regmatch_t regmatch[2];
+
+
+	if ( regcomp(&regex, "pid\\{([^}]*)\\}", REG_EXTENDED) != 0 )
+		ERR(goto done);
+	have_regex = true;
+
+	fp = event->get(event);
+	if ( regexec(&regex, fp, 2, regmatch, 0) == REG_NOMATCH ) {
+		retn = true;
+		goto done;
+	}
+
+	len = regmatch[1].rm_eo - regmatch[1].rm_so;
+	if ( len > sizeof(match) )
+		ERR(goto done);
+	memset(match, '\0', sizeof(match));
+	memcpy(match, fp + regmatch[1].rm_so, len);
+
+	vl = strtol(match, NULL, 0);
+	if ( errno == ERANGE )
+		ERR(goto done);
+	if ( vl > UINT32_MAX )
+		ERR(goto done);
+
+	S->pid = vl;
+	retn = true;
+
+ done:
+	if ( have_regex )
+		regfree(&regex);
+
+	return retn;
 }
 
 
@@ -205,6 +289,10 @@ static _Bool parse(CO(ExchangeEvent, this), CO(String, event))
 
 	/* Parse the event definition. */
 	if ( !_parse_event(S, event) )
+		ERR(goto done);
+
+	/* Parse the process id. */
+	if ( !_parse_pid(S, event) )
 		ERR(goto done);
 
 	/* Parse the actor and subject components. */
@@ -433,6 +521,9 @@ static void dump(CO(ExchangeEvent, this))
 		fputs("*Poisoned.\n", stdout);
 
 	fputs("Event:\n", stdout);
+	if ( S->pid != 0 )
+		fprintf(stdout, "pid:\t%u\n", S->pid);
+	fputs("type:\t", stdout);
 	S->event->print(S->event);
 
 	fputs("\nActor:\n", stdout);
