@@ -403,7 +403,7 @@ static void dump_events(CO(ISOidentity, this))
 	event = (ExchangeEvent *) S->trajectory->get(S->trajectory);
 
 	for (lp= 0; lp < cnt; ++lp ) {
-		fprintf(stdout, "Event: %zu\n", lp+1);
+		fprintf(stdout, "Point: %zu\n", lp+1);
 		(*event)->dump((*event));
 		event += 1;
 		fputs("\n\n", stdout);

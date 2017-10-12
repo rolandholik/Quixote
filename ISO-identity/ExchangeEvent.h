@@ -28,7 +28,9 @@ struct NAAAIM_ExchangeEvent
 	/* External methods. */
 	_Bool (*parse)(const ExchangeEvent, const String);
 	_Bool (*measure)(const ExchangeEvent);
+
 	_Bool (*get_identity)(const ExchangeEvent, const Buffer);
+	_Bool (*get_event)(const ExchangeEvent, const String);
 
 	void (*reset)(const ExchangeEvent);
 	void (*dump)(const ExchangeEvent);

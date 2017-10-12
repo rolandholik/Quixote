@@ -1,7 +1,7 @@
 /** \file
  * This file contains the implementation of an object which manages
  * an information exchange event in the IDfusion iso-identity modeling
- * architecture.  
+ * architecture.
  */
 
 /**************************************************************************
@@ -16,6 +16,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <regex.h>
 
 #include <Origin.h>
 #include <HurdLib.h>
@@ -56,6 +57,9 @@ struct NAAAIM_ExchangeEvent_State
 	/* Object status. */
 	_Bool poisoned;
 
+	/* Event description .*/
+	String event;
+
 	/* Actor identity. */
 	Actor actor;
 
@@ -86,11 +90,82 @@ static void _init_state(CO(ExchangeEvent_State, S))
 
 	S->poisoned = false;
 
+	S->event       = NULL;
 	S->actor       = NULL;
 	S->subject     = NULL;
 	S->identity    = NULL;
 
 	return;
+}
+
+
+/**
+ * Internal private method.
+ *
+ * This method is responsible for parsing the event component of an
+ * information exchange event.  The event description is in the the
+ * following clause of the event:
+ *
+ *	evant{proc=process_name, path=pathname, pid=PID}
+ *
+ *
+ * \param S	A pointer to the state information for the information
+ *		exchange event.
+ *
+ * \param event	The object containing the event.
+ *
+ * \return	A boolean value is used to indicate the success or
+ *		failure of parsing the event definition.  A false
+ *		value indicates the parsing failed and the object.
+ *		A true value indicates the object has been successfully
+ *		populated.
+ */
+
+static _Bool _parse_event(CO(ExchangeEvent_State, S), CO(String, event))
+
+{
+	_Bool retn	 = false,
+	      have_regex = false;
+
+	char *fp,
+	     bufr[2];
+
+	size_t lp,
+	       len;
+
+	regex_t regex;
+
+	regmatch_t regmatch[2];
+
+
+	/* Extract the field itself. */
+	if ( regcomp(&regex, "event\\{([^}]*)\\}", REG_EXTENDED) != 0 )
+		ERR(goto done);
+	have_regex = true;
+
+	fp = event->get(event);
+	if ( regexec(&regex, fp, 2, regmatch, 0) != REG_OK )
+		ERR(goto done);
+
+	fp += regmatch[1].rm_so;
+	len = regmatch[1].rm_eo - regmatch[1].rm_so;
+	bufr[1] = '\0';
+
+	for (lp= 0; lp < len; ++lp) {
+		bufr[0] = *fp;
+		S->event->add(S->event, bufr);
+		++fp;
+	}
+
+	if ( S->event->poisoned(S->event) )
+		ERR(goto done);
+	retn = true;
+
+ done:
+	if ( have_regex )
+		regfree(&regex);
+
+	return retn;
 }
 
 
@@ -127,7 +202,12 @@ static _Bool parse(CO(ExchangeEvent, this), CO(String, event))
 	if ( event->poisoned(event) )
 		ERR(goto done);
 
-	/* Parse the components. */
+
+	/* Parse the event definition. */
+	if ( !_parse_event(S, event) )
+		ERR(goto done);
+
+	/* Parse the actor and subject components. */
 	if ( !S->actor->parse(S->actor, event) )
 		ERR(goto done);
 	if ( !S->subject->parse(S->subject, event) )
@@ -219,7 +299,7 @@ static _Bool measure(CO(ExchangeEvent, this))
  * External public method.
  *
  * This method implements an accessor function for retrieving the
- * idnetity/measurement of an exchange event.  It is considered to
+ * identity/measurement of an exchange event.  It is considered to
  * be a terminal error for the object for this function to be called
  * without previously calling the ->measurement method.
  *
@@ -252,6 +332,51 @@ static _Bool get_identity(CO(ExchangeEvent, this), CO(Buffer, bufr))
 		ERR(goto done);
 
 	if ( !bufr->add_Buffer(bufr, S->identity->get_Buffer(S->identity)) )
+		ERR(goto done);
+	retn = true;
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements an accessor function for retrieving the
+ * description of an exchange event.  This is the name of the actor
+ * process and subject which are involved in the exchange event.
+ *
+ * \param this	A pointer to the actor identity whose identity is
+ *		to be retrieved.
+ *
+ * \param bufr	The object which the event is to be loaded into.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the supplied object has a valid event description in
+ *		it.  A false value indicates the object does not have
+ *		a valid event.  A true value indicates the supplied
+ *		object has a valid copy of this object's measurement.
+ */
+
+static _Bool get_event(CO(ExchangeEvent, this), CO(String, event))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( S->event->poisoned(S->event) )
+		ERR(goto done);
+
+	if ( !event->add(event, S->event->get(S->event)) )
 		ERR(goto done);
 	retn = true;
 
@@ -307,7 +432,10 @@ static void dump(CO(ExchangeEvent, this))
 	if ( S->poisoned )
 		fputs("*Poisoned.\n", stdout);
 
-	fputs("Actor:\n", stdout);
+	fputs("Event:\n", stdout);
+	S->event->print(S->event);
+
+	fputs("\nActor:\n", stdout);
 	S->actor->dump(S->actor);
 
 	fputs("\nSubject:\n", stdout);
@@ -330,6 +458,7 @@ static void whack(CO(ExchangeEvent, this))
 {
 	STATE(S);
 
+	WHACK(S->event);
 	WHACK(S->actor);
 	WHACK(S->subject);
 	WHACK(S->identity);
@@ -375,14 +504,17 @@ extern ExchangeEvent NAAAIM_ExchangeEvent_Init(void)
 	_init_state(this->state);
 
 	/* Initialize aggregate objects. */
-	INIT(NAAAIM, Actor, this->state->actor, ERR(goto fail));
-	INIT(NAAAIM, Subject, this->state->subject, ERR(goto fail));
-	INIT(NAAAIM, SHA256, this->state->identity, ERR(goto fail));
+	INIT(HurdLib, String, this->state->event, goto fail);
+	INIT(NAAAIM, Actor, this->state->actor, goto fail);
+	INIT(NAAAIM, Subject, this->state->subject, goto fail);
+	INIT(NAAAIM, SHA256, this->state->identity, goto fail);
 
 	/* Method initialization. */
 	this->parse	   = parse;
 	this->measure	   = measure;
+
 	this->get_identity = get_identity;
+	this->get_event	   = get_event;
 
 	this->reset = reset;
 	this->dump  = dump;
@@ -391,8 +523,10 @@ extern ExchangeEvent NAAAIM_ExchangeEvent_Init(void)
 	return this;
 
 fail:
+	WHACK(this->state->event);
 	WHACK(this->state->actor);
 	WHACK(this->state->subject);
+	WHACK(this->state->identity);
 
 	root->whack(root, this, this->state);
 	return NULL;
