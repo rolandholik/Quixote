@@ -70,6 +70,7 @@ struct NAAAIM_ISOidentity_State
 	unsigned char measurement[NAAAIM_IDSIZE];
 
 	/* Trajectory map. */
+	size_t trajectory_cursor;
 	Buffer trajectory;
 
 	/* Behavioral contour map. */
@@ -100,7 +101,9 @@ static void _init_state(CO(ISOidentity_State, S))
 	memset(S->hostid, '\0', sizeof(S->hostid));
 	memset(S->measurement, '\0', sizeof(S->measurement));
 
-	S->trajectory = NULL;
+	S->trajectory	     = NULL;
+	S->trajectory_cursor = 0;
+
 	S->contours   = NULL;
 
 	return;
@@ -377,6 +380,90 @@ static _Bool get_measurement(CO(ISOidentity, this), CO(Buffer, bufr))
 /**
  * External public method.
  *
+ * This method is an accessor method for retrieving the information
+ * exchange events which comprise the model.  This method is designed
+ * to be called repeatedly until the list of events is completely
+ * traversed.  The traversal can be reset by calliong the
+ * ->rewind_event method.
+ *
+ * \param this	A pointer to the canister whose events are to be
+ *		retrieved.
+ *
+ * \param event	The object which the event will be copied to.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		a valid event was returned.  A false value
+ *		indicates a failure occurred and a valid event is
+ *		not available.  A true value indicates the event
+ *		object contains a valid value.
+ *
+ *		The end of the event list is signified by a NULL
+ *		event object being set.
+ */
+
+static _Bool get_event(CO(ISOidentity, this), ExchangeEvent * const event)
+
+{
+	STATE(S);
+
+	_Bool retn = true;
+
+	size_t size;
+
+	ExchangeEvent *event_ptr,
+		      return_event = NULL;
+
+
+	/* Check object status. */
+	if ( S->poisoned )
+		goto done;
+
+
+	/* Get and verify cursor position. */
+	size = S->trajectory->size(S->trajectory) / sizeof(ExchangeEvent);
+	if ( S->trajectory_cursor >= size ) {
+		retn = true;
+		goto done;
+	}
+
+	event_ptr  = (ExchangeEvent *) S->trajectory->get(S->trajectory);
+	event_ptr += S->trajectory_cursor;
+	return_event = *event_ptr;
+	++S->trajectory_cursor;
+	retn = true;
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+	else
+		*event = return_event;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method resets the trajector cursor.
+ *
+ * \param this	A pointer to the canister whose events are to be
+ *		retrieved.
+ *
+ * \return	No return value is defined.
+ */
+
+static void rewind_event(CO(ISOidentity, this))
+
+{
+	this->state->trajectory_cursor = 0;
+	return;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements output of the information exchange events in
  * the current behavioral model in verbose form.
  *
@@ -389,26 +476,32 @@ static void dump_events(CO(ISOidentity, this))
 {
 	STATE(S);
 
-	size_t lp,
-	       cnt;
+	size_t lp = 1;
 
-	ExchangeEvent *event;
+	ExchangeEvent event;
 
 
+	/* Verify object status. */
 	if ( S->poisoned ) {
 		fputs("*Poisoned.\n", stdout);
 		return;
 	}
 
-	cnt   = S->trajectory->size(S->trajectory) / sizeof(ExchangeEvent);
-	event = (ExchangeEvent *) S->trajectory->get(S->trajectory);
 
-	for (lp= 0; lp < cnt; ++lp ) {
-		fprintf(stdout, "Point: %zu\n", lp+1);
-		(*event)->dump((*event));
-		event += 1;
-		fputs("\n\n", stdout);
-	}
+	/* Traverse and dump the trajectory path. */
+	rewind_event(this);
+	do {
+		if ( !get_event(this, &event) ) {
+			fputs("Error retrieving event.\n", stdout);
+			return;
+		}
+		if ( event != NULL ) {
+			fprintf(stdout, "Point: %zu\n", lp++);
+			event->dump(event);
+			fputs("\n\n", stdout);
+		}
+	} while ( event != NULL );
+
 
 	return;
 }
@@ -527,6 +620,9 @@ extern ISOidentity NAAAIM_ISOidentity_Init(void)
 
 	this->set_aggregate   = set_aggregate;
 	this->get_measurement = get_measurement;
+
+	this->get_event	   = get_event;
+	this->rewind_event = rewind_event;
 
 	this->dump_events   = dump_events;
 	this->dump_contours = dump_contours;

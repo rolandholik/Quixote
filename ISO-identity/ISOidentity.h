@@ -29,7 +29,11 @@ struct NAAAIM_ISOidentity
 	_Bool (*update)(const ISOidentity, const ExchangeEvent, _Bool *);
 
 	_Bool (*set_aggregate)(const ISOidentity, const Buffer);
+
 	_Bool (*get_measurement)(const ISOidentity, const Buffer);
+
+	void (*rewind_event)(const ISOidentity);
+	_Bool (*get_event)(const ISOidentity, ExchangeEvent *);
 
 	void (*dump_events)(const ISOidentity);
 	void (*dump_contours)(const ISOidentity);
