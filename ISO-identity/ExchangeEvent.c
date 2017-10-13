@@ -479,6 +479,40 @@ static _Bool get_event(CO(ExchangeEvent, this), CO(String, event))
 /**
  * External public method.
  *
+ * This method implements an accessor function for retrieving the
+ * process identifer of an exchange event.
+ *
+ * \param this	A pointer to the event from which the process
+ *		identifier is to be retrieved.
+ *
+ * \param pid	A pointer to the variable which will be loaded
+ *		with the process identifier.
+ *
+ * \return	A boolean value is used to indicate whether or
+ *		not the request for a pid was successful.  A
+ *		false value indicates the object has been
+ *		poisoned and is not able to return a PID,  A
+ *		true value indicates the location provided by
+ *		the caller contains a valid process identifier.
+ */
+
+static _Bool get_pid(CO(ExchangeEvent, this), pid_t * const pid)
+
+{
+	STATE(S);
+
+
+	if ( S->poisoned )
+		return false;
+
+	*pid = S->pid;
+	return true;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements the reset of an information exchange event
  * object to a state which would allow the processing of a new
  * exchange event.
@@ -606,6 +640,7 @@ extern ExchangeEvent NAAAIM_ExchangeEvent_Init(void)
 
 	this->get_identity = get_identity;
 	this->get_event	   = get_event;
+	this->get_pid	   = get_pid;
 
 	this->reset = reset;
 	this->dump  = dump;

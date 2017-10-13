@@ -405,6 +405,8 @@ static _Bool add_event(CO(char *, inbufr))
 	_Bool status,
 	      retn = false;
 
+	pid_t pid;
+
 	String update = NULL;
 
 	ExchangeEvent event = NULL;
@@ -442,6 +444,9 @@ static _Bool add_event(CO(char *, inbufr))
 	if ( !Trajectory->add(Trajectory, (unsigned char *) &update, \
 			      sizeof(String)) )
 		ERR(goto done);
+	if ( !event->get_pid(event, &pid) )
+		ERR(goto done);
+	fprintf(stderr, "Added event for pid=%u\n", pid);
 
 	retn = true;
 

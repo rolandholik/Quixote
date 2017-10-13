@@ -31,6 +31,7 @@ struct NAAAIM_ExchangeEvent
 
 	_Bool (*get_identity)(const ExchangeEvent, const Buffer);
 	_Bool (*get_event)(const ExchangeEvent, const String);
+	_Bool (*get_pid)(const ExchangeEvent, pid_t *);
 
 	void (*reset)(const ExchangeEvent);
 	void (*dump)(const ExchangeEvent);
