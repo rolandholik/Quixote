@@ -40,6 +40,8 @@ struct NAAAIM_ISOidentity
 
 	void (*dump_events)(const ISOidentity);
 	void (*dump_contours)(const ISOidentity);
+
+	size_t (*size)(const ISOidentity);
 	void (*whack)(const ISOidentity);
 
 	/* Private state. */

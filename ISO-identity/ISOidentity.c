@@ -69,6 +69,9 @@ struct NAAAIM_ISOidentity_State
 	/* Canister measurement. */
 	unsigned char measurement[NAAAIM_IDSIZE];
 
+	/* The size of the behavior map. */
+	size_t size;
+
 	/* Trajectory map. */
 	size_t trajectory_cursor;
 	Buffer trajectory;
@@ -101,6 +104,8 @@ static void _init_state(CO(ISOidentity_State, S))
 
 	memset(S->hostid, '\0', sizeof(S->hostid));
 	memset(S->measurement, '\0', sizeof(S->measurement));
+
+	S->size = 0;
 
 	S->trajectory	     = NULL;
 	S->trajectory_cursor = 0;
@@ -294,6 +299,7 @@ static _Bool update(CO(ISOidentity, this), CO(ExchangeEvent, event), \
 	else
 		retn = true;
 
+	++S->size;
 	return retn;
 
  done:
@@ -648,6 +654,25 @@ static void dump_contours(CO(ISOidentity, this))
 /**
  * External public method.
  *
+ * This method implements returning the number of points in the
+ * behavioral map.
+ *
+ * \param this	A pointer to the object which is to be destroyed.
+ *
+ * \return	The size of the behavioral map.
+ *
+ */
+
+static size_t size(CO(ISOidentity, this))
+
+{
+	return this->state->size;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a destructor for an ExchangeEvent object.
  *
  * \param this	A pointer to the object which is to be destroyed.
@@ -723,7 +748,9 @@ extern ISOidentity NAAAIM_ISOidentity_Init(void)
 
 	this->dump_events   = dump_events;
 	this->dump_contours = dump_contours;
-	this->whack	   = whack;
+
+	this->size  = size;
+	this->whack = whack;
 
 	return this;
 
