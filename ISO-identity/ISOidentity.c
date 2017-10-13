@@ -74,6 +74,7 @@ struct NAAAIM_ISOidentity_State
 	Buffer trajectory;
 
 	/* Behavioral contour map. */
+	size_t contours_cursor;
 	Buffer contours;
 };
 
@@ -464,6 +465,90 @@ static void rewind_event(CO(ISOidentity, this))
 /**
  * External public method.
  *
+ * This method is an accessor method for retrieving the contour points
+ * which comprise the behavior model implemented in an object.  This
+ * method is designed to be called repeatedly until the list of events
+ * is completely traversed.  The traversal can be reset by calling the
+ * ->rewind_contours method.
+ *
+ * \param this	A pointer to the canister whose contours are to be
+ *		retrieved.
+ *
+ * \param event	The object which the contour will be copied to.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		a contour event was returned.  A false value
+ *		indicates a failure occurred and a valid conour is
+ *		not available.  A true value indicates the contour
+ *		object contains a valid value.
+ *
+ *		The end of the contour list is signified by a NULL
+ *		contour object being set.
+ */
+
+static _Bool get_contour(CO(ISOidentity, this), Buffer * const contour)
+
+{
+	STATE(S);
+
+	_Bool retn = true;
+
+	size_t size;
+
+	Buffer *contour_ptr,
+		return_contour = NULL;
+
+
+	/* Check object status. */
+	if ( S->poisoned )
+		goto done;
+
+
+	/* Get and verify cursor position. */
+	size = S->contours->size(S->contours) / sizeof(Buffer);
+	if ( S->contours_cursor >= size ) {
+		retn = true;
+		goto done;
+	}
+
+	contour_ptr  = (Buffer *) S->contours->get(S->contours);
+	contour_ptr += S->contours_cursor;
+	return_contour = *contour_ptr;
+	++S->contours_cursor;
+	retn = true;
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+	else
+		*contour = return_contour;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method resets the contour retrieval cursor.
+ *
+ * \param this	A pointer to the canister whose contours are to be
+ *		retrieved.
+ *
+ * \return	No return value is defined.
+ */
+
+static void rewind_contours(CO(ISOidentity, this))
+
+{
+	this->state->contours_cursor = 0;
+	return;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements output of the information exchange events in
  * the current behavioral model in verbose form.
  *
@@ -522,20 +607,28 @@ static void dump_contours(CO(ISOidentity, this))
 {
 	STATE(S);
 
-	size_t cnt = S->contours->size(S->contours) / sizeof(Buffer);
-
-	Buffer *contour = (Buffer *) S->contours->get(S->contours);
+	Buffer contour;
 
 
+	/* Verify object status. */
 	if ( S->poisoned ) {
 		fputs("*Poisoned.\n", stdout);
 		return;
 	}
 
-	while ( cnt-- ) {
-		(*contour)->print((*contour));
-		contour += 1;
-	}
+
+	/* Traverse and dump the contours. */
+	rewind_contours(this);
+	do {
+		if ( !get_contour(this, &contour) ) {
+			fputs("Error retrieving event.\n", stdout);
+			return;
+		}
+		if ( contour != NULL ) {
+			contour->print(contour);
+		}
+	} while ( contour != NULL );
+
 
 	return;
 }
@@ -623,6 +716,9 @@ extern ISOidentity NAAAIM_ISOidentity_Init(void)
 
 	this->get_event	   = get_event;
 	this->rewind_event = rewind_event;
+
+	this->get_contour     = get_contour;
+	this->rewind_contours = rewind_contours;
 
 	this->dump_events   = dump_events;
 	this->dump_contours = dump_contours;

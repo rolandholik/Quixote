@@ -35,6 +35,9 @@ struct NAAAIM_ISOidentity
 	void (*rewind_event)(const ISOidentity);
 	_Bool (*get_event)(const ISOidentity, ExchangeEvent *);
 
+	void (*rewind_contours)(const ISOidentity);
+	_Bool (*get_contour)(const ISOidentity, Buffer *);
+
 	void (*dump_events)(const ISOidentity);
 	void (*dump_contours)(const ISOidentity);
 	void (*whack)(const ISOidentity);
