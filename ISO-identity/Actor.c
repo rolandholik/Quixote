@@ -175,7 +175,7 @@ static void set_identity_elements(CO(Actor, this), const uint32_t uid,	     \
 
 static _Bool _get_field(CO(char *, field), CO(char *, fd), uint32_t *value)
 
-{ 
+{
 	_Bool retn       = false,
 	      have_regex = false;
 
@@ -246,7 +246,7 @@ static _Bool _get_field(CO(char *, field), CO(char *, fd), uint32_t *value)
 
 static _Bool _get_caps(CO(char *, field), CO(char *, fd), uint64_t *value)
 
-{ 
+{
 	_Bool retn       = false,
 	      have_regex = false;
 
@@ -319,7 +319,7 @@ static _Bool parse(CO(Actor, this), CO(String, entry))
 	      retn = false;
 
 	char *fp;
-	  
+
 	regex_t regex;
 
 	regmatch_t regmatch;
@@ -343,7 +343,7 @@ static _Bool parse(CO(Actor, this), CO(String, entry))
 	fp = entry->get(entry);
 	if ( regexec(&regex, fp, 1, &regmatch, 0) != REG_OK )
 		ERR(goto done);
-	
+
 	field->add(field, (unsigned char *) (fp + regmatch.rm_so),
 		   regmatch.rm_eo-regmatch.rm_so);
 	if ( !field->add(field, (unsigned char *) "\0", 1) )
@@ -498,6 +498,72 @@ static _Bool get_measurement(CO(Actor, this), CO(Buffer, bufr))
 /**
  * External public method.
  *
+ * This method implements the generation of an ASCII formatted
+ * representation of the identity elements.  The string generated
+ * is in the same format that is interpreted by the ->parse method.
+ *
+ * \param this	A pointer to the actor object containing the
+ *		identity elements which are to be formatted.
+ *
+ * \param event	The object into which the formatted string is to
+ *		be copied.
+ */
+
+static _Bool format(CO(Actor, this), CO(String, event))
+
+{
+	STATE(S);
+
+	char bufr[2];
+
+	size_t len,
+	       size;
+
+	_Bool retn = false;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( event->poisoned(event) )
+		ERR(goto done);
+
+
+	/* Compute the space needed for the formatted representation. */
+	len = snprintf(NULL, 0, "actor{uid=%d, euid=%d, suid=%d, gid=%d, egid=%d, sgid=%d, fsuid=%d, fsgid=%d, cap=0x%lx} ",
+		       S->elements.uid, S->elements.euid, S->elements.suid, \
+		       S->elements.gid, S->elements.egid, S->elements.sgid, \
+		       S->elements.fsuid, S->elements.fsgid,		    \
+		       S->elements.capability);
+
+	bufr[0] = ' ';
+	bufr[1] = '\0';
+	size = event->size(event);
+	while ( event->size(event) < (len + size) ) {
+		if ( !event->add(event, bufr) )
+			ERR(goto done);
+	}
+
+	/* Write the formatted string to the String object. */
+	snprintf(event->get(event) + size, len, "actor{uid=%d, euid=%d, suid=%d, gid=%d, egid=%d, sgid=%d, fsuid=%d, fsgid=%d, cap=0x%lx} ",
+		S->elements.uid, S->elements.euid, S->elements.suid, \
+		S->elements.gid, S->elements.egid, S->elements.sgid, \
+		S->elements.fsuid, S->elements.fsgid,		    \
+		S->elements.capability);
+
+	retn = true;
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements the reset of the Actor object to a state which
  * would allow the generation of a new actor identity.
  *
@@ -553,7 +619,7 @@ static void dump(CO(Actor, this))
 
 	return;
 }
-	
+
 
 /**
  * External public method.
@@ -574,7 +640,7 @@ static void whack(CO(Actor, this))
 	return;
 }
 
-	
+
 /**
  * External constructor call.
  *
@@ -618,6 +684,7 @@ extern Actor NAAAIM_Actor_Init(void)
 	this->measure		    = measure;
 	this->get_measurement	    = get_measurement;
 
+	this->format = format;
 	this->reset = reset;
 	this->dump  = dump;
 	this->whack = whack;

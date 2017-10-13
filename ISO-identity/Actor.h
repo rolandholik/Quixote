@@ -33,6 +33,8 @@ struct NAAAIM_Actor
 	_Bool (*measure)(const Actor);
 	_Bool (*get_measurement)(const Actor, const Buffer);
 
+	_Bool (*format)(const Actor, const String);
+
 	void (*reset)(const Actor);
 	void (*dump)(const Actor);
 	void (*whack)(const Actor);
