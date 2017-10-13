@@ -105,7 +105,8 @@ static void _init_state(CO(ISOidentity_State, S))
 	S->trajectory	     = NULL;
 	S->trajectory_cursor = 0;
 
-	S->contours   = NULL;
+	S->contours	   = NULL;
+	S->contours_cursor = 0;
 
 	return;
 }
