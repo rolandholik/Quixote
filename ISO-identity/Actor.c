@@ -514,12 +514,11 @@ static _Bool format(CO(Actor, this), CO(String, event))
 {
 	STATE(S);
 
-	char bufr[2];
-
-	size_t len,
-	       size;
-
 	_Bool retn = false;
+
+	char bufr[256];
+
+	size_t used;
 
 
 	/* Verify object status. */
@@ -529,28 +528,17 @@ static _Bool format(CO(Actor, this), CO(String, event))
 		ERR(goto done);
 
 
-	/* Compute the space needed for the formatted representation. */
-	len = snprintf(NULL, 0, "actor{uid=%d, euid=%d, suid=%d, gid=%d, egid=%d, sgid=%d, fsuid=%d, fsgid=%d, cap=0x%lx} ",
+	/* Generate the actor string and add it. */
+	used = snprintf(bufr, sizeof(bufr), "actor{uid=%d, euid=%d, suid=%d, gid=%d, egid=%d, sgid=%d, fsuid=%d, fsgid=%d, cap=0x%lx} ",
 		       S->elements.uid, S->elements.euid, S->elements.suid, \
 		       S->elements.gid, S->elements.egid, S->elements.sgid, \
 		       S->elements.fsuid, S->elements.fsgid,		    \
 		       S->elements.capability);
+	if ( used >= sizeof(bufr) )
+		ERR(goto done);
 
-	bufr[0] = ' ';
-	bufr[1] = '\0';
-	size = event->size(event);
-	while ( event->size(event) < (len + size) ) {
-		if ( !event->add(event, bufr) )
-			ERR(goto done);
-	}
-
-	/* Write the formatted string to the String object. */
-	snprintf(event->get(event) + size, len, "actor{uid=%d, euid=%d, suid=%d, gid=%d, egid=%d, sgid=%d, fsuid=%d, fsgid=%d, cap=0x%lx} ",
-		S->elements.uid, S->elements.euid, S->elements.suid, \
-		S->elements.gid, S->elements.egid, S->elements.sgid, \
-		S->elements.fsuid, S->elements.fsgid,		    \
-		S->elements.capability);
-
+	if ( !event->add(event, bufr) )
+		ERR(goto done);
 	retn = true;
 
  done:

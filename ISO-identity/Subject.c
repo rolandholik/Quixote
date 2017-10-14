@@ -621,7 +621,6 @@ static _Bool format(CO(Subject, this), CO(String, event))
 	if ( !event->add(event, bufr) )
 		ERR(goto done);
 
-
 	/* name=%*phN, s_id=%s */
 	for (lp= 0; lp < sizeof(S->elements.name); ++lp) {
 		snprintf(bufr, sizeof(bufr), "%02x", \
@@ -629,7 +628,6 @@ static _Bool format(CO(Subject, this), CO(String, event))
 		if ( !event->add(event, bufr) )
 			ERR(goto done);
 	}
-
 
 	/* , s_uuid=%*phN */
 	used = snprintf(bufr, sizeof(bufr), ", s_id=%s, s_uuid=", \
@@ -660,8 +658,8 @@ static _Bool format(CO(Subject, this), CO(String, event))
 			ERR(goto done);
 	}
 
-	/* }\n */
-	if ( !event->add(event, "}\n") )
+	/* } */
+	if ( !event->add(event, "}") )
 		ERR(goto done);
 
 	retn = true;

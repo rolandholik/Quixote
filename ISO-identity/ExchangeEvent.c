@@ -513,6 +513,53 @@ static _Bool get_pid(CO(ExchangeEvent, this), pid_t * const pid)
 /**
  * External public method.
  *
+ * This method implements the generation of an ASCII formatted
+ * representation of the information exchange event modeled by an
+ * object.  The string generated is in the same format that is
+ * interpreted by the ->parse method.
+ *
+ * \param this	A pointer to the information excahange object
+ *		which is to be modeled.
+ *
+ * \param event	The object into which the formatted string is to
+ *		be copied.
+ */
+
+static _Bool format(CO(ExchangeEvent, this), CO(String, event))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( event->poisoned(event) )
+		ERR(goto done);
+
+
+	/* Add the event description, actor and subject elements. */
+	event->add(event, "event{");
+	event->add(event, S->event->get(S->event));
+	event->add(event, "} ");
+
+	S->actor->format(S->actor, event);
+
+	if ( !S->subject->format(S->subject, event) )
+		ERR(goto done);
+
+	retn = true;
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements the reset of an information exchange event
  * object to a state which would allow the processing of a new
  * exchange event.
@@ -641,6 +688,8 @@ extern ExchangeEvent NAAAIM_ExchangeEvent_Init(void)
 	this->get_identity = get_identity;
 	this->get_event	   = get_event;
 	this->get_pid	   = get_pid;
+
+	this->format = format;
 
 	this->reset = reset;
 	this->dump  = dump;
