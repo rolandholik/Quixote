@@ -35,6 +35,8 @@ struct NAAAIM_Subject
 	_Bool (*measure)(const Subject);
 	_Bool (*get_measurement)(const Subject, const Buffer);
 
+	_Bool (*format)(const Subject, const String);
+
 	void (*reset)(const Subject);
 	void (*dump)(const Subject);
 	void (*whack)(const Subject);

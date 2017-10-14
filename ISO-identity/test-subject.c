@@ -79,6 +79,12 @@ extern int main(int argc, char *argv[])
 	fputs("\nMeasurement after reset:\n", stdout);
 	bufr->print(bufr);
 
+	fputs("\nIdentity elements:\n", stdout);
+	entry->reset(entry);
+	if ( !subject->format(subject, entry) )
+		ERR(goto done);
+	entry->print(entry);
+
 	retn = 0;
 
 

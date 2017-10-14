@@ -579,6 +579,104 @@ static _Bool get_measurement(CO(Subject, this), CO(Buffer, bufr))
 /**
  * External public method.
  *
+ * This method implements the generation of an ASCII formatted
+ * representation of the subject identity elements.  The string
+ * generated is in the same format that is interpreted by the
+ * ->parse method.
+ *
+ * \param this	A pointer to the subject object containing the
+ *		identity elements which are to be formatted.
+ *
+ * \param event	The object into which the formatted string is to
+ *		be copied.
+ */
+
+static _Bool format(CO(Subject, this), CO(String, event))
+
+{
+	STATE(S);
+
+	char bufr[256];
+
+	unsigned int lp;
+
+	size_t used;
+
+	_Bool retn = false;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( event->poisoned(event) )
+		ERR(goto done);
+
+
+	/* Write the formatted string to the String object. */
+	used = snprintf(bufr, sizeof(bufr), "subject{uid=%d, gid=%d, mode=0%o, name_length=%u, name=",					   		   \
+			S->elements.uid, S->elements.gid, S->elements.mode, \
+			S->elements.name_length);
+	if ( used >= sizeof(bufr) )
+		ERR(goto done);
+	if ( !event->add(event, bufr) )
+		ERR(goto done);
+
+
+	/* name=%*phN, s_id=%s */
+	for (lp= 0; lp < sizeof(S->elements.name); ++lp) {
+		snprintf(bufr, sizeof(bufr), "%02x", \
+			 (unsigned char) S->elements.name[lp]);
+		if ( !event->add(event, bufr) )
+			ERR(goto done);
+	}
+
+
+	/* , s_uuid=%*phN */
+	used = snprintf(bufr, sizeof(bufr), ", s_id=%s, s_uuid=", \
+			S->elements.s_id);
+	if ( used >= sizeof(bufr) )
+		ERR(goto done);
+	if ( !event->add(event, bufr) )
+		ERR(goto done);
+
+	for (lp= 0; lp < sizeof(S->elements.s_uuid); ++lp) {
+		snprintf(bufr, sizeof(bufr), "%02x", \
+			 (unsigned char) S->elements.s_uuid[lp]);
+		if ( !event->add(event, bufr) )
+			ERR(goto done);
+	}
+
+	/* , digest=%*phN */
+	used = snprintf(bufr, sizeof(bufr), "%s", ", digest=");
+	if ( used >= sizeof(bufr) )
+		ERR(goto done);
+	if ( !event->add(event, bufr) )
+		ERR(goto done);
+
+	for (lp= 0; lp < sizeof(S->elements.digest); ++lp) {
+		snprintf(bufr, sizeof(bufr), "%02x",
+			 (unsigned char) S->elements.digest[lp]);
+		if ( !event->add(event, bufr) )
+			ERR(goto done);
+	}
+
+	/* }\n */
+	if ( !event->add(event, "}\n") )
+		ERR(goto done);
+
+	retn = true;
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements the reset of the Subject object to a state
  * which would allow the generation of a new subject identity.
  *
@@ -726,9 +824,10 @@ extern Subject NAAAIM_Subject_Init(void)
 	this->measure		    = measure;
 	this->get_measurement	    = get_measurement;
 
-	this->reset = reset;
-	this->dump  = dump;
-	this->whack = whack;
+	this->format = format;
+	this->reset  = reset;
+	this->dump   = dump;
+	this->whack  = whack;
 
 	return this;
 
