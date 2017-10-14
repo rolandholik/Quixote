@@ -79,11 +79,6 @@
 
 
 /**
- * The trajectory list for the canister.
- */
-static Buffer Trajectory = NULL;
-
-/**
  * The modeling object for the canister.
  */
 static ISOidentity Model = NULL;
@@ -405,8 +400,6 @@ static _Bool add_event(CO(char *, inbufr))
 	_Bool status,
 	      retn = false;
 
-	pid_t pid;
-
 	String update = NULL;
 
 	ExchangeEvent event = NULL;
@@ -423,35 +416,15 @@ static _Bool add_event(CO(char *, inbufr))
 		ERR(goto done);
 	if ( !Model->update(Model, event, &status) )
 		ERR(goto done);
-	if ( !status ) {
-		retn = true;
-		WHACK(update);
+	if ( !status )
 		WHACK(event);
-		goto done;
-	}
-
-
-	/*
-	 * This section of code is only reached if the status of the
-	 * model update event is true.  This indicates the event was
-	 * not a duplicate of a previous event and thus needs to be
-	 * registered in the trajectory map.
-	 *
-	 * This code will go away in a subsequent iteration of the
-	 * code which is capable of generating the trajectory map
-	 * from the model object itself.
-	 */
-	if ( !Trajectory->add(Trajectory, (unsigned char *) &update, \
-			      sizeof(String)) )
-		ERR(goto done);
-	if ( !event->get_pid(event, &pid) )
-		ERR(goto done);
-	fprintf(stderr, "Added event for pid=%u\n", pid);
 
 	retn = true;
 
 
  done:
+	WHACK(update);
+
 	return retn;
 }
 
@@ -590,43 +563,52 @@ static _Bool send_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 {
 	_Bool retn = false;
 
-	unsigned char *member;
+	size_t lp,
+	       cnt = 0;
 
-	unsigned int cnt;
+	ExchangeEvent event;
 
-	String point;
+	String es = NULL;
 
 
 	/*
 	 * Compute the number of elements in the list and send it to
 	 * the client.
 	 */
-	cnt = Trajectory->size(Trajectory) / sizeof(String);
+	cnt = Model->size(Model);
+
 	cmdbufr->reset(cmdbufr);
 	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
 	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
 		ERR(goto done);
-	fprintf(stderr, "Sent trajectory size: %u\n", cnt);
+	fprintf(stderr, "Sent trajectory size: %zu\n", cnt);
 
 
 	/* Send each trajectory point. */
-	member = Trajectory->get(Trajectory);
-	while ( cnt > 0 ) {
-		memcpy(&point, member, sizeof(point));
+	INIT(HurdLib, String, es, ERR(goto done));
 
-		cmdbufr->reset(cmdbufr);
-		cmdbufr->add(cmdbufr, (unsigned char *) point->get(point), \
-			     point->size(point) + 1);
-		if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
+	Model->rewind_event(Model);
+	for (lp= 0; lp < cnt; ++lp ) {
+		if ( !Model->get_event(Model, &event) )
+			ERR(goto done);
+		if ( event == NULL )
+			continue;
+		if ( !event->format(event, es) )
 			ERR(goto done);
 
-		member += sizeof(point);
-		--cnt;
+		cmdbufr->reset(cmdbufr);
+		cmdbufr->add(cmdbufr, (unsigned char *) es->get(es), \
+			     es->size(es) + 1);
+		if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
+			ERR(goto done);
+		es->reset(es);
 	}
 
 	retn = true;
 
  done:
+	WHACK(es);
+
 	return retn;
 }
 
@@ -900,7 +882,6 @@ extern int main(int argc, char *argv[])
 
 
 	/* Initialize the event objects. */
-	INIT(HurdLib, Buffer, Trajectory, ERR(goto done));
 	INIT(NAAAIM, ISOidentity, Model, ERR(goto done));
 
 
@@ -1008,9 +989,6 @@ extern int main(int argc, char *argv[])
 	WHACK(mgmt);
 	WHACK(Enclave);
 	WHACK(Model);
-
-	GWHACK(String, Trajectory)
-	WHACK(Trajectory);
 
 	if ( fd > 0 )
 		close(fd);
