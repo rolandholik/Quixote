@@ -90,7 +90,8 @@ static ISOidentity Model = NULL;
 enum {
 	measurement_event=1,
 	exchange_event,
-	aggregate_event
+	aggregate_event,
+	seal_event
 } event_types;
 
 struct event_definition {
@@ -99,9 +100,10 @@ struct event_definition {
 };
 
 struct event_definition event_list[] = {
-	{measurement_event, "measurement "},
-	{exchange_event, "exchange "},
-	{aggregate_event, "aggregate "},
+	{measurement_event,	"measurement "},
+	{exchange_event,	"exchange "},
+	{aggregate_event,	"aggregate "},
+	{seal_event,		"seal"},
 	{0, NULL}
 };
 
@@ -530,6 +532,12 @@ static _Bool process_event(char * bufr)
 			retn = add_aggregate(p);
 			break;
 
+		case seal_event:
+			fputs("Sealed domain.\n", stderr);
+			Model->seal(Model);
+			retn = true;
+			break;
+
 		default:
 			fprintf(stderr, "Unknown event: %s\n", bufr);
 			break;
@@ -662,6 +670,82 @@ static _Bool send_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 /**
  * Private function.
  *
+ * This function is responsible for returning the current forensics
+ * list to the caller.  The protocol used is to send the number of
+ * elements in the list followed by each point in the forensics
+ * path as an ASCII string.
+ *
+ * \param mgmt		The socket object used to communicate with
+ *			the canister management instance.
+ *
+ * \param cmdbufr	The object which will be used to hold the
+ *			information which will be transmitted.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not the command was processed.  A false value
+ *			indicates the processing of commands should be
+ *			terminated while a true value indicates an
+ *			additional command cycle should be processed.
+ */
+
+static _Bool send_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
+
+{
+	_Bool retn = false;
+
+	size_t lp,
+	       cnt = 0;
+
+	ExchangeEvent event;
+
+	String es = NULL;
+
+
+	/*
+	 * Compute the number of elements in the list and send it to
+	 * the client.
+	 */
+	cnt = Model->forensics_size(Model);
+
+	cmdbufr->reset(cmdbufr);
+	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
+	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
+		ERR(goto done);
+	fprintf(stderr, "Sent forensics size: %zu\n", cnt);
+
+
+	/* Send each trajectory point. */
+	INIT(HurdLib, String, es, ERR(goto done));
+
+	Model->rewind_forensics(Model);
+	for (lp= 0; lp < cnt; ++lp ) {
+		if ( !Model->get_forensics(Model, &event) )
+			ERR(goto done);
+		if ( event == NULL )
+			continue;
+		if ( !event->format(event, es) )
+			ERR(goto done);
+
+		cmdbufr->reset(cmdbufr);
+		cmdbufr->add(cmdbufr, (unsigned char *) es->get(es), \
+			     es->size(es) + 1);
+		if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
+			ERR(goto done);
+		es->reset(es);
+	}
+
+	retn = true;
+
+ done:
+	WHACK(es);
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
  * This function implements the processing of a command from the
  * canister management utility.  This command comes in the form
  * of a binary encoding of the desired command to be run.
@@ -708,9 +792,11 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 		case show_trajectory:
 			retn = send_trajectory(mgmt, cmdbufr);
 			break;
-	}
 
-	retn = true;
+		case show_forensics:
+			retn = send_forensics(mgmt, cmdbufr);
+			break;
+	}
 
 
  done:
