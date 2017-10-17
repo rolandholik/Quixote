@@ -38,10 +38,12 @@ extern int main(int argc, char *argv[])
 
 {
 	_Bool updated,
+	      forensics		= false,
 	      verbose		= false,
 	      dump_measurement	= false,
 	      dump_events	= false,
-	      dump_contours	= false;
+	      dump_contours	= false,
+	      dump_forensics	= false;
 
 	char *aggregate  = NULL,
 	     *trajectory = NULL;
@@ -61,7 +63,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "CEMa:i:v")) != EOF )
+	while ( (opt = getopt(argc, argv, "CEFMa:fi:v")) != EOF )
 		switch ( opt ) {
 			case 'C':
 				dump_contours = true;
@@ -69,11 +71,17 @@ extern int main(int argc, char *argv[])
 			case 'E':
 				dump_events = true;
 				break;
+			case 'F':
+				dump_forensics = true;
+				break;
 			case 'M':
 				dump_measurement = true;
 				break;
 			case 'a':
 				aggregate = optarg;
+				break;
+			case 'f':
+				forensics = true;
 				break;
 			case 'i':
 				trajectory = optarg;
@@ -132,13 +140,43 @@ extern int main(int argc, char *argv[])
 			WHACK(event);
 	}
 
+
+	/* Register a forensics event. */
+	if ( forensics ) {
+		model->seal(model);
+
+		input->reset(input);
+		if ( !input->add(input, "event{sh:/bin/dotest.sh} actor{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=0x20000420} subject{uid=0, gid=0, mode=0100755, name_length=14, name=3bb11576b7c0dd5cf9f4308f60f8e58a07590c0c5db20859f86611c54c67013b, s_id=xvdb, s_uuid=f37070fc24894435b96e88f40a12a7c0, digest=1a3847fb368bde910be9095a52859a88faff7d0474528cadedf46f96802cc9fc}") )
+			ERR(goto done);
+
+		INIT(NAAAIM, ExchangeEvent, event, ERR(goto done));
+		if ( !event->parse(event, input) ) {
+			fputs("Failed to parse event:\n", stderr);
+			input->print(input);
+			ERR(goto done);
+		}
+		if ( !event->measure(event) )
+			ERR(goto done);
+		if ( !model->update(model, event, &updated) )
+			ERR(goto done);
+		if ( !updated )
+			WHACK(event);
+	}
+
+
+	/* Output requested model parameters. */
 	if ( dump_events )
 		model->dump_events(model);
+
+	if ( dump_forensics )
+		model->dump_forensics(model);
+
 	if ( dump_contours ) {
 		if ( verbose )
 			fputs("Contours:\n", stdout);
 		model->dump_contours(model);
 	}
+
 	if ( dump_measurement ) {
 		if ( verbose )
 			fputs("Measurement:\n", stdout);

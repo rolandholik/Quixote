@@ -63,6 +63,9 @@ struct NAAAIM_ISOidentity_State
 	/* Flag to indicate aggregate measurement. */
 	_Bool have_aggregate;
 
+	/* Flag to indicate the measurement domain has been sealed. */
+	_Bool sealed;
+
 	/* Canister identity. */
 	unsigned char hostid[NAAAIM_IDSIZE];
 
@@ -79,6 +82,10 @@ struct NAAAIM_ISOidentity_State
 	/* Behavioral contour map. */
 	size_t contours_cursor;
 	Buffer contours;
+
+	/* Forensics event map. */
+	size_t forensics_cursor;
+	Buffer forensics;
 };
 
 
@@ -101,6 +108,7 @@ static void _init_state(CO(ISOidentity_State, S))
 
 	S->poisoned	  = false;
 	S->have_aggregate = false;
+	S->sealed	  = false;
 
 	memset(S->hostid, '\0', sizeof(S->hostid));
 	memset(S->measurement, '\0', sizeof(S->measurement));
@@ -247,9 +255,12 @@ static _Bool update(CO(ISOidentity, this), CO(ExchangeEvent, event), \
 {
 	STATE(S);
 
-	_Bool retn = false;
+	_Bool retn	    = false,
+	      added	    = false,
+	      release_point = true;
 
-	Buffer point = NULL;
+	Buffer list,
+	       point = NULL;
 
 
 	/* Verify object status and input. */
@@ -279,34 +290,46 @@ static _Bool update(CO(ISOidentity, this), CO(ExchangeEvent, event), \
 
 	/* Register the contour point. */
 	if ( _is_mapped(S->contours, point) ) {
-		*status = false;
-		retn = true;
+		retn	   = true;
+		*status	   = false;
 		goto done;
 	}
 
-	/* Add the event and contour point. */
-	if ( !S->trajectory->add(S->trajectory, (unsigned char *) &event, \
-				 sizeof(ExchangeEvent)) )
-		ERR(goto done);
-	if ( !S->contours->add(S->contours, (unsigned char *) &point, \
-			       sizeof(Buffer)) )
-		ERR(goto done);
-	*status = true;
 
 	/* Update the platform measurement. */
 	if ( !_update_measurement(S, point) )
-		retn = false;
-	else
-		retn = true;
+		ERR(goto done);
 
-	++S->size;
-	return retn;
+
+	/* Add the contour point. */
+	if ( !S->contours->add(S->contours, (unsigned char *) &point, \
+			       sizeof(Buffer)) )
+		ERR(goto done);
+	release_point = false;
+
+	if ( S->sealed )
+		list = S->forensics;
+	else {
+		++S->size;
+		list = S->trajectory;
+	}
+
+	if ( !list->add(list, (unsigned char *) &event, \
+			sizeof(ExchangeEvent)) )
+		ERR(goto done);
+
+	retn  = true;
+	added = true;
 
  done:
+	*status = added;
+
+	if ( release_point )
+		WHACK(point);
+
 	if ( !retn )
 		S->poisoned = true;
 
-	WHACK(point);
 	return retn;
 }
 
@@ -556,6 +579,113 @@ static void rewind_contours(CO(ISOidentity, this))
 /**
  * External public method.
  *
+ * This method is an accessor method for retrieving the exchange
+ * events which have been registered for the canister being modeled.
+ * This method is designed to be called repeatedly until the list of
+ * events is completely traversed.  The traversal can be reset by
+ * calling the ->rewind_forensics method.
+ *
+ * \param this	A pointer to the canister whose forensics events
+ *		are to be retrieved.
+ *
+ * \param event	The object which the event will be copied to.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		a valid event was returned.  A false value
+ *		indicates a failure occurred and a valid event is
+ *		not available.  A true value indicates the event
+ *		object contains a valid value.
+ *
+ *		The end of the event list is signified by a NULL
+ *		event object being set.
+ */
+
+static _Bool get_forensics(CO(ISOidentity, this), ExchangeEvent * const event)
+
+{
+	STATE(S);
+
+	_Bool retn = true;
+
+	size_t size;
+
+	ExchangeEvent *event_ptr,
+		      return_event = NULL;
+
+
+	/* Check object status. */
+	if ( S->poisoned )
+		goto done;
+
+
+	/* Get and verify cursor position. */
+	size = S->forensics->size(S->forensics) / sizeof(ExchangeEvent);
+	if ( S->forensics_cursor >= size ) {
+		retn = true;
+		goto done;
+	}
+
+	event_ptr  = (ExchangeEvent *) S->forensics->get(S->forensics);
+	event_ptr += S->forensics_cursor;
+	return_event = *event_ptr;
+	++S->forensics_cursor;
+	retn = true;
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+	else
+		*event = return_event;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method resets the forensics cursor.
+ *
+ * \param this	A pointer to the canister whose forensics event
+ *		cursor is to be reset.
+ *
+ * \return	No return value is defined.
+ */
+
+static void rewind_forensics(CO(ISOidentity, this))
+
+{
+	this->state->forensics_cursor = 0;
+	return;
+}
+
+
+
+/**
+ * External public method.
+ *
+ * This method implements returning the number of events in the
+ * behavioral forensics trajectory.
+ *
+ * \param this	A pointer to the object whose forensics trajectory
+ *		size is to be returned.
+ *
+ * \return	The size of the forensics trajectory list.
+ *
+ */
+
+static size_t forensics_size(CO(ISOidentity, this))
+
+{
+	STATE(S);
+
+	return S->forensics->size(S->forensics) / sizeof(ExchangeEvent);
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements output of the information exchange events in
  * the current behavioral model in verbose form.
  *
@@ -584,6 +714,52 @@ static void dump_events(CO(ISOidentity, this))
 	rewind_event(this);
 	do {
 		if ( !get_event(this, &event) ) {
+			fputs("Error retrieving event.\n", stdout);
+			return;
+		}
+		if ( event != NULL ) {
+			fprintf(stdout, "Point: %zu\n", lp++);
+			event->dump(event);
+			fputs("\n\n", stdout);
+		}
+	} while ( event != NULL );
+
+
+	return;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements output of the information exchange events
+ * which are registered for the behavioral model.
+ *
+ * \param this	A pointer to the object whose forensics state is to be
+ *		dumped.
+ */
+
+static void dump_forensics(CO(ISOidentity, this))
+
+{
+	STATE(S);
+
+	size_t lp = 1;
+
+	ExchangeEvent event;
+
+
+	/* Verify object status. */
+	if ( S->poisoned ) {
+		fputs("*Poisoned.\n", stdout);
+		return;
+	}
+
+
+	/* Traverse and dump the trajectory path. */
+	rewind_forensics(this);
+	do {
+		if ( !get_forensics(this, &event) ) {
 			fputs("Error retrieving event.\n", stdout);
 			return;
 		}
@@ -641,6 +817,26 @@ static void dump_contours(CO(ISOidentity, this))
 }
 
 
+/**
+ * External public method.
+ *
+ * This method implements sealing the behavioral model in its current
+ * state.  Sealing the model implies that any additional events which
+ * are not in the behavioral map constitute forensic violations for
+ * the system being modeled.
+ *
+ * \param this	A pointer to the object which is to be sealed.
+ *
+ */
+
+static void seal(CO(ISOidentity, this))
+
+{
+	this->state->sealed = true;
+	return;
+}
+
+
 #define GWHACK(type, var) {			\
 	size_t i=var->size(var) / sizeof(type);	\
 	type *o=(type *) var->get(var);		\
@@ -686,6 +882,9 @@ static void whack(CO(ISOidentity, this))
 
 	GWHACK(ExchangeEvent, S->trajectory);
 	WHACK(S->trajectory);
+
+	GWHACK(ExchangeEvent, S->forensics);
+	WHACK(S->forensics);
 
 	GWHACK(Buffer, S->contours);
 	WHACK(S->contours);
@@ -733,6 +932,7 @@ extern ISOidentity NAAAIM_ISOidentity_Init(void)
 	/* Initialize aggregate objects. */
 	INIT(HurdLib, Buffer, this->state->trajectory, goto fail);
 	INIT(HurdLib, Buffer, this->state->contours, goto fail);
+	INIT(HurdLib, Buffer, this->state->forensics, goto fail);
 
 	/* Method initialization. */
 	this->update = update;
@@ -746,9 +946,15 @@ extern ISOidentity NAAAIM_ISOidentity_Init(void)
 	this->get_contour     = get_contour;
 	this->rewind_contours = rewind_contours;
 
-	this->dump_events   = dump_events;
-	this->dump_contours = dump_contours;
+	this->get_forensics	= get_forensics;
+	this->rewind_forensics	= rewind_forensics;
+	this->forensics_size	= forensics_size;
 
+	this->dump_events    = dump_events;
+	this->dump_contours  = dump_contours;
+	this->dump_forensics = dump_forensics;
+
+	this->seal  = seal;
 	this->size  = size;
 	this->whack = whack;
 
