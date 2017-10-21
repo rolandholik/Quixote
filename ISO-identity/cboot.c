@@ -83,6 +83,13 @@
  */
 static ISOidentity Model = NULL;
 
+/**
+ * The seal status of the encounter.  This variable is set by a
+ * seal event from the canister.  Updates which are not in the
+ * behavioral map will cause disciplining requests to be generated
+ * for the canister.
+ */
+static _Bool Sealed = false;
 
 /**
  * Event definitions.
@@ -402,7 +409,10 @@ static _Bool add_event(CO(char *, inbufr))
 
 {
 	_Bool status,
+	      discipline,
 	      retn = false;
+
+	pid_t pid;
 
 	String update = NULL;
 
@@ -418,11 +428,20 @@ static _Bool add_event(CO(char *, inbufr))
 		ERR(goto done);
 	if ( !event->measure(event) )
 		ERR(goto done);
-	if ( !Model->update(Model, event, &status) )
+	if ( !Model->update(Model, event, &status, &discipline) )
 		ERR(goto done);
+
+	/* Discipline process in the canister if needed. */
+	if ( Sealed ) {
+		if ( discipline ) {
+			Model->discipline_pid(Model, &pid);
+			fprintf(stderr, "Discipline required for pid=%d\n", \
+				pid);
+		}
+	}
+
 	if ( !status )
 		WHACK(event);
-
 	retn = true;
 
 
@@ -535,7 +554,8 @@ static _Bool process_event(char * bufr)
 		case seal_event:
 			fputs("Sealed domain.\n", stderr);
 			Model->seal(Model);
-			retn = true;
+			retn   = true;
+			Sealed = true;
 			break;
 
 		default:

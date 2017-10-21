@@ -26,11 +26,13 @@ typedef struct NAAAIM_ISOidentity_State * ISOidentity_State;
 struct NAAAIM_ISOidentity
 {
 	/* External methods. */
-	_Bool (*update)(const ISOidentity, const ExchangeEvent, _Bool *);
+	_Bool (*update)(const ISOidentity, const ExchangeEvent, _Bool *, \
+			_Bool *);
 
 	_Bool (*set_aggregate)(const ISOidentity, const Buffer);
 
 	_Bool (*get_measurement)(const ISOidentity, const Buffer);
+	_Bool (*discipline_pid)(const ISOidentity, pid_t *);
 
 	void (*rewind_event)(const ISOidentity);
 	_Bool (*get_event)(const ISOidentity, ExchangeEvent *);

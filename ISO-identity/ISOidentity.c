@@ -67,6 +67,9 @@ struct NAAAIM_ISOidentity_State
 	/* Flag to indicate the measurement domain has been sealed. */
 	_Bool sealed;
 
+	/* Process identifier to be disciplined. */
+	pid_t discipline_pid;
+
 	/* Canister identity. */
 	unsigned char hostid[NAAAIM_IDSIZE];
 
@@ -110,6 +113,8 @@ static void _init_state(CO(ISOidentity_State, S))
 	S->poisoned	  = false;
 	S->have_aggregate = false;
 	S->sealed	  = false;
+
+	S->discipline_pid = 0;
 
 	memset(S->hostid, '\0', sizeof(S->hostid));
 	memset(S->measurement, '\0', sizeof(S->measurement));
@@ -155,8 +160,11 @@ static _Bool _is_mapped(CO(Buffer, map), CO(ContourPoint, point))
 
 
 	while ( cnt-- ) {
-		if ( point->equal(point, *cp) )
+		if ( point->equal(point, *cp) ) {
+			if ( !(*cp)->is_valid((*cp)) )
+				point->set_invalid(point);
 			return true;
+		}
 		cp += 1;
 	}
 
@@ -241,9 +249,13 @@ static _Bool _update_measurement(CO(ISOidentity_State, S), \
  * \param event	The object containing the event which is to be
  *		registered.
  *
- * \param status	A pointer to a boolean flag  used to inform
+ * \param status	A pointer to a boolean value used to inform
  *			the caller as to whether or not the event was
  *			added to the current model.
+ *
+ * \param discipline	A pointer to a boolean value used to inform
+ *			the caller as to whether or not the update
+ *			requires the process to be disciplined.
  *
  * \return	A boolean value is used to indicate whether or not
  *		the the event was registered.  A false value indicates
@@ -252,7 +264,7 @@ static _Bool _update_measurement(CO(ISOidentity_State, S), \
  */
 
 static _Bool update(CO(ISOidentity, this), CO(ExchangeEvent, event), \
-		    _Bool *status)
+		    _Bool *status, _Bool *discipline)
 
 {
 	STATE(S);
@@ -299,6 +311,10 @@ static _Bool update(CO(ISOidentity, this), CO(ExchangeEvent, event), \
 	if ( _is_mapped(S->contours, cp) ) {
 		retn	   = true;
 		*status	   = false;
+		if ( !cp->is_valid(cp) ) {
+			if ( !event->get_pid(event, &S->discipline_pid) )
+				ERR(goto done);
+		}
 		goto done;
 	}
 
@@ -314,8 +330,12 @@ static _Bool update(CO(ISOidentity, this), CO(ExchangeEvent, event), \
 		ERR(goto done);
 	release_point = false;
 
-	if ( S->sealed )
+	if ( S->sealed ) {
+		cp->set_invalid(cp);
 		list = S->forensics;
+		if ( !event->get_pid(event, &S->discipline_pid) )
+			ERR(goto done);
+	}
 	else {
 		++S->size;
 		list = S->trajectory;
@@ -329,7 +349,8 @@ static _Bool update(CO(ISOidentity, this), CO(ExchangeEvent, event), \
 	added = true;
 
  done:
-	*status = added;
+	*status	    = added;
+	*discipline = !cp->is_valid(cp);
 
 	WHACK(point);
 	if ( release_point )
@@ -413,6 +434,49 @@ static _Bool get_measurement(CO(ISOidentity, this), CO(Buffer, bufr))
 	STATE(S);
 
 	return bufr->add(bufr, S->measurement, sizeof(S->measurement));
+}
+
+
+/**
+ * External public method.
+ *
+ * This method is an accessor method for accessing the process identifier
+ * of the process which has engaged in an extra-dimensional behavior
+ * event.
+ *
+ * \param this	A pointer to the canister whose pid is to be returned.
+ *
+ * \param pid	A pointer to the location where the pid is to be
+ *		storaged.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		a valid pid was returned.  A false value
+ *		indicate a failure in returning the pid value while a
+ *		true value indicates the destination contains a valid
+ *		process ID.
+ */
+
+static _Bool discipline_pid(CO(ISOidentity, this), pid_t * const pid)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+
+
+	*pid = S->discipline_pid;
+	retn = true;
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
 }
 
 
@@ -947,6 +1011,7 @@ extern ISOidentity NAAAIM_ISOidentity_Init(void)
 
 	this->set_aggregate   = set_aggregate;
 	this->get_measurement = get_measurement;
+	this->discipline_pid  = discipline_pid;
 
 	this->get_event	   = get_event;
 	this->rewind_event = rewind_event;
