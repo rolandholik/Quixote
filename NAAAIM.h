@@ -77,3 +77,4 @@
 #define NAAAIM_Subject_OBJID		41
 #define NAAAIM_ExchangeEvent_OBJID	42
 #define NAAAIM_ISOidentity_OBJID	43
+#define NAAAIM_ContourPoint_OBJID	44

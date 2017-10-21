@@ -25,6 +25,7 @@
 
 #include "NAAAIM.h"
 #include "SHA256.h"
+#include "ContourPoint.h"
 #include "ExchangeEvent.h"
 #include "ISOidentity.h"
 
@@ -143,20 +144,20 @@ static void _init_state(CO(ISOidentity_State, S))
  *		a true value indicated the point was present.
  */
 
-static _Bool _is_mapped(CO(Buffer, map), CO(Buffer, point))
+static _Bool _is_mapped(CO(Buffer, map), CO(ContourPoint, point))
 
 {
 	_Bool retn = false;
 
-	size_t cnt = map->size(map) / sizeof(Buffer);
+	size_t cnt = map->size(map) / sizeof(ContourPoint);
 
-	Buffer *b = (Buffer *) map->get(map);
+	ContourPoint *cp = (ContourPoint *) map->get(map);
 
 
 	while ( cnt-- ) {
-		if ( (*b)->equal((*b), point) )
+		if ( point->equal(point, *cp) )
 			return true;
-		b += 1;
+		cp += 1;
 	}
 
 	return retn;
@@ -174,8 +175,8 @@ static _Bool _is_mapped(CO(Buffer, map), CO(Buffer, point))
  * \param map		The object containing the current behavioral
  *			contour map.
  *
- * \param update	The object containing the value which is to
- *			be used to extend the measurement state of
+ * \param update	A pointer to the buffer containing the value
+ *			to be used to extend the measurement state of
  *			the model.
  *
  * \return	A boolean value is used to indicate whether or not
@@ -184,7 +185,8 @@ static _Bool _is_mapped(CO(Buffer, map), CO(Buffer, point))
  *		measurement was successfully extended.
  */
 
-static _Bool _update_measurement(CO(ISOidentity_State, S), CO(Buffer, update))
+static _Bool _update_measurement(CO(ISOidentity_State, S), \
+				 CO(unsigned char *, update))
 
 {
 	_Bool retn = false;
@@ -200,7 +202,7 @@ static _Bool _update_measurement(CO(ISOidentity_State, S), CO(Buffer, update))
 
 	/* Project the update into a host specific domain. */
 	bufr->add(bufr, S->hostid, sizeof(S->hostid));
-	bufr->add_Buffer(bufr, update);
+	bufr->add(bufr, update, NAAAIM_IDSIZE);
 	sha256->add(sha256, bufr);
 	if ( !sha256->compute(sha256) )
 		ERR(goto done);
@@ -262,6 +264,8 @@ static _Bool update(CO(ISOidentity, this), CO(ExchangeEvent, event), \
 	Buffer list,
 	       point = NULL;
 
+	ContourPoint cp = NULL;
+
 
 	/* Verify object status and input. */
 	if ( S->poisoned )
@@ -273,7 +277,7 @@ static _Bool update(CO(ISOidentity, this), CO(ExchangeEvent, event), \
 	if ( !S->have_aggregate ) {
 		if ( !point->add_hexstring(point, DEFAULT_AGGREGATE) )
 			ERR(goto done);
-		if ( !_update_measurement(S, point) )
+		if ( !_update_measurement(S, point->get(point)) )
 			ERR(goto done);
 		S->have_aggregate = true;
 		point->reset(point);
@@ -287,9 +291,12 @@ static _Bool update(CO(ISOidentity, this), CO(ExchangeEvent, event), \
 	if ( !event->get_identity(event, point) )
 		ERR(goto done);
 
+	INIT(NAAAIM, ContourPoint, cp, ERR(goto done));
+	cp->add(cp, point);
+
 
 	/* Register the contour point. */
-	if ( _is_mapped(S->contours, point) ) {
+	if ( _is_mapped(S->contours, cp) ) {
 		retn	   = true;
 		*status	   = false;
 		goto done;
@@ -297,12 +304,12 @@ static _Bool update(CO(ISOidentity, this), CO(ExchangeEvent, event), \
 
 
 	/* Update the platform measurement. */
-	if ( !_update_measurement(S, point) )
+	if ( !_update_measurement(S, cp->get(cp)) )
 		ERR(goto done);
 
 
 	/* Add the contour point. */
-	if ( !S->contours->add(S->contours, (unsigned char *) &point, \
+	if ( !S->contours->add(S->contours, (unsigned char *) &cp, \
 			       sizeof(Buffer)) )
 		ERR(goto done);
 	release_point = false;
@@ -324,8 +331,9 @@ static _Bool update(CO(ISOidentity, this), CO(ExchangeEvent, event), \
  done:
 	*status = added;
 
+	WHACK(point);
 	if ( release_point )
-		WHACK(point);
+		WHACK(cp);
 
 	if ( !retn )
 		S->poisoned = true;
@@ -368,7 +376,7 @@ static _Bool set_aggregate(CO(ISOidentity, this), CO(Buffer, bufr))
 	if ( S->have_aggregate )
 		ERR(goto done);
 
-	if ( !_update_measurement(S, bufr) )
+	if ( !_update_measurement(S, bufr->get(bufr)) )
 		ERR(goto done);
 
 	retn		  = true;
@@ -886,7 +894,7 @@ static void whack(CO(ISOidentity, this))
 	GWHACK(ExchangeEvent, S->forensics);
 	WHACK(S->forensics);
 
-	GWHACK(Buffer, S->contours);
+	GWHACK(ContourPoint, S->contours);
 	WHACK(S->contours);
 
 	S->root->whack(S->root, this, S);

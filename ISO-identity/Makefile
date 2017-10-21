@@ -4,8 +4,8 @@
 
 
 # Variable declarations.
-CSRC = Actor.c Subject.c ExchangeEvent.c ISOidentity.c cboot.c cboot-mgr.c \
-	compute-aggregate.c
+CSRC = Actor.c Subject.c ExchangeEvent.c ISOidentity.c ContourPoint.c \
+	cboot.c cboot-mgr.c compute-aggregate.c
 
 TOOLS = test-actor test-subject test-event generate-contours sha-tool	  \
 	compute-measurement set-behavior cboot cboot-mgr test-ISOidentity \
@@ -66,8 +66,8 @@ test-subject: test-subject.o Subject.o
 test-event: test-event.o ExchangeEvent.o Actor.o Subject.o
 	${CC} ${LDFLAGS} -o $@ $^ ../SHA256.o ${HURDLIB} ${SSL_CRYPTO};
 
-test-ISOidentity: test-ISOidentity.o ISOidentity.o ExchangeEvent.o \
-	Actor.o Subject.o
+test-ISOidentity: test-ISOidentity.o ISOidentity.o ContourPoint.o \
+	ExchangeEvent.o Actor.o Subject.o
 	${CC} ${LDFLAGS} -o $@ $^ ../SHA256.o ${HURDLIB} ${SSL_CRYPTO};
 
 generate-contours: generate-contours.o ExchangeEvent.o Actor.o Subject.o
@@ -85,10 +85,11 @@ sha-tool: sha-tool.o ../SHA256.o
 set-behavior: set-behavior.o
 	${CC} ${LDFLAGS} -o $@ $^ ${HURDLIB}
 
-cboot: cboot.o ../SHA256.o ISOidentity.o ExchangeEvent.o Actor.o Subject.o \
-	../SGX/SGXenclave.o ../SGX/SGXloader.o ../SGX/SGXmetadata.o	   \
-	../SGX/SGXsigstruct.o ../SGX/boot-sgx.o ../SGX/sgx-ocall.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO}			   \
+cboot: cboot.o ../SHA256.o ISOidentity.o ContourPoint.o ExchangeEvent.o \
+	Actor.o Subject.o ../SGX/SGXenclave.o ../SGX/SGXloader.o 	\
+	../SGX/SGXmetadata.o ../SGX/SGXsigstruct.o ../SGX/boot-sgx.o	\
+	../SGX/sgx-ocall.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO} \
 		-Wl,--rpath /usr/local/musl/lib -lelf
 
 cboot-mgr: cboot-mgr.o
@@ -106,6 +107,7 @@ clean:
 # sgx-load.o: SGXenclave.h
 
 Actor.o: Actor.h
+ContourPoint.o: ContourPoint.h
 ExchangeEvent.o: ExchangeEvent.h
 ISOidentity.o: ISOidentity.h
 # SGXmetadata.o: SGX.h SGXmetadata.h
