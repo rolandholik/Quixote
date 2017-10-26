@@ -149,6 +149,14 @@ struct {
  */
 SGXenclave Enclave = NULL;
 
+/**
+ * System call wrapper for setting the actor status of a process.
+ */
+static inline int sys_set_bad_actor(pid_t pid, unsigned long flags)
+{
+	return syscall(327, pid, flags);
+}
+
 /* Define the OCALL interface for the 'print string' call. */
 struct ocall1_interface {
 	char* str;
@@ -435,8 +443,28 @@ static _Bool add_event(CO(char *, inbufr))
 	if ( Sealed ) {
 		if ( discipline ) {
 			Model->discipline_pid(Model, &pid);
-			fprintf(stderr, "Discipline required for pid=%d\n", \
-				pid);
+			discipline = sys_set_bad_actor(pid, 0);
+			if (discipline < 0 ) {
+				fprintf(stderr, "actor status error: %d:%s\n",\
+					errno, strerror(errno));
+			        retn = false;
+				goto done;
+			}
+			if ( discipline > 0 )
+				fprintf(stderr, "PID is disciplined: %d\n", \
+					pid);
+			else {
+				fprintf(stderr, "PID not disciplined: %d, " \
+					"disciplining.\n", pid);
+				discipline = sys_set_bad_actor(pid, 1);
+				if ( discipline < 0 ) {
+					fprintf(stderr, "actor status error:" \
+						" %d:%s\n", errno, 	      \
+						strerror(errno));
+					retn = false;
+					goto done;
+				}
+			}
 		}
 	}
 
