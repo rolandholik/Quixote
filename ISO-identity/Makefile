@@ -9,7 +9,7 @@ CSRC = Actor.c Subject.c ExchangeEvent.c ISOidentity.c ContourPoint.c \
 
 TOOLS = test-actor test-subject test-event generate-contours sha-tool	  \
 	compute-measurement set-behavior cboot cboot-mgr test-ISOidentity \
-	compute-aggregate
+	compute-aggregate bad-actor
 
 CC = musl-gcc
 
@@ -77,6 +77,9 @@ compute-measurement: compute-measurement.o Actor.o Subject.o ../SHA256.o
 	${CC} ${LDFLAGS} -o $@ $^ ${HURDLIB} ${SSL_CRYPTO};
 
 compute-aggregate: compute-aggregate.o ../SHA256.o
+	${CC} ${LDFLAGS} -o $@ $^ ${HURDLIB} ${SSL_CRYPTO};
+
+bad-actor: bad-actor.o
 	${CC} ${LDFLAGS} -o $@ $^ ${HURDLIB} ${SSL_CRYPTO};
 
 sha-tool: sha-tool.o ../SHA256.o
