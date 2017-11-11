@@ -16,29 +16,32 @@ LIBRARY = lib${LIBNAME}.a
 ENCLAVE_CC = gcc64
 
 SGX_SDK	    = /opt/intel/sgxsdk
-SGX_INCLUDE = -I . -I $(SGX_SDK)/include -I $(SGX_SDK)/include/tlibc \
-	-I $(SGX_SDK)/include/stlport
+SGX_INCLUDE = -I . -I ${SGX_SDK}/include -I ${SGX_SDK}/include/tlibc \
+	-I ${SGX_SDK}/include/stlport
 
 ENCLAVE_CFLAGS = -Wall -nostdinc -fvisibility=hidden -fpie -fstack-protector \
-	$(SGX_INCLUDE) -fno-builtin
+	${SGX_INCLUDE} -fno-builtin
 
-SGX_LIBRARY_PATH = $(SGX_SDK)/lib64
+SGX_LIBRARY_PATH = ${SGX_SDK}/lib64
 
 SGX_TRTS_LIB	    = sgx_trts
 SGX_CRYPTO_LIB	    = sgx_tcrypto
 SGX_SERVICE_LIBRARY = sgx_tservice
 
 ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles  \
-	-L$(SGX_LIBRARY_PATH) -L.					     \
-	-Wl,--whole-archive -l${SGX_TRTS_LIB} -Wl,--no-whole-archive	     \
-	-Wl,--start-group -lsgx_tstdc -l$(SGX_CRYPTO_LIB)		     \
-	-l$(SGX_SERVICE_LIBRARY) -l${LIBNAME} -Wl,--end-group		     \
+	-L${SGX_LIBRARY_PATH} -L.					     \
+	-Wl,--whole-archive						     \
+	-l${SGX_TRTS_LIB} -l${LIBNAME}					     \
+	-Wl,--no-whole-archive						     \
+	-Wl,--start-group						     \
+	-lsgx_tstdc -l${SGX_CRYPTO_LIB} -l${SGX_SERVICE_LIBRARY}	     \
+	-Wl,--end-group							     \
 	-Wl,-Bstatic -Wl,-Bsymbolic -Wl,--no-undefined			     \
 	-Wl,-pie,-eenclave_entry -Wl,--export-dynamic			     \
 	-Wl,--defsym,__ImageBase=0					     \
 	-Wl,--version-script=ldscript
 
-SGX_SIGNER = $(SGX_SDK)/bin/sgx_sign
+SGX_SIGNER = ${SGX_SDK}/bin/sgx_sign
 
 
 CC = musl-gcc
@@ -56,7 +59,7 @@ ELFLIB	= -Wl,--rpath /usr/local/musl/lib -lelf
 # Compilation directives.
 #
 %.o: %.c
-	$(ENCLAVE_CC) $(ENCLAVE_CFLAGS) -c $< -o $@;
+	${ENCLAVE_CC} ${ENCLAVE_CFLAGS} -c $< -o $@;
 
 
 #
@@ -79,8 +82,8 @@ all: ${LIBRARY} enclave tools
 enclave: ldscript test-fusion.signed.so
 
 test-fusion.signed.so: test-fusion.so
-	$(SGX_SIGNER) sign -key Private-key.pem -enclave test-fusion.so \
-		-out $@ -config test-fusion-enclave.xml;
+	${SGX_SIGNER} sign -key Private-key.pem -enclave $^ -out $@ \
+		-config test-fusion-enclave.xml;
 
 test-fusion.so: ${ENCOBJS}
 	${ENCLAVE_CC} -o $@ $^ ${ENCLAVE_LDFLAGS};
