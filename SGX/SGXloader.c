@@ -808,22 +808,48 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
 	  * the physical size of the segment the difference in size
 	  * is added as a series of uninitialized pages.
 	  */
-	 if ( r2p(segment->phdr.p_memsz) > r2p(segment->phdr.p_filesz) ) {
-		 memset(page, '\0', sizeof(page));
-		 secinfo.flags = segment->flags;
-		 size = r2p(segment->phdr.p_memsz - segment->phdr.p_filesz);
+        if ( segment->phdr.p_memsz > segment->phdr.p_filesz ) {
+		int correct = 0;
 
-		 build_offset = 0;
-		 while ( build_offset < size ) {
-			 if ( !enclave->add_page(enclave, page, &secinfo, \
-						 SGX_PAGE_EXTEND) )
-				 ERR(goto done);
-			 build_offset += 4096;
-		 }
-		 if ( debug )
-			 fprintf(stdout, "\tAdding unitialized pages: " \
-				 "0x%lx\n", size / 4096);
-	 }
+		memset(page, '\0', sizeof(page));
+		secinfo.flags = segment->flags;
+		size = segment->phdr.p_memsz - offset;
+		if ( debug ) {
+			fprintf(stdout, "\tMemory/file size mismatch, "	      \
+				"%lu/%lu, size=%lu\n", segment->phdr.p_memsz, \
+				segment->phdr.p_filesz,			      \
+				segment->phdr.p_memsz -			      \
+				segment->phdr.p_filesz);
+			fprintf(stdout, "\tCorrected memory size: %lu\n", \
+				size);
+		}
+
+		size = r2p(size - segment->phdr.p_filesz);
+		if ( offset == 0 )
+			correct = -1;
+		else
+			correct = 1;
+		size += (correct * 4096);
+
+		if ( debug ) {
+			fprintf(stdout, "\tPage correction: %d (%s)\n", \
+				correct,				\
+				correct == -1 ? "offset==0" : "offset!=0" );
+			fprintf(stdout, "\tUninitialized size: %lu\n", size);
+		}
+
+		build_offset = 0;
+		while ( build_offset < size ) {
+			if ( !enclave->add_page(enclave, page, &secinfo, \
+						SGX_PAGE_EXTEND) )
+				ERR(goto done);
+			build_offset += 4096;
+		}
+
+		if ( debug )
+			fprintf(stdout, "\tUninitialized pages added: " \
+				"0x%lx\n", size / 4096);
+	}
 
 	 retn = true;
 
