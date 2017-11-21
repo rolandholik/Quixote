@@ -5,7 +5,7 @@
 
 # Variable declarations.
 CSRC   = test-ISOidentity-enclave.c
-ENCSRC = ISOidentity-enclave.c ISOidentity-interface.c \
+ENCSRC = ISOidentity-enclave.c ISOidentity-interface.c ContourPoint.c \
 	regcomp.c regexec.c regerror.c tre-mem.c reg-support.c
 
 TOOLS = test-ISOidentity-enclave
@@ -58,6 +58,9 @@ ELFLIB	= -Wl,--rpath /usr/local/musl/lib -lelf
 # Compilation directives.
 #
 %.o: %.c
+	$(ENCLAVE_CC) $(ENCLAVE_CFLAGS) -c $< -o $@;
+
+%.o: ../../ISO-identity/%.c
 	$(ENCLAVE_CC) $(ENCLAVE_CFLAGS) -c $< -o $@;
 
 
