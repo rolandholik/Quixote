@@ -5,7 +5,8 @@
 
 # Variable declarations.
 CSRC   = test-ISOidentity-enclave.c
-ENCSRC = ISOidentity-enclave.c ISOidentity-interface.c
+ENCSRC = ISOidentity-enclave.c ISOidentity-interface.c \
+	regcomp.c regexec.c regerror.c tre-mem.c reg-support.c
 
 TOOLS = test-ISOidentity-enclave
 
