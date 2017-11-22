@@ -11,6 +11,10 @@
  **************************************************************************/
 
 
+/* Number of tests. */
+#define NUMBER_OF_TESTS 2
+
+
 /* Include files. */
 #include <stdio.h>
 #include <stdbool.h>
@@ -77,10 +81,11 @@ extern int main(int argc, char *argv[])
 
 	char *token	   = NULL,
 	     *sgx_device   = "/dev/isgx",
-	     *enclave_name = NULL;
+	     *enclave_name = "test-fusion.signed.so";
 
 	int opt,
 	    rc,
+	    test,
 	    retn = 1;
 
 	struct SGX_einittoken *einit;
@@ -100,13 +105,10 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "dne:t:")) != EOF )
+	while ( (opt = getopt(argc, argv, "dnt:")) != EOF )
 		switch ( opt ) {
 			case 'd':
 				debug = debug ? false : true;
-			case 'e':
-				enclave_name = optarg;
-				break;
 			case 'n':
 				sgx_device = optarg;
 				break;
@@ -115,10 +117,6 @@ extern int main(int argc, char *argv[])
 				break;
 		}
 
-	if ( enclave_name == NULL ) {
-		fputs("No enclave name specifed.\n", stderr);
-		goto done;
-	}
 
 
 	/* Load the launch token. */
@@ -151,11 +149,15 @@ extern int main(int argc, char *argv[])
 	if ( !enclave->init_enclave(enclave, einit) )
 		ERR(goto done);
 
-	ecall0_table.test = 1;
-	if ( !enclave->boot_slot(enclave, 0, &ocall_table, \
-				 &ecall0_table, &rc) ) {
-		fprintf(stderr, "Enclave returned: %d\n", rc);
-		goto done;
+
+	for (test= 1; test <= NUMBER_OF_TESTS; ++test) {
+		ecall0_table.test = test;
+		if ( !enclave->boot_slot(enclave, 0, &ocall_table, \
+					 &ecall0_table, &rc) ) {
+			fprintf(stderr, "Enclave returned: %d\n", rc);
+			goto done;
+		}
+		fputc('\n', stdout);
 	}
 
 	retn = 0;

@@ -8,9 +8,10 @@
 
 #include "HurdLib.h"
 #include "Buffer.h"
+#include "String.h"
 
 
-void test_fusion(int test)
+static void test_one(void)
 
 {
 	uint8_t lp;
@@ -25,7 +26,7 @@ void test_fusion(int test)
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 
 
-	printf("Test number: %d\n", test);
+	fputs("Test number: 1\n", stdout);
 	len = strlen((char *) input);
 	fputs("Input:\n", stdout);
 	for (lp= 0; lp < len; ++lp)
@@ -39,8 +40,64 @@ void test_fusion(int test)
 	fputc('\n', stdout);
 	bufr->hprint(bufr);
 
+
  done:
 	WHACK(bufr);
 
+	return;
+}
+
+
+static void test_two(void)
+
+{
+	String string = NULL;
+
+	static const char *string1 = "Testing string for String,",
+			  *string2 = " appended string";
+
+
+	fputs("Test number: 2\n", stdout);
+
+	INIT(HurdLib, String, string, ERR(goto done));
+
+	if ( !string->add(string, string1) )
+		ERR(goto done);
+	string->print(string);
+
+	if ( !string->add(string, string2) )
+		ERR(goto done);
+	string->print(string);
+
+	fputs("\nReset test:\n", stdout);
+	string->reset(string);
+	string->add(string, string1);
+	if ( !string->add(string, string2) )
+		ERR(goto done);
+	string->print(string);
+
+
+ done:
+	WHACK(string);
+	return;
+}
+
+
+void test_fusion(int test)
+
+{
+	switch ( test ) {
+		case 1:
+			test_one();
+			break;
+		case 2:
+			test_two();
+			break;
+		default:
+			fputs("Invalid test.\n", stderr);
+			break;
+	}
+
+	fprintf(stdout, "End test: %d\n", test);
 	return;
 }

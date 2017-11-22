@@ -6,7 +6,7 @@
 # Variable declarations.
 CSRC   = test-fusion.c
 ENCSRC = test-fusion-enclave.c test-fusion-interface.c
-LIBSRC = fusion-shim.c Origin.c Fibsequence.c Buffer.c
+LIBSRC = fusion-shim.c Origin.c Fibsequence.c Buffer.c String.c
 
 TOOLS = test-fusion
 
