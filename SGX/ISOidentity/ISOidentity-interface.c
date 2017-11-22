@@ -25,7 +25,7 @@ static sgx_status_t sgx_update_model(void *pms)
 	sgx_status_t retn = SGX_SUCCESS;
 
 	char *update,
-	     *enclave_update;
+	     *enclave_update = NULL;
 
 	size_t update_len = 0;
 
