@@ -15,6 +15,8 @@
 #include <sgx_edger8r.h>
 #include <sgx_trts.h>
 
+typedef int pid_t;
+
 
 /* Prototypes for alternate standard library functions. */
 int atexit(void (*function)(void));

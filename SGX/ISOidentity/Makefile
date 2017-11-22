@@ -5,7 +5,8 @@
 
 # Variable declarations.
 CSRC   = test-ISOidentity-enclave.c
-ENCSRC = ISOidentity-enclave.c ISOidentity-interface.c ContourPoint.c \
+ENCSRC = ISOidentity-enclave.c ISOidentity-interface.c		\
+	ContourPoint.c Actor.c Subject.c ExchangeEvent.c	\
 	regcomp.c regexec.c regerror.c tre-mem.c reg-support.c
 
 TOOLS = test-ISOidentity-enclave
@@ -14,8 +15,8 @@ ENCLAVE_CC = gcc64
 
 SGX_SDK	    = /opt/intel/sgxsdk
 SGX_INCLUDE = -I . -I $(SGX_SDK)/include -I $(SGX_SDK)/include/tlibc \
-	-I $(SGX_SDK)/include/stlport -I ../SGXlibs/SGXfusion	     \
-	-I ../SGXlibs/SGXnaaaim
+	-I $(SGX_SDK)/include/stlport -I ../../ISO-identity	     \
+	-I ../SGXlibs/SGXfusion -I ../SGXlibs/SGXnaaaim
 
 ENCLAVE_CFLAGS = -Wall -nostdinc -fvisibility=hidden -fpie -fstack-protector \
 	$(SGX_INCLUDE) -fno-builtin

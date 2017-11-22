@@ -5,59 +5,47 @@
 
 #include <HurdLib.h>
 #include <Buffer.h>
+#include <String.h>
 #include <SHA256.h>
 
 #include "ISOidentity-interface.h"
 #include "regex.h"
-
-
-static _Bool parse_field(char *update, char *fd, char *match, size_t len)
-
-{
-	_Bool retn = false;
-
-        regex_t regex;
-
-	regmatch_t regmatch[2];
-
-
-	if ( regcomp(&regex, fd, REG_EXTENDED) != 0 )
-		ERR(goto done);
-
-	if ( regexec(&regex, update, 2, regmatch, 0) != REG_OK )
-		ERR(goto done);
-
-	memset(match, '\0', len);
-	memcpy(match, update + regmatch[1].rm_so, \
-	       regmatch[1].rm_eo - regmatch[1].rm_so);
-
-	retn = true;
-
-
- done:
-	return retn;
-}
+#include "ExchangeEvent.h"
 
 
 void update_model(char *update)
 
 {
-	char bufr[1024];
+	Buffer bufr = NULL;
+
+	String entry = NULL;
+
+	ExchangeEvent event = NULL;
 
 
-	if ( !parse_field(update, "event\\{([^}]*)\\}", bufr, sizeof(bufr)) )
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+
+	INIT(HurdLib, String, entry, ERR(goto done));
+	if ( !entry->add(entry, update) )
 		ERR(goto done);
-	fprintf(stdout, "update: %s\n", bufr);
+	entry->print(entry);
+	fputc('\n', stdout);
 
-	if ( !parse_field(update, "actor\\{([^}]*)\\}", bufr, sizeof(bufr)) )
-		ERR(goto done);
-	fprintf(stdout, "actor: %s\n", bufr);
 
-	if ( !parse_field(update, "subject\\{([^}]*)\\}", bufr, sizeof(bufr)) )
+	INIT(NAAAIM, ExchangeEvent, event, ERR(goto done));
+
+	if ( !event->parse(event, entry) )
 		ERR(goto done);
-	fprintf(stdout, "subject: %s\n\n", bufr);
+	if ( !event->measure(event) )
+		ERR(goto done);
+	event->dump(event);
+	fputc('\n', stdout);
 
 
 done:
+	WHACK(bufr);
+	WHACK(entry);
+	WHACK(event);
+
 	return;
 }
