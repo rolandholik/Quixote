@@ -28,6 +28,7 @@ struct NAAAIM_ContourPoint
 	/* External methods. */
 	void (*add)(const ContourPoint, const Buffer);
 	unsigned char * (*get)(const ContourPoint);
+	_Bool (*get_Buffer)(const ContourPoint, const Buffer);
 
 	void (*set_invalid)(const ContourPoint);
 	_Bool (*is_valid)(const ContourPoint);

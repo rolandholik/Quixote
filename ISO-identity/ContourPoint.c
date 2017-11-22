@@ -139,6 +139,53 @@ static unsigned char * get(CO(ContourPoint, this))
 /**
  * External public method.
  *
+ * This method implements an accessor method for retrieving the
+ * value of the contour point as a Buffer object.
+ *
+ * \param this	The object whose value is to be returned.
+ *
+ * \param bufr	A pointer to the object which is to be loaded with
+ *		the measurement value of the contour point.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the supplied object has a valid value.  A false
+ *		value indicates an error was encountered and the
+ *		object does not have a valid value.  A true value
+ *		indicates the supplied object has a valid
+ *		measurement point.
+ */
+
+static _Bool get_Buffer(CO(ContourPoint, this), CO(Buffer, bufr))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Verify arguements. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( bufr == NULL )
+		ERR(goto done);
+	if ( bufr->poisoned(bufr) )
+		ERR(goto done);
+
+
+	/* Load the buffer with the measurement value. */
+	if ( !bufr->add(bufr, S->point, sizeof(S->point)) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a method for indicating the point represents
  * an invalid behavior.
  *
@@ -259,6 +306,8 @@ extern ContourPoint NAAAIM_ContourPoint_Init(void)
 	/* Method initialization. */
 	this->add = add;
 	this->get = get;
+
+	this->get_Buffer = get_Buffer;
 
 	this->set_invalid = set_invalid;
 	this->is_valid	  = is_valid;

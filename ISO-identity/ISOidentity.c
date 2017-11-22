@@ -588,7 +588,7 @@ static void rewind_event(CO(ISOidentity, this))
  *		contour object being set.
  */
 
-static _Bool get_contour(CO(ISOidentity, this), Buffer * const contour)
+static _Bool get_contour(CO(ISOidentity, this), ContourPoint * const contour)
 
 {
 	STATE(S);
@@ -597,8 +597,8 @@ static _Bool get_contour(CO(ISOidentity, this), Buffer * const contour)
 
 	size_t size;
 
-	Buffer *contour_ptr,
-		return_contour = NULL;
+	ContourPoint *contour_ptr,
+		     return_contour = NULL;
 
 
 	/* Check object status. */
@@ -607,13 +607,13 @@ static _Bool get_contour(CO(ISOidentity, this), Buffer * const contour)
 
 
 	/* Get and verify cursor position. */
-	size = S->contours->size(S->contours) / sizeof(Buffer);
+	size = S->contours->size(S->contours) / sizeof(ContourPoint);
 	if ( S->contours_cursor >= size ) {
 		retn = true;
 		goto done;
 	}
 
-	contour_ptr  = (Buffer *) S->contours->get(S->contours);
+	contour_ptr  = (ContourPoint *) S->contours->get(S->contours);
 	contour_ptr += S->contours_cursor;
 	return_contour = *contour_ptr;
 	++S->contours_cursor;
@@ -862,7 +862,9 @@ static void dump_contours(CO(ISOidentity, this))
 {
 	STATE(S);
 
-	Buffer contour;
+	Buffer bufr = NULL;
+
+	ContourPoint contour;
 
 
 	/* Verify object status. */
@@ -873,6 +875,7 @@ static void dump_contours(CO(ISOidentity, this))
 
 
 	/* Traverse and dump the contours. */
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 	rewind_contours(this);
 	do {
 		if ( !get_contour(this, &contour) ) {
@@ -880,10 +883,17 @@ static void dump_contours(CO(ISOidentity, this))
 			return;
 		}
 		if ( contour != NULL ) {
-			contour->print(contour);
+			if ( !bufr->add(bufr, contour->get(contour), \
+					NAAAIM_IDSIZE) )
+				ERR(goto done);
+			bufr->print(bufr);
+			bufr->reset(bufr);
 		}
 	} while ( contour != NULL );
 
+
+ done:
+	WHACK(bufr);
 
 	return;
 }

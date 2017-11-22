@@ -26,6 +26,7 @@
 #include <File.h>
 
 #include <NAAAIM.h>
+#include "ContourPoint.h"
 #include "ExchangeEvent.h"
 #include "ISOidentity.h"
 

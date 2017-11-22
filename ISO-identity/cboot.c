@@ -73,6 +73,7 @@
 #include "../SGX/SGX.h"
 #include "../SGX/SGXenclave.h"
 
+#include "ContourPoint.h"
 #include "ExchangeEvent.h"
 #include "ISOidentity.h"
 #include "cboot.h"
