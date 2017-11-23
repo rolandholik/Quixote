@@ -50,8 +50,13 @@ static const struct OCALL_api ocall_table = {
 
 /* Interfaces for the trusted ECALL's. */
 static struct ecall0_table {
-	char *update;
+	_Bool retn;
 } ecall0_table;
+
+static struct ecall1_table {
+	_Bool retn;
+	char *update;
+} ecall1_table;
 
 
 
@@ -80,6 +85,8 @@ extern int main(int argc, char *argv[])
 	     *sgx_device   = "/dev/isgx",
 	     *enclave_name = "ISOidentity.signed.so";
 
+	static char *violation = "event{sh:/bin/dotest.sh} actor{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=0x20000420} subject{uid=0, gid=0, mode=0100755, name_length=14, name=3bb11576b7c0dd5cf9f4308f60f8e58a07590c0c5db20859f86611c54c67013b, s_id=xvdb, s_uuid=f37070fc24894435b96e88f40a12a7c0, digest=1a3847fb368bde910be9095a52859a88faff7d0474528cadedf46f96802cc9fc}";
+
 	int opt,
 	    rc,
 	    retn = 1;
@@ -100,6 +107,7 @@ extern int main(int argc, char *argv[])
 		"test-ISOidentity");
 	fprintf(stdout, "%s: (C)Copyright 2017, IDfusion, LLC. All rights "
 		"reserved.\n\n", "test-ISOidentity");
+	fflush(stdout);
 
 
 	/* Parse and verify arguements. */
@@ -162,18 +170,62 @@ extern int main(int argc, char *argv[])
 		ERR(goto done);
 
 
+	/* Initialize the model. */
+	if ( !enclave->boot_slot(enclave, 0, &ocall_table, &ecall0_table, \
+				 &rc) )
+	{
+		fprintf(stderr, "Enclave internal error: %d\n", rc);
+		goto done;
+	}
+	if ( !ecall0_table.retn ) {
+		fputs("Enclave model initialization failed.\n", stderr);
+		goto done;
+	}
+
+
 	/* Process the trajectory file. */
 	INIT(HurdLib, String, input, ERR(goto done));
 
 	while ( infile->read_String(infile, input) ) {
-		ecall0_table.update = input->get(input);
-		if ( !enclave->boot_slot(enclave, 0, &ocall_table, \
-					 &ecall0_table, &rc) ) {
+		ecall1_table.update = input->get(input);
+		if ( !enclave->boot_slot(enclave, 1, &ocall_table, \
+					 &ecall1_table, &rc) ) {
 			fprintf(stderr, "Enclave returned: %d\n", rc);
 			goto done;
 		}
-
+		if ( !ecall1_table.retn ) {
+			fputs("Enclave model update failed.\n", stderr);
+			goto done;
+		}
 		input->reset(input);
+	}
+
+
+	/* Seal and violate the model to obtain forensic information. */
+	if ( !enclave->boot_slot(enclave, 2, &ocall_table, NULL, &rc) ) {
+		fprintf(stderr, "Enclave returned: %d\n", rc);
+		goto done;
+	}
+	input->reset(input);
+	if ( !input->add(input, violation) )
+		ERR(goto done);
+
+	ecall1_table.update = input->get(input);
+	if ( !enclave->boot_slot(enclave, 1, &ocall_table, \
+				 &ecall1_table, &rc) ) {
+		fprintf(stderr, "Enclave returned: %d\n", rc);
+		goto done;
+	}
+	if ( !ecall1_table.retn ) {
+		fputs("Enclave model update failed.\n", stderr);
+		goto done;
+	}
+
+
+	/* Dump the model status. */
+	if ( !enclave->boot_slot(enclave, 3, &ocall_table, NULL, &rc) ) {
+		fprintf(stderr, "Enclave returned: %d\n", rc);
+		goto done;
 	}
 
 	retn = 0;
