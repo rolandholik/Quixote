@@ -58,6 +58,10 @@ static struct ecall1_table {
 	char *update;
 } ecall1_table;
 
+struct ecall4_interface {
+	int type;
+	size_t size;
+} ecall4_table;
 
 
 /**
@@ -227,6 +231,25 @@ extern int main(int argc, char *argv[])
 		fprintf(stderr, "Enclave returned: %d\n", rc);
 		goto done;
 	}
+
+
+	/* Test the return of model sizes. */
+	fputs("Sizes:\n", stdout);
+	ecall4_table.type = 0;
+	if ( !enclave->boot_slot(enclave, 4, &ocall_table, &ecall4_table, \
+				 &rc) ) {
+		fprintf(stderr, "Enclave returned: %d\n", rc);
+		goto done;
+	}
+	fprintf(stdout, "\tModel:     %zu\n", ecall4_table.size);
+
+	ecall4_table.type = 1;
+	if ( !enclave->boot_slot(enclave, 4, &ocall_table, &ecall4_table, \
+				 &rc) ) {
+		fprintf(stderr, "Enclave returned: %d\n", rc);
+		goto done;
+	}
+	fprintf(stdout, "\tForensics: %zu\n", ecall4_table.size);
 
 	retn = 0;
 

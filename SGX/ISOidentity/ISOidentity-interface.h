@@ -7,7 +7,7 @@
 
 
 /* Number of interfaces. */
-#define ECALL_NUMBER 4
+#define ECALL_NUMBER 5
 #define OCALL_NUMBER 1
 
 
@@ -34,6 +34,15 @@ void seal_model(void);
 
 /* ECALL3 interface definitions. */
 void dump_model(void);
+
+
+/* ECALL4 interface to return model size. */
+size_t get_size(int);
+
+struct ecall4_interface {
+	int type;
+	size_t size;
+};
 
 
 /* OCALL interface definitions. */

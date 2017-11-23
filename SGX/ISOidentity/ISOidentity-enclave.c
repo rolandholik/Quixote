@@ -120,6 +120,50 @@ void seal_model(void)
 
 
 /**
+ * External ECALL.
+ *
+ * This function implements returning the size of the model.  In order
+ * to reduce the number of required ECALL's the element size being
+ * requested is encoded by an arguement to this call.
+ *
+ * \param type	Specifies which model size is to be returned.  The
+ *		options which can be selected are either the general
+ *		size of the model or the size of the forensics
+ *		elements.
+ *
+ * \returns	The number of elements in the model.  The default
+ *		value returned is 0 which is also returned if the
+ *		model is not initialized.
+ */
+
+size_t get_size(int type)
+
+{
+	size_t size = 0;
+
+
+	/* Verify that model is initialized. */
+	if ( Model == NULL )
+		ERR(goto done);
+
+
+	/* Return the requested model size. */
+	switch ( type ) {
+		case 0:
+			size = Model->size(Model);
+			break;
+		case 1:
+			size = Model->forensics_size(Model);
+			break;
+	}
+
+
+ done:
+	return size;
+}
+
+
+/**
  * External ECALL 3.
  *
  * This method implements dumping the current state of the model.

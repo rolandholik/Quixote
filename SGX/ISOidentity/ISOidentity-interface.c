@@ -119,6 +119,25 @@ static sgx_status_t sgx_dump_model(void *pms)
 }
 
 
+/* ECALL4 interface function. */
+static sgx_status_t sgx_get_size(void *pms)
+
+{
+	sgx_status_t retn = SGX_SUCCESS;
+
+	struct ecall4_interface *ms = (struct ecall4_interface *) pms;
+
+
+	/* Verify arguements. */
+	CHECK_REF_POINTER(pms, sizeof(struct ecall4_interface));
+
+	ms->size = get_size(ms->type);
+
+
+	return retn;
+}
+
+
 /* ECALL interface table. */
 SGX_EXTERNC const struct {
 	size_t nr_ecall;
@@ -130,6 +149,7 @@ SGX_EXTERNC const struct {
 		{(void*)(uintptr_t)sgx_update_model, 0},
 		{(void*)(uintptr_t)sgx_seal_model, 0},
 		{(void*)(uintptr_t)sgx_dump_model, 0},
+		{(void*)(uintptr_t)sgx_get_size, 0},
 	}
 };
 
@@ -141,6 +161,6 @@ SGX_EXTERNC const struct {
 } g_dyn_entry_table = {
 	OCALL_NUMBER,
 	{
-		{0, 0, 0, 0},
+		{0, 0, 0, 0, 0},
 	}
 };
