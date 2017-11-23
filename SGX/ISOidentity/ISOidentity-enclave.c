@@ -186,3 +186,54 @@ void dump_model(void)
 
 	return;
 }
+
+
+/**
+ * External ECALL.
+ *
+ * This method implements setting the aggregate measurement value
+ * for the model.
+ *
+ * \param aggregate	The buffer containing the binary value
+ *			of the aggregate.
+ *
+ * \param length	The size of the buffer.
+ *
+ * \return		A boolean value is used to indicate the
+ *			status of setting the aggregate.  A false
+ *			value indicates the aggregate value was not
+ *			set with a true value indicating the model
+ *			aggregate has been set.
+ */
+
+_Bool set_aggregate(unsigned char *aggregate, size_t length)
+
+{
+	_Bool retn = false;
+
+	Buffer bufr = NULL;
+
+
+	/* Verify the model is initialized. */
+	if ( Model == NULL )
+		ERR(goto done);
+
+
+	/*
+	 * Load the aggregate value into an object for submission
+	 * to the model and then set the aggregate value.
+	 */
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	if ( !bufr->add(bufr, aggregate, length) )
+		ERR(goto done);
+
+	if ( !Model->set_aggregate(Model, bufr) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	WHACK(bufr);
+
+	return retn;
+}

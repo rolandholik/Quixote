@@ -25,6 +25,7 @@ extern _Bool update_model(char *);
 extern void seal_model(void);
 extern void dump_model(void);
 extern size_t get_size(int);
+extern _Bool set_aggregate(uint8_t *, size_t);
 
 
 /* ECALL 0 interface function. */
@@ -150,6 +151,54 @@ static sgx_status_t sgx_get_size(void *pms)
 }
 
 
+/* ECALL5 interface function. */
+static sgx_status_t sgx_set_aggregate(void *pms)
+
+{
+	sgx_status_t retn = SGX_SUCCESS;
+
+	unsigned char *aggregate,
+		      *e_aggregate = NULL;
+
+	size_t aggregate_len = 0;
+
+	struct ISOidentity_ecall5_interface *ms = \
+		(struct ISOidentity_ecall5_interface *) pms;
+
+
+	/* Verify arguements. */
+	aggregate     = ms->aggregate;
+	aggregate_len = ms->aggregate_length;
+
+	CHECK_REF_POINTER(pms, sizeof(struct ISOidentity_ecall5_interface));
+	CHECK_UNIQUE_POINTER(aggregate, aggregate_len);
+
+
+	/*
+	 * Convert arguements in interface structure to enclave
+	 * local values.
+	 */
+	if ( aggregate != NULL ) {
+		if ( (e_aggregate = malloc(aggregate_len)) == NULL ) {
+			retn = SGX_ERROR_OUT_OF_MEMORY;
+			goto done;
+		}
+		memcpy(e_aggregate, aggregate, aggregate_len);
+	}
+
+
+	/* Call enclave function with local arguement. */
+	ms->retn = set_aggregate(e_aggregate, aggregate_len);
+
+
+ done:
+	if ( e_aggregate != NULL )
+		free(e_aggregate);
+
+	return retn;
+}
+
+
 /* ECALL interface table. */
 SGX_EXTERNC const struct {
 	size_t nr_ecall;
@@ -162,6 +211,7 @@ SGX_EXTERNC const struct {
 		{(void*)(uintptr_t)sgx_seal_model, 0},
 		{(void*)(uintptr_t)sgx_dump_model, 0},
 		{(void*)(uintptr_t)sgx_get_size, 0},
+		{(void*)(uintptr_t)sgx_set_aggregate, 0},
 	}
 };
 
@@ -173,6 +223,6 @@ SGX_EXTERNC const struct {
 } g_dyn_entry_table = {
 	OCALL_NUMBER,
 	{
-		{0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0},
 	}
 };

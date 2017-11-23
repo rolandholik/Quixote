@@ -10,6 +10,10 @@
  * for licensing information.
  **************************************************************************/
 
+/* Default aggregate value. */
+#define DEFAULT_AGGREGATE \
+	"0000000000000000000000000000000000000000000000000000000000000000"
+
 
 /* Include files. */
 #include <stdio.h>
@@ -89,6 +93,8 @@ extern int main(int argc, char *argv[])
 	struct ISOidentity_ecall1_interface ecall1_table;
 
 	struct ISOidentity_ecall4_interface ecall4_table;
+
+	struct ISOidentity_ecall5_interface ecall5_table;
 
 	struct SGX_einittoken *einit;
 
@@ -178,6 +184,23 @@ extern int main(int argc, char *argv[])
 	}
 	if ( !ecall0_table.retn ) {
 		fputs("Enclave model initialization failed.\n", stderr);
+		goto done;
+	}
+
+	bufr->reset(bufr);
+	if ( !bufr->add_hexstring(bufr, DEFAULT_AGGREGATE) )
+		ERR(goto done);
+
+	ecall5_table.aggregate = bufr->get(bufr);
+	ecall5_table.aggregate_length = bufr->size(bufr);
+
+	if ( !enclave->boot_slot(enclave, 5, &ocall_table, \
+				 &ecall5_table, &rc) ) {
+		fprintf(stderr, "Enclave returned: %d\n", rc);
+		goto done;
+	}
+	if ( !ecall5_table.retn ) {
+		fputs("Enclave set aggregate failed.\n", stderr);
 		goto done;
 	}
 

@@ -18,7 +18,7 @@
 
 
 /* Number of enclave interfaces. */
-#define ECALL_NUMBER 5
+#define ECALL_NUMBER 6
 #define OCALL_NUMBER 1
 
 
@@ -35,4 +35,10 @@ struct ISOidentity_ecall1_interface {
 struct ISOidentity_ecall4_interface {
 	int type;
 	size_t size;
+};
+
+struct ISOidentity_ecall5_interface {
+	_Bool retn;
+	unsigned char *aggregate;
+	size_t aggregate_length;
 };
