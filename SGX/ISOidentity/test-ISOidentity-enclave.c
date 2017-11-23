@@ -30,6 +30,8 @@
 #include <SGX.h>
 #include <SGXenclave.h>
 
+#include "ISOidentity-interface.h"
+
 
 /* Define the OCALL interface for the 'print string' call. */
 struct ocall1_interface {
@@ -49,19 +51,6 @@ static const struct OCALL_api ocall_table = {
 
 
 /* Interfaces for the trusted ECALL's. */
-static struct ecall0_table {
-	_Bool retn;
-} ecall0_table;
-
-static struct ecall1_table {
-	_Bool retn;
-	char *update;
-} ecall1_table;
-
-struct ecall4_interface {
-	int type;
-	size_t size;
-} ecall4_table;
 
 
 /**
@@ -94,6 +83,12 @@ extern int main(int argc, char *argv[])
 	int opt,
 	    rc,
 	    retn = 1;
+
+	struct ISOidentity_ecall0_interface ecall0_table;
+
+	struct ISOidentity_ecall1_interface ecall1_table;
+
+	struct ISOidentity_ecall4_interface ecall4_table;
 
 	struct SGX_einittoken *einit;
 
@@ -235,7 +230,7 @@ extern int main(int argc, char *argv[])
 
 	/* Test the return of model sizes. */
 	fputs("Sizes:\n", stdout);
-	ecall4_table.type = 0;
+	ecall4_table.type = ISO_IDENTITY_EVENT;
 	if ( !enclave->boot_slot(enclave, 4, &ocall_table, &ecall4_table, \
 				 &rc) ) {
 		fprintf(stderr, "Enclave returned: %d\n", rc);
@@ -243,7 +238,7 @@ extern int main(int argc, char *argv[])
 	}
 	fprintf(stdout, "\tModel:     %zu\n", ecall4_table.size);
 
-	ecall4_table.type = 1;
+	ecall4_table.type = ISO_IDENTITY_FORENSICS;
 	if ( !enclave->boot_slot(enclave, 4, &ocall_table, &ecall4_table, \
 				 &rc) ) {
 		fprintf(stderr, "Enclave returned: %d\n", rc);

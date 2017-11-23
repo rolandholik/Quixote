@@ -1,51 +1,38 @@
-#include <stdint.h>
-#include <wchar.h>
-#include <stddef.h>
-#include <stdlib.h>
+/** \file
+ * This file contains interface definitions for the ISOidentity
+ * modelling enclave.
+ */
 
-#include <sgx_edger8r.h>
+/**************************************************************************
+ * (C)Copyright 2017, IDfusion LLC. All rights reserved.
+ *
+ * Please refer to the file named COPYING in the top of the source tree
+ * for licensing information.
+ **************************************************************************/
 
 
-/* Number of interfaces. */
+/* Model selector definitions. */
+#define ISO_IDENTITY_EVENT     	0
+#define ISO_IDENTITY_FORENSICS	1
+#define ISO_IDENTITY_CONTOURS	2
+
+
+/* Number of enclave interfaces. */
 #define ECALL_NUMBER 5
 #define OCALL_NUMBER 1
 
 
-/* ECALL0 interface definitions. */
-struct ecall0_interface {
+/* ECALL interface definitions. */
+struct ISOidentity_ecall0_interface {
 	_Bool retn;
 };
 
-_Bool init_model(void);
-
-
-/* ECALL1 interface definitions. */
-struct ecall1_interface {
+struct ISOidentity_ecall1_interface {
 	_Bool retn;
 	char *update;
 };
 
-_Bool update_model(char *);
-
-
-/* ECALL2 interface definition. */
-void seal_model(void);
-
-
-/* ECALL3 interface definitions. */
-void dump_model(void);
-
-
-/* ECALL4 interface to return model size. */
-size_t get_size(int);
-
-struct ecall4_interface {
+struct ISOidentity_ecall4_interface {
 	int type;
 	size_t size;
 };
-
-
-/* OCALL interface definitions. */
-#if 0
-sgx_status_t SGX_CDECL ocall_print_string(const char* str);
-#endif

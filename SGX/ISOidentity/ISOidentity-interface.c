@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include <sgx_trts.h>
+#include <sgx_edger8r.h>
 
 #include "ISOidentity-interface.h"
 
@@ -18,17 +19,26 @@
 } while (0)
 
 
+/* Prototype definitions for enclave functions. */
+extern _Bool init_model(void);
+extern _Bool update_model(char *);
+extern void seal_model(void);
+extern void dump_model(void);
+extern size_t get_size(int);
+
+
 /* ECALL 0 interface function. */
 static sgx_status_t sgx_init_model(void *pms)
 
 {
 	sgx_status_t retn = SGX_SUCCESS;
 
-	struct ecall0_interface *ms = (struct ecall0_interface *) pms;
+	struct ISOidentity_ecall0_interface *ms = \
+		(struct ISOidentity_ecall0_interface *) pms;
 
 
 	/* Verify arguements. */
-	CHECK_REF_POINTER(pms, sizeof(struct ecall0_interface));
+	CHECK_REF_POINTER(pms, sizeof(struct ISOidentity_ecall0_interface));
 
 
 	/* Call enclave function and return result. */
@@ -49,14 +59,15 @@ static sgx_status_t sgx_update_model(void *pms)
 
 	size_t update_len = 0;
 
-	struct ecall1_interface *ms = (struct ecall1_interface *) pms;
+	struct ISOidentity_ecall1_interface *ms = \
+		(struct ISOidentity_ecall1_interface *) pms;
 
 
 	/* Verify arguements. */
 	update	   = ms->update;
 	update_len = strlen(update) + 1;
 
-	CHECK_REF_POINTER(pms, sizeof(struct ecall0_interface));
+	CHECK_REF_POINTER(pms, sizeof(struct ISOidentity_ecall0_interface));
 	CHECK_UNIQUE_POINTER(update, update_len);
 
 
@@ -125,11 +136,12 @@ static sgx_status_t sgx_get_size(void *pms)
 {
 	sgx_status_t retn = SGX_SUCCESS;
 
-	struct ecall4_interface *ms = (struct ecall4_interface *) pms;
+	struct ISOidentity_ecall4_interface *ms = \
+		(struct ISOidentity_ecall4_interface *) pms;
 
 
 	/* Verify arguements. */
-	CHECK_REF_POINTER(pms, sizeof(struct ecall4_interface));
+	CHECK_REF_POINTER(pms, sizeof(struct ISOidentity_ecall4_interface));
 
 	ms->size = get_size(ms->type);
 
