@@ -96,6 +96,8 @@ extern int main(int argc, char *argv[])
 
 	struct ISOidentity_ecall5_interface ecall5_table;
 
+	struct ISOidentity_ecall6_interface ecall6_table;
+
 	struct SGX_einittoken *einit;
 
 	SGXenclave enclave = NULL;
@@ -268,6 +270,28 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 	fprintf(stdout, "\tForensics: %zu\n", ecall4_table.size);
+
+
+	/* Test retrieval of the model measurement. */
+	memset(ecall6_table.measurement, '\0', \
+	       sizeof(ecall6_table.measurement));
+	if ( !enclave->boot_slot(enclave, 6, &ocall_table, \
+				 &ecall6_table, &rc) ) {
+		fprintf(stderr, "Enclave returned: %d\n", rc);
+		goto done;
+	}
+	if ( !ecall6_table.retn ) {
+		fputs("Enclave get measurement failed.\n", stderr);
+		goto done;
+	}
+
+	bufr->reset(bufr);
+	if ( !bufr->add(bufr, ecall6_table.measurement, \
+			sizeof(ecall6_table.measurement)) )
+		ERR(goto done);
+
+	fputs("\n\nMeasurement:\n", stdout);
+	bufr->print(bufr);
 
 	retn = 0;
 

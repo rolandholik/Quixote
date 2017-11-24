@@ -8,6 +8,8 @@
 #include <String.h>
 #include <SHA256.h>
 
+#include <NAAAIM.h>
+
 #include "ISOidentity-interface.h"
 #include "regex.h"
 #include "ContourPoint.h"
@@ -229,6 +231,49 @@ _Bool set_aggregate(unsigned char *aggregate, size_t length)
 
 	if ( !Model->set_aggregate(Model, bufr) )
 		ERR(goto done);
+	retn = true;
+
+
+ done:
+	WHACK(bufr);
+
+	return retn;
+}
+
+
+/**
+ * External ECALL.
+ *
+ * This method implements retrieving the current measurement value
+ * from the model.
+ *
+ * \param aggregate	The buffer which will be loaded with the
+ *			binary measurement value.  This routine
+ *			assumes the length of the buffer to be
+ *			the current identity size of 32 bytes.
+ *
+ * \return		A boolean value is returned to indicate the
+ *			status of the retrieval of the measurement
+ *			value.  A false value indicates the buffer
+ *			does not have a valid measurement while a
+ *			true value indicates the measurement is
+ *			valid.
+ */
+
+_Bool get_measurement(unsigned char *measurement)
+
+{
+	_Bool retn = false;
+
+	Buffer bufr = NULL;
+
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+
+	if ( !Model->get_measurement(Model, bufr) )
+		ERR(goto done);
+
+	memcpy(measurement, bufr->get(bufr), bufr->size(bufr));
 	retn = true;
 
 
