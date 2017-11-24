@@ -32,6 +32,7 @@ extern _Bool set_aggregate(uint8_t *, size_t);
 extern _Bool get_measurement(unsigned char *);
 extern _Bool get_pid(pid_t *);
 extern void rewind(int);
+extern _Bool get_event(int, char *, size_t);
 
 
 /* ECALL 0 interface function. */
@@ -281,7 +282,29 @@ static sgx_status_t sgx_rewind(void *pms)
 	/* Verify arguements. */
 	CHECK_REF_POINTER(pms, sizeof(struct ISOidentity_ecall8_interface));
 
-	get_size(ms->type);
+	rewind(ms->type);
+
+
+	return retn;
+}
+
+
+/* ECALL9 interface function. */
+static sgx_status_t sgx_get_event(void *pms)
+
+{
+	sgx_status_t retn = SGX_SUCCESS;
+
+	struct ISOidentity_ecall9_interface *ms = \
+		(struct ISOidentity_ecall9_interface *) pms;
+
+
+	/* Verify arguements. */
+	CHECK_REF_POINTER(pms, sizeof(struct ISOidentity_ecall9_interface));
+
+
+	/* Call enclave function with local arguement. */
+	ms->retn = get_event(ms->type, ms->event, sizeof(ms->event)) ;
 
 
 	return retn;
@@ -304,6 +327,7 @@ SGX_EXTERNC const struct {
 		{(void*)(uintptr_t)sgx_get_measurement, 0},
 		{(void*)(uintptr_t)sgx_get_pid, 0},
 		{(void*)(uintptr_t)sgx_rewind, 0},
+		{(void*)(uintptr_t)sgx_get_event, 0}
 	}
 };
 
@@ -315,6 +339,6 @@ SGX_EXTERNC const struct {
 } g_dyn_entry_table = {
 	OCALL_NUMBER,
 	{
-		{0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 	}
 };

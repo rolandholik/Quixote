@@ -54,7 +54,78 @@ static const struct OCALL_api ocall_table = {
 };
 
 
-/* Interfaces for the trusted ECALL's. */
+/**
+ * Private function.
+ *
+ * This function is used to replay either the model or forensic events.
+ *
+ * \param enclave	The object representing the enclave which is
+ *			to be interrogated for the events.
+ *
+ * \param type		The type of event to be replayed.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		an error was encountered while the event list was
+ *		being replayed.
+ */
+
+static _Bool display_events(SGXenclave enclave, int type)
+
+{
+	_Bool retn = false;
+
+	int rc;
+
+	size_t lp;
+
+	struct ISOidentity_ecall4_interface ecall4;
+
+	struct ISOidentity_ecall8_interface ecall8;
+
+	struct ISOidentity_ecall9_interface ecall9;
+
+
+	/* Get the model component size. */
+	ecall4.type = type;
+	ecall4.size = 0;
+	if ( !enclave->boot_slot(enclave, 4, &ocall_table, &ecall4, &rc) ) {
+		fprintf(stderr, "Enclave returned: %d\n", rc);
+		goto done;
+	}
+	if ( ecall4.size == 0 ) {
+		fputs("Event type has zero size.\n", stdout);
+		retn = true;
+		goto done;
+	}
+
+
+	/* Rewind the event type. */
+	ecall8.type = type;
+	if ( !enclave->boot_slot(enclave, 8, &ocall_table, &ecall8, &rc) ) {
+		fprintf(stderr, "Enclave returned: %d\n", rc);
+		goto done;
+	}
+
+
+	/* Loop through the events. */
+	ecall9.type = type;
+	fprintf(stdout, "Event count: %zu\n", ecall4.size);
+	for (lp= 0; lp < ecall4.size; ++lp) {
+		if ( !enclave->boot_slot(enclave, 9, &ocall_table, &ecall9, \
+					 &rc) ) {
+			fprintf(stderr, "Enclave returned: %d\n", rc);
+			goto done;
+		}
+		if ( strlen(ecall9.event) != 0 )
+			fprintf(stdout, "%s\n", ecall9.event);
+	}
+
+	retn = true;
+
+
+ done:
+	return retn;
+}
 
 
 /**
@@ -310,6 +381,16 @@ extern int main(int argc, char *argv[])
 
 	fputs("\n\nMeasurement:\n", stdout);
 	bufr->print(bufr);
+
+
+	/* Replay model and forensic events. */
+	fputs("\n\nModel events:\n", stdout);
+	if ( !display_events(enclave, ISO_IDENTITY_EVENT) )
+		ERR(goto done);
+
+	fputs("\n\nForensic events:\n", stdout);
+	if ( !display_events(enclave, ISO_IDENTITY_FORENSICS) )
+		ERR(goto done);
 
 	retn = 0;
 

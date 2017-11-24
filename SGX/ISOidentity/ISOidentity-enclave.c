@@ -358,3 +358,81 @@ void rewind(int type)
 
 	return;
 }
+
+
+/**
+ * External ECALL.
+ *
+ * This method implements the retrieval of model events.  The
+ * function is designed to be multiplexed by the arguement to the
+ * function which selects either accepted model update events or
+ * events which have been tagged as forensic violations.  This is
+ * once again to decreate the number of interfaces into the enclace
+ * which are required.
+ *
+ * Since enclaves do not have a good method for returning
+ * null-terminated strings this function takes a length value and
+ * the function verifies that the event value being returned does
+ * not exceed this value.
+ *
+ * \param type	The type of the event to be reset.  The available
+ *		defines to select these are in the interface
+ *		definition file.  The possible types are standard
+ *		model update events and those that are classified as
+ *		forensic events.
+ *
+ * \param event A pointer to the buffer which the event will be
+ *		loaded into.
+ *
+ * \param size	The size of the buffer which is available to hold
+ *		the event.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		a valid value is returned.  A false value indicates
+ *		a valid event is not available while a true value
+ *		indicates the event return was valid.
+ */
+
+_Bool get_event(char type, char *update, size_t size)
+
+{
+	_Bool retn = false;
+
+	String es = NULL;
+
+	ExchangeEvent event;
+
+
+	INIT(HurdLib, String, es, ERR(goto done));
+	memset(update, '\0', size);
+
+	if ( type == ISO_IDENTITY_EVENT ) {
+		if ( !Model->get_event(Model, &event) )
+			ERR(goto done);
+		if ( event == NULL ) {
+			retn = true;
+			goto done;
+		}
+	}
+	if ( type == ISO_IDENTITY_FORENSICS ) {
+		if ( !Model->get_forensics(Model, &event) )
+			ERR(goto done);
+		if ( event == NULL ) {
+			retn = true;
+			goto done;
+		}
+	}
+
+
+	if ( !event->format(event, es) )
+		ERR(goto done);
+	if ( (es->size(es) + 1) > size )
+		ERR(goto done);
+	memcpy(update, es->get(es), es->size(es));
+
+
+ done:
+	WHACK(es);
+
+	return retn;
+}
