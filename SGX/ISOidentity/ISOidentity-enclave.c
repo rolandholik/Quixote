@@ -324,3 +324,37 @@ _Bool get_pid(pid_t *pidptr)
  done:
 	return retn;
 }
+
+
+/**
+ * External ECALL.
+ *
+ * This method implements the reset of the three model components.
+ * The component to be reset is signalled through an arguement to
+ * the caller.
+ *
+ * \param type	The type of the event to be reset.  The available
+ *		defines to select these are in the interface
+ *		definition file.  The possible types are events,
+ *		contours and forensics.
+ *
+ * \return	No return value is defined.
+ */
+
+void rewind(int type)
+
+{
+	switch ( type ) {
+		case ISO_IDENTITY_EVENT:
+			Model->rewind_event(Model);
+			break;
+		case ISO_IDENTITY_FORENSICS:
+			Model->rewind_forensics(Model);
+			break;
+		case ISO_IDENTITY_CONTOURS:
+			Model->rewind_contours(Model);
+			break;
+	}
+
+	return;
+}

@@ -31,6 +31,7 @@ extern size_t get_size(int);
 extern _Bool set_aggregate(uint8_t *, size_t);
 extern _Bool get_measurement(unsigned char *);
 extern _Bool get_pid(pid_t *);
+extern void rewind(int);
 
 
 /* ECALL 0 interface function. */
@@ -267,6 +268,26 @@ static sgx_status_t sgx_get_pid(void *pms)
 }
 
 
+/* ECALL8 interface function. */
+static sgx_status_t sgx_rewind(void *pms)
+
+{
+	sgx_status_t retn = SGX_SUCCESS;
+
+	struct ISOidentity_ecall8_interface *ms = \
+		(struct ISOidentity_ecall8_interface *) pms;
+
+
+	/* Verify arguements. */
+	CHECK_REF_POINTER(pms, sizeof(struct ISOidentity_ecall8_interface));
+
+	get_size(ms->type);
+
+
+	return retn;
+}
+
+
 /* ECALL interface table. */
 SGX_EXTERNC const struct {
 	size_t nr_ecall;
@@ -282,6 +303,7 @@ SGX_EXTERNC const struct {
 		{(void*)(uintptr_t)sgx_set_aggregate, 0},
 		{(void*)(uintptr_t)sgx_get_measurement, 0},
 		{(void*)(uintptr_t)sgx_get_pid, 0},
+		{(void*)(uintptr_t)sgx_rewind, 0},
 	}
 };
 
@@ -293,6 +315,6 @@ SGX_EXTERNC const struct {
 } g_dyn_entry_table = {
 	OCALL_NUMBER,
 	{
-		{0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0},
 	}
 };
