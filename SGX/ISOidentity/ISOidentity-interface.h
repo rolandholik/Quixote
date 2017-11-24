@@ -18,7 +18,7 @@
 
 
 /* Number of enclave interfaces. */
-#define ECALL_NUMBER 7
+#define ECALL_NUMBER 8
 #define OCALL_NUMBER 1
 
 
@@ -29,6 +29,7 @@ struct ISOidentity_ecall0_interface {
 
 struct ISOidentity_ecall1_interface {
 	_Bool retn;
+	_Bool discipline;
 	char *update;
 };
 
@@ -46,4 +47,9 @@ struct ISOidentity_ecall5_interface {
 struct ISOidentity_ecall6_interface {
 	_Bool retn;
 	unsigned char measurement[NAAAIM_IDSIZE];
+};
+
+struct ISOidentity_ecall7_interface {
+	_Bool retn;
+	pid_t pid;
 };

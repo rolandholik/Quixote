@@ -82,7 +82,7 @@ extern int main(int argc, char *argv[])
 	     *sgx_device   = "/dev/isgx",
 	     *enclave_name = "ISOidentity.signed.so";
 
-	static char *violation = "event{sh:/bin/dotest.sh} actor{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=0x20000420} subject{uid=0, gid=0, mode=0100755, name_length=14, name=3bb11576b7c0dd5cf9f4308f60f8e58a07590c0c5db20859f86611c54c67013b, s_id=xvdb, s_uuid=f37070fc24894435b96e88f40a12a7c0, digest=1a3847fb368bde910be9095a52859a88faff7d0474528cadedf46f96802cc9fc}";
+	static char *violation = "pid{9999} event{sh:/bin/dotest.sh} actor{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=0x20000420} subject{uid=0, gid=0, mode=0100755, name_length=14, name=3bb11576b7c0dd5cf9f4308f60f8e58a07590c0c5db20859f86611c54c67013b, s_id=xvdb, s_uuid=f37070fc24894435b96e88f40a12a7c0, digest=1a3847fb368bde910be9095a52859a88faff7d0474528cadedf46f96802cc9fc}";
 
 	int opt,
 	    rc,
@@ -97,6 +97,8 @@ extern int main(int argc, char *argv[])
 	struct ISOidentity_ecall5_interface ecall5_table;
 
 	struct ISOidentity_ecall6_interface ecall6_table;
+
+	struct ISOidentity_ecall7_interface ecall7_table;
 
 	struct SGX_einittoken *einit;
 
@@ -234,7 +236,8 @@ extern int main(int argc, char *argv[])
 	if ( !input->add(input, violation) )
 		ERR(goto done);
 
-	ecall1_table.update = input->get(input);
+	ecall1_table.update	= input->get(input);
+	ecall1_table.discipline = false;
 	if ( !enclave->boot_slot(enclave, 1, &ocall_table, \
 				 &ecall1_table, &rc) ) {
 		fprintf(stderr, "Enclave returned: %d\n", rc);
@@ -243,6 +246,19 @@ extern int main(int argc, char *argv[])
 	if ( !ecall1_table.retn ) {
 		fputs("Enclave model update failed.\n", stderr);
 		goto done;
+	}
+
+	memset(&ecall7_table, '\0', sizeof(ecall7_table));
+	if ( ecall1_table.discipline ) {
+		if ( !enclave->boot_slot(enclave, 7, &ocall_table, \
+					 &ecall7_table, &rc) ) {
+			fprintf(stderr, "Enclave returned: %d\n", rc);
+			goto done;
+		}
+		if ( !ecall7_table.retn ) {
+			fputs("Enclave pid retrieval failed.\n", stderr);
+			goto done;
+		}
 	}
 
 
@@ -270,6 +286,8 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 	fprintf(stdout, "\tForensics: %zu\n", ecall4_table.size);
+
+	fprintf(stdout, "\nPID of violator: %d\n", ecall7_table.pid);
 
 
 	/* Test retrieval of the model measurement. */

@@ -57,17 +57,23 @@ _Bool init_model(void)
  * This method implements adding updates to the ISOidentity model
  * being implemented inside an enclave.
  *
+ * \param update	A pointer to the null-terminated character
+ *			string containing the event.
+ *
+ * \param discipline	A pointer to a boolean value which indicates
+ *			whether or not the update caused a model
+ *			violation and the PID needs to be disciplined.
+ *
  * \return	A boolean value is used to indicate whether or not
  *		the update to the model had succeeded.  A false value
  *		indicates the update had failed while a true value
  *	        indicates the enclave model had been updated.
  */
 
-_Bool update_model(char *update)
+_Bool update_model(char *update, _Bool *discipline)
 
 {
 	_Bool updated,
-	      discipline,
 	      retn = false;
 
 	String input = NULL;
@@ -90,7 +96,7 @@ _Bool update_model(char *update)
 
 
 	/* Update the model. */
-	if ( !Model->update(Model, event, &updated, &discipline) )
+	if ( !Model->update(Model, event, &updated, discipline) )
 		ERR(goto done);
 	if ( !updated )
 		WHACK(event);
@@ -280,5 +286,41 @@ _Bool get_measurement(unsigned char *measurement)
  done:
 	WHACK(bufr);
 
+	return retn;
+}
+
+
+/**
+ * External ECALL.
+ *
+ * This method implements retrieving the process ID value of an
+ * event.
+ *
+ * \param pidptr	A pointer to the variable which the PID is
+ *			to be copied into.
+ *
+ * \return		A boolean value is returned to indicate the
+ *			status of the retrieval of the PID value.
+ *			A false value indicates the variable does not
+ *			have a valid PID while a true value indicates
+ *			the PID is valid.
+ */
+
+_Bool get_pid(pid_t *pidptr)
+
+{
+	_Bool retn = false;
+
+	pid_t pid;
+
+
+	if ( !Model->discipline_pid(Model, &pid) )
+		ERR(goto done);
+
+	*pidptr = pid;
+	retn = true;
+
+
+ done:
 	return retn;
 }

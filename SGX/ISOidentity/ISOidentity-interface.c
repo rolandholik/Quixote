@@ -5,6 +5,8 @@
 #include <sgx_trts.h>
 #include <sgx_edger8r.h>
 
+#include <HurdLib.h>
+
 #include <NAAAIM.h>
 #include "ISOidentity-interface.h"
 
@@ -22,12 +24,13 @@
 
 /* Prototype definitions for enclave functions. */
 extern _Bool init_model(void);
-extern _Bool update_model(char *);
+extern _Bool update_model(char *, _Bool *);
 extern void seal_model(void);
 extern void dump_model(void);
 extern size_t get_size(int);
 extern _Bool set_aggregate(uint8_t *, size_t);
 extern _Bool get_measurement(unsigned char *);
+extern _Bool get_pid(pid_t *);
 
 
 /* ECALL 0 interface function. */
@@ -90,7 +93,7 @@ static sgx_status_t sgx_update_model(void *pms)
 
 
 	/* Call enclave function with local arguement. */
-	ms->retn = update_model(enclave_update);
+	ms->retn = update_model(enclave_update, &ms->discipline);
 
 
  done:
@@ -240,6 +243,30 @@ static sgx_status_t sgx_get_measurement(void *pms)
 }
 
 
+/* ECALL7 interface function. */
+static sgx_status_t sgx_get_pid(void *pms)
+
+{
+	sgx_status_t retn = SGX_SUCCESS;
+
+	pid_t pid;
+
+	struct ISOidentity_ecall7_interface *ms = \
+		(struct ISOidentity_ecall7_interface *) pms;
+
+
+	/* Verify arguements. */
+	CHECK_REF_POINTER(pms, sizeof(struct ISOidentity_ecall7_interface));
+
+
+	/* Call enclave function with local arguement. */
+	ms->retn = get_pid(&pid);
+	ms->pid  = pid;
+
+	return retn;
+}
+
+
 /* ECALL interface table. */
 SGX_EXTERNC const struct {
 	size_t nr_ecall;
@@ -254,6 +281,7 @@ SGX_EXTERNC const struct {
 		{(void*)(uintptr_t)sgx_get_size, 0},
 		{(void*)(uintptr_t)sgx_set_aggregate, 0},
 		{(void*)(uintptr_t)sgx_get_measurement, 0},
+		{(void*)(uintptr_t)sgx_get_pid, 0},
 	}
 };
 
@@ -265,6 +293,6 @@ SGX_EXTERNC const struct {
 } g_dyn_entry_table = {
 	OCALL_NUMBER,
 	{
-		{0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0},
 	}
 };
