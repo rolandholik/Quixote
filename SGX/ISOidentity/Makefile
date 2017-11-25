@@ -4,7 +4,7 @@
 
 
 # Variable declarations.
-CSRC   = test-ISOidentity-enclave.c
+CSRC   = test-ISOidentity-enclave.c ISOenclave.c
 ENCSRC = ISOidentity-enclave.c ISOidentity-interface.c			\
 	ContourPoint.c Actor.c Subject.c ExchangeEvent.c ISOidentity.c	\
 	regcomp.c regexec.c regerror.c tre-mem.c reg-support.c
@@ -47,7 +47,7 @@ SGX_SIGNER = $(SGX_SDK)/bin/sgx_sign
 CC = musl-gcc
 
 CFLAGS = -Wall -O2 -fomit-frame-pointer -march=core2 -I .. -I ../.. \
-	-I ../../HurdLib 
+	-I ../../HurdLib -I ../../ISO-identity
 
 LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib -L../../lib
 
@@ -102,12 +102,15 @@ ldscript:
 
 tools: ${TOOLS}
 
-test-ISOidentity-enclave: test-ISOidentity-enclave.o ../SGXenclave.o	\
-	../SGXloader.o ../SGXmetadata.o ../SGXsigstruct.o		\
-	../sgx-ocall.o ../boot-sgx.o
+test-ISOidentity-enclave: test-ISOidentity-enclave.o ISOenclave.o	  \
+	../SGXenclave.o ../SGXloader.o ../SGXmetadata.o ../SGXsigstruct.o \
+	../sgx-ocall.o ../boot-sgx.o ISOenclave.o
 	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB};
 
 test-ISOidentity-enclave.o: test-ISOidentity-enclave.c
+	${CC} ${CFLAGS} -c $< -o $@;
+
+ISOenclave.o: ISOenclave.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
 
