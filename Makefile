@@ -14,7 +14,7 @@ CSRC = 	SHA256.c SHA256_hmac.c OrgID.c PatientID.c RandomBuffer.c  \
 # 	provider-server
 SERVERS = root-referral device-broker user-broker
 
-SUBDIRS = idgine utils edi SGX ISO-identity # client
+SUBDIRS = idgine utils edi SGX ISOidentity # client
 
 # CC = gcc
 CC = musl-gcc
@@ -153,7 +153,7 @@ utils:
 SGX:
 	${MAKE} -C $@;
 
-ISO-identity:
+ISOidentity:
 	${MAKE} -C $@;
 
 tags:

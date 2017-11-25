@@ -15,7 +15,7 @@ ENCLAVE_CC = gcc64
 
 SGX_SDK	    = /opt/intel/sgxsdk
 SGX_INCLUDE = -I . -I $(SGX_SDK)/include -I $(SGX_SDK)/include/tlibc \
-	-I $(SGX_SDK)/include/stlport -I ../../ISO-identity	     \
+	-I $(SGX_SDK)/include/stlport -I ../../ISOidentity	     \
 	-I ../SGXlibs/SGXfusion -I ../SGXlibs/SGXnaaaim
 
 ENCLAVE_CFLAGS = -Wall -nostdinc -fvisibility=hidden -fpie -fstack-protector \
@@ -47,7 +47,7 @@ SGX_SIGNER = $(SGX_SDK)/bin/sgx_sign
 CC = musl-gcc
 
 CFLAGS = -Wall -O2 -fomit-frame-pointer -march=core2 -I .. -I ../.. \
-	-I ../../HurdLib -I ../../ISO-identity
+	-I ../../HurdLib -I ../../ISOidentity
 
 LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib -L../../lib
 
@@ -61,7 +61,7 @@ ELFLIB	= -Wl,--rpath /usr/local/musl/lib -lelf
 %.o: %.c
 	$(ENCLAVE_CC) $(ENCLAVE_CFLAGS) -c $< -o $@;
 
-%.o: ../../ISO-identity/%.c
+%.o: ../../ISOidentity/%.c
 	$(ENCLAVE_CC) $(ENCLAVE_CFLAGS) -c $< -o $@;
 
 
