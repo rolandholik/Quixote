@@ -430,6 +430,8 @@ _Bool get_event(char type, char *update, size_t size)
 		ERR(goto done);
 	memcpy(update, es->get(es), es->size(es));
 
+	retn = true;
+
 
  done:
 	WHACK(es);
