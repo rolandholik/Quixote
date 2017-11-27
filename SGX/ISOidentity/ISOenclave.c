@@ -316,7 +316,7 @@ static _Bool set_aggregate(CO(ISOenclave, this), CO(Buffer, bufr))
 	ecall5.aggregate	= bufr->get(bufr);
 	ecall5.aggregate_length = bufr->size(bufr);
 
-	if ( !S->enclave->boot_slot(S->enclave, 0, &ocall_table, &ecall5, \
+	if ( !S->enclave->boot_slot(S->enclave, 5, &ocall_table, &ecall5, \
 				    &rc) ) {
 		S->enclave_error = rc;
 		ERR(goto done);
