@@ -89,10 +89,10 @@ set-behavior: set-behavior.o
 	${CC} ${LDFLAGS} -o $@ $^ ${HURDLIB}
 
 cboot: cboot.o ../SHA256.o ISOidentity.o ContourPoint.o ExchangeEvent.o \
-	Actor.o Subject.o ../SGX/SGXenclave.o ../SGX/SGXloader.o 	\
-	../SGX/SGXmetadata.o ../SGX/SGXsigstruct.o ../SGX/boot-sgx.o	\
-	../SGX/sgx-ocall.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO} \
+	Actor.o Subject.o ../SGX/ISOidentity/ISOenclave.o		\
+	../SGX/SGXenclave.o ../SGX/SGXloader.o ../SGX/SGXmetadata.o	\
+	../SGX/SGXsigstruct.o ../SGX/boot-sgx.o ../SGX/sgx-ocall.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO}	\
 		-Wl,--rpath /usr/local/musl/lib -lelf
 
 cboot-mgr: cboot-mgr.o
