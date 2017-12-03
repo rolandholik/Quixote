@@ -16,11 +16,6 @@
  * for licensing information.
  **************************************************************************/
 
-/* Include kernel specific IOCTL information. */
-#include <linux/ioctl.h>
-
-/* The name of the device node used to access the OS driver. */
-#define SGX_DEVICE "/dev/isgx"
 
 /* Add bit operators if they are not defined. */
 #if !defined(BIT_ULL)
