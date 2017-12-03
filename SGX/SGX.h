@@ -188,7 +188,7 @@ typedef struct _data_directory_t {
 	uint32_t size;
 } __attribute__((packed)) data_directory_t;
 
-typedef struct _metadata_t 
+typedef struct _metadata_t
 {
 	uint64_t magic_num;
 	uint64_t version;
@@ -224,7 +224,7 @@ typedef struct _metadata_t
 #define SGX_SECS_RESERVED2_SIZE 32
 #define SGX_SECS_RESERVED3_SIZE 96
 #define SGX_SECS_RESERVED4_SIZE 3836
-                                                                       
+
 struct SGX_secs {
 	uint64_t size;
 	uint64_t base;
@@ -374,3 +374,46 @@ struct OCALL_api {
 	size_t nr_ocall;
 	void *table[];
 };
+
+
+/**
+ * The following structure definitions are used to generate reports
+ * from an enclave which allow up to 64 bytes of data to be securely
+ * conveyed from one enclave to another.  These structures are the
+ * base of enclave<->enclave trust relationships.
+ */
+
+/**
+ * The following structure is created by an enclave requesting a
+ * report from an enclave running on the current platform.
+ */
+struct SGX_targetinfo {
+	sgx_measurement_t mrenclave;
+	sgx_attributes_t attributes;
+	uint8_t reserved1[4];
+	uint32_t miscselect;
+	uint8_t reserved2[456];
+} __attribute__((aligned(512)));
+
+
+/**
+ * The following structure is the report which is returned by an
+ * enclave in response to a request from an enclave which is described
+ * by an SGX_targetinfo tructure.
+ */
+struct SGX_report {
+	uint16_t cpusvn;
+	uint32_t miscselect;
+	uint8_t reserved1[28];
+	sgx_attributes_t attributes;
+	sgx_measurement_t mr_enclave;
+	uint8_t reserved2[32];
+	uint8_t mrsigner[32];
+	uint8_t reserved3[96];
+	uint16_t isvprodid;
+	uint16_t isvsvn;
+	uint8_t reserved4[60];
+	uint8_t reportdata[64];
+	uint8_t keyid[64];
+	uint8_t mac[16];
+} __attribute__((aligned(512)));
