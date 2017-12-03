@@ -397,7 +397,7 @@ struct SGX_targetinfo {
  * by an SGX_targetinfo tructure.
  */
 struct SGX_report {
-	uint16_t cpusvn;
+	uint8_t cpusvn[16];
 	uint32_t miscselect;
 	uint8_t reserved1[28];
 	sgx_attributes_t attributes;
@@ -409,6 +409,6 @@ struct SGX_report {
 	uint16_t isvsvn;
 	uint8_t reserved4[60];
 	uint8_t reportdata[64];
-	uint8_t keyid[64];
+	uint8_t keyid[32];
 	uint8_t mac[16];
 } __attribute__((aligned(512)));
