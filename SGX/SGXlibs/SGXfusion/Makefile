@@ -7,6 +7,7 @@
 CSRC   = test-fusion.c
 ENCSRC = test-fusion-enclave.c test-fusion-interface.c
 LIBSRC = fusion-shim.c Origin.c Fibsequence.c Buffer.c String.c
+ASRC   = enclu_ereport.s
 
 TOOLS = test-fusion
 
@@ -61,12 +62,15 @@ ELFLIB	= -Wl,--rpath /usr/local/musl/lib -lelf
 %.o: %.c
 	${ENCLAVE_CC} ${ENCLAVE_CFLAGS} -c $< -o $@;
 
+%.o: %.s
+	${AS} -o $@ $<;
+
 
 #
 # Automatic definition of classes and objects.
 #
 COBJS	= ${CSRC:.c=.o}
-LIBOBJS = ${LIBSRC:.c=.o}
+LIBOBJS = ${LIBSRC:.c=.o} ${ASRC:.s=.o}
 ENCOBJS = ${ENCSRC:.c=.o}
 
 
