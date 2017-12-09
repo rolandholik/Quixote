@@ -14,3 +14,4 @@
 /* Prototype for the ENCLU[EREPORT] wrapper function. */
 extern void enclu_ereport(struct SGX_targetinfo *, struct SGX_report *, \
 			  char *);
+extern int enclu_egetkey(struct SGX_keyrequest *, uint8_t *);

@@ -396,7 +396,8 @@ struct SGX_targetinfo {
  * enclave in response to a request from an enclave which is described
  * by an SGX_targetinfo tructure.
  */
-struct SGX_report {
+
+struct SGX_reportbody {
 	uint8_t cpusvn[16];
 	uint32_t miscselect;
 	uint8_t reserved1[28];
@@ -409,6 +410,33 @@ struct SGX_report {
 	uint16_t isvsvn;
 	uint8_t reserved4[60];
 	uint8_t reportdata[64];
+};
+
+struct SGX_report {
+	struct SGX_reportbody body;
 	uint8_t keyid[32];
 	uint8_t mac[16];
+} __attribute__((aligned(512)));
+
+
+/**
+ * The following definitions are used to request various keys which
+ * can be retrieved with the ENCLU[EGETKEY] instruction.  This instruction
+ * returns keys which are derived from the current processor identity.
+ */
+
+/* Definition of numeric constants used to select various keys. */
+#define SGX_KEYSELECT_REPORT	0x3
+#define SGX_KEYSELECT_SEAL	0x4
+
+struct SGX_keyrequest {
+	uint16_t keyname;
+	uint16_t keypolicy;
+	uint16_t isvsvn;
+	uint8_t reserved1[2];
+	uint8_t cpusvn[16];
+	sgx_attributes_t attributes;
+	uint8_t keyid[32];
+	uint32_t miscselect;
+	uint8_t reserved2[436];
 } __attribute__((aligned(512)));

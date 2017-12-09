@@ -5,7 +5,8 @@
 
 # Variable declarations.
 CSRC   = test-local-enclave.c
-ENCSRC = LocalTarget-enclave.c LocalTarget-interface.c
+ENCSRC1 = LocalTarget-enclave.c LocalTarget-interface.c
+ENCSRC2 = LocalSource-enclave.c LocalSource-interface.c
 
 TOOLS = test-local-target
 
@@ -64,7 +65,8 @@ ELFLIB	= -Wl,--rpath /usr/local/musl/lib -lelf
 # Automatic definition of classes and objects.
 #
 COBJS	= ${CSRC:.c=.o}
-ENCOBJS = ${ENCSRC:.c=.o}
+ENCOBJS1 = ${ENCSRC1:.c=.o}
+ENCOBJS2 = ${ENCSRC2:.c=.o}
 
 
 #
@@ -76,13 +78,20 @@ ENCOBJS = ${ENCSRC:.c=.o}
 # Targets
 all: ${LIBRARY} enclave tools
 
-enclave: ldscript LocalTarget.signed.so
+enclave: ldscript LocalTarget.signed.so LocalSource.signed.so
 
 LocalTarget.signed.so: LocalTarget.so
 	$(SGX_SIGNER) sign -key Private-key.pem -enclave LocalTarget.so \
 		 -out $@ -config LocalTarget-enclave.xml;
 
-LocalTarget.so: ${ENCOBJS}
+LocalTarget.so: ${ENCOBJS1}
+	${ENCLAVE_CC} -o $@ $^ ${ENCLAVE_LDFLAGS}
+
+LocalSource.signed.so: LocalSource.so
+	$(SGX_SIGNER) sign -key Private-key.pem -enclave $^ -out $@ \
+	-config LocalTarget-enclave.xml;
+
+LocalSource.so: ${ENCOBJS2}
 	${ENCLAVE_CC} -o $@ $^ ${ENCLAVE_LDFLAGS}
 
 ldscript:
@@ -110,6 +119,7 @@ clean:
 	rm -f *.o *~ ldscript;
 	rm -f ${TOOLS};
 	rm -f LocalTarget.so LocalTarget.signed.so;
+	rm -f LocalSource.so LocalSource.signed.so;
 
 
 # Source dependencies.
