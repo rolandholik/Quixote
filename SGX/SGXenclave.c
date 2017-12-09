@@ -1237,6 +1237,7 @@ static _Bool get_targetinfo(CO(SGXenclave, this), \
 	       sizeof(target->mrenclave));
 	memcpy(&target->attributes, &S->secs.attributes, \
 	       sizeof(target->attributes));
+	target->attributes.flags |= 1;
 
 	target->miscselect = S->secs.miscselect;
 
