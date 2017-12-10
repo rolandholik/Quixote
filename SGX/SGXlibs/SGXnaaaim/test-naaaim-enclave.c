@@ -11,6 +11,7 @@
 
 #include "SHA256.h"
 #include "RandomBuffer.h"
+#include "Curve25519.h"
 
 
 void test_one()
@@ -94,6 +95,55 @@ void test_two()
 }
 
 
+void test_three(void)
+
+{
+	Curve25519 ours	  = NULL,
+		   theirs = NULL;
+
+	Buffer b,
+	       shared = NULL;
+
+
+	/* Create the public/private keypairs. */
+	INIT(NAAAIM, Curve25519, ours, goto done);
+	if ( !ours->generate(ours) )
+		goto done;
+	fputs("Our public:\n", stdout);
+	b = ours->get_public(ours);
+	b->print(b);
+
+	INIT(NAAAIM, Curve25519, theirs, goto done);
+	if ( !theirs->generate(theirs) )
+		goto done;
+	fputs("\nTheir public:\n", stdout);
+	b = theirs->get_public(theirs);
+	b->print(b);
+
+
+	/* Generate and confirm the shared secrets. */
+	INIT(HurdLib, Buffer, shared, goto done);
+	if ( !ours->compute(ours, theirs->get_public(theirs), shared) )
+		goto done;
+	fputs("\nOur key:\n", stdout);
+	shared->print(shared);
+
+	shared->reset(shared);
+	if ( !theirs->compute(theirs, ours->get_public(ours), shared) )
+		goto done;
+	fputs("\nTheir key:\n", stdout);
+	shared->print(shared);
+
+
+ done:
+	WHACK(ours);
+	WHACK(theirs);
+	WHACK(shared);
+
+	return;
+}
+
+
 void test_naaaim(unsigned int test)
 
 {
@@ -106,6 +156,10 @@ void test_naaaim(unsigned int test)
 		case 2:
 			test_two();
 			break;
+		case 3:
+			test_three();
+			break;
+
 		default:
 			fputs("Invalid test.\n", stderr);
 			break;

@@ -6,7 +6,7 @@
 # Variable declarations.
 CSRC   = test-naaaim.c
 ENCSRC = test-naaaim-enclave.c test-naaaim-interface.c
-LIBSRC = SHA256.c RandomBuffer.c
+LIBSRC = SHA256.c RandomBuffer.c Curve25519.c
 ASRC   = rdrand.s
 
 TOOLS = test-naaaim
@@ -18,7 +18,7 @@ ENCLAVE_CC = gcc64
 
 SGX_SDK	    = /opt/intel/sgxsdk
 SGX_INCLUDE = -I . -I ${SGX_SDK}/include -I ${SGX_SDK}/include/tlibc \
-	-I ${SGX_SDK}/include/stlport -I ../SGXfusion
+	-I ${SGX_SDK}/include/stlport -I ../SGXfusion -I ../../../lib
 
 ENCLAVE_CFLAGS = -Wall -nostdinc -fvisibility=hidden -fpie -fstack-protector \
 	${SGX_INCLUDE} -fno-builtin
