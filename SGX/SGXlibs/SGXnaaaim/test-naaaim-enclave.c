@@ -8,10 +8,12 @@
 
 #include <HurdLib.h>
 #include <Buffer.h>
+
 #include "SHA256.h"
+#include "RandomBuffer.h"
 
 
-void test_fusion(int test)
+void test_one()
 
 {
 	uint8_t lp;
@@ -29,7 +31,6 @@ void test_fusion(int test)
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 	INIT(NAAAIM, SHA256, sha256, ERR(goto done));
 
-	printf("Test number: %d\n", test);
 	len = strlen((char *) input);
 	fputs("Input:\n", stdout);
 	for (lp= 0; lp < len; ++lp)
@@ -54,6 +55,63 @@ void test_fusion(int test)
  done:
 	WHACK(bufr);
 	WHACK(sha256)
+
+	return;
+}
+
+
+void test_two()
+
+{
+	Buffer b;
+
+	RandomBuffer random = NULL;
+
+
+	INIT(NAAAIM, RandomBuffer, random, ERR(goto done));
+	b = random->get_Buffer(random);
+
+	fputs("8 bytes:\n", stdout);
+	if ( !random->generate(random, sizeof(uint64_t)) )
+		ERR(goto done);
+	b->print(b);
+
+	fputs("18 bytes:\n", stdout);
+	if ( !random->generate(random, 18) )
+		ERR(goto done);
+	b->print(b);
+
+	fputs("32 bytes:\n", stdout);
+	if ( !random->generate(random, 32) )
+		ERR(goto done);
+	b->print(b);
+
+
+ done:
+	WHACK(random);
+
+	return;
+}
+
+
+void test_naaaim(unsigned int test)
+
+{
+
+	fprintf(stdout, "Test number: %u\n", test);
+	switch ( test ) {
+		case 1:
+			test_one();
+			break;
+		case 2:
+			test_two();
+			break;
+		default:
+			fputs("Invalid test.\n", stderr);
+			break;
+	}
+	fprintf(stdout, "End test: %d\n", test);
+
 
 	return;
 }

@@ -6,7 +6,8 @@
 # Variable declarations.
 CSRC   = test-naaaim.c
 ENCSRC = test-naaaim-enclave.c test-naaaim-interface.c
-LIBSRC = SHA256.c
+LIBSRC = SHA256.c RandomBuffer.c
+ASRC   = rdrand.s
 
 TOOLS = test-naaaim
 
@@ -61,12 +62,18 @@ ELFLIB	= -Wl,--rpath /usr/local/musl/lib -lelf
 %.o: %.c
 	${ENCLAVE_CC} ${ENCLAVE_CFLAGS} -c $< -o $@;
 
+%.o: ../../../lib/%.c
+	$(ENCLAVE_CC) $(ENCLAVE_CFLAGS) -c $< -o $@;
+
+%.o: %.s
+	${AS} -o $@ $<;
+
 
 #
 # Automatic definition of classes and objects.
 #
 COBJS	= ${CSRC:.c=.o}
-LIBOBJS = ${LIBSRC:.c=.o}
+LIBOBJS = ${LIBSRC:.c=.o} ${ASRC:.s=.o}
 ENCOBJS = ${ENCSRC:.c=.o}
 
 
@@ -124,3 +131,4 @@ test-naaaim-enclave.o: test-naaaim-interface.h SHA256.h
 test-naaaim-interface.o: test-naaaim-interface.h
 
 SHA256.o: SHA256.h
+RandomBuffer.o: RandomBuffer.h

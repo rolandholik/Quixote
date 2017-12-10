@@ -11,6 +11,12 @@
  **************************************************************************/
 
 
+/* Number of tests. */
+#define PGM "test-naaaim"
+
+#define NUMBER_OF_TESTS 2
+
+
 /* Include files. */
 #include <stdio.h>
 #include <stdbool.h>
@@ -77,11 +83,13 @@ extern int main(int argc, char *argv[])
 
 	char *token	   = NULL,
 	     *sgx_device   = "/dev/isgx",
-	     *enclave_name = NULL;
+	     *enclave_name = "test-naaaim.signed.so";
 
 	int opt,
 	    rc,
 	    retn = 1;
+
+	unsigned int test;
 
 	struct SGX_einittoken *einit;
 
@@ -93,10 +101,9 @@ extern int main(int argc, char *argv[])
 
 
 	/* Output header. */
-	fprintf(stdout, "%s: IDfusion NAAAIM library test utility.\n", \
-		"fusion-test");
+	fprintf(stdout, "%s: IDfusion NAAAIM library test utility.\n", PGM);
 	fprintf(stdout, "%s: (C)Copyright 2017, IDfusion, LLC. All rights "
-		"reserved.\n\n", "fusion-test");
+		"reserved.\n\n", PGM);
 
 
 	/* Parse and verify arguements. */
@@ -114,11 +121,6 @@ extern int main(int argc, char *argv[])
 				token = optarg;
 				break;
 		}
-
-	if ( enclave_name == NULL ) {
-		fputs("No enclave name specifed.\n", stderr);
-		goto done;
-	}
 
 
 	/* Load the launch token. */
@@ -151,12 +153,18 @@ extern int main(int argc, char *argv[])
 	if ( !enclave->init_enclave(enclave, einit) )
 		ERR(goto done);
 
-	ecall0_table.test = 1;
-	if ( !enclave->boot_slot(enclave, 0, &ocall_table, \
-				 &ecall0_table, &rc) ) {
-		fprintf(stderr, "Enclave returned: %d\n", rc);
-		goto done;
+
+	/* Sequence through all tests. */
+	for (test= 1; test <= NUMBER_OF_TESTS; ++test) {
+		ecall0_table.test = test;
+		if ( !enclave->boot_slot(enclave, 0, &ocall_table, \
+					 &ecall0_table, &rc) ) {
+			fprintf(stderr, "Enclave returned: %d\n", rc);
+			goto done;
+		}
+		fputc('\n', stdout);
 	}
+
 
 	retn = 0;
 
