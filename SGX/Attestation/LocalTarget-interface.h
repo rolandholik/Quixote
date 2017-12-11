@@ -17,6 +17,8 @@
 
 /* ECALL interface definitions. */
 struct LocalTarget_ecall0_interface {
+	_Bool retn;
+	unsigned int mode;
 	struct SGX_targetinfo *target;
 	struct SGX_report *report;
 };

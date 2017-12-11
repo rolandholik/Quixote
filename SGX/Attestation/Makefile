@@ -15,7 +15,7 @@ ENCLAVE_CC = gcc64
 SGX_SDK	    = /opt/intel/sgxsdk
 SGX_INCLUDE = -I . -I $(SGX_SDK)/include -I $(SGX_SDK)/include/tlibc \
 	-I $(SGX_SDK)/include/stlport -I .. -I ../../ISOidentity     \
-	-I ../SGXlibs/SGXfusion -I ../SGXlibs/SGXnaaaim
+	-I ../SGXlibs/SGXfusion -I ../SGXlibs/SGXnaaaim -I../../lib
 
 ENCLAVE_CFLAGS = -Wall -nostdinc -fvisibility=hidden -fpie -fstack-protector \
 	$(SGX_INCLUDE) -fno-builtin

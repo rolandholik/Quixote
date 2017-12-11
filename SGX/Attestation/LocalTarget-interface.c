@@ -22,7 +22,8 @@
 
 
 /* Prototype definitions for enclave functions. */
-extern _Bool get_report(struct SGX_targetinfo *, struct SGX_report *);
+extern _Bool get_report(unsigned int, struct SGX_targetinfo *, \
+			struct SGX_report *);
 
 
 /* ECALL 0 interface function. */
@@ -47,7 +48,9 @@ static sgx_status_t sgx_get_report(void *args)
 
 	/* Call enclave function and return result. */
 	target = *ms->target;
-	get_report(&target, &report);
+	report = *ms->report;
+	ms->retn = get_report(ms->mode, &target, &report);
+	*ms->target = target;
 	*ms->report = report;
 
 	return retn;

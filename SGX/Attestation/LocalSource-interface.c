@@ -22,7 +22,8 @@
 
 
 /* Prototype definitions for enclave functions. */
-extern _Bool verify_report(struct SGX_report *);
+extern _Bool verify_report(unsigned int, struct SGX_targetinfo *, \
+			   struct SGX_report *);
 
 
 /* ECALL 0 interface function. */
@@ -34,17 +35,23 @@ static sgx_status_t sgx_verify_report(void *args)
 	struct LocalSource_ecall0_interface *ms = \
 		(struct LocalSource_ecall0_interface *) args;
 
+	struct SGX_targetinfo target;
+
 	struct SGX_report report;
 
 
 	/* Verify arguements. */
 	CHECK_REF_POINTER(args, sizeof(struct LocalSource_ecall0_interface));
+	CHECK_UNIQUE_POINTER(ms->target, sizeof(struct SGX_targetinfo));
 	CHECK_UNIQUE_POINTER(ms->report, sizeof(struct SGX_report));
 
 
 	/* Call enclave function and return result. */
+	target = *ms->target;
 	report = *ms->report;
-	ms->retn = verify_report(&report);
+	ms->retn = verify_report(ms->mode, &target, &report);
+	*ms->target = target;
+	*ms->report = report;
 
 	return retn;
 }

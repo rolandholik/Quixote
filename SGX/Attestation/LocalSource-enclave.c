@@ -7,14 +7,20 @@
 #include <Buffer.h>
 
 #include <NAAAIM.h>
+#include <Curve25519.h>
 
 #include <SGX.h>
 #include <SGXfusion.h>
 
-#include "LocalTarget-interface.h"
+#include "LocalSource-interface.h"
 
 sgx_status_t sgx_rijndael128_cmac_msg(uint8_t (*)[16], uint8_t *, size_t, \
 				      uint8_t *);
+
+/**
+ * The elliptic curve object which will be used.
+ */
+static Curve25519 SharedKey = NULL;
 
 
 /**
@@ -29,10 +35,13 @@ sgx_status_t sgx_rijndael128_cmac_msg(uint8_t (*)[16], uint8_t *, size_t, \
  *		value indicates the report is valid.
  */
 
-_Bool verify_report(struct SGX_report *report)
+_Bool verify_report(unsigned int mode, struct SGX_targetinfo *target, \
+		    struct SGX_report *report)
 
 {
 	_Bool retn = false;
+
+	char report_data[64] __attribute__((aligned(128)));
 
 	int rc;
 
@@ -41,10 +50,25 @@ _Bool verify_report(struct SGX_report *report)
 
 	struct SGX_keyrequest keyrequest;
 
-	Buffer bufr = NULL,
+	Buffer b,
+	       bufr = NULL,
 	       key  = NULL,
 	       mac  = NULL,
 	       dh   = NULL;
+
+
+	/* Generate a NULL report for target context generation. */
+	if ( mode == 1 ) {
+		memset(target, '\0', sizeof(struct SGX_targetinfo));
+		memset(report_data, '\0', sizeof(report_data));
+		enclu_ereport(target, report, report_data);
+
+		target->mrenclave  = report->body.mr_enclave;
+		target->attributes = report->body.attributes;
+		target->miscselect = report->body.miscselect;
+
+		return true;
+	}
 
 
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
@@ -100,12 +124,40 @@ _Bool verify_report(struct SGX_report *report)
 	bufr->print(bufr);
 	fputc('\n', stdout);
 
-	if ( memcmp(report->mac, macbuffer, sizeof(report->mac)) == 0 ) {
+	if ( memcmp(report->mac, macbuffer, sizeof(report->mac)) == 0 )
 		fputs("Report verified.\n", stdout);
-		retn = true;
-	}
 	else
 		fputs("Report not verified.\n", stdout);
+
+
+	/*
+	 * Generate a shared key report response.
+	 */
+	INIT(NAAAIM, Curve25519, SharedKey, ERR(goto done));
+	if ( !SharedKey->generate(SharedKey) )
+		ERR(goto done);
+
+	key->reset(key);
+	bufr->reset(bufr);
+	if ( !bufr->add(bufr, report->body.reportdata, 32) )
+		ERR(goto done);
+	if ( !SharedKey->compute(SharedKey, bufr, key) )
+		ERR(goto done);
+	fputs("\nSource shared key:\n", stdout);
+	key->print(key);
+
+	memset(report_data, '\0', sizeof(report_data));
+	b = SharedKey->get_public(SharedKey);
+	memcpy(report_data, b->get(b), b->size(b));
+
+	memset(target, '\0', sizeof(struct SGX_targetinfo));
+	target->mrenclave  = report->body.mr_enclave;
+	target->attributes = report->body.attributes;
+	target->miscselect = report->body.miscselect;
+
+	enclu_ereport(target, report, report_data);
+
+	retn = true;
 
 
  done:

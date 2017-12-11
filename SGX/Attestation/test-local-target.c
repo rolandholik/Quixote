@@ -200,12 +200,23 @@ extern int main(int argc, char *argv[])
 		ERR(goto done);
 
 
-	/* Request report from target enclave. */
+	/* Get target information from source enclave. */
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 
-	if ( !source->get_targetinfo(source, &targetinfo) )
+	source_ecall0.mode   = 1;
+	source_ecall0.target = &targetinfo;
+	source_ecall0.report = &report;
+	if ( !source->boot_slot(source, 0, &ocall_table, &source_ecall0, \
+				&rc) ) {
+		fprintf(stderr, "Enclave return error: %d\n", rc);
+		ERR(goto done);
+	}
+	if ( !source_ecall0.retn )
 		ERR(goto done);
 
+
+	/* Request report from target enclave. */
+	target_ecall0.mode   = 1;
 	target_ecall0.target = &targetinfo;
 	target_ecall0.report = &report;
 	if ( !target->boot_slot(target, 0, &ocall_table, &target_ecall0, \
@@ -213,6 +224,8 @@ extern int main(int argc, char *argv[])
 		fprintf(stderr, "Enclave return error: %d\n", rc);
 		ERR(goto done);
 	}
+	if ( !target_ecall0.retn )
+		ERR(goto done);
 
 	body = report.body;
 	fputs("Report:\n", stdout);
@@ -264,7 +277,9 @@ extern int main(int argc, char *argv[])
 	fputc('\n', stdout);
 
 
-	/* Verify the report. */
+	/* Verify the report and generate counter report. */
+	source_ecall0.mode   = 2;
+	source_ecall0.target = &targetinfo;
 	source_ecall0.report = &report;
 	if ( !source->boot_slot(source, 0, &ocall_table, &source_ecall0, \
 				&rc) ) {
@@ -275,6 +290,19 @@ extern int main(int argc, char *argv[])
 		fputs("Failed report verification.\n", stdout);
 		goto done;
 	}
+
+
+	/* Transmit report to target to complete key creation. */
+	target_ecall0.mode   = 2;
+	target_ecall0.target = &targetinfo;
+	target_ecall0.report = &report;
+	if ( !target->boot_slot(target, 0, &ocall_table, &target_ecall0, \
+				&rc) ) {
+		fprintf(stderr, "Enclave return error: %d\n", rc);
+		ERR(goto done);
+	}
+	if ( !target_ecall0.retn )
+		ERR(goto done);
 
 	retn = 0;
 
