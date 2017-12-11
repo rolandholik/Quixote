@@ -1193,65 +1193,6 @@ static _Bool get_attributes(CO(SGXenclave, this), sgx_attributes_t *attributes)
 /**
  * External public method.
  *
- * This method implements the population of an SGX_targetinfo structure
- * which is used to request a report from an enclave running on the
- * same hardware platform.
- *
- * \param this		A pointer to the object representing the enclave
- *			whose report request is to be returned.
- *
- * \param target	A pointer to the SGX_targetinfo structure which
- *			is to be returned.
- *
- * \return	If an error is encountered while retrieving the report
- *		a false value is returned.  A true value is returned
- *		if a valid target information structure is being returned
- *		to the caller.
- */
-
-static _Bool get_targetinfo(CO(SGXenclave, this), \
-			    struct SGX_targetinfo * const target)
-
-{
-	STATE(S);
-
-	_Bool retn = false;
-
-	struct SGX_sigstruct sigstruct;
-
-
-	/* Verify object status. */
-	if ( S->poisoned )
-		ERR(goto done);
-
-	/*
-	 * Populate the target information structure from the SGX_secs
-	 * information attached to this enclave.
-	 */
-	if ( !S->loader->get_sigstruct(S->loader, &sigstruct) )
-		ERR(goto done);
-
-	memset(target, '\0', sizeof(struct SGX_targetinfo));
-
-	memcpy(&target->mrenclave, sigstruct.enclave_hash, \
-	       sizeof(target->mrenclave));
-	memcpy(&target->attributes, &S->secs.attributes, \
-	       sizeof(target->attributes));
-	target->attributes.flags |= 1;
-
-	target->miscselect = S->secs.miscselect;
-
-	retn = true;
-
-
- done:
-	return retn;
-}
-
-
-/**
- * External public method.
- *
  * This method implements setting the debug status of the enclave.
  * Enabling debug in the enclave also causes debug status to be set
  * on the metadata manager and the loader.
@@ -1359,7 +1300,6 @@ extern SGXenclave NAAAIM_SGXenclave_Init(void)
 	this->boot_ocall = boot_ocall;
 
 	this->get_attributes = get_attributes;
-	this->get_targetinfo = get_targetinfo;
 
 	this->debug = debug;
 	this->whack = whack;

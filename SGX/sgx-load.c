@@ -32,8 +32,6 @@ extern int main(int argc, char *argv[])
 
 	struct SGX_einittoken *einit;
 
-	struct SGX_targetinfo target;
-
 	SGXenclave enclave = NULL;
 
 	Buffer bufr = NULL;
@@ -93,26 +91,8 @@ extern int main(int argc, char *argv[])
 
 	if ( !enclave->init_enclave(enclave, einit) )
 		ERR(goto done);
+
 	fputs("Enclave loaded.\n", stdout);
-
-
-	/* Test generation of a target information structure. */
-	if ( !enclave->get_targetinfo(enclave, &target) )
-		ERR(goto done);
-
-	bufr->reset(bufr);
-	bufr->add(bufr, (unsigned char *) &target.mrenclave, \
-		  sizeof(target.mrenclave));
-
-	fputs("\nTarget information:\n", stdout);
-	fputs("Measurement:\n", stdout);
-	bufr->print(bufr);
-
-	fputs("\nAttributes:\n", stdout);
-	fprintf(stdout, "\tFlags: 0x%0lx\n", target.attributes.flags);
-	fprintf(stdout, "\tXFRM: 0x%0lx\n", target.attributes.xfrm);
-
-	fprintf(stdout, "\nMiscselect: 0x%0x\n", target.miscselect);
 	retn = 0;
 
 
