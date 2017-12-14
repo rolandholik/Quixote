@@ -45,6 +45,7 @@ struct NAAAIM_TPM2cmd
 
 	_Bool (*nv_remove)(const TPM2cmd, uint32_t, Buffer);
 
+
 #if 0
 	_Bool (*quote)(const TPM2cmd, const Buffer, const Buffer);
 	_Bool (*verify)(const TPM2cmd, const Buffer, const Buffer, \
@@ -59,6 +60,9 @@ struct NAAAIM_TPM2cmd
 	_Bool (*get_pubkey)(const TPM2cmd, const Buffer, const Buffer);
 	void (*list_keys)(const TPM2cmd);
 #endif
+	_Bool (*get_time)(const TPM2cmd, uint64_t *, uint64_t *, uint32_t *, \
+			  uint32_t *, _Bool *);
+
 	_Bool (*set_hash)(const TPM2cmd, const TPM2cmd_hash_type);
 	void (*get_error)(const TPM2cmd, uint32_t error);
 

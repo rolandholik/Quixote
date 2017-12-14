@@ -245,12 +245,12 @@ static _Bool pcr_read(CO(TPM2cmd, this), const TPMI_DH_PCR index, \
 			       TPM_CC_PCR_Read, TPM_RH_NULL, NULL, 0);
 	if ( tpm_retn != 0 ) {
 		const char *msg, *submsg, *num;
-	      
+
 		TSS_ResponseCode_toString(&msg, &submsg, &num, tpm_retn);
 		fprintf(stderr, "TPM error, code=%08x, reason=%s,%s,%s\n", \
 			tpm_retn, msg, submsg, num);
 		goto done;
-	}		
+	}
 
 	if ( !bufr->add(bufr, out.pcrValues.digests[0].t.buffer, \
 			out.pcrValues.digests[0].t.size) )
@@ -450,7 +450,7 @@ static _Bool nv_define(CO(TPM2cmd, this), const uint32_t index,	 \
 
 	if ( pubout.nvPublic.nvPublic.dataSize != size )
 		ERR(goto done);
-									     
+
 	retn = true;
 
  done:
@@ -520,7 +520,7 @@ static _Bool nv_read(CO(TPM2cmd, this), uint32_t index, CO(Buffer, bufr))
 	}
 	a = pubout.nvPublic.nvPublic.attributes.val;
 	fprintf(stderr, "Attributes: 0x%08x\n", a);
-	
+
 	if ( a & TPMA_NVA_PPWRITE )
 		fputs("\tPPWRITE\n", stderr);
 	if ( a & TPMA_NVA_OWNERWRITE )
@@ -818,7 +818,7 @@ static _Bool quote(CO(TPM2cmd, this), CO(Buffer, key_uuid), CO(Buffer, quote))
 		err = "Obtaining quote";
 		goto done;
 	}
-		
+
 	quote->reset(quote);
 	retn = quote->add(quote, nonce.rgbValidationData, \
 			  nonce.ulValidationDataLength);
@@ -885,7 +885,7 @@ static _Bool verify(CO(TPM2cmd, this), CO(Buffer, key), CO(Buffer, pcrref), \
 	TSS_RESULT result = TSS_SUCCESS;
 
 	TPM_QUOTE_INFO2 *qinfo;
-	
+
 	TSS_HKEY pubkey;
 
 	TSS_HHASH pcrhash;
@@ -948,7 +948,7 @@ static _Bool verify(CO(TPM2cmd, this), CO(Buffer, key), CO(Buffer, pcrref), \
 	}
 
 	retn = true;
-	
+
 
  done:
 	if ( result != TSS_SUCCESS )
@@ -1055,7 +1055,7 @@ static _Bool generate_quote(CO(TPM2cmd, this), CO(Buffer, key_uuid), \
 		err = "Obtaining quote";
 		goto done;
 	}
-		
+
 	quote->reset(quote);
 	retn = quote->add(quote, nonce.rgbData, nonce.ulDataLength);
 
@@ -1370,7 +1370,7 @@ static _Bool pcrmask(CO(TPMcmd, this), ...)
 				       &S->pcr);
 	if ( rc != TSS_SUCCESS )
 		goto done;
-		
+
 
 	/* Create a composite mask over the specified registers. */
 	va_start(ap, this);
@@ -1566,16 +1566,103 @@ static void list_keys(CO(TPM2cmd, this))
 			keys[lp].bAuthDataUsage ? " " : " not ");
 		fputc('\n', stdout);
 	}
-		
+
 
  done:
 	Tspi_Context_FreeMemory(S->context, (unsigned char *) keys);
 
 	WHACK(key_uuid);
-	
+
 	return;
 }
 #endif
+
+
+/**
+ * External public method.
+ *
+ * This method implements access to the internal clock system
+ * maintained by the trusted platform module.  This is a clock which
+ * provides millisecond accuracy since the last reset of the last
+ * time component.
+ *
+ * This is technically not a 'safe' time since there is no validation
+ * the time information is being returned from the TPM.  The GetCLock
+ * time is designed to provide an attestation of safe time but our
+ * current Skylake TPM2 is reporting this as not being implemented.
+ *
+ * A subsequent update will obtain the clock information by requesting
+ * a quote of platform configuration register which should achieve the
+ * same effect.
+ *
+ * \param this		A pointer to the TPM2 object whose hash type is to
+ *			be set.
+ *
+ * \param tpm_time	A pointer to a variable which will be loaded with
+ *			the current TPM2 time in milliseconds.
+ *
+ * \param tpm_clock	A pointer to a variable which will be loaded with
+ *			the current TPM2 clock time in milliseconds.
+ *
+ * \param reset		A pointer to a variable will hold the number of
+ *			resets which have been issued to the TPM2 device.
+ *
+ * \param restart	A pointer to a variable which holds the number
+ *			of times the TPM2 device has been restarted.
+ *
+ * \param safe		A pointer to a variable which holds the 'safe'
+ *			status of the times which have been returned.
+ *
+ * \return	A false value is returned to indicate that setting
+ *		of the hash type failed.  A true value indicates the
+ *		operation had succeeded.
+ */
+
+static _Bool get_time(CO(TPM2cmd, this), uint64_t * const tpm_time,	  \
+		      uint64_t * const tpm_clock, uint32_t * const reset, \
+		      uint32_t * const restart, _Bool * const safe)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	TPM_RC tpm_retn;
+
+	ReadClock_Out out;
+
+
+	if ( S->poisoned )
+		goto done;
+
+
+	tpm_retn = TSS_Execute(S->context, (RESPONSE_PARAMETERS *) &out,  \
+			       NULL, NULL, TPM_CC_ReadClock, TPM_RH_NULL, \
+			       NULL, 0);
+	if ( tpm_retn != 0 ) {
+		const char *msg, *submsg, *num;
+
+		TSS_ResponseCode_toString(&msg, &submsg, &num, tpm_retn);
+		fprintf(stderr, "TPM error, code=%08x, reason=%s,%s,%s\n", \
+			tpm_retn, msg, submsg, num);
+		goto done;
+	}
+
+	/* Load arguements to caller provided variables. */
+	*tpm_time	= out.currentTime.time;
+	*tpm_clock	= out.currentTime.clockInfo.clock;
+	*reset		= out.currentTime.clockInfo.resetCount;
+	*restart	= out.currentTime.clockInfo.restartCount;
+	*safe		= out.currentTime.clockInfo.safe ? true : false;
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+	return retn;
+}
 
 
 /**
@@ -1644,7 +1731,7 @@ static void get_error(CO(TPM2cmd, this), const uint32_t error)
 	const char *message,
 		   *sub_message,
 		   *number;
-	      
+
 	TSS_ResponseCode_toString(&message, &sub_message, &number, error);
 	fprintf(stdout, "TPM error, code=%08x, reason=%s,%s,%s\n", \
 		error, message, sub_message, number);
@@ -1673,7 +1760,7 @@ static void whack(CO(TPM2cmd, this))
 	return;
 }
 
-	
+
 /**
  * External constructor call.
  *
@@ -1734,6 +1821,7 @@ extern TPM2cmd NAAAIM_TPM2cmd_Init(void)
 	this->get_pubkey = get_pubkey;
 	this->list_keys  = list_keys;
 #endif
+	this->get_time  = get_time;
 	this->set_hash  = set_hash;
 	this->get_error = get_error;
 

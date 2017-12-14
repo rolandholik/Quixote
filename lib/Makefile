@@ -115,3 +115,4 @@ PossumPipe.o: ../NAAAIM.h PossumPipe.h Duct.h SoftwareStatus.h Curve25519.h \
 Duct_test.o: Duct.h ../NAAAIM.h
 PossumpPipe_test.o: PossumPipe.h
 RSAkey.o: RSAkey.h
+TPM2cmd.o: TPM2cmd.h ../NAAAIM.h

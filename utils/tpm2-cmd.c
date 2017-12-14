@@ -350,7 +350,7 @@ extern int main(int argc, char *argv[])
 			fputs("PCR masking failed.\n", stderr);
 			goto done;
 		}
-			
+
 		if ( !tpmcmd->quote(tpmcmd, key, bufr) ) {
 			fputs("Quote failed.\n", stderr);
 			goto done;
@@ -474,7 +474,7 @@ extern int main(int argc, char *argv[])
 			fputs("PCR masking failed.\n", stderr);
 			goto done;
 		}
-			
+
 		if ( !tpmcmd->generate_quote(tpmcmd, key, bufr) ) {
 			fputs("Generation of reference quote failed.\n", \
 			      stderr);
@@ -593,6 +593,29 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 #endif
+	if ( strcmp(argv[1], "get-time") == 0 ) {
+		uint64_t current_time, clock_time;
+
+		uint32_t reset, restart;
+
+		_Bool safe;
+
+
+		tpmcmd->get_time(tpmcmd, &current_time, &clock_time, &reset, \
+				 &restart, &safe);
+
+		/* Dump parameters for now. */
+		fprintf(stdout, "Time: %lu\n", current_time);
+		fputs("\nClock info:\n", stdout);
+		fprintf(stdout, "\tclock: %lu\n", clock_time);
+		fprintf(stdout, "\tresetCount: %u\n", reset);
+		fprintf(stdout, "\trestartCount: %u\n", restart);
+		fprintf(stdout, "\tsafe: %u\n", safe);
+
+		retn = 0;
+		goto done;
+	}
+
 	if ( strcmp(argv[1], "get-error") == 0 ) {
 		if ( argc != 3 ) {
 			fputs("No error code specified.\n", stderr);
@@ -604,7 +627,7 @@ extern int main(int argc, char *argv[])
                         goto done;
                 if ( index < 0 )
                         goto done;
-		
+
 		tpmcmd->get_error(tpmcmd, index);
 
 		retn = 0;
@@ -612,7 +635,7 @@ extern int main(int argc, char *argv[])
 	}
 
 	fprintf(stderr, "Unknown command: %s\n", argv[1]);
-		
+
 
  done:
 	WHACK(bufr);
