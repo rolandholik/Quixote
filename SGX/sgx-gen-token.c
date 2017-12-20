@@ -1,3 +1,21 @@
+/** \file
+ * This file contains the implementation of a utility which generates
+ * an initialization token for an SGX enclave.  This token is a
+ * required element for the ENCLU[EINIT] instruction which carries out
+ * final initialization and sealing of an enclave.
+ */
+
+/*
+ * (C)Copyright 2017, IDfusion, LLC. All rights reserved.
+ *
+ * Please refer to the file named COPYING in the top of the source tree
+ * for licensing information.
+ */
+
+/* Definitions local to this file. */
+#define PGM "sgx-gen-token"
+
+
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
@@ -17,10 +35,6 @@
 #include "SGX.h"
 #include "SGXenclave.h"
 #include "SGXmetadata.h"
-
-
-/* Definitions local to this file. */
-#define PGM "sgx-gen-token"
 
 
 /**
@@ -108,11 +122,13 @@ static void usage(char *err)
 	fprintf(stdout, "%s: (C)IDfusion, LLC\n", PGM);
 
 	if ( err != NULL )
-		fprintf(stdout, "\n%s: %s\n", PGM, err);
+		fprintf(stdout, "\n%s\n", err);
 
 	fputc('\n', stdout);
-	fprintf(stdout, "%s: Usage:\n", PGM);
-	fputs("\t-d:\tEnable debug mode.\n", stdout);
+	fputs("Usage:\n", stdout);
+	fputs("\t-d:\tEnable enclave debug mode.\n", stdout);
+	fputs("\t-p:\tGenerate token for a non-debug enclave.\n\n", stdout);
+
 	fputs("\t-e:\tEnclave to generate token for.\n", stdout);
 	fputs("\t-l:\tLocation of launch enclave.\n\t\t\tdefault = "	\
 	      "/opt/intel/sgxpsw/aesm/libsgx_le.signed.so\n", stdout);
@@ -128,7 +144,8 @@ static _Bool init_ecall0(char *enclave,
 			 sgx_attributes_t *attributes,	\
 			 sgx_measurement_t *mrenclave,	\
 			 sgx_measurement_t *mrsigner,	\
-			 struct SGX_einittoken *token)
+			 struct SGX_einittoken *token,	\
+			 _Bool debug_enclave)
 
 {
 	_Bool retn = false;
@@ -150,7 +167,7 @@ static _Bool init_ecall0(char *enclave,
 	INIT(NAAAIM, SGXmetadata, init_enclave, ERR(goto done));
 	if ( !init_enclave->load(init_enclave, enclave) )
 		ERR(goto done);
-	if ( !init_enclave->compute_attributes(init_enclave, true) )
+	if ( !init_enclave->compute_attributes(init_enclave, debug_enclave) )
 		ERR(goto done);
 	if ( !init_enclave->get_attributes(init_enclave, attributes) )
 		ERR(goto done);
@@ -227,7 +244,7 @@ static _Bool load_white_list(SGXenclave enclave)
 
 
 static _Bool generate_token(SGXenclave enclave, char *init_enclave, \
-			    struct SGX_einittoken *token)
+			    struct SGX_einittoken *token, _Bool debug_enclave)
 
 {
 	_Bool retn = false;
@@ -241,7 +258,7 @@ static _Bool generate_token(SGXenclave enclave, char *init_enclave, \
 
 
 	if ( !init_ecall0(init_enclave, &ecall0_table, &attributes, \
-			  &mrenclave, &mrsigner, token) )
+			  &mrenclave, &mrsigner, token, debug_enclave) )
 		ERR(goto done);
 
 	if ( !enclave->boot_slot(enclave, 0, &LE_ocall_table, &ecall0_table, \
@@ -306,7 +323,8 @@ static void generate_output(char *output, struct SGX_einittoken *token)
 extern int main(int argc, char *argv[])
 
 {
-	_Bool debug = false;
+	_Bool debug	    = false,
+	      debug_enclave = true;
 
 	char *sgx_device     = "/dev/isgx",
 	     *launch_enclave = "/opt/intel/sgxpsw/aesm/libsgx_le.signed.so",
@@ -326,10 +344,13 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "de:l:n:o:")) != EOF )
+	while ( (opt = getopt(argc, argv, "dpe:l:n:o:")) != EOF )
 		switch ( opt ) {
 			case 'd':
 				debug = true;
+				break;
+			case 'p':
+				debug_enclave = false;
 				break;
 
 			case 'e':
@@ -384,7 +405,7 @@ extern int main(int argc, char *argv[])
 	/* Generate the launch token. */
 	if ( debug )
 		fputs("Generating token.\n", stdout);
-	if ( !generate_token(enclave, init_enclave, &token) )
+	if ( !generate_token(enclave, init_enclave, &token, debug_enclave) )
 		ERR(goto done);
 
 
