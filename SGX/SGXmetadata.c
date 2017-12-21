@@ -73,6 +73,8 @@ struct NAAAIM_SGXmetadata_State
 	Elf *elf;
 
 	/* SGX metadata structures. */
+	uint32_t section_size;
+
 	metadata_t metadata;
 
 	Buffer patches;
@@ -105,6 +107,7 @@ static void _init_state(CO(SGXmetadata_State, S)) {
 	S->fd  = -1;
 	S->elf = NULL;
 
+	S->section_size = 0;
 	memset(&S->metadata, '\0', sizeof(S->metadata));
 
 	S->patches = NULL;
@@ -150,8 +153,7 @@ static _Bool load(CO(SGXmetadata, this), CO(char *, enclave))
 	size_t name_index,
 	       offset;
 
-	uint32_t name_size,
-		 desc_size;
+	uint32_t name_size;
 
 	Elf64_Ehdr *ehdr;
 
@@ -204,12 +206,24 @@ static _Bool load(CO(SGXmetadata, this), CO(char *, enclave))
 		if ( strcmp((char *) (name_data->d_buf + shdr->sh_name),
 			    ".note.sgxmeta") == 0 ) {
 			name_size = *((uint32_t *) data->d_buf);
-			desc_size = *((uint32_t *) (data->d_buf + \
-						    sizeof(uint32_t)));
+			S->section_size = *((uint32_t *) (data->d_buf + \
+							  sizeof(uint32_t)));
 			offset = (3 * sizeof(uint32_t)) + name_size;
 
-			memcpy(&S->metadata, \
-			       (uint8_t *) (data->d_buf + offset), desc_size);
+			/* Verify metadata version. */
+			memcpy(&S->metadata,			   \
+			       (uint8_t *) (data->d_buf + offset), \
+			       2 * sizeof(uint64_t));
+			if ( (S->metadata.version >> 32) == 2 ) {
+				fputs("Unsupported version 2 enclave.\n", \
+				      stderr);
+				retn = false;
+				goto done;
+			}
+
+			memcpy(&S->metadata,			   \
+			       (uint8_t *) (data->d_buf + offset), \
+			       sizeof(metadata_t));
 			retn = true;
 		}
 	}
@@ -1144,9 +1158,13 @@ static void dump(CO(SGXmetadata, this))
 
 
 	/* Output the enlave header information. */
+	fputs("METADATA:\n", stdout);
+	fprintf(stdout, "size: 0x%x\n\n", S->section_size);
+
 	fputs("HEADER:\n", stdout);
 	fprintf(stdout, "magic: 0x%lx\n", mp->magic_num);
-	fprintf(stdout, "version: 0x%lx\n", mp->version);
+	fprintf(stdout, "version: 0x%lx (%lu.%lu)\n", mp->version, \
+		mp->version >> 32, mp->version & 0xffffffff);
 	fprintf(stdout, "tcs policy: 0x%x\n", mp->tcs_policy);
 	fprintf(stdout, "ssa frame size: 0x%x\n", mp->ssa_frame_size);
 	fprintf(stdout, "maximum save buffer size: 0x%x\n", \

@@ -37,6 +37,7 @@ int main(int argc, char *argv[])
 
 	INIT(NAAAIM, SGXmetadata, metadata, ERR(goto done));
 
+	fprintf(stdout, "ENCLAVE:\n%s\n\n", argv[1]);
 	if ( !metadata->load(metadata, argv[1]) )
 		ERR(goto done);
 	metadata->dump(metadata);
