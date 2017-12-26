@@ -68,8 +68,8 @@ demos: idf-sgx-fandf idf-sgx-fandf-unibin
 sgx-check: sgx-check.o
 	${CC} ${LDFLAGS} -o $@ $^;
 
-sgx-metadata: sgx-metadata.o SGXmetadata.o
-	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB};
+sgx-metadata: sgx-metadata.o SGXmetadata.o ../SHA256.o
+	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB} ${SSL_CRYPTO};
 
 sgx-metadata.o: sgx-metadata.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
@@ -139,7 +139,7 @@ clean:
 
 
 # Source dependencies.
-sgx-metadata.o: SGX.h
+sgx-metadata.o: SGX.h SGXenclave.h SGXsigstruct.h SGXmetadata.h
 sgx-load.o: SGXenclave.h
 sgx-provision.o: PVEenclave.h
 
