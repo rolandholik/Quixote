@@ -23,9 +23,11 @@
 #include <unistd.h>
 
 #include <HurdLib.h>
+#include <String.h>
 
 #include <NAAAIM.h>
 
+#include "SGXmessage.h"
 #include "PVEenclave.h"
 
 
@@ -64,17 +66,26 @@ static void usage(char *err)
 extern int main(int argc, char *argv[])
 
 {
-	char *token = NULL;
+	char *msg1_response = NULL,
+	     *token = NULL;
 
 	int opt,
 	    retn;
 
+	String response = NULL;
+
 	PVEenclave pve = NULL;
+
+	SGXmessage msg = NULL;
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "t:")) != EOF )
+	while ( (opt = getopt(argc, argv, "1:t:")) != EOF )
 		switch ( opt ) {
+			case '1':
+				msg1_response = optarg;
+				break;
+
 			case 't':
 				token = optarg;
 				break;
@@ -85,24 +96,44 @@ extern int main(int argc, char *argv[])
 		return 1;
 	}
 
+	INIT(NAAAIM, SGXmessage, msg, ERR(goto done));
+
+
+	/* Decode a message 1 response. */
+	if ( msg1_response != NULL ) {
+		INIT(HurdLib, String, response, ERR(goto done));
+
+		if ( !response->add(response, msg1_response) )
+			ERR(goto done);
+		msg->decode(msg, response);
+		msg->dump(msg);
+		goto done;
+	}
+
 
 	/* Load the provisioning enclave. */
 	INIT(NAAAIM, PVEenclave, pve, ERR(goto done));
 	if ( !pve->open(pve, token) )
 		ERR(goto done);
-	fputs("Provisioning enclave initialized.\n", stdout);
 
 
 	/* Get the endpoint. */
 	if ( !pve->get_endpoint(pve) )
 		ERR(goto done);
-	fputs("Have endpoint.\n", stdout);
 
+
+	/* Encode the message. */
+	if ( !pve->generate_message1(pve, msg) )
+		ERR(goto done);
+
+	msg->dump(msg);
 	retn = 0;
 
 
  done:
 	WHACK(pve);
+	WHACK(msg);
+	WHACK(response);
 
 	return retn;
 }

@@ -28,6 +28,7 @@ struct NAAAIM_PVEenclave
 	_Bool (*open)(const PVEenclave, const char *);
 
 	_Bool (*get_endpoint)(const PVEenclave);
+	_Bool (*generate_message1)(const PVEenclave, const SGXmessage);
 
 	void (*whack)(const PVEenclave);
 

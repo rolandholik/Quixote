@@ -21,12 +21,18 @@
 #define DEVICE	"/dev/isgx"
 #define ENCLAVE	"/opt/intel/sgxpsw/aesm/libsgx_pve.signed.so"
 
+#define XID_SIZE 8
+#define MAX_HEADER_SIZE 6
+
 
 /* Include files. */
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
+
+#include <arpa/inet.h>
 
 #include <Origin.h>
 #include <HurdLib.h>
@@ -37,6 +43,7 @@
 #include "NAAAIM.h"
 #include "SGX.h"
 #include "SGXenclave.h"
+#include "SGXmessage.h"
 #include "PVEenclave.h"
 
 
@@ -53,15 +60,35 @@
 #endif
 
 
-/* Prototype for SGX bootstrap function. */
-extern int boot_sgx(struct SGX_tcs *, long fn, const void *, void *, void *);
+/*
+ * The following structure definitions define the headers that are
+ * placed on the provisiong request and response packets that are
+ * sent and received from the Intel provisioning service.
+ */
+struct provision_request_header {
+	uint8_t protocol;
+	uint8_t version;
+	uint8_t xid[XID_SIZE];
+	uint8_t type;
+	uint8_t size[4];
+} __attribute__((packed));
+
+struct provision_response_header {
+	uint8_t protocol;
+	uint8_t version;
+	uint8_t xid[XID_SIZE];
+	uint8_t type;
+	uint8_t gstatus[2];
+	uint8_t pstatus[2];
+	uint8_t size[4];
+} __attribute__((packed));
 
 
 /**
  * Structure to define a PVE endpoint.
  */
 struct pve_endpoint {
-	uint8_t xid[8];
+	uint8_t xid[XID_SIZE];
 	uint8_t id;
 };
 
@@ -75,7 +102,7 @@ static const struct {
 	void *table[1];
 } PVE_ocall_table = { 0, {NULL}};
 
-	
+
 /** PVEenclave private state information. */
 struct NAAAIM_PVEenclave_State
 {
@@ -194,6 +221,57 @@ static _Bool open(CO(PVEenclave, this), CO(char *, token))
 /**
  * External public method.
  *
+ * This method implements a wrapper for calling the following ECALL:
+ *
+ * This is the message used to initiate communications with the
+ * provisioning service.
+ *
+ * \param this		A pointer to the provisioning object for which
+ *			the message is to be generated.
+ *
+ * \return	If an error is encountered while generating the endpoint
+ *		a false value is returned.  A true value indicates the
+ *		endpoint value has been generated.
+ */
+
+static _Bool generate_message1(CO(PVEenclave, this), CO(SGXmessage, msg))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+
+
+	/*
+	 * Initialize request for:
+	 *	protocol: ENDPOINT_SELECTION
+	 *	type: TYPE_ES_MSG1
+	 *	version: 1
+	 */
+	msg->init_request(msg, 2, 0, 1, S->endpoint.xid);
+
+	/* Add the endpoint selector message. */
+	if ( !msg->encode_es_request(msg, 0, S->endpoint.id) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements the gen_es_msg1_data_wrapper ECALL to the
  * PVE enclave.
  *
@@ -226,8 +304,6 @@ static _Bool get_endpoint(CO(PVEenclave, this))
 		struct pve_endpoint *endpoint;
 	} ecall3;
 
-	Buffer bufr = NULL;
-
 
 	/* Call slot 3 to obtain endpoint information. */
 	ecall3.endpoint = &S->endpoint;
@@ -241,19 +317,10 @@ static _Bool get_endpoint(CO(PVEenclave, this))
 		ERR(goto done);
 	}
 
-	fprintf(stdout, "partition: %u\n", S->endpoint.id);
-
-	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	if ( !bufr->add(bufr, S->endpoint.xid, sizeof(S->endpoint.xid)) )
-		ERR(goto done);
-	bufr->print(bufr);
-
 	retn = true;
 
 
  done:
-	WHACK(bufr);
-
 	if ( !retn )
 		S->poisoned = true;
 
@@ -321,7 +388,8 @@ extern PVEenclave NAAAIM_PVEenclave_Init(void)
 	/* Method initialization. */
 	this->open = open;
 
-	this->get_endpoint = get_endpoint;
+	this->get_endpoint	= get_endpoint;
+	this->generate_message1 = generate_message1;
 
 	this->whack = whack;
 

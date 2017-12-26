@@ -80,3 +80,4 @@
 #define NAAAIM_ContourPoint_OBJID	44
 #define NAAAIM_ISOenclave_OBJID		45
 #define NAAAIM_PVEenclave_OBJID		46
+#define NAAAIM_SGXmessage_OBJID		47

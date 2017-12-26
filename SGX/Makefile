@@ -6,7 +6,7 @@
 # Variable declarations.
 CSRC = sgx-check.c sgx-metadata.c SGXmetadata.c SGXloader.c  \
 	SGXenclave.c SGXsigstruct.c test-ecall.c sgx-ocall.c \
-	PVEenclave.c
+	PVEenclave.c SGXmessage.c
 
 ASRC = boot-sgx.s
 
@@ -100,8 +100,9 @@ sgx-gen-token: sgx-gen-token.o SGXenclave.o SGXloader.o SGXmetadata.o \
 sgx-gen-token.o: sgx-gen-token.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
 
-sgx-provision: sgx-provision.o SGXenclave.o SGXloader.o SGXmetadata.o \
-	SGXsigstruct.o PVEenclave.o ../SHA256.o boot-sgx.o sgx-ocall.o
+sgx-provision: sgx-provision.o SGXenclave.o SGXloader.o SGXmetadata.o	\
+	SGXsigstruct.o PVEenclave.o SGXmessage.o ../SHA256.o boot-sgx.o \
+	sgx-ocall.o
 	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB} ${SSL_CRYPTO};
 
 sgx-provision.o: sgx-provision.c
@@ -147,3 +148,4 @@ SGXloader.o: SGX.h SGXloader.h
 SGXenclave.o: SGX.h SGXenclave.h SGXmetadata.h SGXloader.h
 SGXsigstruct.o: SGX.h SGXsigstruct.h
 PVEenclave.o: SGX.h SGXenclave.h PVEenclave.h
+SGXmessage.o: SGXmessage.h
