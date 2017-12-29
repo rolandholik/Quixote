@@ -97,6 +97,38 @@ enum _tlv_enum_type_t {
 	TLV_SE_REPORT
 };
 
+
+static char *tlv_types[] = {
+	"CIPHER_TEXT",
+	"BLOCK_CIPHER_TEXT",
+	"BLOCK_CIPHER_INFO",
+	"MESSAGE_AUTHENTICATION_CODE",
+	"NONCE",
+	"EPID_GID",
+	"EPID_SIG_RL",
+	"EPID_GROUP_CERT",
+	"DEVICE_ID",
+	"PS_ID",
+	"EPID_JOIN_PROOF",
+	"EPID_SIG",
+	"EPID_MEMBERSHIP_CREDENTIAL",
+	"EPID_PSVN",
+	"QUOTE",
+	"X509_CERT_TLV",
+	"X509_CSR_TLV",
+	"ES_SELECTOR",
+	"ES_INFORMATION",
+	"FLAGS",
+	"QUOTE_SIG",
+	"PLATFORM_INFO_BLOB",
+	"SIGNATURE",
+	"PEK",
+	"PLATFORM_INFO",
+	"PWK2",
+	"SE_REPORT"
+};
+
+
 /*
  * The following structures define formats for short and long encoded
  * messages.
@@ -166,6 +198,9 @@ struct NAAAIM_SGXmessage_State
 	uint32_t size;
 
 	Buffer msg;
+
+	/* Unpacked messages. */
+	Buffer messages;
 };
 
 
@@ -188,6 +223,8 @@ static void _init_state(CO(SGXmessage_State, S)) {
 	S->state    = INIT;
 	S->size	    = 0;
 	S->msg	    = NULL;
+
+	S->messages	= NULL;
 
 	memset(&S->request,  '\0', sizeof(S->request));
 	memset(&S->response, '\0', sizeof(S->response));
@@ -347,6 +384,7 @@ static _Bool encode(CO(SGXmessage, this), CO(String, msg))
 	/* Verify object status. */
 	if ( S->poisoned )
 		ERR(goto done);
+	S->state = REQUEST;
 
 	/* Convert the header and message into a common buffer. */
 	request = S->request;
@@ -395,6 +433,73 @@ static _Bool encode(CO(SGXmessage, this), CO(String, msg))
 	if ( !retn )
 		S->poisoned = true;
 
+	return retn;
+}
+
+
+/**
+ * Interal private method.
+ *
+ * This method unpacks the TLV encoded buffer which was received into
+ * a series of Buffer objects each of which represents one message
+ * in the transaction.
+ *
+ * \param state		The state for the object containing the
+ *			transaction message to be processed.
+ *
+ * \return		A boolean value is used to indicate the status
+ *			of the decoding.  A false value indicates an
+ *			error occurred during decoding while a true
+ *			value indicates the message was successfully
+ *			unpacked.
+ */
+
+static _Bool _unpack_messages(CO(SGXmessage_State, S))
+
+{
+	_Bool retn = false;
+
+	uint8_t *msg = S->msg->get(S->msg);
+
+	size_t size,
+	       mp	= 0,
+	       msg_size = S->msg->size(S->msg);
+
+	struct TLVshort *smsg;
+
+	struct TLVlong *lmsg;
+
+	Buffer bufr = NULL;
+
+
+	INIT(HurdLib, Buffer, S->messages, ERR(goto done));
+
+	while ( mp < msg_size ) {
+		INIT(HurdLib, Buffer, bufr, ERR(goto done));
+
+		if ( msg[mp] & 0x80 ) {
+			lmsg = (struct TLVlong *) &msg[mp];
+			size = sizeof(struct TLVlong) + lmsg->size;
+			if ( !bufr->add(bufr, (void *) &msg[mp], size) )
+				ERR(goto done);
+			mp += size;
+		} else {
+			smsg = (struct TLVshort *) &msg[mp];
+			size = sizeof(struct TLVshort) + htons(smsg->size);
+			if ( !bufr->add(bufr, (void *) &msg[mp], size) )
+				ERR(goto done);
+			mp += size;
+		}
+
+		if ( !S->messages->add(S->messages, (unsigned char *) &bufr, \
+				       sizeof(Buffer)) )
+			ERR(goto done);
+	}
+
+	retn = true;
+
+
+ done:
 	return retn;
 }
 
@@ -469,9 +574,6 @@ static _Bool decode(CO(SGXmessage, this), CO(String, msg))
 	blocks   = bufr->size(bufr) / 4;
 	residual = bufr->size(bufr) % 4;
 
-	fprintf(stdout, "size: %zu, blocks: %u, residual: %u\n", \
-		bufr->size(bufr), blocks, residual);
-
 	for (lp= 0; lp < blocks; ++lp) {
 		EVP_DecodeBlock(decbufr, p, 4);
 		if ( !S->msg->add(S->msg, (void *) decbufr, sizeof(decbufr)) )
@@ -493,6 +595,11 @@ static _Bool decode(CO(SGXmessage, this), CO(String, msg))
 			++lp;
 		S->msg->shrink(S->msg, lp);
 	}
+
+
+	/* Unpack the messages. */
+	if ( !_unpack_messages(S) )
+		ERR(goto done);
 
 	retn = true;
 
@@ -522,13 +629,24 @@ static void dump(CO(SGXmessage, this))
 {
 	STATE(S);
 
-	uint64_t xid;
+	uint8_t *mp,
+		type;
 
 	uint16_t status;
 
-	uint32_t size;
+	uint32_t cnt,
+		 size;
+
+	uint64_t xid;
+
+	struct TLVshort *smsg;
+
+	struct TLVlong *lmsg;
 
 	String msg = NULL;
+
+	Buffer tlv,
+	       *tlvp;
 
 
 	/* Display object status. */
@@ -550,14 +668,33 @@ static void dump(CO(SGXmessage, this))
 		fprintf(stdout, "\tgstatus:  %u\n", status);
 
 		memcpy(&status, S->response.pstatus, sizeof(status));
-		fprintf(stdout, "\tgstatus:  %u\n", status);
+		fprintf(stdout, "\tpstatus:  %u\n", status);
 
 		memcpy(&size, S->response.size, sizeof(size));
 		size = ntohl(size);
 		fprintf(stdout, "\tsize:     %u\n", size);
 
-		fputs("\nMESSAGE:\n", stdout);
-		S->msg->hprint(S->msg);
+		fputs("\nMESSAGES:\n", stdout);
+		tlvp = (Buffer *) S->messages->get(S->messages);
+		cnt  = S->messages->size(S->messages) / sizeof(Buffer);
+
+		for (size= 0; size < cnt; ++size) {
+			tlv = *tlvp;
+			mp  = (uint8_t *) tlv->get(tlv);
+
+			if ( *mp & 0x80 ) {
+				lmsg = (struct TLVlong *) mp;
+				type = lmsg->type & ~0x80;
+			} else {
+				smsg = (struct TLVshort *) mp;
+				type = smsg->type;
+			}
+
+			fprintf(stdout, "\tMsg %u: %s\n", size, \
+				tlv_types[type]);
+			++tlvp;
+		}
+
 		goto done;
 	}
 
@@ -598,6 +735,15 @@ static void dump(CO(SGXmessage, this))
  * \param this	A pointer to the object which is to be destroyed.
  */
 
+#define GWHACK(type, var) {			\
+	size_t i=var->size(var) / sizeof(type);	\
+	type *o=(type *) var->get(var);		\
+	while ( i-- ) {				\
+		(*o)->whack((*o));		\
+		o+=1;				\
+	}					\
+}
+
 static void whack(CO(SGXmessage, this))
 
 {
@@ -605,6 +751,10 @@ static void whack(CO(SGXmessage, this))
 
 
 	WHACK(S->msg);
+	if ( S->messages != NULL ) {
+		GWHACK(Buffer, S->messages);
+		WHACK(S->messages);
+	}
 
 	S->root->whack(S->root, this, S);
 	return;
