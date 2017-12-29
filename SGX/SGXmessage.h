@@ -32,6 +32,9 @@ struct NAAAIM_SGXmessage
 	_Bool (*encode)(const SGXmessage, const String);
 	_Bool (*decode)(const SGXmessage, const String);
 
+	size_t (*message_count)(const SGXmessage);
+	_Bool (*get_message)(const SGXmessage, uint8_t, uint8_t, const Buffer);
+
 	void (*dump)(const SGXmessage);
 	void (*whack)(const SGXmessage);
 

@@ -36,6 +36,7 @@
 #include <String.h>
 
 #include "NAAAIM.h"
+#include "intel-messages.h"
 #include "SGXmessage.h"
 
 
@@ -57,44 +58,6 @@ enum object_state {
 	INIT=0,
 	REQUEST,
 	RESPONSE
-};
-
-
-enum _tlv_enum_type_t {
-	TLV_CIPHER_TEXT=0,
-	TLV_BLOCK_CIPHER_TEXT,
-	TLV_BLOCK_CIPHER_INFO,
-	TLV_MESSAGE_AUTHENTICATION_CODE,
-	TLV_NONCE,
-	TLV_EPID_GID,
-	TLV_EPID_SIG_RL,
-	TLV_EPID_GROUP_CERT,
-	/*SE Provisioning Protocol TLVs*/
-	TLV_DEVICE_ID,
-	TLV_PS_ID,
-	TLV_EPID_JOIN_PROOF,
-	TLV_EPID_SIG,
-	TLV_EPID_MEMBERSHIP_CREDENTIAL,
-	TLV_EPID_PSVN,
-	/*PSE Provisioning Protocol TLVs*/
-	TLV_QUOTE,
-	TLV_X509_CERT_TLV,
-	TLV_X509_CSR_TLV,
-	/*End-point Selection Protocol TLVs*/
-	TLV_ES_SELECTOR,
-	TLV_ES_INFORMATION,
-	/* EPID Provisioning Protocol TLVs Part 2*/
-	TLV_FLAGS,
-	/* PSE Quote Signature*/
-	TLV_QUOTE_SIG,
-	TLV_PLATFORM_INFO_BLOB,
-	/* Generic TLVs*/
-	TLV_SIGNATURE,
-	/* End-point Selection Protocol TLVs*/
-	TLV_PEK,
-	TLV_PLATFORM_INFO,
-	TLV_PWK2,
-	TLV_SE_REPORT
 };
 
 
@@ -511,7 +474,7 @@ static _Bool _unpack_messages(CO(SGXmessage_State, S))
  * Intel server.  It conducts the reverse of the process described
  * in the ->encode method.  The primary difference is that the
  * hexadecimally encoded header is unpacked into a
- * provision_response_header._
+ * provision_response_header.
  *
  * \param this		A pointer to the message object which is to
  *			have the message decoded into into.
@@ -607,6 +570,135 @@ static _Bool decode(CO(SGXmessage, this), CO(String, msg))
  done:
 	WHACK(bufr);
 
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method is an accessor method for returning the number of
+ * decoded messages contained in the object.
+ *
+ * \param this		A pointer to the message object whose message
+ *			count is to be returned.
+ *
+ * \return		A count of the number of messages in the
+ *			object is returned.  If the object is poisoned
+ *			or is not in RESPONSE state a value of zero
+ *			is returned.
+ */
+
+static size_t message_count(CO(SGXmessage, this))
+
+{
+	STATE(S);
+
+
+	/* Exit if the object is poisoned or in the wrong state. */
+	if ( S->poisoned )
+		return 0;
+	if ( S->state != RESPONSE )
+		return 0;
+
+	/* Return the number of objects in the messages buffer. */
+	return S->messages->size(S->messages) / sizeof(Buffer);
+}
+
+
+/**
+ * External public method.
+ *
+ * This method is an accessor method for returning a message of the
+ * specified type and version.
+ *
+ * \param this		A pointer to the message object whose message
+ *			count is to be returned.
+ *
+ * \param type		The type of the message to be searched for.
+ *
+ * \param version	The version number of the message.
+ *
+ * \param msg		The object which the payload of the message
+ *			is to be loaded into.
+ *
+ * \return		A boolean value is returned to indicate if
+ *			the object lookup was successful.  A false
+ *			value indicates the lookup failed while a
+ *			true value indicates the payload has been
+ *			loaded into the supplied object.
+ */
+
+static _Bool get_message(CO(SGXmessage, this), const uint8_t requested, \
+			 uint8_t version, CO(Buffer, msg))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	uint8_t *mp,
+		*pp,
+		type,
+		mver;
+
+	uint32_t size;
+
+	size_t lp,
+	       cnt;
+
+	struct TLVshort *smsg;
+
+	struct TLVlong *lmsg;
+
+	Buffer tlv,
+	       *tlvp;
+
+
+	/* Verify object status and state. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( S->state != RESPONSE )
+		ERR(goto done);
+
+
+	/* Loop through the available messages searching for a match. */
+	tlvp = (Buffer *) S->messages->get(S->messages);
+	cnt  = S->messages->size(S->messages) / sizeof(Buffer);
+
+	for (lp= 0; lp < cnt; ++lp ) {
+		tlv = *tlvp;
+		mp  = (uint8_t *) tlv->get(tlv);
+
+		if ( *mp & 0x80 ) {
+			lmsg = (struct TLVlong *) mp;
+			type = lmsg->type & ~0x80;
+			pp   = mp + sizeof(struct TLVlong);
+			size = ntohl(lmsg->size);
+			mver = lmsg->version;
+		} else {
+			smsg = (struct TLVshort *) mp;
+			type = smsg->type;
+			pp   = mp + sizeof(struct TLVshort);
+			size = ntohs(smsg->size);
+			mver = smsg->version;
+		}
+
+		if ( (type == requested) && (mver == version) ) {
+			if ( !msg->add(msg, pp, size) )
+				ERR(goto done);
+			retn = true;
+			goto done;
+		}
+
+		++tlvp;
+	}
+
+
+ done:
 	if ( !retn )
 		S->poisoned = true;
 
@@ -804,6 +896,9 @@ extern SGXmessage NAAAIM_SGXmessage_Init(void)
 
 	this->encode = encode;
 	this->decode = decode;
+
+	this->message_count = message_count;
+	this->get_message   = get_message;
 
 	this->dump  = dump;
 	this->whack = whack;
