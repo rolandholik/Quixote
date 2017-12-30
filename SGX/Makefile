@@ -6,7 +6,7 @@
 # Variable declarations.
 CSRC = sgx-check.c sgx-metadata.c SGXmetadata.c SGXloader.c  \
 	SGXenclave.c SGXsigstruct.c test-ecall.c sgx-ocall.c \
-	PVEenclave.c SGXmessage.c
+	PVEenclave.c SGXmessage.c SGXecdsa.c
 
 ASRC = boot-sgx.s
 
@@ -48,6 +48,7 @@ LIBS = -lNAAAIM -lHurdLib
 ELFLIB = -Wl,--rpath /usr/local/musl/lib -lelf
 
 HURDLIB = -L../lib -lHurdLib
+INTEL_CRYPTO = -L/opt/intel/sgxsdk/lib64 -lsgx_tcrypto
 
 
 CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I/usr/local/musl/include
@@ -101,9 +102,10 @@ sgx-gen-token.o: sgx-gen-token.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
 
 sgx-provision: sgx-provision.o SGXenclave.o SGXloader.o SGXmetadata.o	\
-	SGXsigstruct.o PVEenclave.o SGXmessage.o ../SHA256.o boot-sgx.o \
-	sgx-ocall.o
-	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB} ${SSL_CRYPTO};
+	SGXsigstruct.o PVEenclave.o SGXmessage.o SGXecdsa.o ../SHA256.o	\
+	../RandomBuffer.o boot-sgx.o sgx-ocall.o
+	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB} ${SSL_CRYPTO} \
+		${INTEL_CRYPTO};
 
 sgx-provision.o: sgx-provision.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
@@ -129,6 +131,9 @@ idf-sgx-fandf: idf-sgx-fandf.o SGXenclave.o SGXloader.o SGXmetadata.o \
 idf-sgx-fandf-unibin: idf-sgx-fandf-unibin.o SGXenclave.o SGXloader.o \
 	SGXmetadata.o SGXsigstruct.o sgx-ocall.o boot-sgx.o ../SHA256.o
 	${CC} -static ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB} ${SSL_CRYPTO};
+
+SGXecdsa.o: SGXecdsa.c
+	$(CC) $(CFLAGS) -I /opt/intel/sgxsdk/include -c $< -o $@;
 
 
 tags:
