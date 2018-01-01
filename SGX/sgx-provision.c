@@ -23,11 +23,16 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 
+#include <openssl/bn.h>
+#include <openssl/rsa.h>
+
 #include <HurdLib.h>
 #include <Buffer.h>
 #include <String.h>
 
 #include <NAAAIM.h>
+#include <SHA256.h>
+
 #include "SGXmessage.h"
 #include "PVEenclave.h"
 #include "SGXecdsa.h"
@@ -228,6 +233,120 @@ static _Bool _verify_pek(CO(SGXmessage, msg), CO(Buffer, pekbufr))
 /**
  * Internal private function.
  *
+ * This function is a subordinate helper function for the
+ * process_message1 function.  This function verifies the signature
+ * of the provisioning server attributes using the RSA key
+ * extracted from the PEK structure that was previously validated.
+ *
+ * The server URL and the time-to-live parameter are obtained from
+ * statically scoped variables that were previously extracted.
+ *
+ * \param msg	A pointer to the object which is managing the
+ *		message.
+ *
+ * \param pek	A pointer to the PEK structure.
+ *
+ * \return	A boolean value is used to indicated the status of
+ *		the endpoint verfication.  A false value indicates
+ *		the verification filed while a true value indicates
+ *		the endpoint attributes are valid.
+ */
+
+static _Bool _verify_endpoint(CO(SGXmessage, msg), CO(struct PEK *, pek), \
+			      CO(Buffer, signature))
+
+{
+	_Bool retn = false;
+
+	static const uint8_t der[] = {
+		0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86,
+		0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01, 0x05,
+		0x00, 0x04, 0x20
+	};
+
+	unsigned char sigout[sizeof(der) + 32];
+
+	BIGNUM *exponent = NULL,
+	       *modulus	 = NULL;
+
+	RSA *key = NULL;
+
+	Buffer b;
+
+	SHA256 sha256 = NULL;
+
+
+	/*
+	 * Convert the exponent and modulus from binary big-endian
+	 * format into big numbers.
+	 */
+	if ( (exponent = BN_bin2bn(pek->e, sizeof(pek->e), NULL)) == NULL )
+		ERR(goto done);
+
+	if ( (modulus = BN_bin2bn(pek->n, sizeof(pek->n), NULL)) == NULL )
+		ERR(goto done);
+
+	if ( (key = RSA_new()) == NULL )
+		ERR(goto done);
+	key->e = exponent;
+	key->n = modulus;
+
+
+	/* Decrypt and extract the signature. */
+	memset(sigout, '\0', sizeof(sigout));
+	if ( RSA_public_decrypt(signature->size(signature) - 1,	       \
+				signature->get(signature) + 1, sigout, \
+				key, RSA_PKCS1_PADDING) == -1 )
+	       ERR(goto done);
+
+	signature->reset(signature);
+	if ( !signature->add(signature, sigout, sizeof(sigout)) )
+		ERR(goto done);
+
+	if ( memcmp(signature->get(signature), der, sizeof(der) != 0) )
+		ERR(goto done);
+        signature->reset(signature);
+	if ( !signature->add(signature, sigout + sizeof(der), \
+			     sizeof(sigout) - sizeof(der)) )
+		ERR(goto done);
+
+	memset(sigout, '\0', sizeof(sigout));
+	memcpy(sigout, signature->get(signature), signature->size(signature));
+	signature->reset(signature);
+
+
+	/* Compute and compare the hash of the endpoint information. */
+	if ( !msg->get_xid(msg, signature) )
+		ERR(goto done);
+	signature->add(signature, (unsigned char *) &Ttl, sizeof(Ttl));
+	if ( !signature->add(signature,				    \
+			     (unsigned char *) Server->get(Server), \
+			     Server->size(Server)) )
+		ERR(goto done);
+
+	INIT(NAAAIM, SHA256, sha256, ERR(goto done));
+	sha256->add(sha256, signature);
+	if ( !sha256->compute(sha256) )
+		ERR(goto done);
+
+	b = sha256->get_Buffer(sha256);
+	if ( !memcmp(sigout, b->get(b), b->size(b)) == 0 )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	RSA_free(key);
+
+	WHACK(sha256);
+
+	return retn;
+}
+
+
+/**
+ * Internal private function.
+ *
  * This function implements the process of validating an endpoint
  * verification message from the Intel servers.  This message provides
  * a validated URL to be used for further message processing.
@@ -251,6 +370,8 @@ static _Bool process_message1(CO(SGXmessage, msg), CO(String, response))
 	_Bool retn = false;
 
 	Buffer bufr = NULL;
+
+	struct PEK pek;
 
 
 	/* Decode and verify the message count. */
@@ -288,15 +409,17 @@ static _Bool process_message1(CO(SGXmessage, msg), CO(String, response))
 	if ( !_verify_pek(msg, bufr) )
 		ERR(goto done);
 	fputs("\nPEK verified.\n", stdout);
+	memcpy(&pek, bufr->get(bufr), sizeof(struct PEK));
+
 
 	/* Process the signature message. */
 	bufr->reset(bufr);
 	if ( !msg->get_message(msg, TLV_SIGNATURE, 1, bufr) )
 		ERR(goto done);
+	if ( !_verify_endpoint(msg, &pek, bufr) )
+		ERR(goto done);
 
-	fputs("\nSIGNATURE:\n", stdout);
-	bufr->hprint(bufr);
-
+	fputs("\nEndpoint verified:\n", stdout);
 	retn = true;
 
 

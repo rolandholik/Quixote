@@ -709,6 +709,65 @@ static _Bool get_message(CO(SGXmessage, this), const uint8_t requested, \
 /**
  * External public method.
  *
+ * This method is an accessor method for returning the transaction
+ * ID from either the request or response structures depending on
+ * the mode that the message is in.
+ *
+ * \param this		A pointer to the message object whose
+ *			transaction id is to be returned.
+ *
+ * \param bufr		The object which the XID is to be loaded into.
+ *
+ * \return		A boolean value is returned to indicate if
+ *			the XID return was successful.  A false
+ *			value indicates the lookup failed while a
+ *			true value indicates the XID has been
+ *			loaded into the supplied object.
+ */
+
+static _Bool get_xid(CO(SGXmessage, this), CO(Buffer, bufr))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	uint8_t *xidp = NULL;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( bufr->poisoned(bufr) )
+		ERR(goto done);
+
+
+	/* Return XID from the active structure. */
+	if ( S->state == REQUEST )
+		xidp = S->request.xid;
+        if ( S->state == RESPONSE )
+		xidp = S->response.xid;
+
+	if ( xidp == NULL )
+		ERR(goto done);
+
+	if ( !bufr->add(bufr, xidp, sizeof(S->request.xid)) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a diagnostic dump of the state of the
  * message object.
  *
@@ -899,6 +958,8 @@ extern SGXmessage NAAAIM_SGXmessage_Init(void)
 
 	this->message_count = message_count;
 	this->get_message   = get_message;
+
+	this->get_xid = get_xid;
 
 	this->dump  = dump;
 	this->whack = whack;
