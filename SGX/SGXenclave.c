@@ -562,6 +562,13 @@ static _Bool init_enclave(CO(SGXenclave, this), struct SGX_einittoken *token)
 	if ( !_init_enclave(this, &rc) )
 		ERR(goto done);
 
+
+	/* Update SECS structure based on initialized enclave. */
+	S->secs.attributes |= 1;
+	memcpy(S->secs.mrsigner, token->mr_signer.m, sizeof(S->secs.mrsigner));
+	memcpy(S->secs.mrenclave, token->mr_enclave.m, \
+	       sizeof(S->secs.mrenclave));
+
 	retn = true;
 
 
@@ -1193,6 +1200,31 @@ static _Bool get_attributes(CO(SGXenclave, this), sgx_attributes_t *attributes)
 /**
  * External public method.
  *
+ * This method implements the retrieval of the enclave control
+ * information for the enclave that was loaded.
+ *
+ * \param this	A pointer to the object representing the enclave
+ *		whose token is to be returned.
+ *
+ * \param secs	A pointer to an enclave control structure that will be
+ *		populated with the values for the loaded enclave.
+ *
+ * \return	No return value is defined.
+ */
+
+static void get_secs(CO(SGXenclave, this), struct SGX_secs *secs)
+
+{
+	STATE(S);
+
+	*secs  = S->secs;
+	return;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements setting the debug status of the enclave.
  * Enabling debug in the enclave also causes debug status to be set
  * on the metadata manager and the loader.
@@ -1300,6 +1332,7 @@ extern SGXenclave NAAAIM_SGXenclave_Init(void)
 	this->boot_ocall = boot_ocall;
 
 	this->get_attributes = get_attributes;
+	this->get_secs	     = get_secs;
 
 	this->debug = debug;
 	this->whack = whack;

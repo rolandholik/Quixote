@@ -49,6 +49,7 @@ struct NAAAIM_SGXenclave
 			  const void *);
 
 	_Bool (*get_attributes)(const SGXenclave, sgx_attributes_t *);
+	void (*get_secs)(const SGXenclave, struct SGX_secs *);
 
 	void (*debug)(const SGXenclave, const _Bool);
 	void (*whack)(const SGXenclave);
