@@ -440,3 +440,32 @@ struct SGX_keyrequest {
 	uint32_t miscselect;
 	uint8_t reserved2[436];
 } __attribute__((aligned(512)));
+
+
+/**
+ * The following structure is returned by the SGX provisioning servers
+ * and contains the key that will be used to secure provisioning
+ * communications with the server.
+ */
+struct SGX_pek {
+	uint8_t n[256];
+	uint8_t e[4];
+	uint8_t sha1_ne[20];
+	uint8_t pek_signature[2 * 32];
+	uint8_t sha1_sign[20];
+} __attribute__((packed));
+
+
+/**
+ * The following structure defines the EPID 'blob'.
+ */
+struct SGX_extended_epid {
+	uint16_t format_id;
+	uint16_t data_length;
+	uint32_t xeid;
+	uint8_t epid_sk[64];
+	uint8_t pek_sk[64];
+	uint8_t qsdk_exp[4];
+	uint8_t qsdk_mod[256];
+	uint8_t signature[64];
+} __attribute__((packed));
