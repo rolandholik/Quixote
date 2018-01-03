@@ -33,23 +33,12 @@
 #include <NAAAIM.h>
 #include <SHA256.h>
 
+#include "SGX.h"
 #include "SGXmessage.h"
 #include "PVEenclave.h"
 #include "SGXecdsa.h"
+#include "PCEenclave.h"
 #include "intel-messages.h"
-
-
-/**
- * Structure definition for the PEK signed structure returned from
- * the intel server.
- */
-struct PEK {
-	uint8_t n[256];
-	uint8_t e[4];
-	uint8_t sha1_ne[20];
-	uint8_t pek_signature[2 * 32];
-	uint8_t sha1_sign[20];
-} __attribute__((packed));
 
 
 /**
@@ -127,7 +116,9 @@ static void usage(char *err)
 
 	fputc('\n', stdout);
 	fputs("Usage:\n", stdout);
-	fputs("\t-t:\tThe file containing the initialization token\n\n", \
+	fputs("\t-p:\tThe file containing the PCE initialization token\n", \
+	      stdout);
+	fputs("\t-t:\tThe file containing the PVE initialization token\n\n", \
 	      stdout);
 
 	return;
@@ -161,7 +152,7 @@ static _Bool _verify_pek(CO(SGXmessage, msg), CO(Buffer, pekbufr))
 	size_t lp,
 	       index;
 
-	struct PEK pek;
+	struct SGX_pek pek;
 
 	struct sgx_ec256_signature signature;
 
@@ -173,7 +164,7 @@ static _Bool _verify_pek(CO(SGXmessage, msg), CO(Buffer, pekbufr))
 
 
 	/* Work on a local copy of the PEK structure. */
-	memcpy(&pek, pekbufr->get(pekbufr), sizeof(struct PEK));
+	memcpy(&pek, pekbufr->get(pekbufr), sizeof(struct SGX_pek));
 
 	INIT(HurdLib, Buffer, pbufr, ERR(goto done));
 	if ( !pbufr->add(pbufr, (void *) &pek, sizeof(pek.n) + sizeof(pek.e)) )
@@ -252,7 +243,7 @@ static _Bool _verify_pek(CO(SGXmessage, msg), CO(Buffer, pekbufr))
  *		the endpoint attributes are valid.
  */
 
-static _Bool _verify_endpoint(CO(SGXmessage, msg), CO(struct PEK *, pek), \
+static _Bool _verify_endpoint(CO(SGXmessage, msg), CO(struct SGX_pek *, pek), \
 			      CO(Buffer, signature))
 
 {
@@ -364,14 +355,15 @@ static _Bool _verify_endpoint(CO(SGXmessage, msg), CO(struct PEK *, pek), \
  *			processed and verified.
  */
 
-static _Bool process_message1(CO(SGXmessage, msg), CO(String, response))
+static _Bool process_message1(CO(SGXmessage, msg), CO(String, response), \
+			      struct SGX_pek *pek)
 
 {
 	_Bool retn = false;
 
 	Buffer bufr = NULL;
 
-	struct PEK pek;
+	struct SGX_pek lpek;
 
 
 	/* Decode and verify the message count. */
@@ -406,20 +398,22 @@ static _Bool process_message1(CO(SGXmessage, msg), CO(String, response))
 	bufr->reset(bufr);
 	if ( !msg->get_message(msg, TLV_PEK, 1, bufr) )
 		ERR(goto done);
+
 	if ( !_verify_pek(msg, bufr) )
 		ERR(goto done);
 	fputs("\nPEK verified.\n", stdout);
-	memcpy(&pek, bufr->get(bufr), sizeof(struct PEK));
+	memcpy(&lpek, bufr->get(bufr), sizeof(struct SGX_pek));
 
 
 	/* Process the signature message. */
 	bufr->reset(bufr);
 	if ( !msg->get_message(msg, TLV_SIGNATURE, 1, bufr) )
 		ERR(goto done);
-	if ( !_verify_endpoint(msg, &pek, bufr) )
+	if ( !_verify_endpoint(msg, &lpek, bufr) )
 		ERR(goto done);
 
 	fputs("\nEndpoint verified:\n", stdout);
+	*pek = lpek;
 	retn = true;
 
 
@@ -436,32 +430,48 @@ extern int main(int argc, char *argv[])
 
 {
 	char *msg1_response = NULL,
-	     *token = NULL;
+	     *token	    = NULL,
+	     *pce_token	    = NULL;
 
 	int opt,
 	    retn;
+
+	struct SGX_pek pek;
+
+	struct SGX_targetinfo pce_tgt;
+
+	struct SGX_report pek_report;
 
 	String response = NULL;
 
 	PVEenclave pve = NULL;
 
+	PCEenclave pce = NULL;
+
 	SGXmessage msg = NULL;
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "1:t:")) != EOF )
+	while ( (opt = getopt(argc, argv, "1:p:t:")) != EOF )
 		switch ( opt ) {
 			case '1':
 				msg1_response = optarg;
 				break;
 
+			case 'p':
+				pce_token = optarg;
+				break;
 			case 't':
 				token = optarg;
 				break;
 		}
 
 	if ( token == NULL ) {
-		usage("No initialization token specified.\n");
+		usage("No PVE token specified.\n");
+		return 1;
+	}
+	if ( pce_token == NULL ) {
+		usage("No PCE token specified.\n");
 		return 1;
 	}
 
@@ -474,8 +484,30 @@ extern int main(int argc, char *argv[])
 		if ( !response->add(response, msg1_response) )
 			ERR(goto done);
 
-		if ( !process_message1(msg, response) )
+		if ( !process_message1(msg, response, &pek) )
 			ERR(goto done);
+
+
+		/* Generate message 2. */
+		INIT(NAAAIM, PCEenclave, pce, ERR(goto done));
+		if ( !pce->open(pce, pce_token) )
+			ERR(goto done);
+		pce->get_target_info(pce, &pce_tgt);
+
+		INIT(NAAAIM, PVEenclave, pve, ERR(goto done));
+		if ( !pve->open(pve, token) )
+			ERR(goto done);
+
+		memset(&pek_report, '\0', sizeof(struct SGX_report));
+		if ( !pve->get_message1(pve, &pek, &pce_tgt, &pek_report) )
+			ERR(goto done);
+		fputs("\nPVE message one created.\n", stdout);
+
+		if ( !pce->get_info(pce, &pek, &pek_report) )
+			ERR(goto done);
+		fputs("\nPCE information created.\n", stdout);
+
+
 		retn = 0;
 		goto done;
 	}
@@ -493,7 +525,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Encode the message. */
-	if ( !pve->generate_message1(pve, msg) )
+	if ( !pve->generate_endpoint_message(pve, msg) )
 		ERR(goto done);
 
 	msg->dump(msg);
@@ -502,6 +534,7 @@ extern int main(int argc, char *argv[])
 
  done:
 	WHACK(pve);
+	WHACK(pce);
 	WHACK(msg);
 	WHACK(response);
 

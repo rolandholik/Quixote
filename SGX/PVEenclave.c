@@ -221,20 +221,109 @@ static _Bool open(CO(PVEenclave, this), CO(char *, token))
 /**
  * External public method.
  *
- * This method implements a wrapper for calling the following ECALL:
+ * This method implements an ECALL to the following provisioning enclave
+ * function:
  *
- * This is the message used to initiate communications with the
- * provisioning service.
+ * gen_prov_msg1_data_wrapper
  *
- * \param this		A pointer to the provisioning object for which
- *			the message is to be generated.
+ * With the following signature:
+ *
+ *	public uint32_t gen_prov_msg1_data_wrapper([in]const extended_epid_group_blob_t *xegb,
+ *		[in]const signed_pek_t *pek,
+ *		[in]const sgx_target_info_t *pce_target_info,
+ *		[out]sgx_report_t *msg1_output);
+ *
+ * This method implements the generation of a report against the
+ * PCE enclave for the PEK structure returned by the endpoing selection
+ * request.
+ *
+ * \param this	A pointer to the provisioning enclave object for which
+ *		the report is to be generated.
+ *
+ * \param pek	The PEK structure which the report is to be generated
+ *		against.
+ *
+ * \param tgt	The PCE enclave target information to be used for
+ *		generating the report.
+ *
+ * \param rpt	The report structure which is to be populated.
+ *
+ * \return	If an error is encountered while generating the report
+ *		a false value is returned.  A true value indicates the
+ *		report has been successfully generated.
+ */
+
+static _Bool get_message1(CO(PVEenclave, this), struct SGX_pek *pek, \
+			  struct SGX_targetinfo *tgt, struct SGX_report *rpt)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	int rc;
+
+	struct SGX_extended_epid epid;
+
+	struct {
+		uint32_t retn;
+		struct SGX_extended_epid *epid;
+		struct SGX_pek *pek;
+		struct SGX_targetinfo *target;
+		struct SGX_report *report;
+	} ecall0;
+
+
+	/* Call slot 0 to obtain message 1. */
+	memset(&ecall0, '\0', sizeof(ecall0));
+	memset(&epid,   '\0', sizeof(epid));
+
+	ecall0.epid   = &epid;
+	ecall0.pek    = pek;
+	ecall0.target = tgt;
+	ecall0.report = rpt;
+
+	if ( !S->enclave->boot_slot(S->enclave, 0, &PVE_ocall_table, &ecall0, \
+				    &rc) ) {
+		fprintf(stderr, "PVE slot 0 call error: %d\n", rc);
+		ERR(goto done);
+	}
+	if ( ecall0.retn != 0 ) {
+		fprintf(stderr, "PVE error: %d\n", ecall0.retn);
+		ERR(goto done);
+	}
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements the generation of the endpoint selection
+ * message.  This message is used to request confirmation of a
+ * secure endpoint with the Intel provisioning server.
+ *
+ * \param this	A pointer to the provisioning object for which
+ *		the message is to be generated.
+ *
+ * \param msg	The object which will have the message encoded into
+ *		it.
  *
  * \return	If an error is encountered while generating the endpoint
  *		a false value is returned.  A true value indicates the
  *		endpoint value has been generated.
  */
 
-static _Bool generate_message1(CO(PVEenclave, this), CO(SGXmessage, msg))
+static _Bool generate_endpoint_message(CO(PVEenclave, this), \
+				       CO(SGXmessage, msg))
 
 {
 	STATE(S);
@@ -388,8 +477,10 @@ extern PVEenclave NAAAIM_PVEenclave_Init(void)
 	/* Method initialization. */
 	this->open = open;
 
-	this->get_endpoint	= get_endpoint;
-	this->generate_message1 = generate_message1;
+	this->get_message1 = get_message1;
+
+	this->get_endpoint		= get_endpoint;
+	this->generate_endpoint_message = generate_endpoint_message;
 
 	this->whack = whack;
 
