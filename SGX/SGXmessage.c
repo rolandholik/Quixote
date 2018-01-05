@@ -878,14 +878,7 @@ static void dump(CO(SGXmessage, this))
 }
 
 
-/**
- * External public method.
- *
- * This method implements a destructor for the SGXmessage object.
- *
- * \param this	A pointer to the object which is to be destroyed.
- */
-
+/* Macro to release all message object. */
 #define GWHACK(type, var) {			\
 	size_t i=var->size(var) / sizeof(type);	\
 	type *o=(type *) var->get(var);		\
@@ -894,6 +887,51 @@ static void dump(CO(SGXmessage, this))
 		o+=1;				\
 	}					\
 }
+
+
+/**
+ * External public method.
+ *
+ * This method implements a reset of the object to prepare it for
+ * creation of a new message.
+ * message object.
+ *
+ * \param this	A pointer to the object whose state is to be reset.
+ *
+ * \return	No return value is defined.
+ */
+
+static void reset(CO(SGXmessage, this))
+
+{
+	STATE(S);
+
+
+	S->poisoned = false;
+	S->state    = INIT;
+	S->size	    = 0;
+
+	memset(&S->request,  '\0', sizeof(S->request));
+	memset(&S->response, '\0', sizeof(S->response));
+
+	S->msg->reset(S->msg);
+
+	if ( S->messages != NULL ) {
+		GWHACK(Buffer, S->messages);
+		WHACK(S->messages);
+	}
+
+	return;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements a destructor for the SGXmessage object.
+ *
+ * \param this	A pointer to the object which is to be destroyed.
+ */
 
 static void whack(CO(SGXmessage, this))
 
@@ -961,6 +999,7 @@ extern SGXmessage NAAAIM_SGXmessage_Init(void)
 
 	this->get_xid = get_xid;
 
+	this->reset = reset;
 	this->dump  = dump;
 	this->whack = whack;
 
