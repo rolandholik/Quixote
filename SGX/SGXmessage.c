@@ -29,6 +29,8 @@
 #include <arpa/inet.h>
 
 #include <openssl/evp.h>
+#include <openssl/bn.h>
+#include <openssl/rsa.h>
 
 #include <Origin.h>
 #include <HurdLib.h>
@@ -36,8 +38,16 @@
 #include <String.h>
 
 #include "NAAAIM.h"
+#include "RandomBuffer.h"
+#include "SHA256.h"
+
 #include "intel-messages.h"
+#include "SGX.h"
+#include "PCEenclave.h"
 #include "SGXmessage.h"
+#include "SGXcmac.h"
+#include "SGXaesgcm.h"
+#include "SGXrsa.h"
 
 
 /* Object state extraction macro. */
@@ -226,6 +236,7 @@ static void init_request(CO(SGXmessage, this), const uint8_t protocol, \
 	/* Verify object status. */
 	if ( S->poisoned )
 		return;
+	S->state = REQUEST;
 
 
 	/* Setup protocol request definition. */
@@ -236,6 +247,75 @@ static void init_request(CO(SGXmessage, this), const uint8_t protocol, \
 
 
 	return;
+}
+
+
+/**
+ * Internal private method.
+ *
+ * The following function encodes the creation of a single TLV message
+ * into a supplied Buffer object.  This is implemented as a separate
+ * function in order to support multiple sub-messages for a given
+ * TLV message type.
+ *
+ * \param S		The object state which is to be updated by
+ *			the encoded message.
+ *
+ * \param type		The numeric descriptor for the object.
+ *
+ * \param version	The version type of the message.
+ *
+ * \param payload	The object containing the payload to be
+ *			encoded into the message.
+ *
+ * \param msg		The object which is to be loaded with the
+ *			encoded message.
+ *
+ * \return		A boolean value is used to indicate whether
+ *			or not the message was successfully encoded.
+ *			A false value indicates the message buffer
+ *			is not valid while a true value indicates
+ *			the buffer contains a valid newly encoded
+ *			message.
+ */
+
+static _Bool _encode_message(CO(SGXmessage_State, S), const uint8_t type, \
+			     const uint8_t version, CO(Buffer, payload),  \
+			     CO(Buffer, msg))
+
+{
+	_Bool retn = false;
+
+	size_t payload_size = payload->size(payload);
+
+	struct TLVshort smsg;
+
+	struct TLVlong lmsg;
+
+
+	/* Select and create the message type. */
+	if ( payload_size <= UINT16_MAX ) {
+		smsg.type    = type;
+		smsg.version = version;
+		smsg.size    = htons(payload_size);
+		msg->add(msg, (void *) &smsg, sizeof(struct TLVshort));
+	} else {
+		lmsg.type    = type;
+		lmsg.version = version;
+		lmsg.size    = htonl(payload_size);
+		msg->add(msg, (void *) &lmsg, sizeof(struct TLVlong));
+	}
+
+
+	/* Add the payload and increment the total message size. */
+	if ( !msg->add(msg, payload->get(payload), payload_size) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	return retn;
 }
 
 
@@ -294,6 +374,242 @@ static _Bool encode_es_request(CO(SGXmessage, this), const uint8_t type, \
 
 
  done:
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method encodes the second provisioning message to be sent
+ * to the Intel provisioning service.
+ *
+ * \param this		A pointer to the message object which is to
+ *			have the message encoded into.
+ *
+ * \param rnd		A pointer to the random number generation
+ *			object to be used.
+ *
+ * \param pve		The transaction key issued by the Intel
+ *			provisioning service in response to the
+ *			endpoint selection message.
+ *
+ * \return		A boolean value is used to indicate whether
+ *			or not the message was successfully encoded.
+ *			A false value indicates an error was encountered
+ *			while encoding the message, a true value indicates
+ *			the message was successfully encoded.
+ */
+
+static _Bool encode_message2(CO(SGXmessage, this), CO(RandomBuffer, rnd), \
+			     CO(PCEenclave, pce), struct SGX_pek *pek,	  \
+			     struct SGX_report *pek_report)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	uint8_t pek_pub = 0;
+
+	uint16_t pce_svn,
+		 pce_id;
+
+	uint32_t size;
+
+	struct {
+		uint8_t  cpu_svn[16];
+		uint16_t pve_svn;
+		uint16_t pce_svn;
+		uint16_t pce_id;
+		uint8_t  fmsp[4];
+	} __attribute__((packed)) platform_info;
+
+	struct provision_request_header reqhdr;
+
+	Buffer b,
+	       sk     = NULL,
+	       bufr   = NULL,
+	       submsg = NULL,
+	       aaad   = NULL,
+	       tag    = NULL,
+	       encout = NULL;
+
+	SHA256 sha256 = NULL;
+
+	SGXcmac cmac = NULL;
+
+	SGXaesgcm aesgcm = NULL;
+
+	SGXrsa rsa = NULL;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( S->state != REQUEST )
+		ERR(goto done);
+
+
+	/*
+	 * Generate the sub message consisting of the randomly generated
+	 * key along with the hash of the components of the key supplied
+	 * by the provisioning server.
+	 */
+	INIT(HurdLib, Buffer, submsg, ERR(goto done));
+
+	INIT(HurdLib, Buffer, sk, ERR(goto done));
+	rnd->generate(rnd, 16);
+	b = rnd->get_Buffer(rnd);
+	if ( !sk->add(sk, b->get(b), b->size(b)) )
+		ERR(goto done);
+	if ( !_encode_message(S, TLV_BLOCK_CIPHER_INFO, 1, sk, submsg) )
+		ERR(goto done);
+
+	/* Hash the exponent and modulus of the PEK. */
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	INIT(NAAAIM, SHA256, sha256, ERR(goto done));
+
+	bufr->add(bufr, pek->n, sizeof(pek->n));
+	sha256->add(sha256, bufr);
+
+	bufr->reset(bufr);
+	bufr->add(bufr, pek->e, sizeof(pek->e));
+	sha256->add(sha256, bufr);
+
+	if ( !sha256->compute(sha256) )
+		ERR(goto done);
+
+	b = sha256->get_Buffer(sha256);
+	if ( !_encode_message(S, TLV_PS_ID, 1, b, submsg) )
+		ERR(goto done);
+
+	/* Encrypt the sub-message and encode it in the current message. */
+	INIT(NAAAIM, SGXrsa, rsa, ERR(goto done));
+	INIT(HurdLib, Buffer, encout, ERR(goto done));
+
+	if ( !rsa->init(rsa, pek) )
+		ERR(goto done);
+	if ( !rsa->encrypt(rsa, submsg, encout) )
+		ERR(goto done);
+
+	bufr->reset(bufr);
+	bufr->add(bufr, &pek_pub, sizeof(pek_pub));
+	if ( !bufr->add_Buffer(bufr, encout) )
+		ERR(goto done);
+	if ( !_encode_message(S, TLV_CIPHER_TEXT, 1, bufr, S->msg) )
+		ERR(goto done);
+
+
+	/*
+	 * Create the second sub-message containing the following:
+	 *
+	 *	PPID
+	 *	Platform configuration information
+	 *	Flags, only if this is a rekey.
+	 */
+	submsg->reset(submsg);
+	bufr->reset(bufr);
+	bufr->add(bufr, &pek_pub, sizeof(pek_pub));
+	if ( !pce->get_ppid(pce, bufr) )
+		ERR(goto done);
+	if ( !_encode_message(S, TLV_CIPHER_TEXT, 1, bufr, submsg) )
+		ERR(goto done);
+
+	memset(&platform_info, '\0', sizeof(platform_info));
+	memcpy(platform_info.cpu_svn, pek_report->body.cpusvn, \
+	       sizeof(platform_info.cpu_svn));
+	memcpy(&platform_info.pve_svn, &pek_report->body.isvsvn, \
+	       sizeof(platform_info.pve_svn));
+
+	pce->get_version(pce, &pce_svn, &pce_id);
+	memcpy(&platform_info.pce_svn, &pce_svn, \
+	       sizeof(platform_info.pce_svn));
+	memcpy(&platform_info.pce_id, &pce_id, sizeof(platform_info.pce_id));
+
+	bufr->reset(bufr);
+	if ( !bufr->add(bufr, (void *) &platform_info, sizeof(platform_info)) )
+		ERR(goto done);
+	if ( !_encode_message(S, TLV_PLATFORM_INFO, 1, bufr, submsg) )
+		ERR(goto done);
+
+
+	/*
+	 * Encrypt the second sub-message.  The buffer object will
+	 * hold the encryption key which is the CMAC of the transaction
+	 * ID under the randomly generated key encrypted under
+	 * the RSA public key provided by the endpoint selection
+	 * message.
+	 */
+	INIT(HurdLib, Buffer, tag, ERR(goto done));
+	if ( !this->get_xid(this, tag) )
+		ERR(goto done);
+
+	INIT(NAAAIM, SGXcmac, cmac, ERR(goto done));
+	bufr->reset(bufr);
+	if ( !cmac->compute(cmac, sk, tag, bufr) )
+		ERR(goto done);
+
+	if ( !rnd->generate(rnd, 12) )
+		ERR(goto done);
+	b = rnd->get_Buffer(rnd);
+
+
+	/*
+	 * Setup a local request header to be included in the
+	 * authenticated data stream.  The size is computed as the
+	 * current message size, the initialization vector size, the
+	 * size of the ciphertext and the final MAC tag.
+	 */
+	reqhdr = S->request;
+	size  = S->msg->size(S->msg);
+	size += sizeof(struct TLVshort) + b->size(b) + submsg->size(submsg);
+	size += sizeof(struct TLVshort) + 16;
+	size  = htonl(size);
+	memcpy(&reqhdr.size, &size, sizeof(reqhdr.size));
+
+	INIT(HurdLib, Buffer, aaad, ERR(goto done));
+	if ( !aaad->add(aaad, (unsigned char *) &reqhdr, sizeof(reqhdr)) )
+		ERR(goto done);
+
+	INIT(NAAAIM, SGXaesgcm, aesgcm, ERR(goto done));
+	tag->reset(tag);
+	encout->reset(encout);
+	if ( !aesgcm->encrypt(aesgcm, bufr, b, submsg, encout, aaad, tag) )
+		ERR(goto done);
+
+	/* Add the IV and encrypted message to the current message. */
+	bufr->reset(bufr);
+	bufr->add_Buffer(bufr, b);
+	if ( !bufr->add_Buffer(bufr, encout) )
+		ERR(goto done);
+	if ( !_encode_message(S, TLV_BLOCK_CIPHER_TEXT, 1, bufr, S->msg) )
+		ERR(goto done);
+
+	/* Add the MAC tag to the current message. */
+	if ( !_encode_message(S, TLV_MESSAGE_AUTHENTICATION_CODE, 1, tag, \
+			      S->msg) )
+		ERR(goto done);
+
+	S->size = S->msg->size(S->msg);
+	retn = true;
+
+
+ done:
+	WHACK(sk)
+	WHACK(bufr);
+	WHACK(submsg);
+	WHACK(aaad);
+	WHACK(tag);
+	WHACK(encout);
+	WHACK(sha256);
+	WHACK(cmac);
+	WHACK(aesgcm);
+	WHACK(rsa);
+
+	if ( !retn )
+		S->poisoned = true;
 
 	return retn;
 }
@@ -764,6 +1080,15 @@ static _Bool get_xid(CO(SGXmessage, this), CO(Buffer, bufr))
 	return retn;
 }
 
+#define GWHACK(type, var) {			\
+	size_t i=var->size(var) / sizeof(type);	\
+	type *o=(type *) var->get(var);		\
+	while ( i-- ) {				\
+		(*o)->whack((*o));		\
+		o+=1;				\
+	}					\
+}
+
 
 /**
  * External public method.
@@ -786,7 +1111,8 @@ static void dump(CO(SGXmessage, this))
 	uint16_t status;
 
 	uint32_t cnt,
-		 size;
+		 size,
+	         hsize;
 
 	uint64_t xid;
 
@@ -816,10 +1142,10 @@ static void dump(CO(SGXmessage, this))
 		fprintf(stdout, "\ttype:     %u\n", S->response.type);
 
 		memcpy(&status, S->response.gstatus, sizeof(status));
-		fprintf(stdout, "\tgstatus:  %u\n", status);
+		fprintf(stdout, "\tgstatus:  %u\n", ntohs(status));
 
 		memcpy(&status, S->response.pstatus, sizeof(status));
-		fprintf(stdout, "\tpstatus:  %u\n", status);
+		fprintf(stdout, "\tpstatus:  %u\n", ntohs(status));
 
 		memcpy(&size, S->response.size, sizeof(size));
 		size = ntohl(size);
@@ -836,13 +1162,15 @@ static void dump(CO(SGXmessage, this))
 			if ( *mp & 0x80 ) {
 				lmsg = (struct TLVlong *) mp;
 				type = lmsg->type & ~0x80;
+				hsize = sizeof(struct TLVlong);
 			} else {
 				smsg = (struct TLVshort *) mp;
 				type = smsg->type;
+				hsize = sizeof(struct TLVshort);
 			}
 
-			fprintf(stdout, "\tMsg %u: %s\n", size, \
-				tlv_types[type]);
+			fprintf(stdout, "\tMsg %u: %s (%zu)\n", size, \
+				tlv_types[type], tlv->size(tlv) - hsize);
 			++tlvp;
 		}
 
@@ -860,8 +1188,35 @@ static void dump(CO(SGXmessage, this))
 	fprintf(stdout, "\ttype:     %u\n", S->request.type);
 	fprintf(stdout, "\tsize:     %u\n", S->size);
 
-	fputs("\nMESSAGE:\n", stdout);
+	fputs("\nMESSAGES:\n", stdout);
+	if ( !_unpack_messages(S) )
+		ERR(goto done);
+	tlvp = (Buffer *) S->messages->get(S->messages);
+	cnt  = S->messages->size(S->messages) / sizeof(Buffer);
+
+	for (size= 0; size < cnt; ++size) {
+		tlv = *tlvp;
+		mp  = (uint8_t *) tlv->get(tlv);
+
+		if ( *mp & 0x80 ) {
+			lmsg = (struct TLVlong *) mp;
+			type = lmsg->type & ~0x80;
+			hsize = sizeof(struct TLVlong);
+		} else {
+			smsg = (struct TLVshort *) mp;
+			type = smsg->type;
+			hsize = sizeof(struct TLVshort);
+		}
+
+		fprintf(stdout, "\tMsg %u: %s (%zu)\n", size, \
+			tlv_types[type], tlv->size(tlv) - hsize);
+		++tlvp;
+	}
+	GWHACK(Buffer, S->messages);
+	WHACK(S->messages);
+	fputc('\n', stdout);
 	S->msg->hprint(S->msg);
+
 
 	INIT(HurdLib, String, msg, ERR(goto done));
 	if ( !this->encode(this, msg) )
@@ -875,17 +1230,6 @@ static void dump(CO(SGXmessage, this))
 	WHACK(msg);
 
 	return;
-}
-
-
-/* Macro to release all message object. */
-#define GWHACK(type, var) {			\
-	size_t i=var->size(var) / sizeof(type);	\
-	type *o=(type *) var->get(var);		\
-	while ( i-- ) {				\
-		(*o)->whack((*o));		\
-		o+=1;				\
-	}					\
 }
 
 
@@ -990,6 +1334,7 @@ extern SGXmessage NAAAIM_SGXmessage_Init(void)
 	/* Method initialization. */
 	this->init_request	= init_request;
 	this->encode_es_request = encode_es_request;
+	this->encode_message2	= encode_message2;
 
 	this->encode = encode;
 	this->decode = decode;

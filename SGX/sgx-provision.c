@@ -32,13 +32,16 @@
 
 #include <NAAAIM.h>
 #include <SHA256.h>
+#include <RandomBuffer.h>
 
 #include "SGX.h"
+#include "PCEenclave.h"
 #include "SGXmessage.h"
 #include "PVEenclave.h"
 #include "SGXecdsa.h"
-#include "PCEenclave.h"
 #include "intel-messages.h"
+
+#include "SGXaesgcm.h"
 
 
 /**
@@ -442,6 +445,8 @@ extern int main(int argc, char *argv[])
 
 	struct SGX_report pek_report;
 
+	Buffer b;
+
 	String response = NULL;
 
 	PVEenclave pve = NULL;
@@ -449,6 +454,8 @@ extern int main(int argc, char *argv[])
 	PCEenclave pce = NULL;
 
 	SGXmessage msg = NULL;
+
+	RandomBuffer rbufr = NULL;
 
 
 	/* Parse and verify arguements. */
@@ -488,7 +495,7 @@ extern int main(int argc, char *argv[])
 			ERR(goto done);
 
 
-		/* Generate message 2. */
+		/* Generate components for message 2. */
 		INIT(NAAAIM, PCEenclave, pce, ERR(goto done));
 		if ( !pce->open(pce, pce_token) )
 			ERR(goto done);
@@ -508,6 +515,28 @@ extern int main(int argc, char *argv[])
 		fputs("\nPCE information created.\n", stdout);
 
 
+		/*
+		 * Initialize message 2 request:
+		 *	protocol: SE_EPID_PROVISIONING (0)
+		 *	type: TYPE_PROV_MSG1 (0)
+		 *	version: TLV_VERSION2 (2)
+		 */
+		msg->reset(msg);
+
+		INIT(NAAAIM, RandomBuffer, rbufr, ERR(goto done));
+		if ( !rbufr->generate(rbufr, 8) )
+			ERR(goto done);
+		b = rbufr->get_Buffer(rbufr);
+		fputs("XID:\n", stdout);
+		b->print(b);
+
+		msg->init_request(msg, 0, 0, 2, b->get(b));
+
+		if ( !msg->encode_message2(msg, rbufr, pce, &pek, \
+					   &pek_report) )
+			ERR(goto done);
+
+		msg->dump(msg);
 		retn = 0;
 		goto done;
 	}
@@ -533,10 +562,11 @@ extern int main(int argc, char *argv[])
 
 
  done:
+	WHACK(response);
 	WHACK(pve);
 	WHACK(pce);
 	WHACK(msg);
-	WHACK(response);
+	WHACK(rbufr);
 
 	WHACK(Server);
 

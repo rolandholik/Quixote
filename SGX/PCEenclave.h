@@ -31,6 +31,8 @@ struct NAAAIM_PCEenclave
 
 	_Bool (*get_info)(const PCEenclave, struct SGX_pek *, \
 			  struct SGX_report *);
+	_Bool (*get_ppid)(const PCEenclave, const Buffer);
+	void  (*get_version)(const PCEenclave, uint16_t *, uint16_t *);
 
 	void (*dump)(const PCEenclave);
 	void (*whack)(const PCEenclave);

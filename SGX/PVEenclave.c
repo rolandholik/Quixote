@@ -41,8 +41,10 @@
 #include <File.h>
 
 #include "NAAAIM.h"
+#include "RandomBuffer.h"
 #include "SGX.h"
 #include "SGXenclave.h"
+#include "PCEenclave.h"
 #include "SGXmessage.h"
 #include "PVEenclave.h"
 

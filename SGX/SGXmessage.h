@@ -28,6 +28,9 @@ struct NAAAIM_SGXmessage
 	void (*init_request)(const SGXmessage, uint8_t, uint8_t, uint8_t, \
 			     const uint8_t *);
 	_Bool (*encode_es_request)(const SGXmessage, uint8_t, uint8_t);
+	_Bool (*encode_message2)(const SGXmessage, const RandomBuffer, \
+				 const PCEenclave, struct SGX_pek *,   \
+				 struct SGX_report *pek_report);
 
 	_Bool (*encode)(const SGXmessage, const String);
 	_Bool (*decode)(const SGXmessage, const String);
