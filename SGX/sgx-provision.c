@@ -29,6 +29,7 @@
 #include <HurdLib.h>
 #include <Buffer.h>
 #include <String.h>
+#include <File.h>
 
 #include <NAAAIM.h>
 #include <SHA256.h>
@@ -427,12 +428,74 @@ static _Bool process_message1(CO(SGXmessage, msg), CO(String, response), \
 }
 
 
+/**
+ * Internal private function.
+ *
+ * This function implements generation of message output.  If no
+ * output file has specified the encoded message is sent to standard
+ * output.  Otherwise the message is output into the specified file.
+ *
+ * \param msg		A pointer to the object which is managing
+ *			the message to be output.
+ *
+ * \param outfile	The name of the output file.
+ *
+ * \return		No return value is specified.
+ */
+
+static void generate_output(CO(SGXmessage, msg), CO(char *, outfile))
+
+{
+	Buffer bufr = NULL;
+
+	String message = NULL;
+
+	File output = NULL;
+
+
+	/* Load the message. */
+	INIT(HurdLib, String, message, ERR(goto done));
+	if ( !msg->encode(msg, message) )
+		ERR(goto done);
+
+
+	/* No output file, send to standard output. */
+	if ( outfile == NULL )
+		message->print(message);
+	else {
+		INIT(HurdLib, Buffer, bufr, ERR(goto done));
+		message->add(message, "\n");
+		if ( !bufr->add(bufr, (void *) message->get(message), \
+				message->size(message)) )
+			ERR(goto done);
+
+		INIT(HurdLib, File, output, ERR(goto done));
+		if ( !output->open_rw(output, outfile) )
+			ERR(goto done);
+		if ( !output->write_Buffer(output, bufr) )
+			ERR(goto done);
+	}
+
+
+ done:
+	WHACK(bufr);
+	WHACK(message);
+	WHACK(output);
+
+	return;
+}
+
+
 /* Main program starts here. */
 
 extern int main(int argc, char *argv[])
 
 {
-	char *msg1_response = NULL,
+	_Bool verbose = false;
+
+	char *input	    = NULL,
+	     *msg_output    = NULL,
+	     *msg1_response = NULL,
 	     *token	    = NULL,
 	     *pce_token	    = NULL;
 
@@ -444,6 +507,12 @@ extern int main(int argc, char *argv[])
 	struct SGX_targetinfo pce_tgt;
 
 	struct SGX_report pek_report;
+
+	enum {
+		none=0,
+		endpoint,
+		message1
+	} mode = none;
 
 	Buffer b;
 
@@ -459,12 +528,24 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "1:p:t:")) != EOF )
+	while ( (opt = getopt(argc, argv, "1Evi:o:p:t:")) != EOF )
 		switch ( opt ) {
 			case '1':
-				msg1_response = optarg;
+				mode = message1;
+				break;
+			case 'E':
+				mode = endpoint;
+				break;
+			case 'v':
+				verbose = true;
 				break;
 
+			case 'i':
+				input = optarg;
+				break;
+			case 'o':
+				msg_output = optarg;
+				break;
 			case 'p':
 				pce_token = optarg;
 				break;
@@ -472,6 +553,11 @@ extern int main(int argc, char *argv[])
 				token = optarg;
 				break;
 		}
+
+	if ( mode == none ) {
+		usage("No mode specified.\n");
+		return 1;
+	}
 
 	if ( token == NULL ) {
 		usage("No PVE token specified.\n");
@@ -482,11 +568,16 @@ extern int main(int argc, char *argv[])
 		return 1;
 	}
 
+	if ( (mode == message1) && (input == NULL) ) {
+		usage("No message 1 input specified.\n");
+		return 1;
+	}
+
 	INIT(NAAAIM, SGXmessage, msg, ERR(goto done));
 
 
 	/* Decode a message 1 response. */
-	if ( msg1_response != NULL ) {
+	if ( mode == message1 ) {
 		INIT(HurdLib, String, response, ERR(goto done));
 		if ( !response->add(response, msg1_response) )
 			ERR(goto done);
@@ -508,11 +599,13 @@ extern int main(int argc, char *argv[])
 		memset(&pek_report, '\0', sizeof(struct SGX_report));
 		if ( !pve->get_message1(pve, &pek, &pce_tgt, &pek_report) )
 			ERR(goto done);
-		fputs("\nPVE message one created.\n", stdout);
+		if ( verbose )
+			fputs("\nPVE message one created.\n", stdout);
 
 		if ( !pce->get_info(pce, &pek, &pek_report) )
 			ERR(goto done);
-		fputs("\nPCE information created.\n", stdout);
+		if ( verbose )
+			fputs("\nPCE information created.\n", stdout);
 
 
 		/*
@@ -527,8 +620,6 @@ extern int main(int argc, char *argv[])
 		if ( !rbufr->generate(rbufr, 8) )
 			ERR(goto done);
 		b = rbufr->get_Buffer(rbufr);
-		fputs("XID:\n", stdout);
-		b->print(b);
 
 		msg->init_request(msg, 0, 0, 2, b->get(b));
 
@@ -536,29 +627,35 @@ extern int main(int argc, char *argv[])
 					   &pek_report) )
 			ERR(goto done);
 
-		msg->dump(msg);
+		if ( verbose )
+			msg->dump(msg);
+		generate_output(msg, msg_output);
+
 		retn = 0;
 		goto done;
 	}
 
 
-	/* Load the provisioning enclave. */
-	INIT(NAAAIM, PVEenclave, pve, ERR(goto done));
-	if ( !pve->open(pve, token) )
-		ERR(goto done);
+	if ( mode == endpoint ) {
+		/* Load the provisioning enclave. */
+		INIT(NAAAIM, PVEenclave, pve, ERR(goto done));
+		if ( !pve->open(pve, token) )
+			ERR(goto done);
 
+		/* Get the endpoint. */
+		if ( !pve->get_endpoint(pve) )
+			ERR(goto done);
 
-	/* Get the endpoint. */
-	if ( !pve->get_endpoint(pve) )
-		ERR(goto done);
+		/* Encode the message. */
+		if ( !pve->generate_endpoint_message(pve, msg) )
+			ERR(goto done);
 
+		if ( verbose )
+			msg->dump(msg);
+		generate_output(msg, msg_output);
 
-	/* Encode the message. */
-	if ( !pve->generate_endpoint_message(pve, msg) )
-		ERR(goto done);
-
-	msg->dump(msg);
-	retn = 0;
+		retn = 0;
+	}
 
 
  done:
