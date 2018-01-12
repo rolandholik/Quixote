@@ -325,6 +325,102 @@ static _Bool encrypt(CO(SGXaesgcm, this), CO(Buffer, key), CO(Buffer, iv), \
 /**
  * External public method.
  *
+ * This method implements AES128-GCM decryption of the supplied message.
+ *
+ * \param this		A pointer to the object managing the decryption
+ *			object.
+ *
+ * \param key		The object containing the binary encryption key.
+ *
+ * \param iv		The object containing the initialization vector.
+ *
+ * \param payload	The object which contains encrypted data to be
+ *			decrypted.
+ *
+ * \param extra		The object containing additional data to be
+ *			included into the authentication tag.
+ *
+ * \return	If an error is encountered processing the decryption
+ *		request a false value is returned.  A true value
+ *		indicates the output object has valid decrypted data.
+ */
+
+static _Bool decrypt(CO(SGXaesgcm, this), CO(Buffer, key), CO(Buffer, iv), \
+		     CO(Buffer, payload), CO(Buffer, output),		   \
+		     CO(Buffer, extra), CO(Buffer, mactag))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	size_t size;
+
+	sgx_aes_gcm_128bit_tag_t tag;
+
+	sgx_aes_gcm_128bit_key_t lkey;
+
+	sgx_status_t status;
+
+
+	/* Object and input status verification. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( key->poisoned(key) )
+		ERR(goto done);
+	if ( iv->poisoned(iv) )
+		ERR(goto done);
+	if ( payload->poisoned(payload) )
+		ERR(goto done);
+	if ( output->poisoned(output) )
+		ERR(goto done);
+	if ( extra->poisoned(extra) )
+		ERR(goto done);
+	if ( mactag->poisoned(mactag) )
+		ERR(goto done);
+
+
+	/* Step the output buffer forward to match the message. */
+	if ( (size = payload->size(payload)) == 0 )
+		ERR(goto done);
+
+	while ( size ) {
+		output->add(output, (unsigned char *) "\0", 1);
+		--size;
+	}
+	if ( output->poisoned(output) )
+		ERR(goto done);
+
+
+	/* Decrypt the requested data and verify integrity. */
+	memcpy(lkey, key->get(key), sizeof(lkey));
+	memcpy(tag, mactag->get(mactag), sizeof(tag));
+	status = sgx_rijndael128GCM_decrypt((const sgx_aes_gcm_128bit_key_t *) \
+					    &lkey,			      \
+					    (uint8_t *) payload->get(payload),\
+					    payload->size(payload),	      \
+					    output->get(output),	      \
+					    iv->get(iv), iv->size(iv),	      \
+					    extra->get(extra),		      \
+					    extra->size(extra),
+					    (const sgx_aes_gcm_128bit_tag_t *)\
+					    &tag);
+	if ( status != SGX_SUCCESS )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a destructor for the SGXaesgcm object.
  *
  * \param this	A pointer to the object which is to be destroyed.
@@ -379,6 +475,7 @@ extern SGXaesgcm NAAAIM_SGXaesgcm_Init(void)
 
 	/* Method initialization. */
 	this->encrypt = encrypt;
+	this->decrypt = decrypt;
 
 	this->whack = whack;
 

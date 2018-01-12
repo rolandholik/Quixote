@@ -31,6 +31,9 @@ struct NAAAIM_SGXaesgcm
 	_Bool (*encrypt)(const SGXaesgcm, const Buffer, const Buffer, \
 			 const Buffer, const Buffer, const Buffer,    \
 			 const Buffer);
+	_Bool (*decrypt)(const SGXaesgcm, const Buffer, const Buffer, \
+			 const Buffer, const Buffer, const Buffer,    \
+			 const Buffer);
 
 	void (*whack)(const SGXaesgcm);
 
