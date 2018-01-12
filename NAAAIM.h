@@ -85,3 +85,4 @@
 #define NAAAIM_PCEenclave_OBJID		49
 #define NAAAIM_SGXcmac_OBJID		50
 #define NAAAIM_SGXaesgcm_OBJID		51
+#define NAAAIM_SGXrsa_OBJID		51
