@@ -1093,6 +1093,63 @@ static _Bool get_xid(CO(SGXmessage, this), CO(Buffer, bufr))
 /**
  * External public method.
  *
+ * This method is an accessor method for returning the binary
+ * representation of the current message header that is operational.
+ * This is needed to support verification of encrypted messages
+ * which include the protocol header as part of the integrity tag.
+ *
+ * \param this		A pointer to the message object whose
+ *			header is to be returned.
+ *
+ * \param bufr		The object which the header is to be loaded
+ *			into.
+ *
+ * \return		A boolean value is returned to indicate if
+ *			the header return was successful.  A false
+ *			value indicates the header failed while a
+ *			true value indicates the header has been
+ *			loaded into the supplied object.
+ */
+
+static _Bool get_header(CO(SGXmessage, this), CO(Buffer, bufr))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Verify object and caller status. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( S->state == INIT )
+		ERR(goto done);
+
+	if ( bufr->poisoned(bufr) )
+		ERR(goto done);
+
+
+	/* Load the header. */
+	if ( S->state == REQUEST )
+		bufr->add(bufr, (void *) &S->request, sizeof(S->request));
+        if ( S->state == RESPONSE )
+		bufr->add(bufr, (void *) &S->response, sizeof(S->response));
+
+	if ( bufr->poisoned(bufr) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a diagnostic dump of the state of the
  * message object.
  *
@@ -1342,7 +1399,8 @@ extern SGXmessage NAAAIM_SGXmessage_Init(void)
 	this->message_count = message_count;
 	this->get_message   = get_message;
 
-	this->get_xid = get_xid;
+	this->get_xid	 = get_xid;
+	this->get_header = get_header;
 
 	this->reset = reset;
 	this->dump  = dump;
