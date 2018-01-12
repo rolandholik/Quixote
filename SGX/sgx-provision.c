@@ -130,6 +130,69 @@ static void usage(char *err)
 
 
 /**
+ * Internal public function.
+ *
+ * This method implements reading the contents of an input file.
+ *
+ * \param fname		A pointer to the null-terminated string containing
+ *			the name of the file which is to be read.
+ *
+ * \param msg		The object which the contents of the file is
+ *			be read into.
+ *
+ *
+ * \return	A boolean value is used to indicate the success or
+ *		failure of reading the file.  A false value indicates
+ *		the read failed while a true file indicates the supplied
+ *		object has the contents of the file.
+ */
+
+static _Bool read_input(CO(char *, fname), CO(String, msg))
+
+{
+	_Bool retn = false;
+
+	char *p;
+
+	File infile = NULL;
+
+	Buffer bufr = NULL;
+
+
+	/* Verify the object status. */
+	if ( msg->poisoned(msg) )
+		ERR(goto done);
+
+
+	/* Open and read in the contents of the file. */
+	INIT(HurdLib, File, infile, ERR(goto done));
+	if ( !infile->open_ro(infile, fname) )
+		ERR(goto done);
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	if ( !infile->slurp(infile, bufr) )
+		ERR(goto done);
+	if ( (p = strchr((char *) bufr->get(bufr), '\n')) != NULL )
+		*p = '\0';
+	else {
+		if ( !bufr->add(bufr, (void *) "\0", 1) )
+			ERR(goto done);
+	}
+
+	if ( !msg->add(msg, (char *) bufr->get(bufr)) )
+		ERR(goto done);
+	retn = 1;
+
+
+ done:
+	WHACK(infile);
+	WHACK(bufr);
+
+	return retn;
+}
+
+
+/**
  * Internal private function.
  *
  * This function is a subordinate helper function for the
@@ -495,9 +558,8 @@ extern int main(int argc, char *argv[])
 
 	char *input	    = NULL,
 	     *msg_output    = NULL,
-	     *msg1_response = NULL,
-	     *token	    = NULL,
-	     *pce_token	    = NULL;
+	     *pve_token	    = "pve.token",
+	     *pce_token	    = "pce.token";
 
 	int opt,
 	    retn;
@@ -511,7 +573,8 @@ extern int main(int argc, char *argv[])
 	enum {
 		none=0,
 		endpoint,
-		message1
+		message1,
+		dump_message
 	} mode = none;
 
 	Buffer b;
@@ -528,10 +591,13 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "1Evi:o:p:t:")) != EOF )
+	while ( (opt = getopt(argc, argv, "1DEvi:o:p:t:")) != EOF )
 		switch ( opt ) {
 			case '1':
 				mode = message1;
+				break;
+			case 'D':
+				mode = dump_message;
 				break;
 			case 'E':
 				mode = endpoint;
@@ -550,7 +616,7 @@ extern int main(int argc, char *argv[])
 				pce_token = optarg;
 				break;
 			case 't':
-				token = optarg;
+				pve_token = optarg;
 				break;
 		}
 
@@ -559,29 +625,37 @@ extern int main(int argc, char *argv[])
 		return 1;
 	}
 
-	if ( token == NULL ) {
-		usage("No PVE token specified.\n");
-		return 1;
-	}
-	if ( pce_token == NULL ) {
-		usage("No PCE token specified.\n");
-		return 1;
-	}
-
 	if ( (mode == message1) && (input == NULL) ) {
 		usage("No message 1 input specified.\n");
 		return 1;
 	}
 
+	if ( (mode == dump_message) && (input == NULL) ) {
+		usage("No input file for message dump.\n");
+		return 1;
+	}
+
+
+	/* Load input if needed. */
 	INIT(NAAAIM, SGXmessage, msg, ERR(goto done));
+
+	INIT(HurdLib, String, response, ERR(goto done));
+	if ( input != NULL ) {
+		if ( !read_input(input, response) )
+			ERR(goto done);
+	}
+
+
+	/* Dump a received message. */
+	if ( mode == dump_message ) {
+		if ( !msg->decode(msg, response) )
+			ERR(goto done);
+		msg->dump(msg);
+	}
 
 
 	/* Decode a message 1 response. */
 	if ( mode == message1 ) {
-		INIT(HurdLib, String, response, ERR(goto done));
-		if ( !response->add(response, msg1_response) )
-			ERR(goto done);
-
 		if ( !process_message1(msg, response, &pek) )
 			ERR(goto done);
 
@@ -593,7 +667,7 @@ extern int main(int argc, char *argv[])
 		pce->get_target_info(pce, &pce_tgt);
 
 		INIT(NAAAIM, PVEenclave, pve, ERR(goto done));
-		if ( !pve->open(pve, token) )
+		if ( !pve->open(pve, pve_token) )
 			ERR(goto done);
 
 		memset(&pek_report, '\0', sizeof(struct SGX_report));
@@ -639,7 +713,7 @@ extern int main(int argc, char *argv[])
 	if ( mode == endpoint ) {
 		/* Load the provisioning enclave. */
 		INIT(NAAAIM, PVEenclave, pve, ERR(goto done));
-		if ( !pve->open(pve, token) )
+		if ( !pve->open(pve, pve_token) )
 			ERR(goto done);
 
 		/* Get the endpoint. */
