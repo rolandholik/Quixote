@@ -43,6 +43,7 @@
 #include "intel-messages.h"
 
 #include "SGXaesgcm.h"
+#include "SGXcmac.h"
 
 
 /**
@@ -494,6 +495,163 @@ static _Bool process_message1(CO(SGXmessage, msg), CO(String, response), \
 /**
  * Internal private function.
  *
+ * This function is a subordinate helper function for the
+ * process_message2 function.  This function verifies and decrypts
+ * the internal message.
+ *
+ * \param msg	A pointer to the object which is managing the
+ *		message.
+ *
+ * \param sk	A pointer to the transaction id which was used to
+ *		generate the outgoing message that generated the
+ *		message being processed.
+ *
+ * \param msg2	The object which will be loaded with the decrypted
+ *		internal message.
+ *
+ * \return	A boolean value is used to indicated the status of
+ *		the decryption.  A false value indicates
+ *		the decryption failed while a true value indicates
+ *		the output object carries a valid message.
+ */
+
+static _Bool _decrypt_message2(CO(SGXmessage, msg), CO(Buffer, sk), \
+			       CO(Buffer, msg2))
+
+{
+	_Bool retn = false;
+
+	Buffer bufr    = NULL,
+	       aaad    = NULL,
+	       iv      = NULL,
+	       key     = NULL,
+	       payload = NULL,
+	       encout  = NULL;
+
+	SGXcmac cmac = NULL;
+
+	SGXaesgcm aesgcm = NULL;
+
+
+	/* Compute the key to be used for decrypting the payload. */
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	if ( !msg->get_xid(msg, bufr) )
+		ERR(goto done);
+
+	if ( !msg->get_message(msg, TLV_NONCE, 1, bufr) )
+		ERR(goto done);
+
+	INIT(HurdLib, Buffer, key, ERR(goto done));
+	INIT(NAAAIM, SGXcmac, cmac, ERR(goto done));
+	if ( !cmac->compute(cmac, sk, bufr, key) )
+		ERR(goto done);
+
+	INIT(HurdLib, Buffer, aaad, ERR(goto done));
+	if ( !msg->get_header(msg, aaad) )
+		ERR(goto done);
+
+	/* Extract the initialization vector and the encrypted payload. */
+	bufr->reset(bufr);
+	if ( !msg->get_message(msg, TLV_BLOCK_CIPHER_TEXT, 1, bufr) )
+		ERR(goto done);
+
+	INIT(HurdLib, Buffer, iv, ERR(goto done));
+	if ( !iv->add(iv, bufr->get(bufr), 12) )
+		ERR(goto done);
+
+	INIT(HurdLib, Buffer, payload, ERR(goto done));
+	if ( !payload->add(payload, bufr->get(bufr) + 12, \
+			   bufr->size(bufr) - 12) )
+		ERR(goto done);
+
+	/* Get the authentication code and decrypt the payload. */
+	bufr->reset(bufr);
+	if ( !msg->get_message(msg, TLV_MESSAGE_AUTHENTICATION_CODE, 1, bufr) )
+		ERR(goto done);
+
+	INIT(NAAAIM, SGXaesgcm, aesgcm, ERR(goto done));
+	if ( !aesgcm->decrypt(aesgcm, key, iv, payload, msg2, aaad, bufr) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	WHACK(bufr);
+	WHACK(aaad);
+	WHACK(iv);
+	WHACK(key);
+	WHACK(payload);
+	WHACK(encout);
+
+	WHACK(cmac);
+	WHACK(aesgcm);
+
+	return retn;
+}
+
+
+/**
+ * Internal private function.
+ *
+ * This function implements the processing of message 2.  This is the
+ * message returned from the Intel provisioning server in response to
+ * message 1 that was received in response to the endpoint selection
+ * message.
+ *
+ * \param msg		A pointer to the object which is managing
+ *			the message.
+ *
+ * \param response	An object containing the ASCII encoded message
+ *			returned from the Intel server.
+ *
+ * \return		A boolean value is used to indicated the status
+ *			of the message processing.  A false value
+ *			indicates that message processing failed while
+ *			a true value indicates the message was
+ *			processed and verified.
+ */
+
+static _Bool process_message2(CO(SGXmessage, msg), CO(String, response),
+			      CO(Buffer, sk))
+
+{
+	_Bool retn = false;
+
+	Buffer message = NULL;
+
+
+	/* Decode and verify the message count. */
+	if (!msg->decode(msg, response) )
+		ERR(goto done);
+	if ( (msg->message_count(msg) != 3) && (msg->message_count(msg) != 4) )
+		ERR(goto done);
+	if ( msg->message_count(msg) == 4 ) {
+		fputs("Message 2 SIGRL not supported.\n", stderr);
+		ERR(goto done);
+	}
+	msg->dump(msg);
+
+
+	/* Decrypt the internal message. */
+	INIT(HurdLib, Buffer, message, ERR(goto done));
+	if ( !_decrypt_message2(msg, sk, message) )
+		ERR(goto done);
+	fputs("\nVerified internal message.\n", stdout);
+
+	retn = true;
+
+
+ done:
+	WHACK(message);
+
+	return retn;
+}
+
+
+/**
+ * Internal private function.
+ *
  * This function implements generation of message output.  If no
  * output file has specified the encoded message is sent to standard
  * output.  Otherwise the message is output into the specified file.
@@ -558,6 +716,7 @@ extern int main(int argc, char *argv[])
 
 	char *input	    = NULL,
 	     *msg_output    = NULL,
+	     *sk_value	    = NULL,
 	     *pve_token	    = "pve.token",
 	     *pce_token	    = "pce.token";
 
@@ -574,10 +733,12 @@ extern int main(int argc, char *argv[])
 		none=0,
 		endpoint,
 		message1,
+		message2,
 		dump_message
 	} mode = none;
 
-	Buffer b;
+	Buffer b,
+	       sk = NULL;
 
 	String response = NULL;
 
@@ -591,10 +752,13 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "1DEvi:o:p:t:")) != EOF )
+	while ( (opt = getopt(argc, argv, "12DEvi:o:p:s:t:")) != EOF )
 		switch ( opt ) {
 			case '1':
 				mode = message1;
+				break;
+			case '2':
+				mode = message2;
 				break;
 			case 'D':
 				mode = dump_message;
@@ -614,6 +778,9 @@ extern int main(int argc, char *argv[])
 				break;
 			case 'p':
 				pce_token = optarg;
+				break;
+			case 's':
+				sk_value = optarg;
 				break;
 			case 't':
 				pve_token = optarg;
@@ -710,6 +877,22 @@ extern int main(int argc, char *argv[])
 	}
 
 
+	/* Decode a message 2 response. */
+	if ( mode == message2 ) {
+		if ( sk_value == NULL ) {
+			usage("No SK value specified.\n");
+			goto done;
+		}
+		INIT(HurdLib, Buffer, sk, ERR(goto done));
+		if ( !sk->add_hexstring(sk, sk_value) )
+			ERR(goto done);
+
+		/* Needed: xid, sk, pek, perhaps bpi. */
+		if ( !process_message2(msg, response, sk) )
+			ERR(goto done);
+	}
+
+
 	if ( mode == endpoint ) {
 		/* Load the provisioning enclave. */
 		INIT(NAAAIM, PVEenclave, pve, ERR(goto done));
@@ -733,6 +916,7 @@ extern int main(int argc, char *argv[])
 
 
  done:
+	WHACK(sk);
 	WHACK(response);
 	WHACK(pve);
 	WHACK(pce);
