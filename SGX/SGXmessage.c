@@ -18,6 +18,16 @@
 
 #define XID_SIZE 8
 
+/* Macro to clear an array object. */
+#define GWHACK(type, var) {			\
+	size_t i=var->size(var) / sizeof(type);	\
+	type *o=(type *) var->get(var);		\
+	while ( i-- ) {				\
+		(*o)->whack((*o));		\
+		o+=1;				\
+	}					\
+}
+
 
 /* Include files. */
 #include <stdint.h>
@@ -1025,6 +1035,71 @@ static _Bool get_message(CO(SGXmessage, this), const uint8_t requested, \
 /**
  * External public method.
  *
+ * This method implements the re-initialization of messages that are
+ * managed by the object.  This method allows the message object to
+ * be re-populated from a subordinate message that is carried in
+ * the top-level object.
+ *
+ * \param this		A pointer to the message object whose messages
+ *			are to be re-initialized.
+ *
+ * \param messages	The object containing the binary message block
+ *			which contains the new message list.
+
+ * \return		A boolean value is used to indicate the status
+ *			of message processing.  A false value indicates
+ *			an error occurred while a true value indicates
+ *			a new message list has been loaded.
+ */
+
+static _Bool reload_messages(CO(SGXmessage, this), CO(Buffer, messages))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Verify object and arguement status. */
+	if ( S->poisoned )
+		return 0;
+	if ( S->state != RESPONSE )
+		return 0;
+
+	if ( messages->poisoned(messages) )
+		ERR(goto done);
+
+
+	/* Clear the current message list. */
+	S->msg->reset(S->msg);
+
+	if ( S->messages != NULL ) {
+		GWHACK(Buffer, S->messages);
+		WHACK(S->messages);
+		S->messages = NULL;
+	}
+
+
+	/* Load the new message buffer and decode it. */
+	if ( !S->msg->add_Buffer(S->msg, messages) )
+		ERR(goto done);
+	if ( !_unpack_messages(S) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method is an accessor method for returning the transaction
  * ID from either the request or response structures depending on
  * the mode that the message is in.
@@ -1078,15 +1153,6 @@ static _Bool get_xid(CO(SGXmessage, this), CO(Buffer, bufr))
 		S->poisoned = true;
 
 	return retn;
-}
-
-#define GWHACK(type, var) {			\
-	size_t i=var->size(var) / sizeof(type);	\
-	type *o=(type *) var->get(var);		\
-	while ( i-- ) {				\
-		(*o)->whack((*o));		\
-		o+=1;				\
-	}					\
 }
 
 
@@ -1396,8 +1462,9 @@ extern SGXmessage NAAAIM_SGXmessage_Init(void)
 	this->encode = encode;
 	this->decode = decode;
 
-	this->message_count = message_count;
-	this->get_message   = get_message;
+	this->message_count   = message_count;
+	this->get_message     = get_message;
+	this->reload_messages = reload_messages;
 
 	this->get_xid	 = get_xid;
 	this->get_header = get_header;
