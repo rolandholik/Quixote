@@ -31,6 +31,7 @@
 
 #include <epid_pve_type.h>
 #include <sgx_tseal.h>
+#include <provision_msg.h>
 
 
 /*
@@ -45,6 +46,8 @@ extern int main(int argc, char *argv[])
 	fprintf(stdout, "NrProof: %lu\n", sizeof(NrProof));
 	fprintf(stdout, "Join proof with escrow: %lu\n", \
 		sizeof(join_proof_with_escrow_t));
+	fprintf(stdout, "message 2 blob input: %lu\n", \
+		sizeof(proc_prov_msg2_blob_input_t));
 
 	return 0;
 }

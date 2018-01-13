@@ -32,7 +32,7 @@ SSL_CRYPTO  = -L /usr/local/musl/lib -lcrypto
 SGXSDK = /u/usr/src/SGX/linux-sgx
 SGXSDK_INCLUDES = -I/opt/intel/sgxsdk/include			    \
 	-I ${SGXSDK}/psw/ae/inc/internal -I ${SGXSDK}/external/epid \
-	-I ${SGXSDK}/common/inc/internal
+	-I ${SGXSDK}/common/inc/internal -I ${SGXSDK}/psw/ae/pve
 
 
 #
