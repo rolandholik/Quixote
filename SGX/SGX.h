@@ -469,3 +469,22 @@ struct SGX_extended_epid {
 	uint8_t qsdk_mod[256];
 	uint8_t signature[64];
 } __attribute__((packed));
+
+
+/**
+ * The following structure defines the PVE generated provisioning
+ * message three.
+ */
+struct SGX_message3 {
+	uint8_t field1_iv[12];
+	uint8_t field1_data[4 + 192];
+	uint8_t field1_mac[16];
+	uint8_t n2[16];
+	uint8_t epid_sig_iv[12];
+	uint8_t epid_sig_mac[16];
+	uint8_t encrypted_pwk2[256];
+	struct SGX_report pwk2_report;
+	uint32_t epid_sig_output_size;
+	uint8_t is_join_proof_generated;
+	uint8_t is_epid_sig_generated;
+} __attribute__((packed));

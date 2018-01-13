@@ -47,6 +47,7 @@
 #include "PCEenclave.h"
 #include "SGXmessage.h"
 #include "PVEenclave.h"
+#include "intel-messages.h"
 
 
 /* Object state extraction macro. */
@@ -93,6 +94,47 @@ struct pve_endpoint {
 	uint8_t xid[XID_SIZE];
 	uint8_t id;
 };
+
+
+/**
+ * Structure used as the primary input to the ECALL that generates
+ * message 3.
+ */
+
+struct platform_info {
+	uint8_t  cpu_svn[16];
+	uint16_t pve_svn;
+	uint16_t pce_svn;
+	uint16_t pce_id;
+	uint8_t  fmsp[4];
+} __attribute__((packed));
+
+struct group_pub_key {
+	uint8_t gid[4];
+	uint8_t h1[64];
+	uint8_t h2[64];
+	uint8_t w[128];
+} __attribute__((packed));
+
+struct signed_epid_group_cert {
+	uint8_t version[2];
+	uint8_t type[2];
+	struct group_pub_key key;
+	uint8_t ecdsa_signature[64];
+} __attribute__((packed));
+
+struct msg2_blob_input {
+	struct signed_epid_group_cert group_cert;
+	struct SGX_extended_epid      xegb;
+	struct SGX_pek		      pek;
+	struct SGX_targetinfo	      pce_target_info;
+	uint8_t			      challenge_nonce[32];
+	struct platform_info	      equiv_pi;
+	struct platform_info	      previous_pi;
+	uint8_t			      previous_gid[4];
+	uint8_t			      old_epid_data_blob[2836];
+	uint8_t			      is_previous_pi_provided;
+} __attribute__((packed));
 
 
 /**
@@ -309,6 +351,145 @@ static _Bool get_message1(CO(PVEenclave, this), struct SGX_pek *pek, \
 /**
  * External public method.
  *
+ * This method implements an ECALL to the following provisioning enclave
+ * function:
+ *
+ * proc_prov_msg2_data_wrapper
+ *
+ * With the following signature:
+ *
+ *	public uint32_t proc_prov_msg2_data_wrapper([in]const proc_prov_msg2_blob_input_t *msg2_input,
+ *		uint8_t performance_rekey_used,
+ *		[user_check]const uint8_t *sigrl,
+ *		uint32_t sigrl_size,
+ *		[out] gen_prov_msg3_output_t *msg3_fixed_output,
+ *		[user_check]uint8_t *epid_sig,
+ *		uint32_t epid_sig_buffer_size);
+ *
+ * This method generates the data to be used to create message 3 to be
+ * sent to the provisioning server.
+ *
+ * \param this	A pointer to the provisioning enclave object which is
+ *		to be used to generate the message.
+ *
+ * \return	If an error is encountered while generating the message
+ *		a false value is returned.  A true value indicates the
+ *		message has been successfully generated.
+ */
+
+static _Bool get_message3(CO(PVEenclave, this), CO(SGXmessage, msg),	   \
+			  struct SGX_pek *pek, struct SGX_targetinfo *tgt, \
+			  CO(Buffer, epid_sig), struct SGX_message3 *message3)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	int rc;
+
+	size_t size;
+
+	struct msg2_blob_input input;
+
+	struct {
+		uint32_t retn;
+		struct msg2_blob_input *msg2_input;
+		uint8_t performance_rekey_used;
+		uint8_t *sigrl;
+		uint32_t sigrl_size;
+		struct SGX_message3 *msg3_fixed_output;
+		uint8_t *epid_sig;
+		uint32_t epid_sig_size;
+	} ecall1;
+
+	Buffer bufr = NULL;
+
+
+	/* Populate the input structure. */
+	memset(&ecall1, '\0', sizeof(ecall1));
+	memset(&input,	'\0', sizeof(input));
+	memset(message3, '\0', sizeof(struct SGX_message3));
+
+	ecall1.msg2_input = &input;
+	ecall1.performance_rekey_used = false;
+
+	ecall1.sigrl	  = NULL;
+	ecall1.sigrl_size = 0;
+
+	if ( msg->message_count(msg) == 4 )
+		input.is_previous_pi_provided = false;
+	else {
+		fputs("Previous pi not supported.\n", stderr);
+		ERR(goto done);
+	}
+
+	/* Add fields from message. */
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	if ( !msg->get_message(msg, TLV_EPID_GROUP_CERT, 1, bufr) )
+		ERR(goto done);
+	memcpy(&input.group_cert, bufr->get(bufr), sizeof(input.group_cert));
+
+	bufr->reset(bufr);
+	if ( !msg->get_message(msg, TLV_NONCE, 1, bufr) )
+		ERR(goto done);
+	memcpy(input.challenge_nonce, bufr->get(bufr), \
+	       sizeof(input.challenge_nonce));
+
+	bufr->reset(bufr);
+	if ( !msg->get_message(msg, TLV_PLATFORM_INFO, 1, bufr) )
+		ERR(goto done);
+	memcpy(&input.equiv_pi, bufr->get(bufr), sizeof(input.equiv_pi));
+
+	/* Add PCE target information. */
+	input.pce_target_info = *tgt;
+
+	/* Add PEK. */
+	input.pek = *pek;
+
+	/*
+	 * Use the default revocation list signature size:
+	 *
+	 * sizeof(EpidSignature) - sizeof(NrProof) + MAX_TLV_HEADER_SIZE
+	 */
+	ecall1.epid_sig_size = 520 - 160 + 6;
+
+	size = ecall1.epid_sig_size;
+	while ( size ) {
+		epid_sig->add(epid_sig, (unsigned char *) "\0", 1);
+		--size;
+	}
+	ecall1.epid_sig = epid_sig->get(epid_sig);
+
+	ecall1.msg3_fixed_output = message3;
+
+	if ( !S->enclave->boot_slot(S->enclave, 1, &PVE_ocall_table, &ecall1, \
+				    &rc) ) {
+		fprintf(stderr, "PVE slot 0 call error: %d\n", rc);
+		ERR(goto done);
+	}
+	if ( ecall1.retn != 0 ) {
+		fprintf(stderr, "PVE error: %d\n", ecall1.retn);
+		ERR(goto done);
+	}
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	WHACK(bufr);
+
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements the generation of the endpoint selection
  * message.  This message is used to request confirmation of a
  * secure endpoint with the Intel provisioning server.
@@ -480,6 +661,7 @@ extern PVEenclave NAAAIM_PVEenclave_Init(void)
 	this->open = open;
 
 	this->get_message1 = get_message1;
+	this->get_message3 = get_message3;
 
 	this->get_endpoint		= get_endpoint;
 	this->generate_endpoint_message = generate_endpoint_message;
