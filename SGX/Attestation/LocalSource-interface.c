@@ -37,7 +37,7 @@ static sgx_status_t sgx_verify_report(void *args)
 
 	struct SGX_targetinfo target;
 
-	struct SGX_report report;
+	struct SGX_report __attribute__((aligned(512))) report;
 
 
 	/* Verify arguements. */

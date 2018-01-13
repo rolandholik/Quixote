@@ -147,7 +147,7 @@ extern int main(int argc, char *argv[])
 
 	struct SGX_reportbody body;
 
-	struct SGX_report report;
+	struct SGX_report __attribute__((aligned(512))) report;
 
 	struct LocalSource_ecall0_interface source_ecall0;
 

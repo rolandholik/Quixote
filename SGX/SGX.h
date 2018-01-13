@@ -395,6 +395,12 @@ struct SGX_targetinfo {
  * The following structure is the report which is returned by an
  * enclave in response to a request from an enclave which is described
  * by an SGX_targetinfo tructure.
+ *
+ * When used in an enclave the SGX_report structure must be 512 byte
+ * aligned.  The alignment constraint is not specified here as it
+ * is for other structures since the SGX_report structure is imbedded
+ * in structures and can cause the size of the structure to be
+ * larger then what they are in the Intel development kit.
  */
 
 struct SGX_reportbody {
@@ -416,7 +422,7 @@ struct SGX_report {
 	struct SGX_reportbody body;
 	uint8_t keyid[32];
 	uint8_t mac[16];
-} __attribute__((aligned(512)));
+};
 
 
 /**
