@@ -13,7 +13,7 @@ ASRC = boot-sgx.s
 
 TOOLS = sgx-check sgx-metadata sgx-loader sgx-load sgx-sigstruct	\
 	sgx-gen-token gen-white-list test-ecall test-pcr idf-sgx-fandf	\
-	idf-sgx-fandf-unibin sgx-provision
+	idf-sgx-fandf-unibin sgx-provision sdk-compute-size
 
 CC = musl-gcc
 AS = as
@@ -27,6 +27,12 @@ LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib -L../lib -L../HurdLib
 
 # OpenSSL crypto library
 SSL_CRYPTO  = -L /usr/local/musl/lib -lcrypto
+
+# Sources for SGX include files, used by sdk-compute-size utility.
+SGXSDK = /u/usr/src/SGX/linux-sgx
+SGXSDK_INCLUDES = -I/opt/intel/sgxsdk/include			    \
+	-I ${SGXSDK}/psw/ae/inc/internal -I ${SGXSDK}/external/epid \
+	-I ${SGXSDK}/common/inc/internal
 
 
 #
@@ -111,6 +117,13 @@ sgx-provision: sgx-provision.o SGXenclave.o SGXloader.o SGXmetadata.o	 \
 
 sgx-provision.o: sgx-provision.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
+
+sdk-compute-size: sdk-compute-size.o
+	${CC} ${LDFLAGS} -o $@ $^;
+
+sdk-compute-size.o: sdk-compute-size.c
+	${CC} ${CFLAGS} ${SGXSDK_INCLUDES} -I/usr/local/musl/include \
+		-c $< -o $@;
 
 gen-white-list: gen-white-list.o
 	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB} ${SSL_CRYPTO};
