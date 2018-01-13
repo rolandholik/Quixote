@@ -613,12 +613,15 @@ static _Bool _decrypt_message2(CO(SGXmessage, msg), CO(Buffer, sk), \
  */
 
 static _Bool process_message2(CO(SGXmessage, msg), CO(String, response),
-			      CO(Buffer, sk))
+			      CO(Buffer, sk), struct SGX_pek *pek)
 
 {
 	_Bool retn = false;
 
-	Buffer message = NULL;
+	Buffer b,
+	       message = NULL;
+
+	SHA256 sha256 = NULL;
 
 
 	/* Decode and verify the message count. */
@@ -637,13 +640,40 @@ static _Bool process_message2(CO(SGXmessage, msg), CO(String, response),
 	INIT(HurdLib, Buffer, message, ERR(goto done));
 	if ( !_decrypt_message2(msg, sk, message) )
 		ERR(goto done);
-	fputs("\nVerified internal message.\n", stdout);
+	fputs("\nDecrypted internal message.\n", stdout);
 
+	if ( !msg->reload_messages(msg, message) )
+		ERR(goto done);
+	if ( (msg->message_count(msg) != 4) && (msg->message_count(msg) != 6) )
+		ERR(goto done);
+
+	fputc('\n', stdout);
+	msg->dump(msg);
+
+
+	/* Verify the internal message. */
+	INIT(NAAAIM, SHA256, sha256, ERR(goto done));
+
+	message->reset(message);
+	message->add(message, pek->n, sizeof(pek->n) + sizeof(pek->e));
+	sha256->add(sha256, message);
+	if ( !sha256->compute(sha256) )
+		ERR(goto done);
+	b = sha256->get_Buffer(sha256);
+
+	message->reset(message);
+	if ( !msg->get_message(msg, TLV_PS_ID, 1, message) )
+		ERR(goto done);
+	if ( !message->equal(message, b) )
+		ERR(goto done);
+
+	fputs("\nVerified internal message.\n", stdout);
 	retn = true;
 
 
  done:
 	WHACK(message);
+	WHACK(sha256);
 
 	return retn;
 }
@@ -707,6 +737,68 @@ static void generate_output(CO(SGXmessage, msg), CO(char *, outfile))
 }
 
 
+/**
+ * Internal private function.
+ *
+ * This function implements support for saving a PEK structure to
+ * a file and reading a PEK structure from a file.  It allows a PEK
+ * once generated to be saved for subsequent processing stages.
+ *
+ * \param pekfile	A character buffer containing the null-terminated
+ *			string of the filename to be used to write or
+ *			read the PEK.
+ *
+ * \param mode		A boolean value used to indicate whether the
+ *			PEK file is to be read or written.  A value of
+ *			false indicates the file is to be written while
+ *			a value of true specifies the file is to be
+ *			read.
+ *
+ * \param pek		A pointer to the structure which will be loaded
+ *			with the contents of the file.
+ *
+ * \return		No return value is specified.
+ */
+
+static _Bool pek_file(CO(char *, file), _Bool mode, struct SGX_pek *pek)
+
+{
+	_Bool retn = false;
+
+	Buffer bufr = NULL;
+
+	File pekfile = NULL;
+
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	INIT(HurdLib, File, pekfile, ERR(goto done));
+
+	if ( mode ) {
+		if ( !pekfile->open_rw(pekfile, file) )
+			ERR(goto done);
+
+		bufr->add(bufr, (void *) pek, sizeof(struct SGX_pek));
+		if ( !pekfile->write_Buffer(pekfile, bufr) )
+			ERR(goto done);
+	} else {
+		if ( !pekfile->open_ro(pekfile, file) )
+			ERR(goto done);
+		if ( !pekfile->slurp(pekfile, bufr) )
+			ERR(goto done);
+		memcpy(pek, bufr->get(bufr), sizeof(struct SGX_pek));
+	}
+
+	retn = true;
+
+
+ done:
+	WHACK(bufr);
+	WHACK(pekfile);
+
+	return retn;
+}
+
+
 /* Main program starts here. */
 
 extern int main(int argc, char *argv[])
@@ -717,6 +809,7 @@ extern int main(int argc, char *argv[])
 	char *input	    = NULL,
 	     *msg_output    = NULL,
 	     *sk_value	    = NULL,
+	     *pek_fname	    = NULL,
 	     *pve_token	    = "pve.token",
 	     *pce_token	    = "pce.token";
 
@@ -752,7 +845,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "12DEvi:o:p:s:t:")) != EOF )
+	while ( (opt = getopt(argc, argv, "12DEvi:k:o:p:s:t:")) != EOF )
 		switch ( opt ) {
 			case '1':
 				mode = message1;
@@ -772,6 +865,9 @@ extern int main(int argc, char *argv[])
 
 			case 'i':
 				input = optarg;
+				break;
+			case 'k':
+				pek_fname = optarg;
 				break;
 			case 'o':
 				msg_output = optarg;
@@ -842,6 +938,10 @@ extern int main(int argc, char *argv[])
 			ERR(goto done);
 		if ( verbose )
 			fputs("\nPVE message one created.\n", stdout);
+		if ( pek_fname != NULL ) {
+			if ( !pek_file(pek_fname, 1, &pek) )
+				ERR(goto done);
+		}
 
 		if ( !pce->get_info(pce, &pek, &pek_report) )
 			ERR(goto done);
@@ -888,7 +988,12 @@ extern int main(int argc, char *argv[])
 			ERR(goto done);
 
 		/* Needed: xid, sk, pek, perhaps bpi. */
-		if ( !process_message2(msg, response, sk) )
+		if ( pek_fname != NULL ) {
+			if ( !pek_file(pek_fname, 0, &pek) )
+				ERR(goto done);
+		}
+
+		if ( !process_message2(msg, response, sk, &pek) )
 			ERR(goto done);
 	}
 
