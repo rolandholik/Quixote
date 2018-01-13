@@ -822,6 +822,8 @@ extern int main(int argc, char *argv[])
 
 	struct SGX_report pek_report;
 
+	struct SGX_message3 message3;
+
 	enum {
 		none=0,
 		endpoint,
@@ -831,7 +833,8 @@ extern int main(int argc, char *argv[])
 	} mode = none;
 
 	Buffer b,
-	       sk = NULL;
+	       sk	= NULL,
+	       epid_sig = NULL;
 
 	String response = NULL;
 
@@ -995,6 +998,27 @@ extern int main(int argc, char *argv[])
 
 		if ( !process_message2(msg, response, sk, &pek) )
 			ERR(goto done);
+
+
+		/* Get PCE enclave target information. */
+		INIT(NAAAIM, PCEenclave, pce, ERR(goto done));
+		if ( !pce->open(pce, pce_token) )
+			ERR(goto done);
+		pce->get_target_info(pce, &pce_tgt);
+
+
+		/* Generate message three from PVE enclave. */
+		INIT(HurdLib, Buffer, epid_sig, ERR(goto done));
+		INIT(NAAAIM, PVEenclave, pve, ERR(goto done));
+		if ( !pve->open(pve, pve_token) )
+			ERR(goto done);
+		if ( !pve->get_message3(pve, msg, &pek, &pce_tgt, epid_sig,
+					&message3) )
+			ERR(goto done);
+		if ( verbose )
+			fputs("\nGenerated message three.\n", stdout);
+
+		retn = 0;
 	}
 
 
@@ -1022,6 +1046,7 @@ extern int main(int argc, char *argv[])
 
  done:
 	WHACK(sk);
+	WHACK(epid_sig);
 	WHACK(response);
 	WHACK(pve);
 	WHACK(pce);
