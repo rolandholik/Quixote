@@ -842,8 +842,9 @@ extern int main(int argc, char *argv[])
 	} mode = none;
 
 	Buffer b,
-	       sk	= NULL,
-	       epid_sig = NULL;
+	       sk	  = NULL,
+	       epid_sig	  = NULL,
+	       report_sig = NULL;
 
 	String response = NULL;
 
@@ -1027,6 +1028,14 @@ extern int main(int argc, char *argv[])
 		if ( verbose )
 			fputs("\nGenerated message three.\n", stdout);
 
+		/* Sign the report in the message. */
+		INIT(HurdLib, Buffer, report_sig, ERR(goto done));
+		if ( !pce->certify_enclave(pce, &message3.pwk2_report, \
+					   &platform_info, report_sig) )
+			ERR(goto done);
+
+		fputs("\nReport signature generated:\n", stdout);
+
 		retn = 0;
 	}
 
@@ -1056,6 +1065,7 @@ extern int main(int argc, char *argv[])
  done:
 	WHACK(sk);
 	WHACK(epid_sig);
+	WHACK(report_sig);
 	WHACK(response);
 	WHACK(pve);
 	WHACK(pce);
