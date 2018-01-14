@@ -153,7 +153,7 @@ static _Bool read_input(CO(char *, fname), CO(String, msg))
 {
 	_Bool retn = false;
 
-	char *p;
+	unsigned char *p;
 
 	File infile = NULL;
 
@@ -173,7 +173,14 @@ static _Bool read_input(CO(char *, fname), CO(String, msg))
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 	if ( !infile->slurp(infile, bufr) )
 		ERR(goto done);
-	if ( (p = strchr((char *) bufr->get(bufr), '\n')) != NULL )
+
+	if ( bufr->size == 0 ) {
+		fputs("No file input.\n", stdout);
+		ERR(goto done);
+	}
+
+	p = bufr->get(bufr) + bufr->size(bufr) - 1;
+	if ( *p == '\n' )
 		*p = '\0';
 	else {
 		if ( !bufr->add(bufr, (void *) "\0", 1) )

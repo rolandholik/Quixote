@@ -428,7 +428,6 @@ static _Bool encode_message2(CO(SGXmessage, this), CO(RandomBuffer, rnd), \
 
 	uint32_t size;
 
-
 	struct SGX_platform_info platform_info;
 
 	struct provision_request_header reqhdr;
@@ -816,7 +815,6 @@ static _Bool decode(CO(SGXmessage, this), CO(String, msg))
 
 	_Bool retn = false;
 
-
 	uint32_t lp,
 		 blocks,
 		 residual,
@@ -850,8 +848,9 @@ static _Bool decode(CO(SGXmessage, this), CO(String, msg))
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 
 	S->msg->reset(S->msg);
-	bufr->add(bufr, (void *) (msg->get(msg) + hdr_size), \
-		  msg->size(msg) - hdr_size);
+	if ( !bufr->add(bufr, (void *) (msg->get(msg) + hdr_size), \
+			msg->size(msg) - hdr_size) )
+		ERR(goto done);
 
 	p = bufr->get(bufr);
 
@@ -879,6 +878,10 @@ static _Bool decode(CO(SGXmessage, this), CO(String, msg))
 			++lp;
 		S->msg->shrink(S->msg, lp);
 	}
+
+	memcpy(&lp, S->response.size, sizeof(lp));
+	if ( ntohl(lp) != S->msg->size(S->msg) )
+		ERR(goto done);
 
 
 	/* Unpack the messages. */
