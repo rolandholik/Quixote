@@ -822,6 +822,8 @@ extern int main(int argc, char *argv[])
 
 	struct SGX_report pek_report;
 
+	struct SGX_platform_info platform_info;
+
 	struct SGX_message3 message3;
 
 	enum {
@@ -1013,7 +1015,7 @@ extern int main(int argc, char *argv[])
 		if ( !pve->open(pve, pve_token) )
 			ERR(goto done);
 		if ( !pve->get_message3(pve, msg, &pek, &pce_tgt, epid_sig,
-					&message3) )
+					&platform_info, &message3) )
 			ERR(goto done);
 		if ( verbose )
 			fputs("\nGenerated message three.\n", stdout);

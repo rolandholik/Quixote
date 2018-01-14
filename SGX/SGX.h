@@ -494,3 +494,16 @@ struct SGX_message3 {
 	uint8_t is_join_proof_generated;
 	uint8_t is_epid_sig_generated;
 } __attribute__((packed));
+
+
+/**
+ * The following structure defines the structure which contains platform
+ * version.
+ */
+struct SGX_platform_info {
+	uint8_t  cpu_svn[16];
+	uint16_t pve_svn;
+	uint16_t pce_svn;
+	uint16_t pce_id;
+	uint8_t  fmsp[4];
+} __attribute__((packed));

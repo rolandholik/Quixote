@@ -100,15 +100,6 @@ struct pve_endpoint {
  * Structure used as the primary input to the ECALL that generates
  * message 3.
  */
-
-struct platform_info {
-	uint8_t  cpu_svn[16];
-	uint16_t pve_svn;
-	uint16_t pce_svn;
-	uint16_t pce_id;
-	uint8_t  fmsp[4];
-} __attribute__((packed));
-
 struct group_pub_key {
 	uint8_t gid[4];
 	uint8_t h1[64];
@@ -129,8 +120,8 @@ struct msg2_blob_input {
 	struct SGX_pek		      pek;
 	struct SGX_targetinfo	      pce_target_info;
 	uint8_t			      challenge_nonce[32];
-	struct platform_info	      equiv_pi;
-	struct platform_info	      previous_pi;
+	struct SGX_platform_info      equiv_pi;
+	struct SGX_platform_info      previous_pi;
 	uint8_t			      previous_gid[4];
 	uint8_t			      old_epid_data_blob[2836];
 	uint8_t			      is_previous_pi_provided;
@@ -377,9 +368,10 @@ static _Bool get_message1(CO(PVEenclave, this), struct SGX_pek *pek, \
  *		message has been successfully generated.
  */
 
-static _Bool get_message3(CO(PVEenclave, this), CO(SGXmessage, msg),	   \
-			  struct SGX_pek *pek, struct SGX_targetinfo *tgt, \
-			  CO(Buffer, epid_sig), struct SGX_message3 *message3)
+static _Bool get_message3(CO(PVEenclave, this), CO(SGXmessage, msg),	      \
+			  struct SGX_pek *pek, struct SGX_targetinfo *tgt,    \
+			  CO(Buffer, epid_sig), struct SGX_platform_info *pi, \
+			  struct SGX_message3 *message3)
 
 {
 	STATE(S);
@@ -440,6 +432,7 @@ static _Bool get_message3(CO(PVEenclave, this), CO(SGXmessage, msg),	   \
 	if ( !msg->get_message(msg, TLV_PLATFORM_INFO, 1, bufr) )
 		ERR(goto done);
 	memcpy(&input.equiv_pi, bufr->get(bufr), sizeof(input.equiv_pi));
+	*pi = input.equiv_pi;
 
 	/* Add PCE target information. */
 	input.pce_target_info = *tgt;

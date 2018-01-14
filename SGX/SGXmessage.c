@@ -428,13 +428,8 @@ static _Bool encode_message2(CO(SGXmessage, this), CO(RandomBuffer, rnd), \
 
 	uint32_t size;
 
-	struct {
-		uint8_t  cpu_svn[16];
-		uint16_t pve_svn;
-		uint16_t pce_svn;
-		uint16_t pce_id;
-		uint8_t  fmsp[4];
-	} __attribute__((packed)) platform_info;
+
+	struct SGX_platform_info platform_info;
 
 	struct provision_request_header reqhdr;
 
