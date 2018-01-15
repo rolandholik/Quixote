@@ -516,6 +516,10 @@ static _Bool process_message1(CO(SGXmessage, msg), CO(String, response), \
  * \param msg2	The object which will be loaded with the decrypted
  *		internal message.
  *
+ * \param nonce	The object that will be loaded with the nonce
+ *		supplied by the provisiong server for the received
+ *		message.
+ *
  * \return	A boolean value is used to indicated the status of
  *		the decryption.  A false value indicates
  *		the decryption failed while a true value indicates
@@ -523,7 +527,7 @@ static _Bool process_message1(CO(SGXmessage, msg), CO(String, response), \
  */
 
 static _Bool _decrypt_message2(CO(SGXmessage, msg), CO(Buffer, sk), \
-			       CO(Buffer, msg2))
+			       CO(Buffer, msg2), CO(Buffer, nonce))
 
 {
 	_Bool retn = false;
@@ -545,7 +549,9 @@ static _Bool _decrypt_message2(CO(SGXmessage, msg), CO(Buffer, sk), \
 	if ( !msg->get_xid(msg, bufr) )
 		ERR(goto done);
 
-	if ( !msg->get_message(msg, TLV_NONCE, 1, bufr) )
+	if ( !msg->get_message(msg, TLV_NONCE, 1, nonce) )
+		ERR(goto done);
+	if ( !bufr->add_Buffer(bufr, nonce) )
 		ERR(goto done);
 
 	INIT(HurdLib, Buffer, key, ERR(goto done));
@@ -553,9 +559,14 @@ static _Bool _decrypt_message2(CO(SGXmessage, msg), CO(Buffer, sk), \
 	if ( !cmac->compute(cmac, sk, bufr, key) )
 		ERR(goto done);
 
+	sk->reset(sk);
+	if ( !sk->add_Buffer(sk, key) )
+		ERR(goto done);
+
 	INIT(HurdLib, Buffer, aaad, ERR(goto done));
 	if ( !msg->get_header(msg, aaad) )
 		ERR(goto done);
+
 
 	/* Extract the initialization vector and the encrypted payload. */
 	bufr->reset(bufr);
@@ -612,6 +623,20 @@ static _Bool _decrypt_message2(CO(SGXmessage, msg), CO(Buffer, sk), \
  * \param response	An object containing the ASCII encoded message
  *			returned from the Intel server.
  *
+ * \param sk		The object containing the session to be used
+ *			to generate the encryption key to decrypt the
+ *			encrypted portion of the payload.  This object
+ *			will be loaded with the generated key for
+ *			use by the caller in encrypting the returned
+ *			payload.
+ *
+ * \param pek		A pointer to the structure containing the PEK
+ *			key that is used as the authentication root
+ *			source.
+ *
+ * \param nonce		The object that will be loaded with the NONCE
+ *			that was supplied by the caller.
+ *
  * \return		A boolean value is used to indicated the status
  *			of the message processing.  A false value
  *			indicates that message processing failed while
@@ -619,8 +644,9 @@ static _Bool _decrypt_message2(CO(SGXmessage, msg), CO(Buffer, sk), \
  *			processed and verified.
  */
 
-static _Bool process_message2(CO(SGXmessage, msg), CO(String, response),
-			      CO(Buffer, sk), struct SGX_pek *pek)
+static _Bool process_message2(CO(SGXmessage, msg), CO(String, response), \
+			      CO(Buffer, sk), struct SGX_pek *pek,	 \
+			      CO(Buffer, nonce))
 
 {
 	_Bool retn = false;
@@ -645,7 +671,7 @@ static _Bool process_message2(CO(SGXmessage, msg), CO(String, response),
 
 	/* Decrypt the internal message. */
 	INIT(HurdLib, Buffer, message, ERR(goto done));
-	if ( !_decrypt_message2(msg, sk, message) )
+	if ( !_decrypt_message2(msg, sk, message, nonce) )
 		ERR(goto done);
 	fputs("\nDecrypted internal message.\n", stdout);
 
@@ -656,7 +682,6 @@ static _Bool process_message2(CO(SGXmessage, msg), CO(String, response),
 
 	fputc('\n', stdout);
 	msg->dump(msg);
-
 
 	/* Verify the internal message. */
 	INIT(NAAAIM, SHA256, sha256, ERR(goto done));
@@ -842,7 +867,8 @@ extern int main(int argc, char *argv[])
 	} mode = none;
 
 	Buffer b,
-	       sk	  = NULL,
+	       nonce	  = NULL,
+	       sk_ek2	  = NULL,
 	       epid_sig	  = NULL,
 	       report_sig = NULL;
 
@@ -959,7 +985,7 @@ extern int main(int argc, char *argv[])
 		if ( !pce->get_info(pce, &pek, &pek_report) )
 			ERR(goto done);
 		if ( verbose )
-			fputs("\nPCE information created.\n", stdout);
+			fputs("\npce information created.\n", stdout);
 
 
 		/*
@@ -996,8 +1022,8 @@ extern int main(int argc, char *argv[])
 			usage("No SK value specified.\n");
 			goto done;
 		}
-		INIT(HurdLib, Buffer, sk, ERR(goto done));
-		if ( !sk->add_hexstring(sk, sk_value) )
+		INIT(HurdLib, Buffer, sk_ek2, ERR(goto done));
+		if ( !sk_ek2->add_hexstring(sk_ek2, sk_value) )
 			ERR(goto done);
 
 		/* Needed: xid, sk, pek, perhaps bpi. */
@@ -1006,7 +1032,8 @@ extern int main(int argc, char *argv[])
 				ERR(goto done);
 		}
 
-		if ( !process_message2(msg, response, sk, &pek) )
+		INIT(HurdLib, Buffer, nonce, ERR(goto done));
+		if ( !process_message2(msg, response, sk_ek2, &pek, nonce) )
 			ERR(goto done);
 
 
@@ -1063,7 +1090,8 @@ extern int main(int argc, char *argv[])
 
 
  done:
-	WHACK(sk);
+	WHACK(sk_ek2);
+	WHACK(nonce);
 	WHACK(epid_sig);
 	WHACK(report_sig);
 	WHACK(response);
