@@ -380,8 +380,6 @@ static _Bool get_message3(CO(PVEenclave, this), CO(SGXmessage, msg),	      \
 
 	int rc;
 
-	size_t size;
-
 	struct msg2_blob_input input;
 
 	struct {
