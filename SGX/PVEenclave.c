@@ -441,18 +441,20 @@ static _Bool get_message3(CO(PVEenclave, this), CO(SGXmessage, msg),	      \
 	input.pek = *pek;
 
 	/*
-	 * Use the default revocation list signature size:
+	 * The calculation for the default EPID signature size is
+	 * as follows:
 	 *
 	 * sizeof(EpidSignature) - sizeof(NrProof) + MAX_TLV_HEADER_SIZE
+	 *
+	 * 520 - 160 + 6
+	 *
+	 * The Intel PSW indicates that the EPID signature size needs
+	 * to be of this value but testing indicates that if a previous
+	 * EPID is not being processed the signature can be set to NULL
+	 * with a size of zero.
 	 */
-	ecall1.epid_sig_size = 520 - 160 + 6;
-
-	size = ecall1.epid_sig_size;
-	while ( size ) {
-		epid_sig->add(epid_sig, (unsigned char *) "\0", 1);
-		--size;
-	}
-	ecall1.epid_sig = epid_sig->get(epid_sig);
+	ecall1.epid_sig	     = NULL;
+	ecall1.epid_sig_size = 0;
 
 	ecall1.msg3_fixed_output = message3;
 
@@ -474,7 +476,6 @@ static _Bool get_message3(CO(PVEenclave, this), CO(SGXmessage, msg),	      \
 		S->poisoned = true;
 
 	WHACK(bufr);
-
 
 	return retn;
 }
