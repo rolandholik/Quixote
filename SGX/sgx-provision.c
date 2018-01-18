@@ -867,6 +867,7 @@ extern int main(int argc, char *argv[])
 	} mode = none;
 
 	Buffer b,
+	       bufr	  = NULL,
 	       nonce	  = NULL,
 	       sk_ek2	  = NULL,
 	       epid_sig	  = NULL,
@@ -1061,7 +1062,28 @@ extern int main(int argc, char *argv[])
 					   &platform_info, report_sig) )
 			ERR(goto done);
 
-		fputs("\nReport signature generated:\n", stdout);
+		fputs("\nReport signature generated.\n", stdout);
+
+		/*
+		 * Initialize message 3 request:
+		 *	protocol: SE_EPID_PROVISIONING (0)
+		 *	type: TYPE_PROV_MSG3 (2)
+		 *	version: TLV_VERSION2 (2)
+		 */
+		INIT(HurdLib, Buffer, bufr, ERR(goto done));
+		if ( !msg->get_xid(msg, bufr) )
+			ERR(goto done);
+
+		msg->reset(msg);
+		msg->init_request(msg, 0, 2, 2, bufr->get(bufr));
+
+		if ( !msg->encode_message3(msg, nonce, sk_ek2, &message3, \
+					   report_sig) )
+			ERR(goto done);
+
+		if ( verbose )
+			msg->dump(msg);
+		generate_output(msg, msg_output);
 
 		retn = 0;
 	}
@@ -1090,6 +1112,7 @@ extern int main(int argc, char *argv[])
 
 
  done:
+	WHACK(bufr);
 	WHACK(sk_ek2);
 	WHACK(nonce);
 	WHACK(epid_sig);
