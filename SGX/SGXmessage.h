@@ -31,6 +31,9 @@ struct NAAAIM_SGXmessage
 	_Bool (*encode_message2)(const SGXmessage, const RandomBuffer, \
 				 const PCEenclave, struct SGX_pek *,   \
 				 struct SGX_report *pek_report);
+	_Bool (*encode_message3)(const SGXmessage, const Buffer,      \
+				 const Buffer, struct SGX_message3 *, \
+				 const Buffer);
 
 	_Bool (*encode)(const SGXmessage, const String);
 	_Bool (*decode)(const SGXmessage, const String);

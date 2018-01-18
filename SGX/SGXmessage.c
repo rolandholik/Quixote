@@ -294,7 +294,8 @@ static _Bool _encode_message(CO(SGXmessage_State, S), const uint8_t type, \
 			     CO(Buffer, msg))
 
 {
-	_Bool retn = false;
+	_Bool retn = false,
+	      need_large_header = false;
 
 	size_t payload_size = payload->size(payload);
 
@@ -303,14 +304,21 @@ static _Bool _encode_message(CO(SGXmessage_State, S), const uint8_t type, \
 	struct TLVlong lmsg;
 
 
+	/*
+	 * Check for messages types explicitly requiring large header
+	 * size.
+	 */
+	need_large_header = (type == TLV_QUOTE_SIG) || (type == TLV_SE_REPORT);
+
+
 	/* Select and create the message type. */
-	if ( payload_size <= UINT16_MAX ) {
+	if ( (payload_size <= UINT16_MAX) && !need_large_header ) {
 		smsg.type    = type;
 		smsg.version = version;
 		smsg.size    = htons(payload_size);
 		msg->add(msg, (void *) &smsg, sizeof(struct TLVshort));
 	} else {
-		lmsg.type    = type;
+		lmsg.type    = type | 0x80;
 		lmsg.version = version;
 		lmsg.size    = htonl(payload_size);
 		msg->add(msg, (void *) &lmsg, sizeof(struct TLVlong));
@@ -622,6 +630,191 @@ static _Bool encode_message2(CO(SGXmessage, this), CO(RandomBuffer, rnd), \
 /**
  * External public method.
  *
+ * This method encodes the third provisioning message to be sent
+ * to the Intel provisioning service.
+ *
+ * \param this		A pointer to the message object which is to
+ *			have the message encoded into.
+ *
+ * \param nonce		The object containing the nonce from the incoming
+ *			message that will be re-used in the output
+ *			message.
+ *
+ * \param ek2		The key that was generated for decryption of
+ *			the incoming message used to create the response
+ *			that is being encoded.
+ *
+ * \param msg3		The object containing the output message from
+ *			the provisioning enclave that is to be sent to
+ *			the Intel provisioning servers.
+ *
+ * \param report_sig	The object containing the signature generated
+ *			by the PCE enclave over the report imbedded
+ *			in the response.
+ *
+ * \return		A boolean value is used to indicate whether
+ *			or not the message was successfully encoded.
+ *			A false value indicates an error was encountered
+ *			while encoding the message, a true value indicates
+ *			the message was successfully encoded.
+ */
+
+static _Bool encode_message3(CO(SGXmessage, this), CO(Buffer, nonce),	 \
+			     CO(Buffer, ek2), struct SGX_message3 *msg3, \
+			     CO(Buffer, report_sig))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	uint8_t pek_pub = 0;
+
+	uint32_t size;
+
+	struct provision_request_header reqhdr;
+
+	Buffer iv,
+	       aaad   = NULL,
+	       tag    = NULL,
+	       encout = NULL,
+	       bufr   = NULL,
+	       submsg = NULL;
+
+	RandomBuffer rnd = NULL;
+
+	SGXaesgcm aesgcm = NULL;
+
+
+	/* Verify object status and arguements. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( S->state != REQUEST )
+		ERR(goto done);
+	if ( nonce->poisoned(nonce) )
+		ERR(goto done);
+
+
+	/* Add the incoming nonce value to this message. */
+	if ( !_encode_message(S, TLV_NONCE, 1, nonce, S->msg) )
+		ERR(goto done);
+
+
+	/* Add the join proof as a sub message. */
+	if ( !msg3->is_join_proof_generated ) {
+		fputs("No join proof generated.\n", stderr);
+		ERR(goto done);
+	}
+
+	INIT(HurdLib, Buffer, submsg, ERR(goto done));
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	bufr->add(bufr, msg3->field1_iv, sizeof(msg3->field1_iv));
+	if ( !bufr->add(bufr, msg3->field1_data, sizeof(msg3->field1_data)) )
+		ERR(goto done);
+	if ( !_encode_message(S, TLV_BLOCK_CIPHER_TEXT, 1, bufr, submsg) )
+		ERR(goto done);
+
+	bufr->reset(bufr);
+	if ( !bufr->add(bufr, msg3->field1_mac, sizeof(msg3->field1_mac)) )
+		ERR(goto done);
+	if ( !_encode_message(S, TLV_MESSAGE_AUTHENTICATION_CODE, 1, bufr, \
+			      submsg) )
+		ERR(goto done);
+
+	bufr->reset(bufr);
+	if ( !bufr->add(bufr, msg3->n2, sizeof(msg3->n2)) )
+		ERR(goto done);
+	if ( !_encode_message(S, TLV_NONCE, 1, bufr, submsg) )
+		ERR(goto done);
+
+	bufr->reset(bufr);
+	bufr->add(bufr, &pek_pub, sizeof(pek_pub));
+	if ( !bufr->add(bufr, msg3->encrypted_pwk2, \
+			sizeof(msg3->encrypted_pwk2)) )
+		ERR(goto done);
+	if ( !_encode_message(S, TLV_CIPHER_TEXT, 1, bufr, submsg) )
+		ERR(goto done);
+
+	bufr->reset(bufr);
+	bufr->add(bufr, (void *) &msg3->pwk2_report.body, \
+		  sizeof(msg3->pwk2_report.body));
+	bufr->add_Buffer(bufr, report_sig);
+	if ( !_encode_message(S, TLV_SE_REPORT, 1, bufr, submsg) )
+		ERR(goto done);
+
+	/* Encrypt the sub-message. */
+	INIT(NAAAIM, RandomBuffer, rnd, ERR(goto done));
+	if ( !rnd->generate(rnd, 12) )
+		ERR(goto done);
+	iv = rnd->get_Buffer(rnd);
+
+	/*
+	 * See documentation in encode_message2 for computation of
+	 * header size for AAAD data block.
+	 *
+	 * If an EPID signature is present the size of the request
+	 * header needs to be extended in order to support the EPID
+	 * TLV.
+	 */
+	reqhdr = S->request;
+	size  = S->msg->size(S->msg);
+	size += sizeof(struct TLVshort) + iv->size(iv) + submsg->size(submsg);
+	size += sizeof(struct TLVshort) + 16;
+
+	if ( msg3->is_epid_sig_generated ) {
+		size += sizeof(struct TLVshort) + sizeof(msg3->epid_sig_iv) + \
+			msg3->epid_sig_output_size;
+		size += sizeof(struct TLVshort) + sizeof(msg3->epid_sig_mac);
+	}
+
+	size  = htonl(size);
+	memcpy(&reqhdr.size, &size, sizeof(reqhdr.size));
+
+	INIT(HurdLib, Buffer, aaad, ERR(goto done));
+	if ( !aaad->add(aaad, (unsigned char *) &reqhdr, sizeof(reqhdr)) )
+		ERR(goto done);
+
+	INIT(HurdLib, Buffer, encout, ERR(goto done));
+	INIT(HurdLib, Buffer, tag, ERR(goto done));
+	INIT(NAAAIM, SGXaesgcm, aesgcm, ERR(goto done));
+	if ( !aesgcm->encrypt(aesgcm, ek2, iv, submsg, encout, aaad, tag) )
+		ERR(goto done);
+
+	bufr->reset(bufr);
+	bufr->add_Buffer(bufr, iv);
+	if ( !bufr->add_Buffer(bufr, encout) )
+		ERR(goto done);
+	if ( !_encode_message(S, TLV_BLOCK_CIPHER_TEXT, 1, bufr, S->msg) )
+		ERR(goto done);
+
+	/* Add the MAC tag to the current message. */
+	if ( !_encode_message(S, TLV_MESSAGE_AUTHENTICATION_CODE, 1, tag, \
+			      S->msg) )
+		ERR(goto done);
+
+	S->size = S->msg->size(S->msg);
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	WHACK(aaad);
+	WHACK(tag);
+	WHACK(encout);
+	WHACK(bufr);
+	WHACK(submsg);
+	WHACK(rnd);
+	WHACK(aesgcm);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements the final encoding of the message for
  * transmission.  This encoding occurs in two separate forms.  The
  * provision request header is encoded by converting each byte of
@@ -762,7 +955,7 @@ static _Bool _unpack_messages(CO(SGXmessage_State, S))
 
 		if ( msg[mp] & 0x80 ) {
 			lmsg = (struct TLVlong *) &msg[mp];
-			size = sizeof(struct TLVlong) + lmsg->size;
+			size = sizeof(struct TLVlong) + htonl(lmsg->size);
 			if ( !bufr->add(bufr, (void *) &msg[mp], size) )
 				ERR(goto done);
 			mp += size;
@@ -1251,7 +1444,6 @@ static void dump(CO(SGXmessage, this))
 	if ( S->poisoned )
 		fputs("*POISONED*\n", stdout);
 
-
 	/* Display response information. */
 	if ( S->state == RESPONSE ) {
 		memcpy(&xid,  S->response.xid,  sizeof(xid));
@@ -1307,7 +1499,10 @@ static void dump(CO(SGXmessage, this))
 	fprintf(stdout, "\tversion:  %u\n", S->request.version);
 	fprintf(stdout, "\txid:	  0x%0lx\n", xid);
 	fprintf(stdout, "\ttype:     %u\n", S->request.type);
-	fprintf(stdout, "\tsize:     %u\n", S->size);
+
+	memcpy(&size, S->request.size, sizeof(size));
+	size = ntohl(size);
+	fprintf(stdout, "\tsize:     %u\n", size);
 
 	fputs("\nMESSAGES:\n", stdout);
 	if ( !_unpack_messages(S) )
@@ -1456,6 +1651,7 @@ extern SGXmessage NAAAIM_SGXmessage_Init(void)
 	this->init_request	= init_request;
 	this->encode_es_request = encode_es_request;
 	this->encode_message2	= encode_message2;
+	this->encode_message3	= encode_message3;
 
 	this->encode = encode;
 	this->decode = decode;
