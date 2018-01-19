@@ -714,6 +714,183 @@ static _Bool process_message2(CO(SGXmessage, msg), CO(String, response), \
 /**
  * Internal private function.
  *
+ * This function is a subordinate helper function for the
+ * process_message3 function.  This function verifies and decrypts
+ * the internal message.
+ *
+ * \param msg	A pointer to the object which is managing the
+ *		message.
+ *
+ * \param sk	A pointer to the transaction id which was used to
+ *		generate the outgoing message that generated the
+ *		message being processed.
+ *
+ * \param msg3	The object which will be loaded with the decrypted
+ *		internal message.
+ *
+ * \return	A boolean value is used to indicated the status of
+ *		the decryption.  A false value indicates
+ *		the decryption failed while a true value indicates
+ *		the output object carries a valid message.
+ */
+
+static _Bool _decrypt_message3(CO(SGXmessage, msg), CO(Buffer, sk), \
+			       CO(Buffer, msg3))
+
+{
+	_Bool retn = false;
+
+	Buffer bufr    = NULL,
+	       nonce   = NULL,
+	       aaad    = NULL,
+	       iv      = NULL,
+	       key     = NULL,
+	       payload = NULL,
+	       encout  = NULL;
+
+	SGXcmac cmac = NULL;
+
+	SGXaesgcm aesgcm = NULL;
+
+
+	/* Compute the key to be used for decrypting the payload. */
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	if ( !msg->get_xid(msg, bufr) )
+		ERR(goto done);
+
+	INIT(HurdLib, Buffer, nonce, ERR(goto done));
+	if ( !msg->get_message(msg, TLV_NONCE, 1, nonce) )
+		ERR(goto done);
+	if ( !bufr->add_Buffer(bufr, nonce) )
+		ERR(goto done);
+
+	INIT(HurdLib, Buffer, key, ERR(goto done));
+	INIT(NAAAIM, SGXcmac, cmac, ERR(goto done));
+	if ( !cmac->compute(cmac, sk, bufr, key) )
+		ERR(goto done);
+
+	/* Generate the additional authentication information. */
+	INIT(HurdLib, Buffer, aaad, ERR(goto done));
+	if ( !msg->get_header(msg, aaad) )
+		ERR(goto done);
+	if ( !aaad->add_Buffer(aaad, nonce) )
+		ERR(goto done);
+
+
+	/* Extract the initialization vector and the encrypted payload. */
+	bufr->reset(bufr);
+	if ( !msg->get_message(msg, TLV_BLOCK_CIPHER_TEXT, 1, bufr) )
+		ERR(goto done);
+
+	INIT(HurdLib, Buffer, iv, ERR(goto done));
+	if ( !iv->add(iv, bufr->get(bufr), 12) )
+		ERR(goto done);
+
+	INIT(HurdLib, Buffer, payload, ERR(goto done));
+	if ( !payload->add(payload, bufr->get(bufr) + 12, \
+			   bufr->size(bufr) - 12) )
+		ERR(goto done);
+
+	/* Get the authentication code and decrypt the payload. */
+	bufr->reset(bufr);
+	if ( !msg->get_message(msg, TLV_MESSAGE_AUTHENTICATION_CODE, 1, bufr) )
+		ERR(goto done);
+
+	INIT(NAAAIM, SGXaesgcm, aesgcm, ERR(goto done));
+	if ( !aesgcm->decrypt(aesgcm, key, iv, payload, msg3, aaad, bufr) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	WHACK(bufr);
+	WHACK(nonce);
+	WHACK(aaad);
+	WHACK(iv);
+	WHACK(key);
+	WHACK(payload);
+	WHACK(encout);
+
+	WHACK(cmac);
+	WHACK(aesgcm);
+
+	return retn;
+}
+
+
+/**
+ * Internal private function.
+ *
+ * This function implements the processing of provisioning message 3.
+ * This is the message returned from the Intel provisioning server in
+ * response to the message which was the result of processing message
+ * 2.  Message three contains the EPID blob which is the target
+ * of the provisioning process.
+ *
+ * \param msg		A pointer to the object which is managing
+ *			the message.
+ *
+ * \param response	An object containing the ASCII encoded message
+ *			returned from the Intel server.
+ *
+ * \param sk		The object containing the session to be used
+ *			to generate the encryption key to decrypt the
+ *			encrypted portion of the payload.  This object
+ *			will be loaded with the generated key for
+ *			use by the caller in encrypting the returned
+ *			payload.
+ *
+ * \return		A boolean value is used to indicated the status
+ *			of message three processing.  A false value
+ *			indicates that message processing failed while
+ *			a true value indicates the message was
+ *			processed and verified.
+ */
+
+static _Bool process_message3(CO(SGXmessage, msg), CO(String, response), \
+			      CO(Buffer, sk))
+
+{
+	_Bool retn = false;
+
+	Buffer message = NULL;
+
+
+	/* Decode and verify the message count. */
+	if (!msg->decode(msg, response) )
+		ERR(goto done);
+	if ( (msg->message_count(msg) != 3) )
+		ERR(goto done);
+	msg->dump(msg);
+
+
+	/* Decrypt and verify the internal message. */
+	INIT(HurdLib, Buffer, message, ERR(goto done));
+	if ( !_decrypt_message3(msg, sk, message) )
+		ERR(goto done);
+	fputs("\nDecrypted internal message 3.\n", stdout);
+
+	if ( !msg->reload_messages(msg, message) )
+		ERR(goto done);
+	if ( msg->message_count(msg) != 5 )
+		ERR(goto done);
+
+	fputc('\n', stdout);
+	msg->dump(msg);
+
+	retn = true;
+
+ done:
+	WHACK(message);
+
+	return retn;
+}
+
+
+/**
+ * Internal private function.
+ *
  * This function implements generation of message output.  If no
  * output file has specified the encoded message is sent to standard
  * output.  Otherwise the message is output into the specified file.
@@ -856,13 +1033,14 @@ extern int main(int argc, char *argv[])
 
 	struct SGX_platform_info platform_info;
 
-	struct SGX_message3 message3;
+	struct SGX_message3 msg3;
 
 	enum {
 		none=0,
 		endpoint,
 		message1,
 		message2,
+		message3,
 		dump_message
 	} mode = none;
 
@@ -885,13 +1063,16 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "12DEvi:k:o:p:s:t:")) != EOF )
+	while ( (opt = getopt(argc, argv, "123DEvi:k:o:p:s:t:")) != EOF )
 		switch ( opt ) {
 			case '1':
 				mode = message1;
 				break;
 			case '2':
 				mode = message2;
+				break;
+			case '3':
+				mode = message3;
 				break;
 			case 'D':
 				mode = dump_message;
@@ -930,6 +1111,11 @@ extern int main(int argc, char *argv[])
 
 	if ( (mode == message1) && (input == NULL) ) {
 		usage("No message 1 input specified.\n");
+		return 1;
+	}
+
+	if ( (mode == message3) && (input == NULL) ) {
+		usage("No message 3 input specified.\n");
 		return 1;
 	}
 
@@ -1051,14 +1237,14 @@ extern int main(int argc, char *argv[])
 		if ( !pve->open(pve, pve_token) )
 			ERR(goto done);
 		if ( !pve->get_message3(pve, msg, &pek, &pce_tgt, epid_sig,
-					&platform_info, &message3) )
+					&platform_info, &msg3) )
 			ERR(goto done);
 		if ( verbose )
 			fputs("\nGenerated message three.\n", stdout);
 
 		/* Sign the report in the message. */
 		INIT(HurdLib, Buffer, report_sig, ERR(goto done));
-		if ( !pce->certify_enclave(pce, &message3.pwk2_report, \
+		if ( !pce->certify_enclave(pce, &msg3.pwk2_report, \
 					   &platform_info, report_sig) )
 			ERR(goto done);
 
@@ -1077,7 +1263,7 @@ extern int main(int argc, char *argv[])
 		msg->reset(msg);
 		msg->init_request(msg, 0, 2, 2, bufr->get(bufr));
 
-		if ( !msg->encode_message3(msg, nonce, sk_ek2, &message3, \
+		if ( !msg->encode_message3(msg, nonce, sk_ek2, &msg3, \
 					   report_sig) )
 			ERR(goto done);
 
@@ -1086,6 +1272,21 @@ extern int main(int argc, char *argv[])
 		generate_output(msg, msg_output);
 
 		retn = 0;
+	}
+
+
+	/* Decode a message 3 response. */
+	if ( mode == message3 ) {
+		if ( sk_value == NULL ) {
+			usage("No SK value specified.\n");
+			goto done;
+		}
+		INIT(HurdLib, Buffer, sk_ek2, ERR(goto done));
+		if ( !sk_ek2->add_hexstring(sk_ek2, sk_value) )
+			ERR(goto done);
+
+		if ( !process_message3(msg, response, sk_ek2) )
+			ERR(goto done);
 	}
 
 
