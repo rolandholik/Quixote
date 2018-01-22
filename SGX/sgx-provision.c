@@ -1049,7 +1049,8 @@ extern int main(int argc, char *argv[])
 	       nonce	  = NULL,
 	       sk_ek2	  = NULL,
 	       epid_sig	  = NULL,
-	       report_sig = NULL;
+	       report_sig = NULL,
+	       epid_blob  = NULL;
 
 	String response = NULL;
 
@@ -1060,6 +1061,8 @@ extern int main(int argc, char *argv[])
 	SGXmessage msg = NULL;
 
 	RandomBuffer rbufr = NULL;
+
+	File epid_output = NULL;
 
 
 	/* Parse and verify arguements. */
@@ -1277,6 +1280,11 @@ extern int main(int argc, char *argv[])
 
 	/* Decode a message 3 response. */
 	if ( mode == message3 ) {
+		if ( msg_output == NULL ) {
+			usage("No output file specified.\n");
+			goto done;
+		}
+
 		if ( sk_value == NULL ) {
 			usage("No SK value specified.\n");
 			goto done;
@@ -1287,6 +1295,23 @@ extern int main(int argc, char *argv[])
 
 		if ( !process_message3(msg, response, sk_ek2) )
 			ERR(goto done);
+
+		/* Generate EPID blob using PVE enclave. */
+		INIT(HurdLib, Buffer, epid_blob, ERR(goto done));
+		INIT(NAAAIM, PVEenclave, pve, ERR(goto done));
+		if ( !pve->open(pve, pve_token) )
+			ERR(goto done);
+		if ( !pve->get_epid(pve, msg, epid_blob) )
+			ERR(goto done);
+
+		INIT(HurdLib, File, epid_output, ERR(goto done));
+		if ( !epid_output->open_rw(epid_output, msg_output) )
+			ERR(goto done);
+		if ( !epid_output->write_Buffer(epid_output, epid_blob) )
+			ERR(goto done);
+		if ( verbose )
+			fprintf(stdout, "\nExtracted EPID blob to: %s\n", \
+				msg_output);
 	}
 
 
@@ -1318,11 +1343,13 @@ extern int main(int argc, char *argv[])
 	WHACK(nonce);
 	WHACK(epid_sig);
 	WHACK(report_sig);
+	WHACK(epid_blob);
 	WHACK(response);
 	WHACK(pve);
 	WHACK(pce);
 	WHACK(msg);
 	WHACK(rbufr);
+	WHACK(epid_output);
 
 	WHACK(Server);
 
