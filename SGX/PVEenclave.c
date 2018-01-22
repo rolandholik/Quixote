@@ -129,6 +129,31 @@ struct msg2_blob_input {
 
 
 /**
+ * Structure used to define platform software version.  Needs to
+ * be lifted into SGX.h.
+ */
+struct psvn {
+	uint8_t cpu_svn[16];
+	uint16_t isv_svn;
+} __attribute__((packed)) psvn;
+
+
+/**
+ * Structure used as input to EPID extraction routine.
+ */
+struct msg4_input {
+	struct SGX_extended_epid xegb;
+	uint8_t member_credential_iv[12];
+	uint8_t encrypted_member_credential[164];
+	uint8_t member_credential_mac[16];
+	uint8_t n2[16];
+	struct psvn equivalent_psvn;
+	uint8_t fmsp[4];
+	struct signed_epid_group_cert group_cert;
+} __attribute__((packed));
+
+
+/**
  * The following defines an empty OCALL table for the provisioning
  * enclave.
  */
@@ -482,6 +507,120 @@ static _Bool get_message3(CO(PVEenclave, this), CO(SGXmessage, msg),	      \
 /**
  * External public method.
  *
+ * This method implements an ECALL to the following provisioning enclave
+ * function:
+ *
+ * proc_prov_msg4_data_wrapper
+ *
+ * With the following signature:
+ *
+ *	public uint32_t proc_prov_msg4_data_wrapper([in]const proc_prov_msg4_input_t* msg4_input,
+ *		[out]proc_prov_msg4_output_t* data_blob);
+ *
+ * This method extracts the EPID blob from the final message returned
+ * from the provisioning servers.
+ *
+ * \param this	A pointer to the provisioning enclave object which is
+ *		to be used to extract the EPID.
+ *
+ * \return	If an error is encountered while extracting EPID
+ *		a false value is returned.  A true value indicates the
+ *		message has been successfully generated.
+ */
+
+static _Bool get_epid(CO(PVEenclave, this), CO(SGXmessage, msg), \
+		      CO(Buffer, epid_blob))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	int rc;
+
+	uint8_t output[2836];
+
+	struct msg4_input input;
+
+	struct {
+		uint32_t retn;
+		struct msg4_input *input;
+		uint8_t *output;
+	} ecall2;
+
+	Buffer bufr = NULL;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+
+
+	/* Setup input structure. */
+	memset(&input, '\0', sizeof(input));
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	if ( !msg->get_message(msg, TLV_EPID_GROUP_CERT, 1, bufr) )
+		ERR(goto done);
+	memcpy(&input.group_cert, bufr->get(bufr), sizeof(input.group_cert));
+
+	bufr->reset(bufr);
+	if ( !msg->get_message(msg, TLV_NONCE, 1, bufr) )
+		ERR(goto done);
+	memcpy(&input.n2, bufr->get(bufr), sizeof(input.n2));
+
+	bufr->reset(bufr);
+	if ( !msg->get_message(msg, TLV_PLATFORM_INFO, 1, bufr) )
+		ERR(goto done);
+	memcpy(&input.equivalent_psvn, bufr->get(bufr), \
+	       sizeof(input.equivalent_psvn));
+	memcpy(&input.fmsp, bufr->get(bufr) + sizeof(struct psvn) + \
+	       sizeof(uint16_t) + sizeof(uint16_t), sizeof(input.fmsp));
+
+	bufr->reset(bufr);
+	if ( !msg->get_message(msg, TLV_BLOCK_CIPHER_TEXT, 1, bufr) )
+		ERR(goto done);
+	memcpy(&input.member_credential_iv, bufr->get(bufr), \
+	       sizeof(input.member_credential_iv));
+	memcpy(&input.encrypted_member_credential, bufr->get(bufr) + 12, \
+	       sizeof(input.encrypted_member_credential));
+
+	bufr->reset(bufr);
+	if ( !msg->get_message(msg, TLV_MESSAGE_AUTHENTICATION_CODE, 1, bufr) )
+		ERR(goto done);
+	memcpy(&input.member_credential_mac, bufr->get(bufr), \
+	       sizeof(input.member_credential_mac));
+
+	/* Call the PVE enclave to process the EPID blob. */
+	memset(&ecall2, '\0', sizeof(ecall2));
+	ecall2.input  = &input;
+	ecall2.output = output;
+
+	if ( !S->enclave->boot_slot(S->enclave, 2, &PVE_ocall_table, &ecall2, \
+				    &rc) ) {
+		fprintf(stderr, "PVE slot 2 call error: %d\n", rc);
+		ERR(goto done);
+	}
+	if ( ecall2.retn != 0 ) {
+		fprintf(stderr, "PVE error: %d\n", ecall2.retn);
+		ERR(goto done);
+	}
+
+	if ( !epid_blob->add(epid_blob, output, sizeof(output)) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	WHACK(bufr);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements the generation of the endpoint selection
  * message.  This message is used to request confirmation of a
  * secure endpoint with the Intel provisioning server.
@@ -654,6 +793,7 @@ extern PVEenclave NAAAIM_PVEenclave_Init(void)
 
 	this->get_message1 = get_message1;
 	this->get_message3 = get_message3;
+	this->get_epid	   = get_epid;
 
 	this->get_endpoint		= get_endpoint;
 	this->generate_endpoint_message = generate_endpoint_message;

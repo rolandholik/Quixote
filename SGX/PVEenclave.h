@@ -33,6 +33,7 @@ struct NAAAIM_PVEenclave
 			      struct SGX_pek *, struct SGX_targetinfo *, \
 			      const Buffer, struct SGX_platform_info *,	 \
 			      struct SGX_message3 *);
+	_Bool (*get_epid)(const PVEenclave, const SGXmessage, const Buffer);
 
 	_Bool (*get_endpoint)(const PVEenclave);
 	_Bool (*generate_endpoint_message)(const PVEenclave, const SGXmessage);
