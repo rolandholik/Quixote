@@ -34,6 +34,7 @@
 #include <NAAAIM.h>
 #include <SHA256.h>
 #include <RandomBuffer.h>
+#include <HTTP.h>
 
 #include "SGX.h"
 #include "PCEenclave.h"
@@ -906,11 +907,16 @@ static _Bool process_message3(CO(SGXmessage, msg), CO(String, response), \
 static void generate_output(CO(SGXmessage, msg), CO(char *, outfile))
 
 {
-	Buffer bufr = NULL;
+	char *url = "http://ps.sgx.trustedservices.intel.com:80/";
+
+	Buffer bufr    = NULL,
+	       outbufr = NULL;
 
 	String message = NULL;
 
 	File output = NULL;
+
+	HTTP http = NULL;
 
 
 	/* Load the message. */
@@ -918,29 +924,45 @@ static void generate_output(CO(SGXmessage, msg), CO(char *, outfile))
 	if ( !msg->encode(msg, message) )
 		ERR(goto done);
 
+	/* Issue the HTTP post request. */
+	INIT(NAAAIM, HTTP, http, ERR(goto done));
+	http->add_arg(http, "-q");
+
+	INIT(HurdLib, Buffer, outbufr, ERR(goto done));
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	if ( !bufr->add(bufr, (unsigned char *) message->get(message), \
+			message->size(message)) )
+		ERR(goto done);
+
+	if ( !http->post(http, url, bufr, outbufr) )
+		ERR(goto done);
+
 
 	/* No output file, send to standard output. */
-	if ( outfile == NULL )
-		message->print(message);
-	else {
-		INIT(HurdLib, Buffer, bufr, ERR(goto done));
-		message->add(message, "\n");
-		if ( !bufr->add(bufr, (void *) message->get(message), \
-				message->size(message)) )
+	if ( outfile == NULL ) {
+		if ( !outbufr->add(outbufr, (void *) "\0", 1) )
 			ERR(goto done);
 
+		message->reset(message);
+		if ( !message->add(message, (char *) outbufr->get(outbufr)) )
+			ERR(goto done);
+		message->print(message);
+	}
+	else {
 		INIT(HurdLib, File, output, ERR(goto done));
 		if ( !output->open_rw(output, outfile) )
 			ERR(goto done);
-		if ( !output->write_Buffer(output, bufr) )
+		if ( !output->write_Buffer(output, outbufr) )
 			ERR(goto done);
 	}
 
 
  done:
 	WHACK(bufr);
+	WHACK(outbufr);
 	WHACK(message);
 	WHACK(output);
+	WHACK(http);
 
 	return;
 }
