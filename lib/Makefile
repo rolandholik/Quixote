@@ -6,7 +6,7 @@
 # Variable declarations.
 CSRC = Duct.c OTEDKS.c Curve25519.c IPC.c SoftwareStatus.c Ivy.c IDmgr.c    \
 	TPMcmd.c TPM2cmd.c PossumPacket.c PossumPipe.c RSAkey.c SmartCard.c \
-	LocalDuct.c
+	LocalDuct.c HTTP.c
 
 TESTS = Duct_test OTEDKS_test Curve25519_test IPC_test PossumPipe_test \
 	RSAkey_test LocalDuct_test #SmartCard_test
