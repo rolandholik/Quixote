@@ -39,6 +39,7 @@
 #include "SGX.h"
 #include "PCEenclave.h"
 #include "SGXmessage.h"
+#include "SGXepid.h"
 #include "PVEenclave.h"
 #include "SGXecdsa.h"
 #include "intel-messages.h"
@@ -1071,8 +1072,7 @@ extern int main(int argc, char *argv[])
 	       nonce	  = NULL,
 	       sk_ek2	  = NULL,
 	       epid_sig	  = NULL,
-	       report_sig = NULL,
-	       epid_blob  = NULL;
+	       report_sig = NULL;
 
 	String response = NULL;
 
@@ -1081,6 +1081,8 @@ extern int main(int argc, char *argv[])
 	PCEenclave pce = NULL;
 
 	SGXmessage msg = NULL;
+
+	SGXepid epid = NULL;
 
 	RandomBuffer rbufr = NULL;
 
@@ -1319,17 +1321,14 @@ extern int main(int argc, char *argv[])
 			ERR(goto done);
 
 		/* Generate EPID blob using PVE enclave. */
-		INIT(HurdLib, Buffer, epid_blob, ERR(goto done));
+		INIT(NAAAIM, SGXepid, epid, ERR(goto done));
 		INIT(NAAAIM, PVEenclave, pve, ERR(goto done));
 		if ( !pve->open(pve, pve_token) )
 			ERR(goto done);
-		if ( !pve->get_epid(pve, msg, epid_blob) )
+		if ( !pve->get_epid(pve, msg, epid) )
 			ERR(goto done);
 
-		INIT(HurdLib, File, epid_output, ERR(goto done));
-		if ( !epid_output->open_rw(epid_output, msg_output) )
-			ERR(goto done);
-		if ( !epid_output->write_Buffer(epid_output, epid_blob) )
+		if ( !epid->save(epid, msg_output) )
 			ERR(goto done);
 		if ( verbose )
 			fprintf(stdout, "\nExtracted EPID blob to: %s\n", \
@@ -1365,7 +1364,7 @@ extern int main(int argc, char *argv[])
 	WHACK(nonce);
 	WHACK(epid_sig);
 	WHACK(report_sig);
-	WHACK(epid_blob);
+	WHACK(epid);
 	WHACK(response);
 	WHACK(pve);
 	WHACK(pce);
