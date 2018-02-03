@@ -42,6 +42,7 @@
 #include "RandomBuffer.h"
 #include "SGX.h"
 #include "SGXenclave.h"
+#include "SGXepid.h"
 #include "QEenclave.h"
 
 
@@ -87,7 +88,7 @@ struct NAAAIM_QEenclave_State
 	SGXenclave enclave;
 
 	/* The buffer containing the EPID. */
-	Buffer epid;
+	SGXepid epid;
 };
 
 
@@ -202,7 +203,7 @@ static _Bool open(CO(QEenclave, this), CO(char *, token))
  *		EPID has been successfully loaded and verified.
  */
 
-static _Bool load_epid(CO(QEenclave, this), CO(char *, epid))
+static _Bool load_epid(CO(QEenclave, this), CO(char *, epid_name))
 
 {
 	STATE(S);
@@ -214,6 +215,8 @@ static _Bool load_epid(CO(QEenclave, this), CO(char *, epid))
 	uint8_t resealed;
 
 	File epid_file = NULL;
+
+	Buffer b;
 
 	struct {
 		uint32_t retn;
@@ -232,29 +235,16 @@ static _Bool load_epid(CO(QEenclave, this), CO(char *, epid))
 	 * Allocate the EPID buffer if this is the first call, otherwise
 	 * reset it.
 	 */
-	if ( S->epid == NULL ) {
-		INIT(HurdLib, Buffer, S->epid, ERR(goto done));
-	}
-	else {
-		if ( S->epid->poisoned(S->epid) )
-			ERR(goto done);
-		S->epid->reset(S->epid);
-	}
-
-
-	/* Load the blob. */
-	INIT(HurdLib, File, epid_file, ERR(goto done));
-	if ( !epid_file->open_ro(epid_file, epid) )
+	INIT(NAAAIM, SGXepid, S->epid, ERR(goto done));
+	if ( !S->epid->load(S->epid, epid_name) )
 		ERR(goto done);
-	if ( !epid_file->slurp(epid_file, S->epid) )
-		ERR(goto done);
-
+	b = S->epid->get_epid(S->epid);
 
 	/* Call slot 0 to verify the blob. */
 	memset(&ecall0, '\0', sizeof(ecall0));
 
-	ecall0.p_blob	     = S->epid->get(S->epid);
-	ecall0.blob_size     = S->epid->size(S->epid);
+	ecall0.p_blob	     = b->get(b);
+	ecall0.blob_size     = b->size(b);
 	ecall0.p_is_resealed = &resealed;
 
 	if ( !S->enclave->boot_slot(S->enclave, 0, &QE_ocall_table, &ecall0, \
