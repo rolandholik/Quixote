@@ -110,8 +110,8 @@ sgx-gen-token.o: sgx-gen-token.c
 
 sgx-provision: sgx-provision.o SGXenclave.o SGXloader.o SGXmetadata.o	 \
 	SGXsigstruct.o PVEenclave.o PCEenclave.o SGXmessage.o SGXecdsa.o \
-	SGXcmac.o SGXaesgcm.o SGXrsa.o ../SHA256.o ../RandomBuffer.o	 \
-	 boot-sgx.o sgx-ocall.o
+	SGXcmac.o SGXaesgcm.o SGXrsa.o SGXepid.o ../SHA256.o		 \
+	../RandomBuffer.o boot-sgx.o sgx-ocall.o
 	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${LIBS} ${SSL_CRYPTO} \
 		${INTEL_CRYPTO};
 
