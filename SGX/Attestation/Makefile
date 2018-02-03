@@ -4,11 +4,11 @@
 
 
 # Variable declarations.
-CSRC   = test-local-enclave.c
+CSRC   = test-local-enclave.c test-remote-enclave.c
 ENCSRC1 = LocalTarget-enclave.c LocalTarget-interface.c
 ENCSRC2 = LocalSource-enclave.c LocalSource-interface.c
 
-TOOLS = test-local-target
+TOOLS = test-local-target test-remote-target
 
 ENCLAVE_CC = gcc64
 
@@ -112,6 +112,14 @@ test-local-target: test-local-target.o					  \
 	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB};
 
 test-local-target.o: test-local-target.c
+	${CC} ${CFLAGS} -c $< -o $@;
+
+test-remote-target: test-remote-target.o				  \
+	../SGXenclave.o ../SGXloader.o ../SGXmetadata.o ../SGXsigstruct.o \
+	../QEenclave.o ../SGXepid.o ../sgx-ocall.o ../boot-sgx.o
+	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB};
+
+test-remote-target.o: test-remote-target.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
 
