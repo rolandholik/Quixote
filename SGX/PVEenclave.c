@@ -46,6 +46,7 @@
 #include "SGXenclave.h"
 #include "PCEenclave.h"
 #include "SGXmessage.h"
+#include "SGXepid.h"
 #include "PVEenclave.h"
 #include "intel-messages.h"
 
@@ -529,7 +530,7 @@ static _Bool get_message3(CO(PVEenclave, this), CO(SGXmessage, msg),	      \
  */
 
 static _Bool get_epid(CO(PVEenclave, this), CO(SGXmessage, msg), \
-		      CO(Buffer, epid_blob))
+		      CO(SGXepid, epid_blob))
 
 {
 	STATE(S);
@@ -576,6 +577,8 @@ static _Bool get_epid(CO(PVEenclave, this), CO(SGXmessage, msg), \
 	       sizeof(input.equivalent_psvn));
 	memcpy(&input.fmsp, bufr->get(bufr) + sizeof(struct psvn) + \
 	       sizeof(uint16_t) + sizeof(uint16_t), sizeof(input.fmsp));
+	epid_blob->add_platform_info(epid_blob, (struct SGX_platform_info *) \
+				     bufr->get(bufr));
 
 	bufr->reset(bufr);
 	if ( !msg->get_message(msg, TLV_BLOCK_CIPHER_TEXT, 1, bufr) )
@@ -606,7 +609,10 @@ static _Bool get_epid(CO(PVEenclave, this), CO(SGXmessage, msg), \
 		ERR(goto done);
 	}
 
-	if ( !epid_blob->add(epid_blob, output, sizeof(output)) )
+	bufr->reset(bufr);
+	if ( !bufr->add(bufr, output, sizeof(output)) )
+		ERR(goto done);
+	if ( !epid_blob->add_epid(epid_blob, bufr) )
 		ERR(goto done);
 	retn = true;
 
