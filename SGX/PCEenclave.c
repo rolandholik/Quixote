@@ -529,6 +529,31 @@ static void get_version(CO(PCEenclave, this), uint16_t *svn, uint16_t *id)
 /**
  * External public method.
  *
+ * This method implements an accessor method for returning the platform
+ * security information for the PCE enclave.
+ *
+ * \param this	A pointer to the PCE object whose security version
+ *		information is to be returned.
+ *
+ * \param psvn	A pointer to the structure which will be populated with
+ *		the platform security information.
+ *
+ * \return	No return value is defined.
+ */
+
+static void get_psvn(CO(PCEenclave, this), struct SGX_psvn *psvn)
+
+{
+	STATE(S);
+
+	S->enclave->get_psvn(S->enclave, psvn);
+	return;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a method for dumping the current status of
  * the PCE object for diagnostic purposes.
  *
@@ -630,6 +655,7 @@ extern PCEenclave NAAAIM_PCEenclave_Init(void)
 	this->get_info	  = get_info;
 	this->get_ppid	  = get_ppid;
 	this->get_version = get_version;
+	this->get_psvn	  = get_psvn;
 
 	this->certify_enclave = certify_enclave;
 
