@@ -281,7 +281,7 @@ static _Bool generate_token(SGXenclave enclave, char *init_enclave, \
 static void generate_output(char *output, struct SGX_einittoken *token)
 
 {
-	uint8_t token_buffer[1024];
+	uint8_t token_buffer[sizeof(struct SGX_einittoken)];
 
 	Buffer bufr = NULL;
 

@@ -339,7 +339,13 @@ struct SGX_add_param {
  */
 #define ISGX_IOCTL_ENCLAVE_INIT		_IOW('p', 0x04, struct isgx_init_param)
 
+/**
+ * The definition of an initialization token.  The driver and Intel
+ * SDK treats this as two structures, the first embedded in the
+ * second.  The SDK treats this as a type definition of token_t.
+ */
 struct SGX_einittoken {
+	/* Referred to as the launch_body_t in the SDK .*/
 	uint32_t valid;
 	uint32_t reserved1[11];
 	sgx_attributes_t attributes;
@@ -348,8 +354,16 @@ struct SGX_einittoken {
 	sgx_measurement_t mr_signer;
 	uint8_t reserved3[32];
 
+	/* Referred to as the _launch_t structure. */
+	uint8_t cpusvnle[16];
+	uint16_t isvprodidle;
 	uint16_t isvsvnle;
-	uint8_t	reserved4[92];
+	uint8_t reserved4[24];
+	uint32_t maskedmiscselectle;
+	uint64_t maskedattributesle;
+	uint64_t maskedxfrmle;
+	uint8_t keyid[32];
+	uint8_t mac[16];
 } __attribute__((aligned(512)));
 
 struct SGX_init_param {
