@@ -50,6 +50,7 @@ struct NAAAIM_SGXenclave
 
 	_Bool (*get_attributes)(const SGXenclave, sgx_attributes_t *);
 	void (*get_secs)(const SGXenclave, struct SGX_secs *);
+	void (*get_psvn)(const SGXenclave, struct SGX_psvn *);
 
 	void (*debug)(const SGXenclave, const _Bool);
 	void (*whack)(const SGXenclave);

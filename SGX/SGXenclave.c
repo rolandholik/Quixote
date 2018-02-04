@@ -25,6 +25,7 @@
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
+#include <errno.h>
 
 #include <Origin.h>
 #include <HurdLib.h>
@@ -80,6 +81,9 @@ struct NAAAIM_SGXenclave_State
 
 	/* The SGX Enclave Control Structure. */
 	struct SGX_secs secs;
+
+	/* The processor security version the enclave is based on. */
+	uint8_t cpu_svn[16];
 
 	/* The enclave start address and the virtual page count. */
 	unsigned long int enclave_address;
@@ -149,7 +153,8 @@ static void _init_state(CO(SGXenclave_State, S)) {
 
 	S->loader  = NULL;
 
-	memset(&S->secs, '\0', sizeof(struct SGX_secs));
+	memset(&S->secs,   '\0', sizeof(struct SGX_secs));
+	memset(S->cpu_svn, '\0', sizeof(S->cpu_svn));
 
 	S->enclave_address = 0;
 	S->page_cnt	   = 0;
@@ -568,6 +573,7 @@ static _Bool init_enclave(CO(SGXenclave, this), struct SGX_einittoken *token)
 	memcpy(S->secs.mrsigner, token->mr_signer.m, sizeof(S->secs.mrsigner));
 	memcpy(S->secs.mrenclave, token->mr_enclave.m, \
 	       sizeof(S->secs.mrenclave));
+	memcpy(S->cpu_svn, token->cpusvnle, sizeof(S->cpu_svn));
 
 	retn = true;
 
@@ -1225,6 +1231,34 @@ static void get_secs(CO(SGXenclave, this), struct SGX_secs *secs)
 /**
  * External public method.
  *
+ * This method implements an accessor method for returning the platform
+ * security version of an enclave.  This is a structure which contains
+ * the security version of the enclave and the processor security
+ * version.
+ *
+ * \param this	A pointer to the object representing the enclave
+ *		whose security version is to be returned.
+ *
+ * \param psvn	A pointer to the structure which will be populated
+ *		with the security version information.
+ *
+ * \return	No return value is defined.
+ */
+
+static void get_psvn(CO(SGXenclave, this), struct SGX_psvn *psvn)
+
+{
+	STATE(S);
+
+	psvn->isv_svn = S->secs.isvsvn;
+	memcpy(psvn->cpu_svn, S->cpu_svn, sizeof(psvn->cpu_svn));
+	return;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements setting the debug status of the enclave.
  * Enabling debug in the enclave also causes debug status to be set
  * on the metadata manager and the loader.
@@ -1333,6 +1367,7 @@ extern SGXenclave NAAAIM_SGXenclave_Init(void)
 
 	this->get_attributes = get_attributes;
 	this->get_secs	     = get_secs;
+	this->get_psvn	     = get_psvn;
 
 	this->debug = debug;
 	this->whack = whack;

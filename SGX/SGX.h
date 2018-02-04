@@ -521,3 +521,13 @@ struct SGX_platform_info {
 	uint16_t pce_id;
 	uint8_t  fmsp[4];
 } __attribute__((packed));
+
+
+/**
+ * The following structure defines the information which represents
+ * the security version of an enclave.
+ */
+struct SGX_psvn {
+	uint8_t cpu_svn[16];
+	uint16_t isv_svn;
+} __attribute__((packed));
