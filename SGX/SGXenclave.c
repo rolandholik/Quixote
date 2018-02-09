@@ -1162,6 +1162,42 @@ static int boot_ocall(CO(SGXenclave, this), int slot, CO(void *, ocall), \
 /**
  * External public method.
  *
+ * This method implements returning the target information for
+ * an enclave so a report can be generated against it.
+ *
+ * \param this	A pointer to the enclave object for which target
+ *		information is to be returned.
+ *
+ * \param tgt	A pointer to the target information structure which
+ *		is to be populated.
+ *
+ * \return	If an error is encountered while generating the target
+ *		information a false value is returned.  A true value
+ *		indicates the object contains valid information about
+ *		the enclave.
+ */
+
+static void get_target_info(CO(SGXenclave, this), struct SGX_targetinfo *tgt)
+
+{
+	STATE(S);
+
+
+	/* Populate the target information. */
+	memset(tgt, '\0', sizeof(struct SGX_targetinfo));
+
+	tgt->miscselect = S->secs.miscselect;
+	memcpy(tgt->mrenclave.m, S->secs.mrenclave, sizeof(S->secs.mrenclave));
+	memcpy(&tgt->attributes, &S->secs.attributes, sizeof(tgt->attributes));
+
+
+	return;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements the retrieval of the SGX attributes from the
  * enclave represented by the object.  This is a passthrough accessor
  * call to the SGX loader object.
@@ -1365,9 +1401,10 @@ extern SGXenclave NAAAIM_SGXenclave_Init(void)
 	this->boot_slot	 = boot_slot;
 	this->boot_ocall = boot_ocall;
 
-	this->get_attributes = get_attributes;
-	this->get_secs	     = get_secs;
-	this->get_psvn	     = get_psvn;
+	this->get_target_info = get_target_info;
+	this->get_attributes  = get_attributes;
+	this->get_secs	      = get_secs;
+	this->get_psvn	      = get_psvn;
 
 	this->debug = debug;
 	this->whack = whack;

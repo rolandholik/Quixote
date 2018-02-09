@@ -48,6 +48,7 @@ struct NAAAIM_SGXenclave
 	int (*boot_ocall)(const SGXenclave, const int, const void *, \
 			  const void *);
 
+	void (*get_target_info)(const SGXenclave, struct SGX_targetinfo *);
 	_Bool (*get_attributes)(const SGXenclave, sgx_attributes_t *);
 	void (*get_secs)(const SGXenclave, struct SGX_secs *);
 	void (*get_psvn)(const SGXenclave, struct SGX_psvn *);
