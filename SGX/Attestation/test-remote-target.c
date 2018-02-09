@@ -148,7 +148,7 @@ extern int main(int argc, char *argv[])
 
 	struct SGX_targetinfo qe_target_info;
 
-	struct SGX_report enclave_report;
+	struct SGX_report __attribute__((aligned(512))) enclave_report;
 
 	struct SGX_psvn pce_psvn;
 
