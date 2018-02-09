@@ -63,13 +63,13 @@ extern int main(int argc, char *argv[])
 	int opt,
 	    retn = 1;
 
+	struct SGX_targetinfo qe_target_info;
+
 	struct SGX_psvn pce_psvn;
 
 	QEenclave qe = NULL;
 
 	PCEenclave pce = NULL;
-
-	Buffer bufr = NULL;
 
 
 	/* Parse and verify arguements. */
@@ -92,16 +92,20 @@ extern int main(int argc, char *argv[])
 
 
 	/* Load and initialize the source and target enclaves. */
-	fputs("Opening quoting enclave.\n", stderr);
 	INIT(NAAAIM, QEenclave, qe, ERR(goto done));
 	if ( !qe->open(qe, quote_token) )
 		ERR(goto done);
+
+	if ( !qe->get_target_info(qe, &qe_target_info) )
+		ERR(goto done);
+	fputs("Obtained quoting enclave target information.\n", stderr);
 
 
 	/* Verify the EPID blob. */
 	if ( !qe->load_epid(qe, epid_blob) )
 		ERR(goto done);
 	fputs("Verified EPID.\n", stdout);
+
 
 	/* Get the platform security information for the PCE enclave. */
 	INIT(NAAAIM, PCEenclave, pce, ERR(goto done));
@@ -115,8 +119,8 @@ extern int main(int argc, char *argv[])
  done:
 	fputs("Done.\n", stdout);
 
-	WHACK(bufr);
 	WHACK(qe);
+	WHACK(pce);
 
 
 	return retn;
