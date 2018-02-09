@@ -28,6 +28,7 @@
 #include "SGX.h"
 #include "SGXenclave.h"
 #include "QEenclave.h"
+#include "PCEenclave.h"
 #include "SGXepid.h"
 
 #include "LocalSource-interface.h"
@@ -56,12 +57,17 @@ extern int main(int argc, char *argv[])
 
 {
 	char *epid_blob	  = NULL,
-	     *quote_token = "qe.token";
+	     *quote_token = "qe.token",
+	     *pce_token	  = "pce.token";
 
 	int opt,
 	    retn = 1;
 
+	struct SGX_psvn pce_psvn;
+
 	QEenclave qe = NULL;
+
+	PCEenclave pce = NULL;
 
 	Buffer bufr = NULL;
 
@@ -96,6 +102,12 @@ extern int main(int argc, char *argv[])
 	if ( !qe->load_epid(qe, epid_blob) )
 		ERR(goto done);
 	fputs("Verified EPID.\n", stdout);
+
+	/* Get the platform security information for the PCE enclave. */
+	INIT(NAAAIM, PCEenclave, pce, ERR(goto done));
+	if ( !pce->open(pce, pce_token) )
+		ERR(goto done);
+	pce->get_psvn(pce, &pce_psvn);
 
 	retn = 0;
 

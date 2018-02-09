@@ -116,7 +116,8 @@ test-local-target.o: test-local-target.c
 
 test-remote-target: test-remote-target.o				  \
 	../SGXenclave.o ../SGXloader.o ../SGXmetadata.o ../SGXsigstruct.o \
-	../QEenclave.o ../SGXepid.o ../sgx-ocall.o ../boot-sgx.o
+	../QEenclave.o ../SGXepid.o ../PCEenclave.o ../sgx-ocall.o	  \
+	../boot-sgx.o
 	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB};
 
 test-remote-target.o: test-remote-target.c
