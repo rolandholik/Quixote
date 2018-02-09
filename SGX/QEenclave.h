@@ -27,7 +27,7 @@ struct NAAAIM_QEenclave
 	/* External methods. */
 	_Bool (*open)(const QEenclave, const char *);
 
-	_Bool (*get_target_info)(const QEenclave, struct SGX_targetinfo *);
+	void (*get_target_info)(const QEenclave, struct SGX_targetinfo *);
 
 	_Bool (*load_epid)(const QEenclave, const char *);
 
