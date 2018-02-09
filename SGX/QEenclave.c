@@ -188,6 +188,35 @@ static _Bool open(CO(QEenclave, this), CO(char *, token))
 /**
  * External public method.
  *
+ * This method implements returning the target information for the
+ * quoting enclave so a report can be generated against it.  This
+ * method is a direct passthrough call to the underlying object.
+ *
+ * \param this	A pointer to the QE object for which target
+ *		information is to be returned.
+ *
+ * \param tgt	A pointer to the target information structure which
+ *		is to be populated.
+ *
+ * \return	If an error is encountered while generating the QE
+ *		information a false value is returned.  A true value
+ *		indicates the object contains valid information about
+ *		the quoting enclave.
+ */
+
+static void get_target_info(CO(QEenclave, this), struct SGX_targetinfo *tgt)
+
+{
+	STATE(S);
+
+	S->enclave->get_target_info(S->enclave, tgt);
+	return;
+}
+
+
+/**
+ * External public method.
+ *
  * This method is responsible for loading and verifying the EPID
  * that has been provisioned to the platform.
  *
@@ -331,6 +360,8 @@ extern QEenclave NAAAIM_QEenclave_Init(void)
 
 	/* Method initialization. */
 	this->open = open;
+
+	this->get_target_info = get_target_info;
 
 	this->load_epid = load_epid;
 
