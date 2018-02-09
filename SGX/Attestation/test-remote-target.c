@@ -16,6 +16,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <unistd.h>
+#include <string.h>
 
 #include <Origin.h>
 #include <HurdLib.h>
@@ -24,6 +25,7 @@
 #include <File.h>
 
 #include <NAAAIM.h>
+#include <RandomBuffer.h>
 
 #include "SGX.h"
 #include "SGXenclave.h"
@@ -135,7 +137,8 @@ extern int main(int argc, char *argv[])
 {
 	_Bool debug = true;
 
-	char *epid_blob	     = NULL,
+	char *spid_key	     = NULL,
+	     *epid_blob	     = NULL,
 	     *sgx_device     = "/dev/isgx",
 	     *source_token   = "source.token",
 	     *quote_token    = "qe.token",
@@ -154,6 +157,10 @@ extern int main(int argc, char *argv[])
 
 	struct LocalSource_ecall0_interface source_ecall0;
 
+	Buffer spid = NULL;
+
+	RandomBuffer nonce = NULL;
+
 	QEenclave qe = NULL;
 
 	PCEenclave pce = NULL;
@@ -162,7 +169,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "e:q:")) != EOF )
+	while ( (opt = getopt(argc, argv, "e:q:s:")) != EOF )
 		switch ( opt ) {
 			case 'e':
 				epid_blob = optarg;
@@ -170,12 +177,20 @@ extern int main(int argc, char *argv[])
 			case 'q':
 				quote_token = optarg;
 				break;
+			case 's':
+				spid_key = optarg;
+				break;
 		}
 
 
 	/* Verify arguements. */
 	if ( epid_blob == NULL ) {
 		fputs("No EPID blob specified.\n", stderr);
+		goto done;
+	}
+
+	if ( spid_key == NULL ) {
+		fputs("No SPID specified.\n", stderr);
 		goto done;
 	}
 
@@ -227,9 +242,33 @@ extern int main(int argc, char *argv[])
 	fputs("Generated quoting enclave report.\n", stdout);
 
 
+	/*
+	 * Convert the SPID into a binary buffer and generate the
+	 * nonce to be used.
+	 */
+	if ( strlen(spid_key) != 32 ) {
+		fputs("Invalid SPID size.\n", stderr);
+		goto done;
+	}
+
+	INIT(HurdLib, Buffer, spid, ERR(goto done));
+	if ( !spid->add_hexstring(spid, spid_key) ) {
+		fputs("Invalid SPID.\n", stderr);
+		goto done;
+	}
+
+	INIT(NAAAIM, RandomBuffer, nonce, ERR(goto done));
+	if ( !nonce->generate(nonce, 16) ) {
+		fputs("Unable to generate nonce.\n", stderr);
+		goto done;
+	}
+
+
  done:
 	fputs("Done.\n", stdout);
 
+	WHACK(spid);
+	WHACK(nonce);
 	WHACK(qe);
 	WHACK(pce);
 	WHACK(source);

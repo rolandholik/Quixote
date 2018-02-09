@@ -53,6 +53,9 @@ LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib -L../../lib
 HURDLIB = -L../../HurdLib -lHurdLib
 ELFLIB	= -Wl,--rpath /usr/local/musl/lib -lelf
 
+# OpenSSL crypto library
+SSL_CRYPTO  = -L /usr/local/musl/lib -lcrypto
+
 
 #
 # Compilation directives.
@@ -116,9 +119,9 @@ test-local-target.o: test-local-target.c
 
 test-remote-target: test-remote-target.o				  \
 	../SGXenclave.o ../SGXloader.o ../SGXmetadata.o ../SGXsigstruct.o \
-	../QEenclave.o ../SGXepid.o ../PCEenclave.o ../sgx-ocall.o	  \
-	../boot-sgx.o
-	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB};
+	../QEenclave.o ../SGXepid.o ../PCEenclave.o ../../RandomBuffer.o  \
+	../sgx-ocall.o ../boot-sgx.o
+	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB} ${SSL_CRYPTO};
 
 test-remote-target.o: test-remote-target.c
 	${CC} ${CFLAGS} -c $< -o $@;
