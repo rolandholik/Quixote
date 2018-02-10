@@ -31,7 +31,10 @@
 
 #include <epid_pve_type.h>
 #include <sgx_tseal.h>
+#include <sgx_quote.h>
 #include <provision_msg.h>
+#include <epid/common/types.h>
+#include <se_quote_internal.h>
 
 
 /*
@@ -48,6 +51,21 @@ extern int main(int argc, char *argv[])
 		sizeof(join_proof_with_escrow_t));
 	fprintf(stdout, "message 2 blob input: %lu\n", \
 		sizeof(proc_prov_msg2_blob_input_t));
+	fprintf(stdout, "Hard coded join proof with escrow TLV SIZE: %lu\n", \
+		HARD_CODED_JOIN_PROOF_WITH_ESCROW_TLV_SIZE);
+	fprintf(stdout, "Hard coded epid member with escrow RLV_size: %lu\n", \
+		HARD_CODED_EPID_MEMBER_WITH_ESCROW_TLV_SIZE);
+	fprintf(stdout, "SGX_TRUSTED_EPID_BLOB_SIZE_SDK: %u\n", \
+		SGX_TRUSTED_EPID_BLOB_SIZE_SDK);
+	fprintf(stdout, "SGX_TRUSTED_EPID_BLOB_SIZE_SIK: %u\n", \
+		SGX_TRUSTED_EPID_BLOB_SIZE_SIK);
 
+	fprintf(stdout, "BasicSignature: %zu\n", sizeof(BasicSignature));
+	fprintf(stdout, "sgx_quote_t: %zu\n", sizeof(sgx_quote_t));
+	fprintf(stdout, "SE_QUOTE_LENGTH_WITHOUT_SIG: %zu\n", \
+		SE_QUOTE_LENGTH_WITHOUT_SIG);
+
+	fprintf(stdout, "sgx_sealed_data_type: %zu\n", \
+		sizeof(sgx_sealed_data_t));
 	return 0;
 }
