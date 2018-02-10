@@ -30,6 +30,9 @@ struct NAAAIM_QEenclave
 	void (*get_target_info)(const QEenclave, struct SGX_targetinfo *);
 
 	_Bool (*load_epid)(const QEenclave, const char *);
+	_Bool (*generate_quote)(const QEenclave, struct SGX_report *report, \
+				int type, const Buffer, const Buffer,	    \
+				const Buffer, const Buffer, uint16_t pce_svn);
 
 	void (*whack)(const QEenclave);
 
