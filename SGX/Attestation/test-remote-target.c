@@ -140,10 +140,10 @@ extern int main(int argc, char *argv[])
 	char *spid_key	     = NULL,
 	     *epid_blob	     = NULL,
 	     *sgx_device     = "/dev/isgx",
-	     *source_token   = "source.token",
+	     *source_token   = "target.token",
 	     *quote_token    = "qe.token",
 	     *pce_token	     = "pce.token",
-	     *source_enclave = "LocalSource.signed.so";
+	     *source_enclave = "LocalTarget.signed.so";
 
 	int rc,
 	    opt,
@@ -157,7 +157,8 @@ extern int main(int argc, char *argv[])
 
 	struct LocalSource_ecall0_interface source_ecall0;
 
-	Buffer spid = NULL;
+	Buffer spid  = NULL,
+	       quote = NULL;
 
 	RandomBuffer nonce = NULL;
 
@@ -200,15 +201,14 @@ extern int main(int argc, char *argv[])
 	if ( !qe->open(qe, quote_token) )
 		ERR(goto done);
 
-	if ( !qe->get_target_info(qe, &qe_target_info) )
-		ERR(goto done);
+	qe->get_target_info(qe, &qe_target_info);
 	fputs("Obtained quoting enclave target information.\n", stderr);
 
 
 	/* Verify the EPID blob. */
 	if ( !qe->load_epid(qe, epid_blob) )
 		ERR(goto done);
-	fputs("Verified EPID.\n", stdout);
+	fputs("Loaded and verified EPID.\n", stdout);
 
 
 	/* Get the platform security information for the PCE enclave. */
@@ -216,8 +216,7 @@ extern int main(int argc, char *argv[])
 	if ( !pce->open(pce, pce_token) )
 		ERR(goto done);
 	pce->get_psvn(pce, &pce_psvn);
-
-	retn = 0;
+	fputs("Have PCE security information.\n", stdout);
 
 
 	/*
@@ -239,7 +238,7 @@ extern int main(int argc, char *argv[])
 	}
 	if ( !source_ecall0.retn )
 		ERR(goto done);
-	fputs("Generated quoting enclave report.\n", stdout);
+	fputs("Generated attesting enclave report.\n", stdout);
 
 
 	/*
@@ -256,18 +255,35 @@ extern int main(int argc, char *argv[])
 		fputs("Invalid SPID.\n", stderr);
 		goto done;
 	}
+	fprintf(stdout, "SPID:  %s\n", spid_key);
+
 
 	INIT(NAAAIM, RandomBuffer, nonce, ERR(goto done));
 	if ( !nonce->generate(nonce, 16) ) {
 		fputs("Unable to generate nonce.\n", stderr);
 		goto done;
 	}
+	fputs("NONCE: ", stdout);
+	nonce->get_Buffer(nonce)->print(nonce->get_Buffer(nonce));
+
+
+	/* Request the quote. */
+	INIT(HurdLib, Buffer, quote, ERR(goto done));
+
+	if ( !qe->generate_quote(qe, &enclave_report, 0, spid,		\
+				 nonce->get_Buffer(nonce), NULL, quote, \
+				 pce_psvn.isv_svn) )
+		ERR(goto done);
+
+	fputs("Generated quote:\n", stdout);
+	quote->hprint(quote);
+
+	retn = 0;
 
 
  done:
-	fputs("Done.\n", stdout);
-
 	WHACK(spid);
+	WHACK(quote);
 	WHACK(nonce);
 	WHACK(qe);
 	WHACK(pce);
