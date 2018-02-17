@@ -531,3 +531,21 @@ struct SGX_psvn {
 	uint8_t cpu_svn[16];
 	uint16_t isv_svn;
 } __attribute__((packed));
+
+
+/**
+ * The following structure defines the quote information returned in
+ * response to a request to the Quoting Enclave to generate an
+ * remote attestation report for an enclave.
+ */
+struct SGX_quote {
+	uint16_t version;
+	uint16_t sign_type;
+	uint8_t epid_group_id[4];
+	uint16_t qe_svn;
+	uint8_t reserved[6];
+	uint8_t basename[32];
+	struct SGX_reportbody report_body;
+	uint32_t signature_len;
+	uint8_t signature[];
+} __attribute__((packed));
