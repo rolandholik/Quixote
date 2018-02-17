@@ -370,9 +370,6 @@ static _Bool generate_quote(CO(QEenclave, this), struct SGX_report *ereport, \
 
 	int rc;
 
-	uint8_t *spid_bufr  = spid->get(spid),
-		*nonce_bufr = nonce->get(nonce);
-
 	uint32_t n2 = 0;
 
 	size_t size;
@@ -386,8 +383,8 @@ static _Bool generate_quote(CO(QEenclave, this), struct SGX_report *ereport, \
 		uint32_t blob_size;
 		struct SGX_report *p_report;
 		int quote_type;
-		uint8_t **spid;
-		uint8_t **p_nonce;
+		uint8_t *spid;
+		uint8_t *p_nonce;
 		uint8_t *p_sig_rl;
 		uint32_t sig_rl_size;
 		struct SGX_report *qe_report;
@@ -414,8 +411,8 @@ static _Bool generate_quote(CO(QEenclave, this), struct SGX_report *ereport, \
 	ecall1.p_report	  = ereport;
 	ecall1.quote_type = type;
 
-	ecall1.spid    = &spid_bufr;
-	ecall1.p_nonce = &nonce_bufr;
+	ecall1.spid    = spid->get(spid);
+	ecall1.p_nonce = nonce->get(nonce);
 
 	if ( sigrl != NULL )
 		ecall1.sig_rl_size = sigrl->size(sigrl);
