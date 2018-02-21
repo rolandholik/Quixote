@@ -46,12 +46,13 @@ SGX_SIGNER = $(SGX_SDK)/bin/sgx_sign
 CC = musl-gcc
 
 CFLAGS = -Wall -O2 -fomit-frame-pointer -march=core2 -I .. -I ../.. \
-	-I ../../HurdLib -I ../../ISOidentity
+	-I ../../HurdLib -I ../../ISOidentity -I ../../lib
 
 LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib -L../../lib
 
 HURDLIB = -L../../HurdLib -lHurdLib
 ELFLIB	= -Wl,--rpath /usr/local/musl/lib -lelf
+NAAAIM_LIB = -L../../lib -lNAAAIM
 
 # OpenSSL crypto library
 SSL_CRYPTO  = -L /usr/local/musl/lib -lcrypto
@@ -121,7 +122,8 @@ test-remote-target: test-remote-target.o				  \
 	../SGXenclave.o ../SGXloader.o ../SGXmetadata.o ../SGXsigstruct.o \
 	../QEenclave.o ../SGXepid.o ../PCEenclave.o ../../RandomBuffer.o  \
 	../sgx-ocall.o ../boot-sgx.o
-	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${NAAAIM_LIB} ${HURDLIB} \
+		${SSL_CRYPTO};
 
 test-remote-target.o: test-remote-target.c
 	${CC} ${CFLAGS} -c $< -o $@;
