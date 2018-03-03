@@ -510,6 +510,8 @@ static Buffer get_Buffer(CO(Sha256, this))
 static void print(CO(Sha256, this))
 
 {
+	STATE(S);
+
 	if ( S->poisoned ) {
 		fputs("* POISONED *\n", stderr);
 		return;
