@@ -30,13 +30,16 @@ SGX_CRYPTO_LIB	    = sgx_tcrypto
 SGX_SERVICE_LIBRARY = sgx_tservice
 
 ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles  \
+	-Wl,--whole-archive -lsgx_tsgxssl -Wl,--no-whole-archive	     \
 	-L${SGX_LIBRARY_PATH} -L . -L ../SGXfusion			     \
 	-Wl,--whole-archive						     \
 	-l${SGX_TRTS_LIB} -lSGXfusion					     \
 	-Wl,--no-whole-archive						     \
 	-Wl,--start-group						     \
 	-lsgx_tstdc -l${SGX_CRYPTO_LIB} -l${SGX_SERVICE_LIBRARY} -lSGXnaaaim \
+	-lsgx_tsgxssl_crypto						     \
 	-Wl,--end-group							     \
+	-lsgx_tstdcxx							     \
 	-Wl,-Bstatic -Wl,-Bsymbolic -Wl,--no-undefined			     \
 	-Wl,-pie,-eenclave_entry -Wl,--export-dynamic			     \
 	-Wl,--defsym,__ImageBase=0					     \
@@ -92,8 +95,8 @@ test-naaaim.signed.so: test-naaaim.so
 	${SGX_SIGNER} sign -key Private-key.pem -enclave $^ -out $@ \
 		-config test-naaaim-enclave.xml;
 
-test-naaaim.so: ${ENCOBJS}
-	${ENCLAVE_CC} -o $@ $^ ${ENCLAVE_LDFLAGS};
+test-naaaim.so: ${ENCOBJS} ${LIBRARY}
+	${ENCLAVE_CC} -o $@ ${ENCOBJS} ${ENCLAVE_LDFLAGS};
 
 ldscript:
 	echo "{"			>  ldscript;
