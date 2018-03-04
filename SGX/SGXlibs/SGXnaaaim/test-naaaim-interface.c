@@ -50,10 +50,11 @@ SGX_EXTERNC const struct {
 /* OCALL interface table. */
 SGX_EXTERNC const struct {
 	size_t nr_ocall;
-	uint8_t entry_table[1][2];
+	uint8_t entry_table[OCALL_NUMBER][ECALL_NUMBER];
 } g_dyn_entry_table = {
 	OCALL_NUMBER,
 	{
 		{0},
+		{0}
 	}
 };

@@ -6,7 +6,7 @@
 # Variable declarations.
 CSRC   = test-naaaim.c
 ENCSRC = test-naaaim-enclave.c test-naaaim-interface.c
-LIBSRC = SHA256.c RandomBuffer.c Curve25519.c ssl-ocall.c
+LIBSRC = SHA256.c RandomBuffer.c Curve25519.c SHA256_hmac.c ssl-ocall.c
 ASRC   = rdrand.s
 
 TOOLS = test-naaaim

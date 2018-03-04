@@ -12,6 +12,7 @@
 #include "SHA256.h"
 #include "RandomBuffer.h"
 #include "Curve25519.h"
+#include "SHA256_hmac.h"
 
 
 void test_one()
@@ -26,11 +27,11 @@ void test_one()
 
 	Buffer bufr = NULL;
 
-	SHA256 sha256 = NULL;
+	Sha256 sha256 = NULL;
 
 
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	INIT(NAAAIM, SHA256, sha256, ERR(goto done));
+	INIT(NAAAIM, Sha256, sha256, ERR(goto done));
 
 	len = strlen((char *) input);
 	fputs("Input:\n", stdout);
@@ -144,6 +145,61 @@ void test_three(void)
 }
 
 
+void test_four()
+
+{
+	static const unsigned char *input = \
+		(const unsigned char *) "Hi There";
+
+	static const char *hkey = "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b";
+
+	Buffer b,
+	       key  = NULL,
+	       bufr = NULL;
+
+	SHA256_hmac hmac = NULL;
+
+
+	/* Setup input buffer. */
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	if ( !bufr->add(bufr, input, strlen((char *) input)) )
+		ERR(goto done);
+	fputs("Input:\n", stdout);
+	bufr->hprint(bufr);
+
+
+	/* Setup buffer with key. */
+	INIT(HurdLib, Buffer, key,  ERR(goto done));
+	if ( !key->add_hexstring(key, hkey) )
+		ERR(goto done);
+	fputs("\nKey:\n", stdout);
+	key->print(key);
+
+
+	/* Compute the message authentication code. */
+	if ( (hmac = NAAAIM_SHA256_hmac_Init(key)) == NULL )
+		ERR(goto done);
+	hmac->add_Buffer(hmac, bufr);
+	if ( !hmac->compute(hmac) )
+		ERR(goto done);
+
+	fputc('\n', stdout);
+	fputs("SHA256_HMAC:\n", stdout);
+	b = hmac->get_Buffer(hmac);
+	b->print(b);
+
+	fputs("\nExpected:\n", stdout);
+	fputs("198a607eb44bfbc69903a0f1cf2bbdc5ba0aa3f3d9ae3c1c7a3b1696a0b68cf7	\n", stdout);
+
+
+ done:
+	WHACK(bufr);
+	WHACK(hmac)
+
+	return;
+}
+
+
 void test_naaaim(unsigned int test)
 
 {
@@ -158,6 +214,9 @@ void test_naaaim(unsigned int test)
 			break;
 		case 3:
 			test_three();
+			break;
+		case 4:
+			test_four();
 			break;
 
 		default:

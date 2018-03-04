@@ -14,7 +14,7 @@
 /* Number of tests. */
 #define PGM "test-naaaim"
 
-#define NUMBER_OF_TESTS 3
+#define NUMBER_OF_TESTS 4
 
 
 /* Include files. */
@@ -49,8 +49,45 @@ int ocall1_handler(struct ocall1_interface *interface)
 	return 0;
 }
 
+struct ocall2_interface {
+	int* ms_cpuinfo;
+	int ms_leaf;
+	int ms_subleaf;
+};
+
+static void cpuid(int *eax, int *ebx, int *ecx, int *edx)\
+
+{
+	__asm("cpuid\n\t"
+	      /* Output. */
+	      : "=a" (*eax), "=b" (*ebx), "=c" (*ecx), "=d" (*edx)
+	      /* Input. */
+	      : "0" (*eax), "2" (*ecx));
+
+	return;
+}
+
+
+int ocall2_handler(struct ocall2_interface *pms)
+
+{
+	struct ocall2_interface *ms = (struct ocall2_interface *) pms;
+
+
+	ms->ms_cpuinfo[0] = ms->ms_leaf;
+	ms->ms_cpuinfo[2] = ms->ms_subleaf;
+
+	cpuid(&ms->ms_cpuinfo[0], &ms->ms_cpuinfo[1], &ms->ms_cpuinfo[2], \
+	      &ms->ms_cpuinfo[3]);
+
+	return 0;
+}
+
 static const struct OCALL_api ocall_table = {
-	1, {ocall1_handler}
+	2,
+	{
+		ocall1_handler,
+		ocall2_handler}
 };
 
 
