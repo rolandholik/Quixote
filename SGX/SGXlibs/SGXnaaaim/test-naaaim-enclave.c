@@ -13,6 +13,7 @@
 #include "RandomBuffer.h"
 #include "Curve25519.h"
 #include "SHA256_hmac.h"
+#include "AES256_cbc.h"
 
 
 void test_one()
@@ -200,6 +201,86 @@ void test_four()
 }
 
 
+void test_five()
+
+{
+	static const unsigned char *input = \
+		(const unsigned char *) "The Secret";
+
+	static const char *iv_val  = "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f",
+			  *key_val = "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a";
+
+	Buffer iv   = NULL,
+	       key  = NULL,
+	       bufr = NULL;
+
+	AES256_cbc encrypt = NULL,
+		   decrypt = NULL;
+
+
+	/* Setup input buffer. */
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	if ( !bufr->add(bufr, input, strlen((char *) input)) )
+		ERR(goto done);
+	fputs("Input:\n", stdout);
+	bufr->hprint(bufr);
+
+
+	/* Setup IV and key. */
+	INIT(HurdLib, Buffer, iv,  ERR(goto done));
+	if ( !iv->add_hexstring(iv, iv_val) )
+		ERR(goto done);
+	fputs("\nIV:\n", stdout);
+	iv->print(iv);
+
+	INIT(HurdLib, Buffer, key, ERR(goto done));
+	if ( !key->add_hexstring(key, key_val) )
+		ERR(goto done);
+	fputs("KEY:\n", stdout);
+	key->print(key);
+
+
+	/* Encrypt the string. */
+	if ( (encrypt = NAAAIM_AES256_cbc_Init_encrypt(key, iv)) == NULL )
+		ERR(goto done);
+	if ( !encrypt->encrypt(encrypt, bufr) )
+		ERR(goto done);
+
+	bufr->reset(bufr);
+	if ( !bufr->add_Buffer(bufr, encrypt->get_Buffer(encrypt)) )
+		ERR(goto done);
+
+	fputc('\n', stdout);
+	fputs("Encrypted payload:\n", stdout);
+	bufr->print(bufr);
+
+
+	/* Decrypt the string to confirm invertibility. */
+	if ( (decrypt = NAAAIM_AES256_cbc_Init_decrypt(key, iv)) == NULL )
+		ERR(goto done);
+	if ( !decrypt->decrypt(decrypt, encrypt->get_Buffer(encrypt)) )
+		ERR(goto done);
+
+	bufr->reset(bufr);
+	if ( !bufr->add_Buffer(bufr, decrypt->get_Buffer(decrypt)) )
+		ERR(goto done);
+
+	fputc('\n', stdout);
+	fputs("Decrypted payload:\n", stdout);
+	bufr->hprint(bufr);
+
+
+ done:
+	WHACK(bufr);
+	WHACK(iv);
+	WHACK(key);
+	WHACK(encrypt);
+	WHACK(decrypt);
+
+	return;
+}
+
+
 void test_naaaim(unsigned int test)
 
 {
@@ -217,6 +298,9 @@ void test_naaaim(unsigned int test)
 			break;
 		case 4:
 			test_four();
+			break;
+		case 5:
+			test_five();
 			break;
 
 		default:
