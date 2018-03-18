@@ -83,6 +83,9 @@ static sgx_status_t sgx_test_client(void *pms)
 
 
  done:
+	if ( hostname != NULL )
+		free(hostname);
+
 	return status;
 }
 
