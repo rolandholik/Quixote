@@ -7,10 +7,12 @@
 CSRC   = test-naaaim.c
 ENCSRC = test-naaaim-enclave.c test-naaaim-interface.c
 LIBSRC = SHA256.c RandomBuffer.c Curve25519.c SHA256_hmac.c AES256_cbc.c \
-	ssl-ocall.c
+	Duct.c ssl-ocall.c
 ASRC   = rdrand.s
 
-TOOLS = test-naaaim
+DUCTSRC = test-Duct-enclave.c test-Duct-interface.c
+
+TOOLS = test-naaaim test-Duct
 
 LIBNAME = SGXnaaaim
 LIBRARY = lib${LIBNAME}.a
@@ -56,8 +58,9 @@ CFLAGS = -Wall -O2 -fomit-frame-pointer -march=core2 -I ../.. -I ../../.. \
 
 LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib -L../../../lib
 
-HURDLIB = -L../../../HurdLib -lHurdLib
-ELFLIB	= -Wl,--rpath /usr/local/musl/lib -lelf
+HURDLIB	  = -L../../../HurdLib -lHurdLib
+NAAAIMLIB = -L../../../lib -lNAAAIM
+ELFLIB	  = -Wl,--rpath /usr/local/musl/lib -lelf
 
 
 #
@@ -76,9 +79,10 @@ ELFLIB	= -Wl,--rpath /usr/local/musl/lib -lelf
 #
 # Automatic definition of classes and objects.
 #
-COBJS	= ${CSRC:.c=.o}
-LIBOBJS = ${LIBSRC:.c=.o} ${ASRC:.s=.o}
-ENCOBJS = ${ENCSRC:.c=.o}
+COBJS	 = ${CSRC:.c=.o}
+LIBOBJS	 = ${LIBSRC:.c=.o} ${ASRC:.s=.o}
+ENCOBJS	 = ${ENCSRC:.c=.o}
+DUCTOBJS = ${DUCTSRC:.c=.o}
 
 
 #
@@ -90,7 +94,7 @@ ENCOBJS = ${ENCSRC:.c=.o}
 # Targets
 all: ${LIBRARY} enclave tools
 
-enclave: ldscript test-naaaim.signed.so
+enclave: ldscript test-naaaim.signed.so test-Duct.signed.so
 
 test-naaaim.signed.so: test-naaaim.so
 	${SGX_SIGNER} sign -key Private-key.pem -enclave $^ -out $@ \
@@ -98,6 +102,13 @@ test-naaaim.signed.so: test-naaaim.so
 
 test-naaaim.so: ${ENCOBJS} ${LIBRARY}
 	${ENCLAVE_CC} -o $@ ${ENCOBJS} ${ENCLAVE_LDFLAGS};
+
+test-Duct.signed.so: test-Duct.so
+	${SGX_SIGNER} sign -key Private-key.pem -enclave $^ -out $@ \
+		-config test-Duct-enclave.xml;
+
+test-Duct.so: ${DUCTOBJS} ${LIBRARY}
+	${ENCLAVE_CC} -o $@ ${DUCTOBJS} ${ENCLAVE_LDFLAGS};
 
 ldscript:
 	echo "{"			>  ldscript;
@@ -119,6 +130,14 @@ test-naaaim: test-naaaim.o ../../SGXenclave.o ../../SGXloader.o	   \
 test-naaaim.o: test-naaaim.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
+test-Duct: test-Duct.o ../../SGXenclave.o ../../SGXloader.o	   \
+	../../SGXmetadata.o ../../SGXsigstruct.o ../../sgx-ocall.o \
+	../../boot-sgx.o
+	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${NAAAIMLIB} ${HURDLIB};
+
+test-Duct.o: test-Duct.c
+	${CC} ${CFLAGS} -I ../../../lib -c $< -o $@;
+
 ${LIBRARY}: ${LIBOBJS}
 	ar r ${LIBRARY} $^;
 	ranlib ${LIBRARY};
@@ -127,7 +146,8 @@ clean:
 	rm -f *.o *~ ldscript;
 	rm -f ${TOOLS};
 	rm -f ${LIBRARY};
-	rm -f test-naaaim.so test-naaaim.signed.so;
+	rm -f test-naaaim.so test-naaaim.signed.so test-Duct.so \
+		test-Duct.signed.so;
 
 
 # Source dependencies.

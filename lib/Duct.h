@@ -14,6 +14,54 @@
 #define NAAAIM_Duct_HEADER
 
 
+/**
+ * Enumeration type which defines the method type whose userspace
+ * implementation is being requested.
+ */
+enum Duct_ocalls {
+	Duct_init,
+
+	Duct_init_server,
+	Duct_init_client,
+	Duct_set_server,
+	Duct_init_port,
+	Duct_accept_connection,
+	Duct_init_connection,
+	Duct_send_buffer,
+	Duct_receive_buffer,
+
+	Duct_get_ipv4,
+	Duct_get_client,
+
+	Duct_do_reverse,
+	Duct_eof,
+	Duct_reset,
+	Duct_whack,
+
+	Duct_END
+};
+
+
+/**
+ * Structure which marshalls the data for the call into and out of
+ * the Duct manager.
+ */
+struct Duct_ocall {
+	_Bool retn;
+	enum Duct_ocalls ocall;
+	unsigned int instance;
+
+	_Bool eof;
+	_Bool mode;
+	uint32_t addr;
+	int port;
+	char *hostname;
+
+	size_t size;
+	unsigned char *bufr;
+};
+
+
 /* Object type definitions. */
 typedef struct NAAAIM_Duct * Duct;
 
@@ -50,5 +98,8 @@ struct NAAAIM_Duct
 
 /* Duct constructor call. */
 extern Duct NAAAIM_Duct_Init(void);
+
+/* Definition for entry point for Duct SGX manager. */
+extern int Duct_sgxmgr(struct Duct_ocall *ocp);
 
 #endif
