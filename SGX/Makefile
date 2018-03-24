@@ -156,9 +156,6 @@ SGXcmac.o: SGXcmac.c
 SGXaesgcm.o: SGXaesgcm.c
 	$(CC) $(CFLAGS) -I /opt/intel/sgxsdk/include -c $< -o $@;
 
-SGXrsa.o: SGXrsa.c
-	$(CC) $(CFLAGS) -I /opt/intel/sgxsdk/include -c $< -o $@;
-
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};
