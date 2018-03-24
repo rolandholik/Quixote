@@ -13,6 +13,10 @@
  * for licensing information.
  **************************************************************************/
 
+/* Local defines. */
+#define DEVICE "/dev/isgx"
+
+
 /* Include files. */
 #include <stdint.h>
 #include <stdlib.h>
@@ -30,6 +34,8 @@
 #include <Origin.h>
 #include <HurdLib.h>
 #include <Buffer.h>
+#include <String.h>
+#include <File.h>
 
 #include "NAAAIM.h"
 #include "SGX.h"
@@ -163,6 +169,68 @@ static void _init_state(CO(SGXenclave_State, S)) {
 	S->threads    = NULL;
 
 	return;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements setting the debug status of the enclave.
+ * Enabling debug in the enclave also causes debug status to be set
+ * on the metadata manager and the loader.
+ *
+ * \param this	A pointer to the object whose debug status is
+ *		to be modified.
+ *
+ * \param debug	The debug status to be set for the object.
+ *
+ * \return	No return value is defined.
+ */
+
+static _Bool setup(CO(SGXenclave, this), CO(char *, name), CO(char *, token), \
+		  const _Bool debug)
+
+{
+	_Bool retn = false;
+
+	struct SGX_einittoken *einit;
+
+	Buffer bufr = NULL;
+
+	File token_file = NULL;
+
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	INIT(HurdLib, File, token_file, ERR(goto done));
+
+	token_file->open_ro(token_file, token);
+	if ( !token_file->slurp(token_file, bufr) )
+		ERR(goto done);
+	einit = (void *) bufr->get(bufr);
+
+
+	/* Load and initialize the enclave. */
+	if ( !this->open_enclave(this, DEVICE, name, debug) )
+		ERR(goto done);
+
+	if ( !this->create_enclave(this) )
+		ERR(goto done);
+
+	if ( !this->load_enclave(this) )
+		ERR(goto done);
+
+	if ( !this->init_enclave(this, einit) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	WHACK(bufr);
+	WHACK(token_file);
+
+	return retn;
+
 }
 
 
@@ -1383,6 +1451,8 @@ extern SGXenclave NAAAIM_SGXenclave_Init(void)
 	_init_state(this->state);
 
 	/* Method initialization. */
+	this->setup = setup;
+
 	this->open_enclave	  = open_enclave;
 	this->open_enclave_memory = open_enclave_memory;
 	this->create_enclave = create_enclave;

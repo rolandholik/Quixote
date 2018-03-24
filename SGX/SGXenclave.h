@@ -25,6 +25,8 @@ typedef struct NAAAIM_SGXenclave_State * SGXenclave_State;
 struct NAAAIM_SGXenclave
 {
 	/* External methods. */
+	_Bool (*setup)(const SGXenclave, const char *, const char *, _Bool);
+
 	_Bool (*open_enclave)(const SGXenclave, const char *, const char *, \
 			      _Bool);
 	_Bool (*open_enclave_memory)(const SGXenclave, const char *, \

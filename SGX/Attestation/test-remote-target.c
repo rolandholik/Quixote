@@ -82,84 +82,6 @@ static const struct OCALL_api ocall_table = {
 
 
 /**
- * Static public function.
- *
- * This function opens and initializes an enclave whose name and
- * token are specified.
- *
- * \param enclave	The object which will be used to manage the
- *			enclave.
- *
- * \param device	A pointer to a null-terminated character buffer
- *			containing the name of the SGX device used to
- *			issue the control commands to the kernel
- *			driver.
- *
- * \param name		A pointer to a null-terminated character buffer
- *			containing the name of the shared object
- *			file containing the enclave image.
- *
- * \param token		A pointer to a null-terminated character buffer
- *			containing the name of the file containing
- *			the initialization token.
- *
- * \param debug		A boolean value used to indicate whether or
- *			not the debug attribute is to be set on
- *			the enclave.
- *
- * \return	If an error is encountered while initializing the
- *		enclave a false value is returned.  A true value indicates
- *		the enclave has been loaded and initialized.
- */
-
-static _Bool open_enclave(CO(SGXenclave, enclave), CO(char *, device), \
-			  CO(char *, name), CO(char *, token), 	       \
-			  const _Bool debug)
-
-{
-	_Bool retn = false;
-
-	struct SGX_einittoken *einit;
-
-	Buffer bufr = NULL;
-
-	File token_file = NULL;
-
-
-	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	INIT(HurdLib, File, token_file, ERR(goto done));
-
-	token_file->open_ro(token_file, token);
-	if ( !token_file->slurp(token_file, bufr) )
-		ERR(goto done);
-	einit = (void *) bufr->get(bufr);
-
-
-	/* Load and initialize the enclave. */
-	if ( !enclave->open_enclave(enclave, device, name, debug) )
-		ERR(goto done);
-
-	if ( !enclave->create_enclave(enclave) )
-		ERR(goto done);
-
-	if ( !enclave->load_enclave(enclave) )
-		ERR(goto done);
-
-	if ( !enclave->init_enclave(enclave, einit) )
-		ERR(goto done);
-
-	retn = true;
-
-
- done:
-	WHACK(bufr);
-	WHACK(token_file);
-
-	return retn;
-}
-
-
-/**
  * Internal private function.
  *
  * This method parses the supplied input for a single JSON field.
@@ -459,7 +381,6 @@ extern int main(int argc, char *argv[])
 
 	char *spid_key	     = NULL,
 	     *epid_blob	     = NULL,
-	     *sgx_device     = "/dev/isgx",
 	     *source_token   = "target.token",
 	     *quote_token    = "qe.token",
 	     *pce_token	     = "pce.token",
@@ -572,8 +493,7 @@ extern int main(int argc, char *argv[])
 	 * for.  The report will be directed to the quoting enclave.
 	 */
 	INIT(NAAAIM, SGXenclave, source, ERR(goto done));
-	if ( !open_enclave(source, sgx_device, source_enclave, source_token, \
-			   debug) )
+	if ( !source->setup(source, source_enclave, source_token, debug) )
 		ERR(goto done);
 
 	source_ecall0.mode   = 1;
@@ -618,7 +538,6 @@ extern int main(int argc, char *argv[])
 
 	/* Request the quote. */
 	INIT(HurdLib, Buffer, quote, ERR(goto done));
-
 	if ( !qe->generate_quote(qe, &enclave_report, 0, spid,		\
 				 nonce->get_Buffer(nonce), NULL, quote, \
 				 pce_psvn.isv_svn) )
