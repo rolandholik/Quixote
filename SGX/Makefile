@@ -7,7 +7,7 @@
 CSRC = sgx-check.c sgx-metadata.c SGXmetadata.c SGXloader.c	    \
 	SGXenclave.c SGXsigstruct.c test-ecall.c sgx-ocall.c	    \
 	PVEenclave.c SGXmessage.c SGXecdsa.c PCEenclave.c SGXcmac.c \
-	SGXaesgcm.c SGXrsa.c QEenclave.c SGXepid.c
+	SGXaesgcm.c SGXrsa.c QEenclave.c SGXepid.c SGXquote.c
 
 ASRC = boot-sgx.s
 
@@ -176,3 +176,4 @@ SGXsigstruct.o: SGX.h SGXsigstruct.h
 PVEenclave.o: SGX.h SGXenclave.h PVEenclave.h
 SGXmessage.o: SGXmessage.h
 QEenclave.o: SGX.h SGXenclave.h QEenclave.h
+SGXquote.o: SGX.h QEenclave.h PCEenclave.h SGXquote.h

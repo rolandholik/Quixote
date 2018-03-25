@@ -38,8 +38,7 @@
 
 #include "SGX.h"
 #include "SGXenclave.h"
-#include "QEenclave.h"
-#include "PCEenclave.h"
+#include "SGXquote.h"
 #include "SGXepid.h"
 
 #include "LocalSource-interface.h"
@@ -384,25 +383,17 @@ extern int main(int argc, char *argv[])
 	     *source_token   = "target.token",
 	     *quote_token    = "qe.token",
 	     *pce_token	     = "pce.token",
-	     *source_enclave = "LocalTarget.signed.so",
-	     *url	     = "https://as.sgx.trustedservices.intel.com:443/attestation/sgx/v2/report";
-
-	char *quote_value = NULL;
+	     *source_enclave = "LocalTarget.signed.so";
 
 	int rc,
 	    opt,
 	    retn = 1;
 
-	struct SGX_targetinfo qe_target_info;
-
 	struct SGX_report __attribute__((aligned(512))) enclave_report;
-
-	struct SGX_psvn pce_psvn;
 
 	struct LocalSource_ecall0_interface source_ecall0;
 
-	Buffer bufr	= NULL,
-	       spid	= NULL,
+	Buffer spid	= NULL,
 	       quote	= NULL,
 	       http_in	= NULL,
 	       http_out = NULL;
@@ -413,9 +404,7 @@ extern int main(int argc, char *argv[])
 
 	Base64 base64 = NULL;
 
-	QEenclave qe = NULL;
-
-	PCEenclave pce = NULL;
+	SGXquote quoter = NULL;
 
 	SGXenclave source = NULL;
 
@@ -423,7 +412,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "e:q:s:Q:")) != EOF )
+	while ( (opt = getopt(argc, argv, "e:q:s:")) != EOF )
 		switch ( opt ) {
 			case 'e':
 				epid_blob = optarg;
@@ -433,9 +422,6 @@ extern int main(int argc, char *argv[])
 				break;
 			case 's':
 				spid_key = optarg;
-				break;
-			case 'Q':
-				quote_value = optarg;
 				break;
 		}
 
@@ -454,38 +440,14 @@ extern int main(int argc, char *argv[])
 
 	/* Print banner. */
 	fprintf(stdout, "%s: Remote attestation test utility.\n", PGM);
-	fprintf(stdout, "%s: (C)IDfusion, LLC\n", PGM);
+	fprintf(stdout, "%s: (C)2018 IDfusion, LLC\n", PGM);
 
 
-	/* Load and initialize the source and target enclaves. */
-	INIT(NAAAIM, QEenclave, qe, ERR(goto done));
-	if ( !qe->open(qe, quote_token) )
+	/* Load and initialize the quoting object. */
+	INIT(NAAAIM, SGXquote, quoter, ERR(goto done));
+	if ( !quoter->init(quoter, quote_token, pce_token, epid_blob) )
 		ERR(goto done);
-
-	qe->get_target_info(qe, &qe_target_info);
-	fputs("\nObtained target enclave information.\n\n", stdout);
-
-
-	/* Verify the EPID blob. */
-	if ( !qe->load_epid(qe, epid_blob) )
-		ERR(goto done);
-	fputs("Loaded and verified EPID.\n", stdout);
-
-
-	/* Get the platform security information for the PCE enclave. */
-	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-
-	INIT(NAAAIM, PCEenclave, pce, ERR(goto done));
-	if ( !pce->open(pce, pce_token) )
-		ERR(goto done);
-	pce->get_psvn(pce, &pce_psvn);
-	fputs("\nHave PCE security information.\n", stdout);
-
-	bufr->add(bufr, pce_psvn.cpu_svn, sizeof(pce_psvn.cpu_svn));
-	fputs("\tCPU svn: ", stdout);
-	bufr->print(bufr);
-	fprintf(stdout, "\tISV svn: %u\n", pce_psvn.isv_svn);
-	WHACK(bufr);
+	fputs("\nInitialized quoting object.\n\n", stdout);
 
 
 	/*
@@ -497,7 +459,7 @@ extern int main(int argc, char *argv[])
 		ERR(goto done);
 
 	source_ecall0.mode   = 1;
-	source_ecall0.target = &qe_target_info;
+	source_ecall0.target = quoter->get_qe_targetinfo(quoter);
 	source_ecall0.report = &enclave_report;
 	if ( !source->boot_slot(source, 0, &ocall_table, &source_ecall0, \
 				&rc) ) {
@@ -538,9 +500,8 @@ extern int main(int argc, char *argv[])
 
 	/* Request the quote. */
 	INIT(HurdLib, Buffer, quote, ERR(goto done));
-	if ( !qe->generate_quote(qe, &enclave_report, 0, spid,		\
-				 nonce->get_Buffer(nonce), NULL, quote, \
-				 pce_psvn.isv_svn) )
+	if ( !quoter->generate_quote(quoter, &enclave_report, spid, \
+				     nonce->get_Buffer(nonce), quote) )
 		ERR(goto done);
 
 	fputs("\nBinary quote:\n", stdout);
@@ -548,48 +509,9 @@ extern int main(int argc, char *argv[])
 	fputs("\n", stdout);
 
 
+	/* Request a report on the quote. */
 	INIT(HurdLib, String, output, ERR(goto done));
-	INIT(NAAAIM, Base64, base64, ERR(goto done));
-
-	if ( !output->add(output, "{\r\n\"isvEnclaveQuote\":\"") )
-		ERR(goto done)
-	if ( !base64->encode(base64, quote, output) )
-		ERR(goto done);
-	if ( !output->add(output, "\"\r\n}\r\n") )
-		ERR(goto done);
-
-
-	/* Post the quote. */
-	INIT(HurdLib, Buffer, http_in, ERR(goto done));
-	INIT(HurdLib, Buffer, http_out, ERR(goto done));
-	INIT(NAAAIM, HTTP, http, ERR(goto done));
-
-	http->add_arg(http, "-v");
-	http->add_arg(http, "-S");
-	http->add_arg(http, "--no-check-certificate");
-	http->add_arg(http, "--secure-protocol=TLSv1_2");
-	http->add_arg(http, "--private-key=ias-key.pem");
-	http->add_arg(http, "--certificate=ias-cert.pem");
-	http->add_arg(http, "-oias.log");
-
-	if ( !http_in->add(http_in, (unsigned char *) output->get(output), \
-			   output->size(output)) )
-		ERR(goto done);
-	if ( quote_value == NULL ) {
-		if ( !http->post(http, url, http_in, http_out) )
-			ERR(goto done);
-	}
-	else {
-		if ( !http_out->add(http_out, (unsigned char *) quote_value, \
-				    strlen(quote_value)) )
-			ERR(goto done);
-	}
-
-
-	if ( !http_out->add(http_out, (unsigned char *) "\0", 1) )
-		ERR(goto done);
-	output->reset(output);
-	if ( !output->add(output, (char *) http_out->get(http_out)) )
+	if ( !quoter->generate_report(quoter, quote, output) )
 		ERR(goto done);
 
 	fputs("Attestation report:\n", stdout);
@@ -607,15 +529,13 @@ extern int main(int argc, char *argv[])
 	WHACK(spid);
 	WHACK(quote);
 	WHACK(nonce);
-	WHACK(qe);
-	WHACK(pce);
 	WHACK(source);
 	WHACK(output);
 	WHACK(base64);
+	WHACK(quoter);
 	WHACK(http_in);
 	WHACK(http_out);
 	WHACK(http);
-
 
 	return retn;
 
