@@ -10,11 +10,6 @@
  **************************************************************************/
 
 
-/* Number of enclave interfaces. */
-#define ECALL_NUMBER 1
-#define OCALL_NUMBER 1
-
-
 /* ECALL interface definitions. */
 struct LocalSource_ecall0_interface {
 	_Bool retn;

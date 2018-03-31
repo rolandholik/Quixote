@@ -1,3 +1,8 @@
+/* Number of enclave interfaces. */
+#define ECALL_NUMBER 1
+#define OCALL_NUMBER 1
+
+
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
