@@ -779,6 +779,59 @@ static _Bool get_attributes(CO(SGXmetadata, this), \
 
 
 /**
+ * External public method.
+ *
+ * This method is an accessor method which returns the major and
+ * minor numbers of the metadata version.
+ *
+ * \param this		A pointer to the metadata object whose version
+ *			information is to be returned.
+ *
+ * \param major		A pointer to the 32-bit variable which will be
+ *			loaded with the major number of the metadata
+ *			version.
+ *
+ * \param minor		A pointer to the 32-bit variable which will be
+ *			loaded with the minor number of the metadata
+ *			version.
+ *
+ * \return		A true value is returned if the object has
+ *			not been poisoned and the supplied variables
+ *			will be loaded with the metadata version.
+ *			A false value is returned if the object is
+ *			poisoned, in this case the variables will
+ *			not be guaranteed to have any valid values.
+ */
+
+static _Bool get_version(CO(SGXmetadata, this), uint32_t *major, \
+			 uint32_t *minor)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+
+
+	/*
+	 * Return the major and minor versions via the supplied pointers.
+	 */
+	*major = S->metadata.version >> 32;
+	*minor = S->metadata.version & UINT32_MAX;
+
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
  * Internal private method.
  *
  * This method implements the loading of an individual layout
@@ -1331,6 +1384,7 @@ extern SGXmetadata NAAAIM_SGXmetadata_Init(void)
 	this->get_secs		 = get_secs;
 	this->get_sigstruct	 = get_sigstruct;
 	this->get_attributes	 = get_attributes;
+	this->get_version	 = get_version;
 
 	this->load_layouts	 = load_layouts;
 

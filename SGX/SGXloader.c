@@ -11,6 +11,10 @@
  * for licensing information.
  **************************************************************************/
 
+/* Loader bug/compatibility flags. */
+#define NULL_PADDING_NEEDED 0x1
+
+
 /* Include files. */
 #include <stdint.h>
 #include <stdlib.h>
@@ -709,7 +713,8 @@ static _Bool _finish_segment(CO(SGXenclave, enclave), \
 
 static _Bool _build_segment(CO(SGXenclave, enclave),	   \
 			    CO(struct segment *, segment), \
-			    const uint64_t offset, const _Bool debug)
+			    const uint64_t offset,	   \
+			    const uint64_t compatibility, const _Bool debug)
 {
 	_Bool retn = false;
 
@@ -723,7 +728,8 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
 		 residual;
 
 	uint64_t build_offset,
-		 size = 4096 - offset;
+		 size	= 4096 - offset,
+		 loaded = 4096;
 
 	struct SGX_secinfo secinfo;
 
@@ -773,7 +779,9 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
 		if ( !enclave->add_page(enclave, data_ptr, &secinfo,
 					SGX_PAGE_EXTEND) )
 			ERR(goto done);
+		loaded	 += 4096;
 		data_ptr += 4096;
+
 		if ( debug )
 			fprintf(stdout, "\tAdded page: 0x%lx/0x%lx/0x%lx\n", \
 				vaddr, segment->flags,			     \
@@ -796,6 +804,8 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
 		if ( !enclave->add_page(enclave, page, &secinfo, \
 					SGX_PAGE_EXTEND) )
 			ERR(goto done);
+		loaded += 4096;
+
 		if ( debug )
 			fprintf(stdout, "\tAdded residual: "	\
 				 "0x%lx/0x%lx/0x%lx\n", vaddr,	\
@@ -809,34 +819,33 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
 	  * is added as a series of uninitialized pages.
 	  */
         if ( segment->phdr.p_memsz > segment->phdr.p_filesz ) {
-		int correct = 0;
-
 		memset(page, '\0', sizeof(page));
 		secinfo.flags = segment->flags;
-		size = segment->phdr.p_memsz - offset;
+
+		if ( loaded >= segment->phdr.p_memsz )
+			size = 0;
+		else
+			size = segment->phdr.p_memsz - segment->phdr.p_filesz;
+
+		if ( compatibility & NULL_PADDING_NEEDED )
+			size = loaded - segment->phdr.p_memsz;
+
+		size = r2p(size);
+
 		if ( debug ) {
 			fprintf(stdout, "\tMemory/file size mismatch, "	      \
-				"%lu/%lu, size=%lu\n", segment->phdr.p_memsz, \
+				"%lu/%lu, size=%lu, loaded=%lu\n",	      \
+				segment->phdr.p_memsz,			      \
 				segment->phdr.p_filesz,			      \
 				segment->phdr.p_memsz -			      \
-				segment->phdr.p_filesz);
-			fprintf(stdout, "\tCorrected memory size: %lu\n", \
-				size);
+				segment->phdr.p_filesz, loaded);
+			if ( compatibility & NULL_PADDING_NEEDED )
+				fputs("\tImplemented NULL padding " \
+				      "workaround.\n", stdout);
+			fprintf(stdout, "\tZero page count: %lu\n", \
+				size / 4096);
 		}
 
-		size = r2p(size - segment->phdr.p_filesz);
-		if ( offset == 0 )
-			correct = -1;
-		else
-			correct = 1;
-		size += (correct * 4096);
-
-		if ( debug ) {
-			fprintf(stdout, "\tPage correction: %d (%s)\n", \
-				correct,				\
-				correct == -1 ? "offset==0" : "offset!=0" );
-			fprintf(stdout, "\tUninitialized size: %lu\n", size);
-		}
 
 		build_offset = 0;
 		while ( build_offset < size ) {
@@ -845,13 +854,9 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
 				ERR(goto done);
 			build_offset += 4096;
 		}
-
-		if ( debug )
-			fprintf(stdout, "\tUninitialized pages added: " \
-				"0x%lx\n", size / 4096);
 	}
 
-	 retn = true;
+	retn = true;
 
 
   done:
@@ -889,12 +894,15 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
 		 page[4096];
 
 	 uint32_t lp,
+		  major,
+		  minor,
 		  segcnt;
 
 	 uint64_t *payload,
 		  offset,
 		  size,
-		  max_rva = 0;
+		  max_rva	= 0,
+		  compatibility = 0;
 
 	 struct segment *segptr;
 
@@ -904,6 +912,13 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
 	 /* Verify object status. */
 	 if ( S->poisoned )
 		 ERR(goto done);
+
+
+	 /* Setup compatibility mask. */
+	 if ( !S->metadata->get_version(S->metadata, &major, &minor) )
+		 ERR(goto done);
+	 if ( (major == 1) && (minor == 3) )
+		 compatibility |= NULL_PADDING_NEEDED;
 
 
 	 /* Iterate through the list of segments loading each one. */
@@ -963,7 +978,8 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
 				vaddr, secinfo.flags, *payload);
 
 		/* Build remaining pages. */
-		if ( !_build_segment(enclave, segptr, offset, S->debug) )
+		if ( !_build_segment(enclave, segptr, offset, compatibility, \
+				     S->debug) )
 			ERR(goto done);
 	}
 
