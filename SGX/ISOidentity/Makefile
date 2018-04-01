@@ -6,8 +6,7 @@
 # Variable declarations.
 CSRC   = test-ISOidentity-enclave.c ISOenclave.c
 ENCSRC = ISOidentity-enclave.c ISOidentity-interface.c			\
-	ContourPoint.c Actor.c Subject.c ExchangeEvent.c ISOidentity.c	\
-	regcomp.c regexec.c regerror.c tre-mem.c reg-support.c
+	ContourPoint.c Actor.c Subject.c ExchangeEvent.c ISOidentity.c
 
 TOOLS = test-ISOidentity-enclave
 
