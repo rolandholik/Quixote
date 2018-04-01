@@ -41,7 +41,7 @@
 #include "SGXquote.h"
 #include "SGXepid.h"
 
-#include "LocalSource-interface.h"
+#include "LocalTarget-interface.h"
 
 
 /**
@@ -76,7 +76,13 @@ int ocall0_handler(struct SGXfusion_ocall0_interface *interface)
 }
 
 static const struct OCALL_api ocall_table = {
-	1, {ocall0_handler}
+	4,
+	{
+		ocall0_handler,
+		NULL, /*ocall2_handler */
+		NULL, /*Duct_sgxmgr*/
+		SGXquote_sgxmgr,
+	}
 };
 
 
@@ -389,9 +395,16 @@ extern int main(int argc, char *argv[])
 	    opt,
 	    retn = 1;
 
+	enum {
+		untrusted,
+		trusted
+	} mode = untrusted;
+
 	struct SGX_report __attribute__((aligned(512))) enclave_report;
 
-	struct LocalSource_ecall0_interface source_ecall0;
+	struct LocalTarget_ecall0_interface source_ecall0;
+
+	struct LocalTarget_ecall1 source_ecall1;
 
 	Buffer spid	= NULL,
 	       quote	= NULL,
@@ -412,8 +425,11 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "e:q:s:")) != EOF )
+	while ( (opt = getopt(argc, argv, "Te:q:s:")) != EOF )
 		switch ( opt ) {
+			case 'T':
+				mode = trusted;
+				break;
 			case 'e':
 				epid_blob = optarg;
 				break;
@@ -424,6 +440,11 @@ extern int main(int argc, char *argv[])
 				spid_key = optarg;
 				break;
 		}
+
+
+	/* Print banner. */
+	fprintf(stdout, "%s: Remote test utility.\n", PGM);
+	fprintf(stdout, "%s: (C)2018 IDfusion, LLC\n", PGM);
 
 
 	/* Verify arguements. */
@@ -438,16 +459,47 @@ extern int main(int argc, char *argv[])
 	}
 
 
-	/* Print banner. */
-	fprintf(stdout, "%s: Remote attestation test utility.\n", PGM);
-	fprintf(stdout, "%s: (C)2018 IDfusion, LLC\n", PGM);
+	/* Test trusted mode. */
+	if ( mode == trusted ) {
+		fputs("\nTesting enclave mode attestation.\n", stdout);
+
+		INIT(NAAAIM, SGXenclave, source, ERR(goto done));
+		if ( !source->setup(source, source_enclave, source_token, \
+				    debug) )
+			ERR(goto done);
+
+		source_ecall1.qe_token	    = quote_token;
+		source_ecall1.qe_token_size = strlen(quote_token) + 1;
+
+		source_ecall1.pce_token	     = pce_token;
+		source_ecall1.pce_token_size = strlen(pce_token) + 1;
+
+		source_ecall1.epid_blob	     = epid_blob;
+		source_ecall1.epid_blob_size = strlen(epid_blob) + 1;
+
+		source_ecall1.spid 	= spid_key;
+		source_ecall1.spid_size = strlen(spid_key) + 1;
+
+		if ( !source->boot_slot(source, 1, &ocall_table, \
+					&source_ecall1, &rc) ) {
+			fprintf(stderr, "Enclave return error: %d\n", rc);
+			ERR(goto done);
+		}
+
+		if ( !source_ecall1.retn )
+			fputs("Trusted remote attestation test failed.\n", \
+			      stderr);
+		goto done;
+	}
 
 
 	/* Load and initialize the quoting object. */
+	fputs("\nTesting non-enclave attestation.\n", stdout);
+
+	fputs("\nInitializing quote.\n", stdout);
 	INIT(NAAAIM, SGXquote, quoter, ERR(goto done));
 	if ( !quoter->init(quoter, quote_token, pce_token, epid_blob) )
 		ERR(goto done);
-	fputs("\nInitialized quoting object.\n\n", stdout);
 
 
 	/*

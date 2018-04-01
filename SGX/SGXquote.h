@@ -14,6 +14,50 @@
 #define NAAAIM_SGXquote_HEADER
 
 
+/**
+ * Enumeration type which defines the method type whose userspace
+ * implementation is being requested.
+ */
+enum SGXquote_ocalls {
+	SGXquote_init_object,
+
+	SGXquote_init,
+	SGXquote_generate_quote,
+	SGXquote_generate_report,
+
+	SGXquote_get_qe_targetinfo,
+
+	SGXquote_whack,
+
+	SGXquote_END
+};
+
+
+/**
+ * Structure which marshalls the data for the call into and out of
+ * the Duct manager.
+ */
+struct SGXquote_ocall {
+	_Bool retn;
+	enum SGXquote_ocalls ocall;
+	unsigned int instance;
+
+	char *quote_token;
+	char *pce_token;
+	char *epid_blob;
+
+	struct SGX_targetinfo *qe_target_info;
+	struct SGX_report report;
+
+	unsigned char spid[16];
+	unsigned char nonce[16];
+
+	size_t bufr_size;
+	unsigned char *bufr;
+	unsigned char arena[];
+};
+
+
 /* Object type definitions. */
 typedef struct NAAAIM_SGXquote * SGXquote;
 
@@ -42,5 +86,8 @@ struct NAAAIM_SGXquote
 
 /* Sgxmetadata constructor call. */
 extern SGXquote NAAAIM_SGXquote_Init(void);
+
+/* Definition for entry point for SGXquote SGX manager. */
+extern int SGXquote_sgxmgr(struct SGXquote_ocall *ocp);
 
 #endif

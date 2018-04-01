@@ -121,7 +121,7 @@ test-local-target.o: test-local-target.c
 test-remote-target: test-remote-target.o				  \
 	../SGXenclave.o ../SGXloader.o ../SGXmetadata.o ../SGXsigstruct.o \
 	../QEenclave.o ../SGXepid.o ../PCEenclave.o ../SGXquote.o	  \
-	../../RandomBuffer.o ../sgx-ocall.o ../boot-sgx.o
+	../../RandomBuffer.o ../SGXquote_sgxmgr.o ../sgx-ocall.o ../boot-sgx.o
 	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${NAAAIM_LIB} ${HURDLIB} \
 		${SSL_CRYPTO};
 
