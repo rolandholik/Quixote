@@ -8,12 +8,14 @@
 
 #include <HurdLib.h>
 #include <Buffer.h>
+#include <String.h>
 
 #include "SHA256.h"
 #include "RandomBuffer.h"
 #include "Curve25519.h"
 #include "SHA256_hmac.h"
 #include "AES256_cbc.h"
+#include "Base64.h"
 
 
 void test_one()
@@ -281,6 +283,58 @@ void test_five()
 }
 
 
+void test_six()
+
+{
+	RandomBuffer rnd = NULL;
+
+	Buffer b,
+	       bufr = NULL;
+
+	String ascii = NULL;
+
+	Base64 base64 = NULL;
+
+
+	/* Create a random buffer to encode. */
+	INIT(NAAAIM, RandomBuffer, rnd, ERR(goto done));
+	if ( !rnd->generate(rnd, 16) )
+		ERR(goto done);
+
+	b = rnd->get_Buffer(rnd);
+	fputs("Random buffer:\n", stdout);
+	b->print(b);
+
+
+	/* Encode the random buffer. */
+	INIT(HurdLib, String, ascii, ERR(goto done));
+	INIT(NAAAIM, Base64, base64, ERR(goto done));
+
+	if ( !base64->encode(base64, b, ascii) )
+		ERR(goto done);
+	fputs("\nEncoded random buffer:\n", stdout);
+	ascii->print(ascii);
+
+
+	/* Decode the buffer. */
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+
+	if ( !base64->decode(base64, ascii, bufr) )
+		ERR(goto done);
+	fputs("\nDecoded ranom buffer:\n", stdout);
+	bufr->print(bufr);
+
+
+ done:
+	WHACK(rnd);
+	WHACK(bufr);
+	WHACK(ascii);
+	WHACK(base64);
+
+	return;
+}
+
+
 void test_naaaim(unsigned int test)
 
 {
@@ -301,6 +355,9 @@ void test_naaaim(unsigned int test)
 			break;
 		case 5:
 			test_five();
+			break;
+		case 6:
+			test_six();
 			break;
 
 		default:

@@ -14,7 +14,7 @@
 /* Number of tests. */
 #define PGM "test-naaaim"
 
-#define NUMBER_OF_TESTS 5
+#define NUMBER_OF_TESTS 6
 
 
 /* Include files. */
