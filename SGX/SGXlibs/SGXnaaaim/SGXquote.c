@@ -127,7 +127,7 @@ struct NAAAIM_SGXquote_State
  *
  * \return	The endian converted integer.
  */
-static inline uint16_t htons(uint16_t value)
+static inline uint16_t ntohs(uint16_t value)
 
 {
 	return value << 8 | value >> 8;
@@ -652,7 +652,7 @@ static _Bool decode_report(CO(SGXquote, this), CO(String, report))
 		tlv = (struct TLVshort *) bufr->get(bufr);
 		if ( (tlv->type != 21) || (tlv->version != 2) )
 			ERR(goto done);
-		tlv_size = htons(tlv->size);
+		tlv_size = ntohs(tlv->size);
 		fprintf(stdout, "%s: tlv=%04x, size=%04x\n", __func__, \
 			tlv->size, tlv_size);
 
@@ -852,7 +852,7 @@ static void dump_report(CO(SGXquote, this))
 
 
 	memcpy(&flags, plb->sgx_tcb_evaluation_flags, sizeof(flags));
-	flags = htons(flags);
+	flags = ntohs(flags);
 	fprintf(stdout, "\n\tTCB evaluation flags: %u\n", flags);
 	if ( flags & 0x1 )
 		fputs("\t\tCPU svn out of date.\n", stdout);
@@ -862,7 +862,7 @@ static void dump_report(CO(SGXquote, this))
 		fputs("\t\tPCE enclave out of date.\n", stdout);
 
 	memcpy(&flags, plb->pse_evaluation_flags, sizeof(flags));
-	flags = htons(flags);
+	flags = ntohs(flags);
 	fprintf(stdout, "\n\tPSE evaluation flags: %u\n", flags);
 
 	psvnp = &plb->latest_equivalent_tcb_psvn;

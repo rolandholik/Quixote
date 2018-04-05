@@ -578,7 +578,7 @@ static _Bool decode_report(CO(SGXquote, this), CO(String, report))
 		tlv = (struct TLVshort *) bufr->get(bufr);
 		if ( (tlv->type != 21) || (tlv->version != 2) )
 			ERR(goto done);
-		tlv_size = htons(tlv->size);
+		tlv_size = ntohs(tlv->size);
 
 		bufr->reset(bufr);
 		if ( !bufr->add_hexstring(bufr, \
@@ -746,7 +746,7 @@ static void dump_report(CO(SGXquote, this))
 
 
 	memcpy(&flags, plb->sgx_tcb_evaluation_flags, sizeof(flags));
-	flags = htons(flags);
+	flags = ntohs(flags);
 	fprintf(stdout, "\n\tTCB evaluation flags: %u\n", flags);
 	if ( flags & 0x1 )
 		fputs("\t\tCPU svn out of date.\n", stdout);
@@ -756,7 +756,7 @@ static void dump_report(CO(SGXquote, this))
 		fputs("\t\tPCE enclave out of date.\n", stdout);
 
 	memcpy(&flags, plb->pse_evaluation_flags, sizeof(flags));
-	flags = htons(flags);
+	flags = ntohs(flags);
 	fprintf(stdout, "\n\tPSE evaluation flags: %u\n", flags);
 
 	psvnp = &plb->latest_equivalent_tcb_psvn;
