@@ -58,6 +58,21 @@ struct SGXquote_ocall {
 };
 
 
+/**
+ * Enumeration type which defines the status of the remote enclave.
+ */
+enum SGXquote_status {
+	SGXquote_status_OK=0,
+	SGXquote_status_SIGNATURE_INVALID,
+	SGXquote_status_GROUP_REVOKED,
+	SGXquote_status_SIGNATURE_REVOKED,
+	SGXquote_status_KEY_REVOKD,
+	SGXquote_status_SIGRL_VERSION_MISMATCH,
+	SGXquote_status_GROUP_OUT_OF_DATE,
+	SGXquote_status_UNDEFINED
+};
+
+
 /* Object type definitions. */
 typedef struct NAAAIM_SGXquote * SGXquote;
 
@@ -74,8 +89,11 @@ struct NAAAIM_SGXquote
 	_Bool (*generate_quote)(const SGXquote, struct SGX_report *report, \
 				const Buffer, const Buffer, const Buffer);
 	_Bool (*generate_report)(const SGXquote, const Buffer, const String);
+	_Bool (*decode_report)(const SGXquote, const String);
 
 	struct SGX_targetinfo * (*get_qe_targetinfo)(const SGXquote);
+
+	void (*dump_report)(const SGXquote);
 	void (*whack)(const SGXquote);
 
 

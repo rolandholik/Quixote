@@ -20,6 +20,9 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include <regex.h>
+
+#include <arpa/inet.h>
 
 #include <Origin.h>
 #include <HurdLib.h>
@@ -48,6 +51,42 @@
 #endif
 
 
+
+/**
+ * The following array defines the strings used to indicate the
+ * general result of the attestation.
+ */
+static const char *Quote_status[] = {
+	"OK",
+	"SIGNATURE_INVALID",
+	"GROUP_REVOKED",
+	"SIGNATURE_REVOKED",
+	"KEY_REVOKED",
+	"SIGRL_VERSION_MISMATCH",
+	"GROUP_OUT_OF_DATE",
+	"UNDEFINED",
+	NULL
+};
+
+
+/**
+ * The following structure defines the information 'blob' that is
+ * returned from the Intel attestation servers if the EPID group
+ * has been revoked or is out of date.
+ */
+struct platform_info {
+	uint8_t sgx_epid_group_flags;
+	uint8_t sgx_tcb_evaluation_flags[2];
+	uint8_t pse_evaluation_flags[2];
+	struct SGX_psvn latest_equivalent_tcb_psvn;
+	uint8_t latest_pse_isvsvn[4];
+	uint8_t latest_psda_svn[4];
+	uint32_t xeid;
+	uint8_t GroupId[4];
+	uint8_t signature[64];
+} __attribute__((packed));
+
+
 /** SGXquote private state information. */
 struct NAAAIM_SGXquote_State
 {
@@ -72,8 +111,15 @@ struct NAAAIM_SGXquote_State
 	/* The quoting enclave. */
 	QEenclave qe;
 
-	/* The object containing the quote. */
-	Buffer quote;
+	/* Information derived from an attestation report. */
+	String id;
+	String timestamp;
+
+	enum SGXquote_status status;
+
+	struct SGX_quote quote;
+
+	struct platform_info platform_info;
 };
 
 
@@ -99,7 +145,13 @@ static void _init_state(CO(SGXquote_State, S)) {
 	memset(&S->qe_target_info, '\0', sizeof(struct SGX_targetinfo));
 
 	S->qe	 = NULL;
-	S->quote = NULL;
+
+	S->id	     = NULL;
+	S->timestamp = NULL;
+	S->status    = SGXquote_status_UNDEFINED;
+
+	memset(&S->quote, '\0', sizeof(struct SGX_quote));
+	memset(&S->platform_info, '\0', sizeof(struct platform_info));
 
 	return;
 }
@@ -235,7 +287,6 @@ static _Bool generate_quote(CO(SGXquote, this),				 \
 
 
 	/* Generate quote into object specific buffer. */
-	INIT(HurdLib, Buffer, S->quote, ERR(goto done));
 	if ( !S->qe->generate_quote(S->qe, report, 0, spid, nonce, NULL, \
 				    quote, S->pce_psvn.isv_svn) )
 		ERR(goto done);
@@ -353,6 +404,207 @@ static _Bool generate_report(CO(SGXquote, this), CO(Buffer, quote), \
 
 
 /**
+ * Internal private function.
+ *
+ * This method parses the supplied input for a single JSON field.  It
+ * is a subordinate helper function for the ->decode_report method.
+ *
+ * \param field	The object containing the field to be parsed.
+ *
+ * \param rgx	The object which is to be used to create the
+ *		regular expression.
+ *
+ * \param fd	The field descriptor tag which is to be returned.
+ *
+ * \param value	A pointer to the object that will be loaded with
+ *		the parsed field value.
+ *
+ * \return	A boolean value is used to indicate the success or
+ *		failure of the field extraction.  A false value is
+ *		used to indicate a failure occurred during the field
+ *		entry extraction.  A true value indicates the
+ *		field has been successfully extracted and the value
+ *		variable contains a legitimate value.
+ */
+
+static _Bool _get_field(CO(String, field), CO(String, rgx), CO(char *, fd), \
+			CO(String, value))
+
+{
+	_Bool retn       = false,
+	      have_regex = false;
+
+	char *fp,
+	     element[2];
+
+	size_t len;
+
+	regex_t regex;
+
+	regmatch_t regmatch[2];
+
+
+	/* Extract the field element. */
+	value->reset(value);
+
+	rgx->reset(rgx);
+	rgx->add(rgx, ".*\"");
+	rgx->add(rgx, fd);
+	if ( !rgx->add(rgx, "\":\"([^\"]*).*") )
+		ERR(goto done);
+
+	if ( regcomp(&regex, rgx->get(rgx), REG_EXTENDED) != 0 )
+		ERR(goto done);
+	have_regex = true;
+
+	if ( regexec(&regex, field->get(field), 2, regmatch, 0) != REG_OK )
+		ERR(goto done);
+
+	len = regmatch[1].rm_eo - regmatch[1].rm_so;
+	if ( len > field->size(field) )
+		ERR(goto done);
+
+
+	/* Copy the field element to the output object. */
+	memset(element, '\0', sizeof(element));
+	fp = field->get(field) + regmatch[1].rm_so;
+
+	while ( len-- ) {
+		element[0] = *fp;
+		value->add(value, element);
+		++fp;
+	}
+	if ( value->poisoned(value) )
+		ERR(goto done);
+
+	retn = true;
+
+ done:
+	if ( have_regex )
+		regfree(&regex);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements the decoding of an enclave attestation report
+ * that has been previously requested.
+ *
+ * \param this		A pointer to the quoting object which is to
+ *			be used for decoding the report.
+ *
+ * \param report	The object containing the report that is to
+ *			be decoded.
+ *
+ * \return	A boolean value is returned to indicate the
+ *		status of the initialization of the quote.  A false
+ *		value indicates an error occurred while a true
+ *		value indicates the quote was successfully initialized.
+ */
+
+static _Bool decode_report(CO(SGXquote, this), CO(String, report))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	uint16_t tlv_size;
+
+	struct TLVshort {
+		uint8_t type;
+		uint8_t version;
+		uint16_t size;
+	} __attribute__((packed)) *tlv;
+
+	Buffer bufr = NULL;
+
+	String field  = NULL,
+	       fregex = NULL;
+
+	Base64 base64 = NULL;
+
+
+	/* Decode the mandatory information fields. */
+	INIT(HurdLib, String, fregex, ERR(goto done));
+
+	INIT(HurdLib, String, S->id, ERR(goto done));
+	if ( !_get_field(report, fregex, "id", S->id) )
+		ERR(goto done);
+
+	INIT(HurdLib, String, S->timestamp, ERR(goto done));
+	if ( !_get_field(report, fregex, "timestamp", S->timestamp) )
+		ERR(goto done);
+
+	INIT(HurdLib, String, field, ERR(goto done));
+	if ( !_get_field(report, fregex, "isvEnclaveQuoteStatus", field) )
+		ERR(goto done);
+
+	for (S->status= 0; Quote_status[S->status] != NULL; ++S->status) {
+		if ( strcmp(field->get(field), Quote_status[S->status]) \
+		     == 0)
+			break;
+	}
+
+
+	/* Decode the quote body. */
+	field->reset(field);
+	if ( !_get_field(report, fregex, "isvEnclaveQuoteBody", field) )
+		ERR(goto done);
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	INIT(NAAAIM, Base64, base64, ERR(goto done));
+
+	if ( !base64->decode(base64, field, bufr) )
+		ERR(goto done);
+
+	memcpy(&S->quote, bufr->get(bufr), sizeof(struct SGX_quote));
+
+
+	/* Decode the platform information report if available. */
+	if ( S->status == SGXquote_status_GROUP_OUT_OF_DATE ||
+	     S->status == SGXquote_status_GROUP_REVOKED ) {
+		field->reset(field);
+		if ( !_get_field(report, fregex, "platformInfoBlob", field) )
+			ERR(goto done);
+
+		bufr->reset(bufr);
+		if ( !bufr->add_hexstring(bufr, field->get(field)) )
+			ERR(goto done);
+
+		tlv = (struct TLVshort *) bufr->get(bufr);
+		if ( (tlv->type != 21) || (tlv->version != 2) )
+			ERR(goto done);
+		tlv_size = htons(tlv->size);
+
+		bufr->reset(bufr);
+		if ( !bufr->add_hexstring(bufr, \
+					  field->get(field) + sizeof(*tlv)*2) )
+			ERR(goto done);
+		if ( tlv_size != bufr->size(bufr) )
+			ERR(goto done);
+
+		memcpy(&S->platform_info, bufr->get(bufr), \
+		       sizeof(struct platform_info));
+	}
+	retn = true;
+
+
+ done:
+	WHACK(field);
+	WHACK(fregex);
+
+	WHACK(bufr);
+	WHACK(base64);
+
+	return retn;
+}
+
+
+/**
  * External public method.
  *
  * This method implements an accessor method for returning a pointer
@@ -379,6 +631,158 @@ static struct SGX_targetinfo * get_qe_targetinfo(CO(SGXquote, this))
 /**
  * External public method.
  *
+ * This method implements the decoding and print out of an attestation
+ * report
+ *
+ * \param this	A pointer to the object containing the attestation report
+ *		to be generated.
+ */
+
+static void dump_report(CO(SGXquote, this))
+
+{
+	STATE(S);
+
+	uint16_t flags;
+
+	uint32_t gid;
+
+	struct SGX_reportbody *bp;
+
+	struct platform_info *plb;
+
+	struct SGX_psvn *psvnp;
+
+	Buffer bufr = NULL;
+
+
+	/* Verify object status. */
+	if ( S->poisoned ) {
+		fputs("*POISONED*\n", stdout);
+		return;
+	}
+	if ( S->status == SGXquote_status_UNDEFINED ) {
+		fputs("No report available.\n", stdout);
+		return;
+	}
+
+	fputs("ID:        ", stdout);
+	S->id->print(S->id);
+
+	fputs("Timestamp: ", stdout);
+	S->timestamp->print(S->timestamp);
+
+	fprintf(stdout, "Status:    %s\n", Quote_status[S->status]);
+
+
+	fputs("\nQuote:\n", stdout);
+	fprintf(stdout, "\tversion:    %u\n", S->quote.version);
+	fprintf(stdout, "\tsign_type:  %u\n", S->quote.sign_type);
+
+	memcpy(&gid, S->quote.epid_group_id, sizeof(gid));
+	fprintf(stdout, "\tgroup id:   0x%08x\n", gid);
+
+	fprintf(stdout, "\tQE svn:     %u\n", S->quote.qe_svn);
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	if ( !bufr->add(bufr, (unsigned char *) S->quote.basename, \
+			sizeof(S->quote.basename)) )
+		ERR(goto done);
+	fputs("\tBasename:   ", stdout);
+	bufr->print(bufr);
+
+	bp = &S->quote.report_body;
+	fputs("\tReport body:\n", stdout);
+
+	bufr->reset(bufr);
+	if ( !bufr->add(bufr, bp->cpusvn, sizeof(bp->cpusvn)) )
+		ERR(goto done);
+	fputs("\t\tcpusvn:      ", stdout);
+	bufr->print(bufr);
+
+	fprintf(stdout, "\t\tmiscselect:  %u\n", bp->miscselect);
+	fprintf(stdout, "\t\tattributes:  flags=0x%0lx, xfrm=0x%0lx\n", \
+		bp->attributes.flags, bp->attributes.xfrm);
+
+	bufr->reset(bufr);
+	if ( !bufr->add(bufr, bp->mr_enclave.m, sizeof(bp->mr_enclave.m)) )
+		ERR(goto done);
+	fputs("\t\tmeasurement: ", stdout);
+	bufr->print(bufr);
+
+	bufr->reset(bufr);
+	if ( !bufr->add(bufr, bp->mrsigner, sizeof(bp->mrsigner)) )
+		ERR(goto done);
+	fputs("\t\tsigner:      ", stdout);
+	bufr->print(bufr);
+
+	fprintf(stdout, "\t\tISV prodid:  %u\n", bp->isvprodid);
+	fprintf(stdout, "\t\tISV svn:     %u\n", bp->isvsvn);
+
+	bufr->reset(bufr);
+	if ( !bufr->add(bufr, bp->reportdata, sizeof(bp->reportdata)) )
+		ERR(goto done);
+	fputs("\t\treportdata:  ", stdout);
+	bufr->print(bufr);
+
+
+	/* Outplut platform info report if it is available. */
+	if ( !(S->status == SGXquote_status_GROUP_OUT_OF_DATE ||
+	       S->status == SGXquote_status_GROUP_REVOKED) ) {
+		fputs("Have platform status.\n", stdout);
+		goto done;
+	}
+
+	fputs("\nPlatform Info Report:\n", stdout);
+	plb = &S->platform_info;
+
+	fprintf(stdout, "\tEPID group flags: %u\n", plb->sgx_epid_group_flags);
+	if ( plb->sgx_epid_group_flags & 0x1 )
+		fputs("\t\tEPID group revoked.\n", stdout);
+	if ( plb->sgx_epid_group_flags & 0x2 )
+		fputs("\t\tPerformance rekey available.\n", stdout);
+	if ( plb->sgx_epid_group_flags & 0x4 )
+		fputs("\t\tEPID group out of date.\n", stdout);
+
+
+	memcpy(&flags, plb->sgx_tcb_evaluation_flags, sizeof(flags));
+	flags = htons(flags);
+	fprintf(stdout, "\n\tTCB evaluation flags: %u\n", flags);
+	if ( flags & 0x1 )
+		fputs("\t\tCPU svn out of date.\n", stdout);
+	if ( flags & 0x2 )
+		fputs("\t\tQE enclave out of date.\n", stdout);
+	if ( flags & 0x4 )
+		fputs("\t\tPCE enclave out of date.\n", stdout);
+
+	memcpy(&flags, plb->pse_evaluation_flags, sizeof(flags));
+	flags = htons(flags);
+	fprintf(stdout, "\n\tPSE evaluation flags: %u\n", flags);
+
+	psvnp = &plb->latest_equivalent_tcb_psvn;
+	bufr->reset(bufr);
+	if ( !bufr->add(bufr, psvnp->cpu_svn, sizeof(psvnp->cpu_svn)) )
+		ERR(goto done);
+
+	fputs("\n\tRecommended platform status:\n", stdout);
+	fputs("\t\tCPU svn: ", stdout);
+	bufr->print(bufr);
+
+	fprintf(stdout, "\t\tISV svn: %u\n", psvnp->isv_svn);
+
+	fprintf(stdout, "\n\tExtended group id: 0x%x\n", plb->xeid);
+
+
+ done:
+	WHACK(bufr);
+
+	return;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a destructor for the SGXquote object.
  *
  * \param this	A pointer to the object which is to be destroyed.
@@ -390,7 +794,8 @@ static void whack(CO(SGXquote, this))
 	STATE(S);
 
 	WHACK(S->qe);
-	WHACK(S->quote);
+	WHACK(S->id);
+	WHACK(S->timestamp);
 
 	S->root->whack(S->root, this, S);
 	return;
@@ -436,10 +841,12 @@ extern SGXquote NAAAIM_SGXquote_Init(void)
 
 	this->generate_quote  = generate_quote;
 	this->generate_report = generate_report;
+	this->decode_report   = decode_report;
 
 	this->get_qe_targetinfo = get_qe_targetinfo;
 
-	this->whack = whack;
+	this->dump_report = dump_report;
+	this->whack	  = whack;
 
 	return this;
 }

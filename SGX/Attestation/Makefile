@@ -27,6 +27,7 @@ SGX_CRYPTO_LIB	    = sgx_tcrypto
 SGX_SERVICE_LIBRARY = sgx_tservice
 
 ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles  \
+	-Wl,--whole-archive -lsgx_tsgxssl -Wl,--no-whole-archive	     \
 	-L${SGX_LIBRARY_PATH} -L . -L ../SGXlibs/SGXfusion		     \
 	-L ../SGXlibs/SGXnaaaim						     \
 	-Wl,--whole-archive						     \
@@ -34,6 +35,7 @@ ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles  \
 	-Wl,--no-whole-archive						     \
 	-Wl,--start-group						     \
 	-lsgx_tstdc -l${SGX_CRYPTO_LIB} -l${SGX_SERVICE_LIBRARY} -lSGXnaaaim \
+	-lsgx_tsgxssl_crypto						     \
 	-Wl,--end-group							     \
 	-Wl,-Bstatic -Wl,-Bsymbolic -Wl,--no-undefined			     \
 	-Wl,-pie,-eenclave_entry -Wl,--export-dynamic			     \

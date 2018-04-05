@@ -208,13 +208,20 @@ _Bool test_attestation(char *qe_token, char *pce_token, char *epid_blob, \
 	quote->hprint(quote);
 
 
-	/* Verify the quote. */
+	/* Generate the verifying report. */
 	INIT(HurdLib, String, output, ERR(goto done));
 	if ( !quoter->generate_report(quoter, quote, output) )
 		ERR(goto done);
 
 	fputs("\nAttestation report:\n", stdout);
 	output->print(output);
+
+
+	/* Decode response values. */
+	fputc('\n', stdout);
+	if ( !quoter->decode_report(quoter, output) )
+		ERR(goto done);
+	quoter->dump_report(quoter);
 
 
  done:

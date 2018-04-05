@@ -44,25 +44,6 @@
 #include "LocalTarget-interface.h"
 
 
-/**
- * The following structure defines the information 'blob' that is
- * returned from the Intel attestation servers if the EPID group
- * has been revoked or is out of date.
- */
-struct platform_info_blob {
-	uint8_t sgx_epid_group_flags;
-	uint8_t sgx_tcb_evaluation_flags[2];
-	uint8_t pse_evaluation_flags[2];
-	struct SGX_psvn latest_equivalent_tcb_psvn;
-	uint8_t latest_pse_isvsvn[4];
-	uint8_t latest_psda_svn[4];
-	uint32_t xeid;
-	uint8_t GroupId[4];
-	uint8_t signature[64];
-} __attribute__((packed));
-
-
-
 /** OCALL interface definition. */
 struct SGXfusion_ocall0_interface {
 	char* str;
@@ -75,307 +56,49 @@ int ocall0_handler(struct SGXfusion_ocall0_interface *interface)
 	return 0;
 }
 
+struct ocall2_interface {
+	int* ms_cpuinfo;
+	int ms_leaf;
+	int ms_subleaf;
+};
+
+static void cpuid(int *eax, int *ebx, int *ecx, int *edx)\
+
+{
+	__asm("cpuid\n\t"
+	      /* Output. */
+	      : "=a" (*eax), "=b" (*ebx), "=c" (*ecx), "=d" (*edx)
+	      /* Input. */
+	      : "0" (*eax), "2" (*ecx));
+
+	return;
+}
+
+
+int ocall2_handler(struct ocall2_interface *pms)
+
+{
+	struct ocall2_interface *ms = (struct ocall2_interface *) pms;
+
+
+	ms->ms_cpuinfo[0] = ms->ms_leaf;
+	ms->ms_cpuinfo[2] = ms->ms_subleaf;
+
+	cpuid(&ms->ms_cpuinfo[0], &ms->ms_cpuinfo[1], &ms->ms_cpuinfo[2], \
+	      &ms->ms_cpuinfo[3]);
+
+	return 0;
+}
+
 static const struct OCALL_api ocall_table = {
 	4,
 	{
 		ocall0_handler,
-		NULL, /*ocall2_handler */
+		ocall2_handler, /*ocall2_handler */
 		NULL, /*Duct_sgxmgr*/
 		SGXquote_sgxmgr,
 	}
 };
-
-
-/**
- * Internal private function.
- *
- * This method parses the supplied input for a single JSON field.
- *
- * \param field	The object containing the field to be parsed.
- *
- * \param rgx	The object which is to be used to create the
- *		regular expression.
- *
- * \param fd	The field descriptor tag which is to be returned.
- *
- * \param value	A pointer to the object that will be loaded with
- *		the parsed field value.
- *
- * \return	A boolean value is used to indicate the success or
- *		failure of the field extraction.  A false value is
- *		used to indicate a failure occurred during the field
- *		entry extraction.  A true value indicates the
- *		field has been successfully extracted and the value
- *		variable contains a legitimate value.
- */
-
-static _Bool _get_field(CO(String, field), CO(String, rgx), CO(char *, fd), \
-			CO(String, value))
-
-{
-	_Bool retn       = false,
-	      have_regex = false;
-
-	char *fp,
-	     element[2];
-
-	size_t len;
-
-	regex_t regex;
-
-	regmatch_t regmatch[2];
-
-
-	/* Extract the field element. */
-	value->reset(value);
-
-	rgx->reset(rgx);
-	rgx->add(rgx, ".*\"");
-	rgx->add(rgx, fd);
-	if ( !rgx->add(rgx, "\":\"([^\"]*).*") )
-		ERR(goto done);
-
-	if ( regcomp(&regex, rgx->get(rgx), REG_EXTENDED) != 0 )
-		ERR(goto done);
-	have_regex = true;
-
-	if ( regexec(&regex, field->get(field), 2, regmatch, 0) != REG_OK )
-		ERR(goto done);
-
-	len = regmatch[1].rm_eo - regmatch[1].rm_so;
-	if ( len > field->size(field) )
-		ERR(goto done);
-
-
-	/* Copy the field element to the output object. */
-	memset(element, '\0', sizeof(element));
-	fp = field->get(field) + regmatch[1].rm_so;
-
-	while ( len-- ) {
-		element[0] = *fp;
-		value->add(value, element);
-		++fp;
-	}
-	if ( value->poisoned(value) )
-		ERR(goto done);
-
-	retn = true;
-
- done:
-	if ( have_regex )
-		regfree(&regex);
-
-	return retn;
-}
-
-/**
- * Static public function.
- *
- * This function decodes the Intel Authentication Services (IAS) report
- * which is the JSON encoded result from the posting of an enclave quote
- * to the IAS service.
- *
- * \param enclave	The object which contains the quote.
- *
- * \return	If an error is encountered while decoding the response
- *		a false value is returned.  A true value indicates the
- *		quote was succesfully processed.
- */
-
-static _Bool decode_ias_report(CO(String, report))
-
-{
-	_Bool retn		 = false,
-	      have_platform_info = false;
-
-	uint16_t flags,
-	         tlv_size;
-
-	uint32_t gid;
-
-	static const char *revoked  = "GROUP_REVOKED",
-			  *outdated = "GROUP_OUT_OF_DATE";
-
-	struct TLVshort {
-		uint8_t type;
-		uint8_t version;
-		uint16_t size;
-	} __attribute__((packed)) *tlv;
-
-	struct platform_info_blob plb;
-
-	struct SGX_quote *qp,
-			  quote;
-
-	struct SGX_psvn *psvnp;
-
-	struct SGX_reportbody *bp;
-
-	Buffer bufr = NULL;
-
-	String field  = NULL,
-	       fregex = NULL;
-
-	Base64 base64 = NULL;
-
-
-	INIT(HurdLib, String, field, ERR(goto done));
-	INIT(HurdLib, String, fregex, ERR(goto done));
-
-	if ( !_get_field(report, fregex, "id", field) )
-		ERR(goto done);
-	fputs("ID:        ", stdout);
-	field->print(field);
-
-	if ( !_get_field(report, fregex, "timestamp", field) )
-		ERR(goto done);
-	fputs("Timestamp: ", stdout);
-	field->print(field);
-
-	if ( !_get_field(report, fregex, "isvEnclaveQuoteStatus", field) )
-		ERR(goto done);
-	have_platform_info = (strcmp(outdated, field->get(field)) == 0 || \
-			      strcmp(revoked,  field->get(field)) == 0);
-	fputs("Status:    ", stdout);
-	field->print(field);
-
-	if ( !_get_field(report, fregex, "isvEnclaveQuoteBody", field) )
-		ERR(goto done);
-
-	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	INIT(NAAAIM, Base64, base64, ERR(goto done));
-
-	if ( !base64->decode(base64, field, bufr) )
-		ERR(goto done);
-
-	qp = (struct SGX_quote *) bufr->get(bufr);
-	quote = *qp;
-
-	fputs("\nQuote:\n", stdout);
-	fprintf(stdout, "\tversion:    %u\n", quote.version);
-	fprintf(stdout, "\tsign_type:  %u\n", quote.sign_type);
-
-	memcpy(&gid, quote.epid_group_id, sizeof(gid));
-	fprintf(stdout, "\tgroup id:   0x%08x\n", gid);
-
-	fprintf(stdout, "\tQE svn:     %u\n", quote.qe_svn);
-
-	bufr->reset(bufr);
-	if ( !bufr->add(bufr, (unsigned char *) quote.basename, \
-			sizeof(quote.basename)) )
-		ERR(goto done);
-	fputs("\tBasename:   ", stdout);
-	bufr->print(bufr);
-
-	bp = &quote.report_body;
-	fputs("\tReport body:\n", stdout);
-
-	bufr->reset(bufr);
-	if ( !bufr->add(bufr, bp->cpusvn, sizeof(bp->cpusvn)) )
-		ERR(goto done);
-	fputs("\t\tcpusvn:      ", stdout);
-	bufr->print(bufr);
-
-	fprintf(stdout, "\t\tmiscselect:  %u\n", bp->miscselect);
-	fprintf(stdout, "\t\tattributes:  flags=0x%0lx, xfrm=0x%0lx\n", \
-		bp->attributes.flags, bp->attributes.xfrm);
-
-	bufr->reset(bufr);
-	if ( !bufr->add(bufr, bp->mr_enclave.m, sizeof(bp->mr_enclave.m)) )
-		ERR(goto done);
-	fputs("\t\tmeasurement: ", stdout);
-	bufr->print(bufr);
-
-	bufr->reset(bufr);
-	if ( !bufr->add(bufr, bp->mrsigner, sizeof(bp->mrsigner)) )
-		ERR(goto done);
-	fputs("\t\tsigner:      ", stdout);
-	bufr->print(bufr);
-
-	fprintf(stdout, "\t\tISV prodid:  %u\n", bp->isvprodid);
-	fprintf(stdout, "\t\tISV svn:     %u\n", bp->isvsvn);
-
-	bufr->reset(bufr);
-	if ( !bufr->add(bufr, bp->reportdata, sizeof(bp->reportdata)) )
-		ERR(goto done);
-	fputs("\t\treportdata:  ", stdout);
-	bufr->print(bufr);
-
-
-	/* Decode platform information. */
-	if ( !have_platform_info ) {
-		retn = true;
-		goto done;
-	}
-
-	fputs("\nPlatform Info Report:\n", stdout);
-	if ( !_get_field(report, fregex, "platformInfoBlob", field) )
-		ERR(goto done);
-
-	bufr->reset(bufr);
-	if ( !bufr->add_hexstring(bufr, field->get(field)) )
-		ERR(goto done);
-
-	tlv = (struct TLVshort *) bufr->get(bufr);
-	if ( (tlv->type != 21) || (tlv->version != 2) )
-		ERR(goto done);
-	tlv_size = htons(tlv->size);
-
-	bufr->reset(bufr);
-	if ( !bufr->add_hexstring(bufr, field->get(field) + sizeof(*tlv)*2) )
-		ERR(goto done);
-	if ( tlv_size != bufr->size(bufr) )
-		ERR(goto done);
-
-	memcpy(&plb, bufr->get(bufr), sizeof(plb));
-
-	fprintf(stdout, "\tEPID group flags: %u\n", plb.sgx_epid_group_flags);
-	if ( plb.sgx_epid_group_flags & 0x1 )
-		fputs("\t\tEPID group revoked.\n", stdout);
-	if ( plb.sgx_epid_group_flags & 0x2 )
-		fputs("\t\tPerformance rekey available.\n", stdout);
-	if ( plb.sgx_epid_group_flags & 0x4 )
-		fputs("\t\tEPID group out of date.\n", stdout);
-
-	memcpy(&flags, plb.sgx_tcb_evaluation_flags, sizeof(flags));
-	flags = htons(flags);
-	fprintf(stdout, "\n\tTCB evaluation flags: %u\n", flags);
-	if ( flags & 0x1 )
-		fputs("\t\tCPU svn out of date.\n", stdout);
-	if ( flags & 0x2 )
-		fputs("\t\tQE enclave out of date.\n", stdout);
-	if ( flags & 0x4 )
-		fputs("\t\tPCE enclave out of date.\n", stdout);
-
-	memcpy(&flags, plb.pse_evaluation_flags, sizeof(flags));
-	flags = htons(flags);
-	fprintf(stdout, "\n\tPSE evaluation flags: %u\n", flags);
-
-	psvnp = &plb.latest_equivalent_tcb_psvn;
-	bufr->reset(bufr);
-	if ( !bufr->add(bufr, psvnp->cpu_svn, sizeof(psvnp->cpu_svn)) )
-		ERR(goto done);
-
-	fputs("\n\tRecommended platform status:\n", stdout);
-	fputs("\t\tCPU svn: ", stdout);
-	bufr->print(bufr);
-
-	fprintf(stdout, "\t\tISV svn: %u\n", psvnp->isv_svn);
-
-	fprintf(stdout, "\n\tExtended group id: 0x%x\n", plb.xeid);
-
-	retn = true;
-
-
- done:
-	WHACK(field);
-	WHACK(fregex);
-
-	WHACK(bufr);
-	WHACK(base64);
-
-	return retn;
-}
 
 
 /* Program entry point. */
@@ -572,7 +295,9 @@ extern int main(int argc, char *argv[])
 
 	/* Decode response values. */
 	fputc('\n', stdout);
-	decode_ias_report(output);
+	if ( !quoter->decode_report(quoter, output) )
+		ERR(goto done);
+	quoter->dump_report(quoter);
 
 	retn = 0;
 
