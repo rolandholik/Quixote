@@ -7,7 +7,7 @@
 CSRC   = test-fusion.c
 ENCSRC = test-fusion-enclave.c test-fusion-interface.c
 LIBSRC = fusion-shim.c regcomp.c regexec.c regerror.c tre-mem.c reg-support.c \
-	Origin.c Fibsequence.c Buffer.c String.c
+	inet.c Origin.c Fibsequence.c Buffer.c String.c
 ASRC   = enclu_ereport.s enclu_egetkey.s
 
 TOOLS = test-fusion

@@ -119,24 +119,6 @@ struct NAAAIM_SGXquote_State
 /**
  * Internal private function.
  *
- * The following function is a standin in for the htons function which
- * is not available in the SGX standard C library.
- *
- * \param value	The 16-bit integer which is to be converted to into
- *		network byte order.
- *
- * \return	The endian converted integer.
- */
-static inline uint16_t ntohs(uint16_t value)
-
-{
-	return value << 8 | value >> 8;
-}
-
-
-/**
- * Internal private function.
- *
  * This method is responsible for marshalling arguements and generating
  * the OCALL for the external methods call.
  *
