@@ -59,6 +59,8 @@ struct Duct_ocall {
 
 	size_t size;
 	unsigned char *bufr;
+
+	unsigned char arena[];
 };
 
 

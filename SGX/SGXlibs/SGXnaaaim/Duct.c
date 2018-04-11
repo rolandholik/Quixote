@@ -133,9 +133,7 @@ static int duct_ocall(struct Duct_ocall *ocall)
 
 	int status = SGX_ERROR_INVALID_PARAMETER;
 
-	void *arena;
-
-	size_t arena_size = 0;
+	size_t arena_size = sizeof(struct Duct_ocall);
 
 	struct Duct_ocall *ocp = NULL;
 
@@ -144,43 +142,42 @@ static int duct_ocall(struct Duct_ocall *ocall)
 	if ( ocall->ocall == Duct_send_buffer ) {
 		if ( !sgx_is_within_enclave(ocall->bufr, ocall->size) )
 			goto done;
-		arena_size = ocall->size;
+		arena_size += ocall->size;
 	}
 	if ( ocall->ocall == Duct_set_server ) {
 		if ( !sgx_is_within_enclave(ocall->hostname, \
 					    strlen(ocall->hostname) + 1) )
 			goto done;
-		arena_size = strlen(ocall->hostname) + 1;
+		arena_size += strlen(ocall->hostname) + 1;
 	}
 	if ( ocall->ocall == Duct_init_port && (ocall->hostname != NULL) ) {
 		if ( !sgx_is_within_enclave(ocall->hostname, \
 					    strlen(ocall->hostname) + 1) )
 			goto done;
-		arena_size = strlen(ocall->hostname) + 1;
+		arena_size += strlen(ocall->hostname) + 1;
 	}
 
 
 	/* Allocate and initialize the outbound method structure. */
-	if ( (ocp = sgx_ocalloc(sizeof(struct Duct_ocall) + arena_size)) == \
-	     NULL )
+	if ( (ocp = sgx_ocalloc(arena_size)) == NULL )
 		goto done;
 
+	memset(ocp, '\0', arena_size);
 	*ocp = *ocall;
-	arena = ocp + sizeof(struct Duct_ocall);
 
 
 	/* Setup arena and pointers to it. */
 	if ( ocall->ocall == Duct_send_buffer ) {
-		memcpy(arena, ocall->bufr, ocall->size);
-		ocp->bufr = arena;
+		memcpy(ocp->arena, ocall->bufr, ocall->size);
+		ocp->bufr = ocp->arena;
 	}
 	if ( ocall->ocall == Duct_set_server ) {
-		memcpy(arena, ocp->hostname, strlen(ocp->hostname) + 1);
-		ocp->hostname = arena;
+		memcpy(ocp->arena, ocp->hostname, strlen(ocp->hostname) + 1);
+		ocp->hostname = (char *) ocp->arena;
 	}
 	if ( ocall->ocall == Duct_init_port && (ocp->hostname != NULL) ) {
-		memcpy(arena, ocp->hostname, strlen(ocp->hostname) + 1);
-		ocp->hostname = arena;
+		memcpy(ocp->arena, ocp->hostname, strlen(ocp->hostname) + 1);
+		ocp->hostname = (char *) ocp->arena;
 	}
 
 
