@@ -7,12 +7,14 @@
 CSRC   = test-naaaim.c
 ENCSRC = test-naaaim-enclave.c test-naaaim-interface.c
 LIBSRC = SHA256.c RandomBuffer.c Curve25519.c SHA256_hmac.c AES256_cbc.c \
-	Duct.c SGXquote.c Base64.c ssl-ocall.c
+	Duct.c SGXquote.c Base64.c IDtoken.c PossumPacket.c PossumPipe.c \
+	SoftwareStatus.c OTEDKS.c IDmgr.c Ivy.c ssl-ocall.c
 ASRC   = rdrand.s
 
-DUCTSRC = test-Duct-enclave.c test-Duct-interface.c
+DUCTSRC	  = test-Duct-enclave.c test-Duct-interface.c
+POSSUMSRC = test-Possum-enclave.c test-Possum-interface.c
 
-TOOLS = test-naaaim test-Duct
+TOOLS = test-naaaim test-Duct test-Possum
 
 LIBNAME = SGXnaaaim
 LIBRARY = lib${LIBNAME}.a
@@ -63,6 +65,8 @@ HURDLIB	  = -L../../../HurdLib -lHurdLib
 NAAAIMLIB = -L../../../lib -lNAAAIM
 ELFLIB	  = -Wl,--rpath /usr/local/musl/lib -lelf
 
+SSL_CRYPTO  = -L /usr/local/musl/lib -lcrypto
+
 
 #
 # Compilation directives.
@@ -80,10 +84,11 @@ ELFLIB	  = -Wl,--rpath /usr/local/musl/lib -lelf
 #
 # Automatic definition of classes and objects.
 #
-COBJS	 = ${CSRC:.c=.o}
-LIBOBJS	 = ${LIBSRC:.c=.o} ${ASRC:.s=.o}
-ENCOBJS	 = ${ENCSRC:.c=.o}
-DUCTOBJS = ${DUCTSRC:.c=.o}
+COBJS	   = ${CSRC:.c=.o}
+LIBOBJS	   = ${LIBSRC:.c=.o} ${ASRC:.s=.o}
+ENCOBJS	   = ${ENCSRC:.c=.o}
+DUCTOBJS   = ${DUCTSRC:.c=.o}
+POSSUMOBJS = ${POSSUMSRC:.c=.o}
 
 
 #
@@ -95,7 +100,8 @@ DUCTOBJS = ${DUCTSRC:.c=.o}
 # Targets
 all: ${LIBRARY} enclave tools
 
-enclave: ldscript test-naaaim.signed.so test-Duct.signed.so
+enclave: ldscript test-naaaim.signed.so test-Duct.signed.so \
+	test-Possum.signed.so
 
 test-naaaim.signed.so: test-naaaim.so
 	${SGX_SIGNER} sign -key Private-key.pem -enclave $^ -out $@ \
@@ -110,6 +116,13 @@ test-Duct.signed.so: test-Duct.so
 
 test-Duct.so: ${DUCTOBJS} ${LIBRARY}
 	${ENCLAVE_CC} -o $@ ${DUCTOBJS} ${ENCLAVE_LDFLAGS};
+
+test-Possum.signed.so: test-Possum.so
+	${SGX_SIGNER} sign -key Private-key.pem -enclave $^ -out $@ \
+		-config test-Duct-enclave.xml;
+
+test-Possum.so: ${POSSUMOBJS} ${LIBRARY}
+	${ENCLAVE_CC} -o $@ ${POSSUMOBJS} ${ENCLAVE_LDFLAGS};
 
 ldscript:
 	echo "{"			>  ldscript;
@@ -139,6 +152,16 @@ test-Duct: test-Duct.o ../../SGXenclave.o ../../SGXloader.o	   \
 test-Duct.o: test-Duct.c
 	${CC} ${CFLAGS} -I ../../../lib -c $< -o $@;
 
+test-Possum: test-Possum.o ../../SGXenclave.o ../../SGXloader.o		      \
+	../../SGXmetadata.o ../../SGXsigstruct.o ../../SGXquote_sgxmgr.o      \
+	../../SGXquote.o ../../QEenclave.o ../../PCEenclave.o ../../SGXepid.o \
+	../../sgx-ocall.o ../../boot-sgx.o
+	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${NAAAIMLIB} ${HURDLIB} \
+		${SSL_CRYPTO};
+
+test-Possum.o: test-Possum.c
+	${CC} ${CFLAGS} -I ../../../lib -c $< -o $@;
+
 ${LIBRARY}: ${LIBOBJS}
 	ar r ${LIBRARY} $^;
 	ranlib ${LIBRARY};
@@ -148,12 +171,15 @@ clean:
 	rm -f ${TOOLS};
 	rm -f ${LIBRARY};
 	rm -f test-naaaim.so test-naaaim.signed.so test-Duct.so \
-		test-Duct.signed.so;
+		test-Duct.signed.so test-Possum.so test-Possum.signed.so;
 
 
 # Source dependencies.
 test-naaaim-enclave.o: test-naaaim-interface.h SHA256.h
 test-naaaim-interface.o: test-naaaim-interface.h
+
+test-Possum-enclave.o: test-Possum-interface.h
+test-Possum-interface.o: test-Possum-interface.h
 
 SHA256.o: SHA256.h
 RandomBuffer.o: RandomBuffer.h
