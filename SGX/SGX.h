@@ -446,6 +446,9 @@ struct SGX_report {
  */
 
 /* Definition of numeric constants used to select various keys. */
+#define SGX_KEYPOLICY_SIGNER	0x1
+#define SGX_KEYPOLICY_ENCLAVE	0x2
+
 #define SGX_KEYSELECT_REPORT	0x3
 #define SGX_KEYSELECT_SEAL	0x4
 
