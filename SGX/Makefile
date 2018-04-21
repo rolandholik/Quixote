@@ -12,9 +12,9 @@ CSRC = sgx-check.c sgx-metadata.c SGXmetadata.c SGXloader.c	    \
 
 ASRC = boot-sgx.s
 
-TOOLS = sgx-check sgx-metadata sgx-loader sgx-load sgx-sigstruct	\
-	sgx-gen-token gen-white-list test-ecall test-pcr idf-sgx-fandf	\
-	idf-sgx-fandf-unibin sgx-provision sdk-compute-size
+TOOLS = sgx-check sgx-metadata sgx-loader sgx-load sgx-sigstruct	     \
+	sgx-gen-token gen-white-list test-ecall test-pcr idf-sgx-fandf	     \
+	idf-sgx-fandf-unibin sgx-provision sdk-compute-size sgx-gen-verifier \
 
 CC = musl-gcc
 AS = as
@@ -28,6 +28,9 @@ LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib -L../lib -L../HurdLib
 
 # OpenSSL crypto library
 SSL_CRYPTO  = -L /usr/local/musl/lib -lcrypto
+
+# NAAAIM library definition
+NAAAIM_LIB = -L../lib -lNAAAIM
 
 # Sources for SGX include files, used by sdk-compute-size utility.
 SGXSDK = /u/usr/src/SGX/linux-sgx
@@ -52,7 +55,7 @@ SGXSDK_INCLUDES = -I/opt/intel/sgxsdk/include			    \
 COBJS = ${CSRC:.c=.o}
 AOBJS = ${ASRC:.s=.o}
 
-LIBS = -lNAAAIM -lHurdLib 
+LIBS = -lNAAAIM -lHurdLib
 ELFLIB = -Wl,--rpath /usr/local/musl/lib -lelf
 
 HURDLIB = -L../lib -lHurdLib
@@ -131,6 +134,14 @@ gen-white-list: gen-white-list.o
 
 gen-white-list.o: gen-white-list.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
+
+sgx-gen-verifier: sgx-gen-verifier.o SGXmetadata.o ../IDtoken.o ../SHA256.o \
+	../SHA256_hmac.o
+	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB} ${SSL_CRYPTO} \
+		${NAAAIM_LIB}
+
+sgx-gen-verifier.o: sgx-gen-verifier.c
+	${CC} ${CFLAGS} -c $< -o $@;
 
 test-ecall: test-ecall.o SGXenclave.o SGXloader.o SGXmetadata.o \
 	SGXsigstruct.o sgx-ocall.o boot-sgx.o
