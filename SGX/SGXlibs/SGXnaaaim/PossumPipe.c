@@ -79,6 +79,20 @@
 #define STATE(var) CO(PossumPipe_State, var) = this->state
 
 
+/**
+ * Reference to the device identity provided.
+ */
+extern size_t Identity_size;
+extern unsigned char *Identity;
+
+
+/**
+ * Reference to the device verified.
+ */
+extern size_t Verifier_size;
+extern unsigned char *Verifier;
+
+
 /** PossumPipe private state information. */
 struct NAAAIM_PossumPipe_State
 {
@@ -870,58 +884,27 @@ static PossumPipe_type receive_packet(CO(PossumPipe, this), CO(Buffer, bufr))
  *			for the client was successful.  A false value
  *			is returned if the search was unsuccessful.
  */
-#define TEMPLATE_HASH "da9502abf3222a8241657f6ef4535ac75906195b969a0f5f53fa6c02e3966e1a"
 
 static _Bool find_client(CO(Buffer, packet), CO(IDtoken, token), CO(Ivy, ivy))
 
 {
 	_Bool retn = false;
 
-	Buffer bufr = NULL;
+	Buffer b,
+	       bufr = NULL;
 
 
-	/* Add software status. */
+	/* Use verifier provided by the enclave startup code. */
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	if ( !bufr->add_hexstring(bufr, TEMPLATE_HASH) )
+	if ( !bufr->add(bufr, Verifier, Verifier_size) )
 		ERR(goto done);
-	if ( !ivy->set_element(ivy, Ivy_software, bufr) )
-		ERR(goto done);
-
-
-	/* Add verifier version of identity. */
-	token->reset(token);
-	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	if ( !bufr->add_hexstring(bufr, "d3cbaa751500f9c8b2884287cf6edc1a928099d7990a5d54a1292f110fed5d50") )
-		ERR(goto done);
-	if ( !token->set_element(token, IDtoken_orgkey, bufr) )
+	if ( !ivy->decode(ivy, bufr) )
 		ERR(goto done);
 
-	bufr->reset(bufr);
-	if ( !bufr->add_hexstring(bufr, "9bfe0fa0a487842e4e95ad2b509a4f0d9d75604a9a026aa065531095a38d98af") )
+	/* Extract identity token. */
+	if ( (b = ivy->get_element(ivy, Ivy_id)) == NULL )
 		ERR(goto done);
-	if ( !token->set_element(token, IDtoken_orgid,bufr) )
-		ERR(goto done);
-
-	bufr->reset(bufr);
-	bufr->add_hexstring(bufr, "a7798540e608a51693cc7b56aef5201b97abb0013495dfde56fe82f05beb4e11");
-	bufr->add_hexstring(bufr, "fb57ab3c7c9076582afbd345deefc64ea165d63bdf77adc6d90bef0d19d9deec");
-	bufr->add_hexstring(bufr, "917c2637c097bd425cb14fda429ce18e65022b005a4cb58b9929adcc0e13242e");
-	bufr->add_hexstring(bufr, "fee166684dd6e2563868cd4640f9daf5abc148f8a83811613938d4f9c4d45b92");
-	bufr->add_hexstring(bufr, "fe1a072c4be5ef358a6960d724f6d91800191a2a060d64e014972c0e5b4cac79");
-	bufr->add_hexstring(bufr, "fc426dbf60027a33831b7e2c2ff9e66d2b022efde0f80b5c849ea5ae2dac5407");
-	bufr->add_hexstring(bufr, "27700e41c9a8888f10d8f842fd9cc307ac572f4e2acb3101422e05db745f1952");
-	if ( !bufr->add_hexstring(bufr, "379e238ad8390f3970cadf6165beea57ac5f81a5914f60f75eaf335ccd5be694") )
-		ERR(goto done);
-	if ( !token->set_element(token, IDtoken_id, bufr) )
-		ERR(goto done);
-
-	bufr->reset(bufr);
-	if ( !bufr->add_hexstring(bufr, "60932d5c4d013eea8de51501d530e1228fff991ec4c0b784dbdd8da7c707a2be") )
-		ERR(goto done);
-	if ( !token->set_element(token, IDtoken_key, bufr) )
-		ERR(goto done);
-
-	if ( !token->to_verifier(token) )
+	if ( !token->decode(token, b) )
 		ERR(goto done);
 
 	retn = true;

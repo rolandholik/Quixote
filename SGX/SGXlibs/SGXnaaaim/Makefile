@@ -12,7 +12,7 @@ LIBSRC = SHA256.c RandomBuffer.c Curve25519.c SHA256_hmac.c AES256_cbc.c \
 ASRC   = rdrand.s
 
 DUCTSRC	  = test-Duct-enclave.c test-Duct-interface.c
-POSSUMSRC = test-Possum-enclave.c test-Possum-interface.c
+POSSUMSRC = test-Possum-enclave.c test-Possum-interface.c RandomBuffer.c
 
 TOOLS = test-naaaim test-Duct test-Possum
 
@@ -155,6 +155,7 @@ test-Duct.o: test-Duct.c
 test-Possum: test-Possum.o ../../SGXenclave.o ../../SGXloader.o		      \
 	../../SGXmetadata.o ../../SGXsigstruct.o ../../SGXquote_sgxmgr.o      \
 	../../SGXquote.o ../../QEenclave.o ../../PCEenclave.o ../../SGXepid.o \
+	../../../IDtoken.o ../../../SHA256.o ../../../SHA256_hmac.o	      \
 	../../sgx-ocall.o ../../boot-sgx.o
 	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${NAAAIMLIB} ${HURDLIB} \
 		${SSL_CRYPTO};

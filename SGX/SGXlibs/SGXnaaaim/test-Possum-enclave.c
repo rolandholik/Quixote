@@ -28,6 +28,14 @@
 #include <HurdLib.h>
 #include <Buffer.h>
 
+#include <RandomBuffer.h>
+#include <IDtoken.h>
+#include <Ivy.h>
+#include <SHA256.h>
+
+#include <SGX.h>
+#include <SGXfusion.h>
+
 #include "PossumPipe.h"
 
 
@@ -47,17 +55,32 @@ enum test_mode {
 } Mode = none;
 
 
+/**
+ * The device identity to be used.
+ */
+size_t Identity_size	= 0;
+unsigned char *Identity = NULL;
+
+
+/**
+ * The device verified for the communication counter-party.
+ */
+size_t Verifier_size	= 0;
+unsigned char *Verifier = NULL;
+
+
 static _Bool ping(CO(PossumPipe, pipe))
 
 {
 	_Bool retn = false;
 
-	Buffer bufr	 = NULL,
-	       reference = NULL;
+	Buffer b,
+	       bufr = NULL;
+
+	RandomBuffer rnd = NULL;
 
 
 	INIT(HurdLib, Buffer, bufr, goto done);
-	INIT(HurdLib, Buffer, reference, goto done);
 
 	if ( Mode == server ) {
 		fputs("\nWaiting for ping packet.\n", stderr);
@@ -80,9 +103,13 @@ static _Bool ping(CO(PossumPipe, pipe))
 
 	if ( Mode == client ) {
 		fputs("\nSending ping packet:\n", stderr);
-		reference->add_hexstring(reference, KEY1);
 
-		bufr->add_hexstring(bufr, KEY1);
+		INIT(NAAAIM, RandomBuffer, rnd, ERR(goto done));
+		if ( !rnd->generate(rnd, 32) )
+			ERR(goto done);
+		b = rnd->get_Buffer(rnd);
+
+		bufr->add_Buffer(bufr, b);
 		bufr->print(bufr);
 
 		if ( !pipe->send_packet(pipe, PossumPipe_data, bufr) ) {
@@ -97,12 +124,12 @@ static _Bool ping(CO(PossumPipe, pipe))
 			goto done;
 		}
 
-		if ( bufr->equal(bufr, reference) )
+		if ( bufr->equal(bufr, b) )
 			fputs("\nPacket is verified.\n", stdout);
 		else {
 			fputs("\nPacket failed verification.\n", stdout);
 			fputs("\nSent:\n", stdout);
-			reference->print(reference);
+			b->print(b);
 			fputs("Received:\n", stdout);
 			bufr->print(bufr);
 		}
@@ -113,7 +140,7 @@ static _Bool ping(CO(PossumPipe, pipe))
 
  done:
 	WHACK(bufr);
-	WHACK(reference);
+	WHACK(rnd);
 
 	return retn;
 }
@@ -130,20 +157,35 @@ static _Bool ping(CO(PossumPipe, pipe))
  * \param spid_key	A pointer to the Service Provider ID (SPID)
  *			encoded in ASCII hexadecimal form.
  *
+ * \param id_size	The size of the buffer containing the
+ *			identity token.
+ *
+ * \param identity	A pointer to a buffer containing the identity
+ *			token which will identify the enclave.
+ *
+ * \param vfy_size	The size of the buffer containing the identity
+ *			verifier that will be used.
+ *
+ * \param verifier	A pointer to a buffer containing the identity
+ *			verifier that will be used.
+ *
  * \return	A boolean value is used to indicate the status of the
  *		test.  A false value indicates an error was encountered
  *		while a true value indicates the test was successfully
  *		conducted.
  */
 
-_Bool test_server(int port, char *spid_key)
+_Bool test_server(int port, char *spid_key, size_t id_size, \
+		  unsigned char *identity, size_t vfy_size, \
+		  unsigned char *verifier)
 
 {
 	_Bool retn = false;
 
 	PossumPipe pipe = NULL;
 
-	Buffer spid = NULL;
+	Buffer spid = NULL,
+	       bufr = NULL;
 
 
 	/* Convert the SPID value into binary form. */
@@ -152,11 +194,19 @@ _Bool test_server(int port, char *spid_key)
 		ERR(goto done);
 
 
+	/* Stash the identity token and verifier buffer descriptions. */
+	Identity      = identity;
+	Identity_size = id_size;
+
+	Verifier      = verifier;
+	Verifier_size = vfy_size;
+
+
 	/* Start the server listening. */
 	fprintf(stdout, "Server mode: port=%d\n", port);
 
 	INIT(NAAAIM, PossumPipe, pipe, ERR(goto done));
-	if ( !pipe->init_server(pipe, "localhost", port, false) )
+	if ( !pipe->init_server(pipe, NULL, port, false) )
 		ERR(goto done);
 
 	if ( !pipe->accept_connection(pipe) ) {
@@ -174,8 +224,9 @@ _Bool test_server(int port, char *spid_key)
 
 
  done:
-	WHACK(spid);
 	WHACK(pipe);
+	WHACK(spid);
+	WHACK(bufr);
 
 	return retn;
 }
@@ -198,20 +249,39 @@ _Bool test_server(int port, char *spid_key)
  * \param spid_key	A pointer to the Service Provider ID (SPID)
  *			encoded in ASCII hexadecimal form.
  *
+ * \param id_size	The size of the buffer containing the
+ *			identity token.
+ *
+ * \param identity	A pointer to a buffer containing the identity
+ *			token which will identify the enclave.
+ *
+ * \param vfy_size	The size of the buffer containing the identity
+ *			verifier that will be used.
+ *
+ * \param verifier	A pointer to a buffer containing the identity
+ *			verifier that will be used.
+ *
  * \return	A boolean value is used to indicate the status of the
  *		test.  A false value indicates an error was encountered
  *		while a true value indicates the test was successfully
  *		conducted.
  */
 
-_Bool test_client(char *hostname, int port, char *spid_key)
+_Bool test_client(char *hostname, int port, char *spid_key, size_t id_size, \
+		  unsigned char *identity, size_t vfy_size,		    \
+		  unsigned char *verifier)
 
 {
 	_Bool retn = false;
 
 	PossumPipe pipe = NULL;
 
-	Buffer spid = NULL;
+	Buffer bufr = NULL,
+	       spid = NULL;
+
+	Ivy ivy = NULL;
+
+	IDtoken idt = NULL;
 
 
 	/* Convert the SPID value into binary form. */
@@ -220,6 +290,15 @@ _Bool test_client(char *hostname, int port, char *spid_key)
 		ERR(goto done);
 
 
+	/* Stash the identity token and verifier buffer descriptions. */
+	Identity      = identity;
+	Identity_size = id_size;
+
+	Verifier      = verifier;
+	Verifier_size = vfy_size;
+
+
+	/* Start client mode. */
 	fprintf(stdout, "Client mode: connecting to %s:%d\n", hostname, port);
 	INIT(NAAAIM, PossumPipe, pipe, ERR(goto done));
 	if ( !pipe->init_client(pipe, hostname, port) ) {
@@ -238,8 +317,97 @@ _Bool test_client(char *hostname, int port, char *spid_key)
 
 
  done:
-	WHACK(spid);
 	WHACK(pipe);
+	WHACK(bufr);
+	WHACK(spid);
+	WHACK(ivy);
+	WHACK(idt);
 
 	return retn ? 0 : 1;
+}
+
+
+
+/**
+ * ECALL 3
+ *
+ * This function implements the ecall entry point for a function which
+ * generates the platform specific device identity.
+ *
+ * \param id		A pointer containing the buffer which will
+ *			be loaded with the 32 byte platform
+ *			specific enclave identity.
+ *
+ * \return	A boolean value is used to indicate the status of the
+ *		test.  A false value indicates an error was encountered
+ *		while a true value indicates the test was successfully
+ *		conducted.
+ */
+
+_Bool generate_identity(uint8_t *id)
+
+{
+	_Bool retn = false;
+
+	int rc;
+
+	uint8_t keydata[16] __attribute__((aligned(128)));
+
+	char report_data[64] __attribute__((aligned(128)));
+
+	Buffer b,
+	       bufr = NULL;
+
+	Sha256 sha256 = NULL;
+
+	struct SGX_report __attribute__((aligned(512))) report;
+
+	struct SGX_targetinfo target;
+
+	struct SGX_keyrequest keyrequest;
+
+
+	/* Request a self report to get the measurement. */
+	memset(&target, '\0', sizeof(struct SGX_targetinfo));
+	memset(&report, '\0', sizeof(struct SGX_report));
+	memset(report_data, '\0', sizeof(report_data));
+	enclu_ereport(&target, &report, report_data);
+
+
+	/* Request the key. */
+	memset(keydata, '\0', sizeof(keydata));
+	memset(&keyrequest, '\0', sizeof(struct SGX_keyrequest));
+
+	keyrequest.keyname   = SGX_KEYSELECT_SEAL;
+	keyrequest.keypolicy = SGX_KEYPOLICY_SIGNER;
+	memcpy(keyrequest.keyid, report.body.mr_enclave.m, \
+	       sizeof(keyrequest.keyid));
+
+
+	/* Generate the derived key and return it to the caller. */
+	if ( (rc = enclu_egetkey(&keyrequest, keydata)) != 0 ) {
+		fprintf(stdout, "EGETKEY return: %d\n", rc);
+		goto done;
+	}
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	if ( !bufr->add(bufr, keydata, sizeof(keydata)) )
+		ERR(goto done);
+
+	INIT(NAAAIM, Sha256, sha256, ERR(goto done));
+	sha256->add(sha256, bufr);
+	if ( !sha256->compute(sha256) )
+		ERR(goto done);
+
+	b = sha256->get_Buffer(sha256);
+	memcpy(id, b->get(b), 32);
+
+	retn = true;
+
+
+ done:
+	WHACK(bufr);
+	WHACK(sha256);
+
+	return retn;
 }

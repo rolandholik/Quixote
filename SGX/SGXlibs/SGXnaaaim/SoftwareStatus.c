@@ -53,8 +53,13 @@
 #include <Buffer.h>
 #include <String.h>
 
+#include <SGX.h>
+#include <SGXfusion.h>
+
 #include "NAAAIM.h"
 #include "SoftwareStatus.h"
+#include "SHA256.h"
+
 
 #define STATE(var) CO(SoftwareStatus_State, var) = this->state
 
@@ -146,13 +151,14 @@ static bool open(CO(SoftwareStatus, this))
  * External public method.
  *
  * This method implements a request to take the current measurement of
- * the software status of the system.
+ * an enclave's software status.  It implements this by requesting a
+ * NULL hardware report.
  *
  * \param this	The object being used to request the measurement.
  *
- * \return	If an error is encountered reading the measurement file
- *		a false value is returned.  A true value indicates the
- *		measurement was successfully made.
+ * \return	If an error is encountered while measuring the enclave
+ *		a false value is returned.  A true value indcates
+ *		the measurement was successfully taken.
  */
 
 static _Bool measure(CO(SoftwareStatus, this))
@@ -160,19 +166,69 @@ static _Bool measure(CO(SoftwareStatus, this))
 {
 	STATE(S);
 
+	int rc;
+
 	_Bool retn = false;
 
+	char report_data[64] __attribute__((aligned(128)));
 
-	if ( !S->template_hash->add_hexstring(S->template_hash, \
-					      TEMPLATE_HASH) )
+	uint8_t keydata[16] __attribute__((aligned(128)));
+
+	struct SGX_targetinfo target;
+
+	struct SGX_report __attribute__((aligned(512))) report;
+
+	struct SGX_keyrequest keyrequest;
+
+	Buffer b,
+	       bufr = NULL;
+
+	Sha256 sha256 = NULL;
+
+
+	/* Request a report on the current enclave. */
+	memset(&target, '\0', sizeof(struct SGX_targetinfo));
+	memset(&report, '\0', sizeof(struct SGX_report));
+	memset(report_data, '\0', sizeof(report_data));
+	enclu_ereport(&target, &report, report_data);
+
+
+	/* Request the key. */
+	memset(keydata, '\0', sizeof(keydata));
+	memset(&keyrequest, '\0', sizeof(struct SGX_keyrequest));
+
+	keyrequest.keyname   = SGX_KEYSELECT_SEAL;
+	keyrequest.keypolicy = SGX_KEYPOLICY_SIGNER;
+	memcpy(keyrequest.keyid, report.body.mr_enclave.m, \
+	       sizeof(keyrequest.keyid));
+
+	if ( (rc = enclu_egetkey(&keyrequest, keydata)) != 0 ) {
+		fprintf(stdout, "EGETKEY return: %d\n", rc);
+		goto done;
+	}
+
+
+	/* Derive and save the key. */
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	if ( !bufr->add(bufr, keydata, sizeof(keydata)) )
 		ERR(goto done);
-	if ( !S->file_hash->add_hexstring(S->file_hash, FILE_HASH) )
+
+	INIT(NAAAIM, Sha256, sha256, ERR(goto done));
+	sha256->add(sha256, bufr);
+	if ( !sha256->compute(sha256) )
+		ERR(goto done);
+
+	b = sha256->get_Buffer(sha256);
+	if ( !S->template_hash->add_Buffer(S->template_hash, b) )
 		ERR(goto done);
 
 	retn = true;
 
 
  done:
+	WHACK(bufr);
+	WHACK(sha256);
+
 	return retn;
 }
 

@@ -33,6 +33,8 @@
 #include <NAAAIM.h>
 #include <Duct.h>
 #include <PossumPipe.h>
+#include <IDtoken.h>
+
 #include <SGX.h>
 #include <SGXenclave.h>
 #include <SGXquote.h>
@@ -117,7 +119,9 @@ extern int main(int argc, char *argv[])
 {
 	_Bool debug = true;
 
-	char *spid	   = NULL,
+	char *id_token	   = NULL,
+	     *spid	   = NULL,
+	     *verifier	   = NULL,
 	     *token	   = "test-Possum.token",
 	     *hostname	   = "localhost",
 	     *enclave_name = "test-Possum.signed.so";
@@ -126,28 +130,38 @@ extern int main(int argc, char *argv[])
 	    rc,
 	    retn = 1;
 
-	enum {none, client, server} Mode = none;
+	enum {none, client, server, measure} Mode = none;
+
+	FILE *idfile = NULL;
+
+	Buffer bufr	= NULL,
+	       ivy	= NULL,
+	       id_bufr	= NULL,
+	       vfy_bufr = NULL;
+
+	IDtoken idt = NULL;
+
+	File infile = NULL;
 
 	SGXenclave enclave = NULL;
-
-	Buffer bufr = NULL;
 
 	struct Possum_ecall0 ecall0;
 
 	struct Possum_ecall1 ecall1;
 
+	struct Possum_ecall2 ecall2;
 
-	/* Output header. */
-	fprintf(stdout, "%s: IDfusion SGX PossumPipe test utility.\n", PGM);
-	fprintf(stdout, "%s: (C)Copyright 2018, IDfusion, LLC. All rights "
-		"reserved.\n\n", PGM);
+
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "CSdh:s:t:")) != EOF )
+	while ( (opt = getopt(argc, argv, "CMSdh:i:s:t:v:")) != EOF )
 		switch ( opt ) {
 			case 'C':
 				Mode = client;
+				break;
+			case 'M':
+				Mode = measure;
 				break;
 			case 'S':
 				Mode = server;
@@ -159,11 +173,17 @@ extern int main(int argc, char *argv[])
 			case 'h':
 				hostname = optarg;
 				break;
+			case 'i':
+				id_token = optarg;
+				break;
 			case 's':
 				spid = optarg;
 				break;
 			case 't':
 				token = optarg;
+				break;
+			case 'v':
+				verifier = optarg;
 				break;
 		}
 
@@ -174,8 +194,82 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
+
+	/* Handle request for measurement. */
+	if ( Mode == measure ) {
+		INIT(NAAAIM, SGXenclave, enclave, ERR(goto done));
+		if ( !enclave->setup(enclave, enclave_name, token, debug) )
+			ERR(goto done);
+
+		memset(&ecall2, '\0', sizeof(struct Possum_ecall2));
+
+		if ( !enclave->boot_slot(enclave, 2, &ocall_table, \
+					 &ecall2, &rc) ) {
+			fprintf(stderr, "Enclave returned: %d\n", rc);
+			goto done;
+		}
+		if ( !ecall2.retn ) {
+			fputs("Enclave measurement failed.\n", stderr);
+			goto done;
+		}
+
+		INIT(HurdLib, Buffer, bufr, ERR(goto done));
+		if ( !bufr->add(bufr, ecall2.id, sizeof(ecall2.id)) ) {
+			fputs("Unable to generate enclave value.\n", stderr);
+			goto done;
+		}
+		bufr->print(bufr);
+
+		goto done;
+	}
+
+
+	/* Output header. */
+	fprintf(stdout, "%s: IDfusion SGX PossumPipe test utility.\n", PGM);
+	fprintf(stdout, "%s: (C)Copyright 2018, IDfusion, LLC. All rights "
+		"reserved.\n\n", PGM);
+
 	if ( spid == NULL ) {
 		fputs("No SPID specified.\n", stderr);
+		goto done;
+	}
+
+	if ( verifier == NULL ) {
+		fputs("No identifier verified specifed.\n", stderr);
+		goto done;
+	}
+
+	if ( id_token == NULL ) {
+		fputs("No device identity specifed.\n", stderr);
+		goto done;
+	}
+
+
+	/* Load the identity token. */
+	INIT(NAAAIM, IDtoken, idt, goto done);
+	if ( (idfile = fopen(id_token, "r")) == NULL ) {
+		fputs("Cannot open identity token file.\n", stderr);
+		goto done;
+	}
+	if ( !idt->parse(idt, idfile) ) {
+		fputs("Enable to parse identity token.\n", stderr);
+		goto done;
+	}
+
+	INIT(HurdLib, Buffer, id_bufr, ERR(goto done));
+	if ( !idt->encode(idt, id_bufr) ) {
+		fputs("Error encoding identity token.\n", stderr);
+		goto done;
+	}
+
+
+	/* Load the identifier verifier. */
+	INIT(HurdLib, Buffer, ivy, ERR(goto done));
+	INIT(HurdLib, File, infile, ERR(goto done));
+
+	infile->open_ro(infile, verifier);
+	if ( !infile->slurp(infile, ivy) ) {
+		fputs("Cannot read identity verifier.\n", stderr);
 		goto done;
 	}
 
@@ -188,9 +282,18 @@ extern int main(int argc, char *argv[])
 
 	/* Test server mode. */
 	if ( Mode == server ) {
+		memset(&ecall0, '\0', sizeof(struct Possum_ecall0));
+
 		ecall0.port	 = 11990;
+
 		ecall0.spid	 = spid;
 		ecall0.spid_size = strlen(spid) + 1;
+
+		ecall0.identity	     = id_bufr->get(id_bufr);
+		ecall0.identity_size = id_bufr->size(id_bufr);
+
+		ecall0.verifier	     = ivy->get(ivy);
+		ecall0.verifier_size = ivy->size(ivy);
 
 		if ( !enclave->boot_slot(enclave, 0, &ocall_table, \
 					 &ecall0, &rc) ) {
@@ -202,11 +305,21 @@ extern int main(int argc, char *argv[])
 
 	/* Test client mode. */
 	if ( Mode == client ) {
+		memset(&ecall1, '\0', sizeof(struct Possum_ecall0));
+
 		ecall1.port	     = 11990;
+
 		ecall1.hostname	     = hostname;
 		ecall1.hostname_size = strlen(hostname) + 1;
+
 		ecall1.spid	     = spid;
 		ecall1.spid_size     = strlen(spid) + 1;
+
+		ecall1.identity	     = id_bufr->get(id_bufr);
+		ecall1.identity_size = id_bufr->size(id_bufr);
+
+		ecall1.verifier	     = ivy->get(ivy);
+		ecall1.verifier_size = ivy->size(ivy);
 
 		if ( !enclave->boot_slot(enclave, 1, &ocall_table, \
 					 &ecall1, &rc) ) {
@@ -219,7 +332,15 @@ extern int main(int argc, char *argv[])
 
 
  done:
+	if ( idfile != NULL )
+		fclose(idfile);
+
 	WHACK(bufr);
+	WHACK(id_bufr);
+	WHACK(vfy_bufr);
+	WHACK(idt);
+	WHACK(ivy);
+	WHACK(infile);
 	WHACK(enclave);
 
 	return retn;

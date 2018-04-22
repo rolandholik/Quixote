@@ -29,6 +29,12 @@ static sgx_status_t sgx_test_server(void *pms)
 
 	char *spid = NULL;
 
+	unsigned char *identity = NULL,
+		      *verifier = NULL;
+
+	size_t identity_size = 0,
+	       verifier_size = 0;
+
 	struct Possum_ecall0 *ms;
 
 
@@ -45,15 +51,38 @@ static sgx_status_t sgx_test_server(void *pms)
 	}
 	memcpy(spid, ms->spid, ms->spid_size);
 
+	if ( !SGXidf_untrusted_region(ms->identity, ms->identity_size) )
+		goto done;
+	if ( (identity = malloc(ms->identity_size)) == NULL ) {
+		status = SGX_ERROR_OUT_OF_MEMORY;
+		goto done;
+	}
+	identity_size = ms->identity_size;
+	memcpy(identity, ms->identity, identity_size);
+
+	if ( !SGXidf_untrusted_region(ms->verifier, ms->verifier_size) )
+		goto done;
+	if ( (verifier = malloc(ms->verifier_size)) == NULL ) {
+		status = SGX_ERROR_OUT_OF_MEMORY;
+		goto done;
+	}
+	verifier_size = ms->verifier_size;
+	memcpy(verifier, ms->verifier, verifier_size);
+
 	__builtin_ia32_lfence();
 
 
 	/* Call the trused function. */
-	ms->retn = test_server(ms->port, spid);
+	ms->retn = test_server(ms->port, spid, identity_size, identity, \
+			       verifier_size, verifier);
 	status = SGX_SUCCESS;
 
 
  done:
+	free(spid);
+	free(identity);
+	free(verifier);
+
 	return status;
 }
 
@@ -66,6 +95,12 @@ static sgx_status_t sgx_test_client(void *pms)
 
 	char *hostname = NULL,
 	     *spid     = NULL;
+
+	unsigned char *identity = NULL,
+		      *verifier = NULL;
+
+	size_t identity_size = 0,
+	       verifier_size = 0;
 
 	int port;
 
@@ -95,17 +130,78 @@ static sgx_status_t sgx_test_client(void *pms)
 	}
 	memcpy(spid, ms->spid, ms->spid_size);
 
+	if ( !SGXidf_untrusted_region(ms->identity, ms->identity_size) )
+		goto done;
+	if ( (identity = malloc(ms->identity_size)) == NULL ) {
+		status = SGX_ERROR_OUT_OF_MEMORY;
+		goto done;
+	}
+	identity_size = ms->identity_size;
+	memcpy(identity, ms->identity, identity_size);
+
+	if ( !SGXidf_untrusted_region(ms->verifier, ms->verifier_size) )
+		goto done;
+	if ( (verifier = malloc(ms->verifier_size)) == NULL ) {
+		status = SGX_ERROR_OUT_OF_MEMORY;
+		goto done;
+	}
+	verifier_size = ms->verifier_size;
+	memcpy(verifier, ms->verifier, verifier_size);
+
 	__builtin_ia32_lfence();
 
 
 	/* Call trusted function. */
-	ms->retn = test_client(hostname, port, spid);
+	ms->retn = test_client(hostname, port, spid, identity_size, identity, \
+			       verifier_size, verifier);
 	status = SGX_SUCCESS;
 
 
  done:
-	if ( hostname != NULL )
-		free(hostname);
+	free(hostname);
+	free(spid);
+	free(identity);
+	free(verifier);
+
+	return status;
+}
+
+
+static sgx_status_t sgx_generate_identity(void *pms)
+
+{
+	sgx_status_t status = SGX_ERROR_INVALID_PARAMETER;
+
+	uint8_t *id = NULL;
+
+	struct Possum_ecall2 *ms;
+
+
+	/* Verify marshalled arguements and setup parameters. */
+	if ( !SGXidf_untrusted_region(pms, sizeof(struct Possum_ecall2)) )
+		goto done;
+	ms = (struct Possum_ecall2 *) pms;
+
+	if ( !SGXidf_untrusted_region(ms->id, 32) )
+		goto done;
+	if ( (id = malloc(32)) == NULL ) {
+		status = SGX_ERROR_OUT_OF_MEMORY;
+		goto done;
+	}
+
+	__builtin_ia32_lfence();
+
+
+	/* Call trusted function. */
+	ms->retn = generate_identity(id);
+	status = SGX_SUCCESS;
+
+	if ( ms->retn )
+		memcpy(ms->id, id, 32);
+
+
+ done:
+	free(id);
 
 	return status;
 }
@@ -119,7 +215,8 @@ const struct {
 	ECALL_NUMBER,
 	{
 		{(void *)(uintptr_t)sgx_test_server, 0},
-		{(void *)(uintptr_t)sgx_test_client, 0}
+		{(void *)(uintptr_t)sgx_test_client, 0},
+		{(void *)(uintptr_t)sgx_generate_identity, 0}
 	}
 };
 
@@ -131,9 +228,9 @@ const struct {
 } g_dyn_entry_table = {
 	OCALL_NUMBER,
 	{
-		{0, 0},
-		{0, 0},
-		{0, 0},
-		{0, 0}
+		{0, 0, 0},
+		{0, 0, 0},
+		{0, 0, 0},
+		{0, 0, 0}
 	}
 };

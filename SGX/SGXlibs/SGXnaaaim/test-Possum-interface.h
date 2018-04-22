@@ -8,7 +8,7 @@
 
 
 /* Number of enclave interfaces. */
-#define ECALL_NUMBER 2
+#define ECALL_NUMBER 3
 #define OCALL_NUMBER 4
 
 
@@ -20,6 +20,12 @@ struct Possum_ecall0 {
 
 	char *spid;
 	size_t spid_size;
+
+	unsigned char *identity;
+	size_t identity_size;
+
+	unsigned char *verifier;
+	size_t verifier_size;
 };
 
 struct Possum_ecall1 {
@@ -32,9 +38,24 @@ struct Possum_ecall1 {
 
 	char *spid;
 	size_t spid_size;
+
+	unsigned char *identity;
+	size_t identity_size;
+
+	unsigned char *verifier;
+	size_t verifier_size;
+};
+
+struct Possum_ecall2 {
+	_Bool retn;
+
+	uint8_t id[32];
 };
 
 
-_Bool test_server(unsigned int, char *);
-_Bool test_client(char *, int port, char *);
+_Bool test_server(unsigned int, char *, size_t, unsigned char *, size_t, \
+		  unsigned char *);
+_Bool test_client(char *, int port, char *, size_t, unsigned char *, \
+		  size_t, unsigned char *);
+_Bool generate_identity(uint8_t *);
 #endif
