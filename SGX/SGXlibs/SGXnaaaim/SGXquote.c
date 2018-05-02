@@ -21,8 +21,9 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
-
 #include <regex.h>
+
+#include <arpa/inet.h>
 
 #include <Origin.h>
 #include <HurdLib.h>
@@ -635,12 +636,6 @@ static _Bool decode_report(CO(SGXquote, this), CO(String, report))
 		if ( (tlv->type != 21) || (tlv->version != 2) )
 			ERR(goto done);
 		tlv_size = ntohs(tlv->size);
-		fprintf(stdout, "%s: tlv=%04x, size=%04x\n", __func__, \
-			tlv->size, tlv_size);
-
-		fputs("TLV layout:\n", stdout);
-		bufr->hprint(bufr);
-
 
 		bufr->reset(bufr);
 		if ( !bufr->add_hexstring(bufr, \
