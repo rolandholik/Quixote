@@ -118,8 +118,8 @@ struct NAAAIM_PossumPacket_State
 	 * The replay_nonce is a 32 byte nonce used to prevent replay
 	 * attacks with the packet.
 	 *
-	 * The quote_nonce is a 20 byte nonce which will be used by
-	 * the counter-party to generate a machine status quote.
+	 * The quote_nonce is the 16 byte SPID which the counter-party
+	 * will use to generate the enclave quote.
 	 */
 	Buffer replay_nonce;
 	Buffer quote_nonce;
@@ -283,14 +283,19 @@ static _Bool compute_checksum(CO(PossumPacket_State, S),	      \
  *
  * \param spi		The Security Parameter Index to be proposed/used.
  *
+ * \param spid		The object containing the service provider identity
+ *			which the counter-party is to use to generate
+ *			the attestation quote.
+ *
  * \return	A boolean value is used to indicate the sucess or
  *		failure of creating the packet.  A false value
  *		indicates creation failed while a true indicates it
  *		was successful.
  */
 
-static _Bool create_packet1(CO(PossumPacket, this), CO(IDtoken, token),
-			    CO(Curve25519, dh), const uint32_t spi)
+static _Bool create_packet1(CO(PossumPacket, this), CO(IDtoken, token),	\
+			    CO(Curve25519, dh), const uint32_t spi,	\
+			    CO(Buffer, spid))
 
 {
 
@@ -337,14 +342,12 @@ static _Bool create_packet1(CO(PossumPacket, this), CO(IDtoken, token),
 	if ( !S->identity->add_Buffer(S->identity, hmac->get_Buffer(hmac)) )
 		goto done;
 
-	/* Add replay and quote nonces. */
+	/* Add replay nonce and SPID value for attestation. */
 	rnd->generate(rnd, REPLAY_NONCE);
 	if ( !S->replay_nonce->add_Buffer(S->replay_nonce, \
 					  rnd->get_Buffer(rnd)) )
 		goto done;
-	rnd->generate(rnd, QUOTE_NONCE);
-	if ( !S->quote_nonce->add_Buffer(S->quote_nonce, \
-					 rnd->get_Buffer(rnd)) )
+	if ( !S->quote_nonce->add_Buffer(S->quote_nonce, spid) )
 		goto done;
 
 	/* Add the Diffie-Hellman key. */

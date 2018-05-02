@@ -1238,23 +1238,24 @@ static _Bool receive_platform_quote(CO(PossumPipe, this), CO(Buffer, bufr), \
  * function.  It encapsulates the functionality needed to generate a
  * platform quote.
  *
- * \param nonce		The object containing the value to be used
- *			for the quoting nonce.
+ * \param nonce		The object containing the nonce that was
+ *			supplied by the counter-party in the
+ *			initiation message.
+ *
+ * \param spid		The object containing the spid value that
+ *			was supplied by the counter-party to generate
+ *			the quote against.
  *
  * \param quote		The object which the generated quote will
  *			be placed in.
- *
- * \param spid		The object containing the service provider
- *			identity that is to be used to generate the
- *			quote.
  *
  * \return		If the quote is received and verified a true
  *			value is returned.  If an error is encountered a
  *			false value is returned.
  */
 
-static _Bool _generate_quote(CO(Buffer, nonce), CO(Buffer, quote), \
-			     CO(Buffer, spid))
+static _Bool _generate_quote(CO(Buffer, nonce), CO(Buffer, spid), \
+			     CO(Buffer, quote))
 
 {
 	_Bool retn = false;
@@ -1265,6 +1266,8 @@ static _Bool _generate_quote(CO(Buffer, nonce), CO(Buffer, quote), \
 
 	struct SGX_targetinfo *tp,
 			      target;
+
+	Buffer qnonce = NULL;
 
 	SGXquote quoter = NULL;
 
@@ -1282,14 +1285,19 @@ static _Bool _generate_quote(CO(Buffer, nonce), CO(Buffer, quote), \
 	memset(report_data, '\0', sizeof(report_data));
 	enclu_ereport(&target, &report, report_data);
 
+	INIT(HurdLib, Buffer, qnonce, ERR(goto done));
+	if ( !qnonce->add(qnonce, nonce->get(nonce), 16) )
+		ERR(goto done);
+
 
 	/* Request the quote. */
-	if ( !quoter->generate_quote(quoter, &report, spid, nonce, quote) )
+	if ( !quoter->generate_quote(quoter, &report, spid, qnonce, quote) )
 		ERR(goto done);
 	retn = true;
 
 
  done:
+	WHACK(qnonce);
 	WHACK(quoter);
 
 	return retn;
@@ -1369,7 +1377,7 @@ static _Bool send_platform_quote(CO(PossumPipe, this), CO(Buffer, bufr), \
 	if ( !tpmcmd->quote(tpmcmd, uuid, quote) )
 		ERR(goto done);
 #else
-	if ( !_generate_quote(nonce, quote, spid) )
+	if ( !_generate_quote(nonce, spid, quote) )
 		ERR(goto done);
 #endif
 
@@ -1547,6 +1555,7 @@ static _Bool start_host_mode(CO(PossumPipe, this), CO(Buffer, spid))
 	Duct duct = S->duct;
 
 	Buffer b,
+	       our_nonce,
 	       netbufr		= NULL,
 	       nonce		= NULL,
 	       quote_nonce	= NULL,
@@ -1690,7 +1699,7 @@ static _Bool start_host_mode(CO(PossumPipe, this), CO(Buffer, spid))
 #if 0
 	packet->set_schedule(packet, token, time(NULL));
 #else
-	packet->create_packet1(packet, token, dhkey, spi);
+	packet->create_packet1(packet, token, dhkey, spi, spid);
 	packet->set_schedule(packet, token, 1523018969);
 #endif
 
@@ -1705,10 +1714,11 @@ static _Bool start_host_mode(CO(PossumPipe, this), CO(Buffer, spid))
 	if ( !duct->send_Buffer(duct, netbufr) )
 		ERR(goto done);
 
-	if ( (b = packet->get_element(packet, PossumPacket_replay_nonce)) \
+	if ( (our_nonce = packet->get_element(packet,			  \
+					      PossumPacket_replay_nonce)) \
 	     == NULL )
 		ERR(goto done);
-	if ( !generate_shared_keys(this, b, nonce, dhkey, public) ) {
+	if ( !generate_shared_keys(this, our_nonce, nonce, dhkey, public) ) {
 		fputs("Failed key generation.\n", stderr);
 		ERR(goto done);
 	}
@@ -1718,12 +1728,12 @@ static _Bool start_host_mode(CO(PossumPipe, this), CO(Buffer, spid))
 	if ( (b = packet->get_element(packet, PossumPacket_quote_nonce)) == \
 	     NULL )
 		ERR(goto done);
-	if ( !receive_platform_quote(this, netbufr, ivy, b) )
+	if ( !receive_platform_quote(this, netbufr, ivy, nonce) )
 		ERR(goto done);
 
 	/* Send platform verification quote. */
 	netbufr->reset(netbufr);
-	if ( !send_platform_quote(this, netbufr, quote_nonce, spid) )
+	if ( !send_platform_quote(this, netbufr, nonce, quote_nonce) )
 		ERR(goto done);
 
 	/* Get connection confirmation start. */
@@ -1907,6 +1917,7 @@ static _Bool start_client_mode(CO(PossumPipe, this), CO(Buffer, spid))
 
 	Buffer b,
 	       public,
+	       their_nonce = NULL,
 	       nonce	   = NULL,
 	       quote_nonce = NULL,
 	       bufr	   = NULL;
@@ -1962,7 +1973,7 @@ static _Bool start_client_mode(CO(PossumPipe, this), CO(Buffer, spid))
 	tspi = propose_spi(HOST_SPI_ARENA, 0);
 	spi = spi | tspi;
 #endif
-	packet->create_packet1(packet, token, dhkey, spi);
+	packet->create_packet1(packet, token, dhkey, spi, spid);
 
 	if ( !packet->encode_packet1(packet, b, bufr) )
 		ERR(goto done);
@@ -2033,11 +2044,12 @@ static _Bool start_client_mode(CO(PossumPipe, this), CO(Buffer, spid))
 		ERR(goto done);
 	public = b;
 
-	if ( (b = packet->get_element(packet, PossumPacket_replay_nonce)) \
+	if ( (their_nonce = packet->get_element(packet,			    \
+						PossumPacket_replay_nonce)) \
 	     == NULL )
 		ERR(goto done);
 	bufr->reset(bufr);
-	if ( !bufr->add_Buffer(bufr, b) )
+	if ( !bufr->add_Buffer(bufr, their_nonce) )
 		ERR(goto done);
 
 	if ( !generate_shared_keys(this, bufr, nonce, dhkey, public) )
@@ -2048,7 +2060,7 @@ static _Bool start_client_mode(CO(PossumPipe, this), CO(Buffer, spid))
 	     == NULL )
 		ERR(goto done);
 	bufr->reset(bufr);
-	if ( !send_platform_quote(this, bufr, b, spid) )
+	if ( !send_platform_quote(this, bufr, their_nonce, b) )
 		ERR(goto done);
 
 	/* Receive platform reference. */
