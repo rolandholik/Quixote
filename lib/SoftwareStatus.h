@@ -28,6 +28,7 @@ struct NAAAIM_SoftwareStatus
 	/* External methods. */
 	_Bool (*open)(const SoftwareStatus);
 	_Bool (*measure)(const SoftwareStatus);
+	_Bool (*measure_derived)(const SoftwareStatus, const uint8_t *);
 
 	Buffer (*get_template_hash)(const SoftwareStatus);
 	Buffer (*get_file_hash)(const SoftwareStatus);

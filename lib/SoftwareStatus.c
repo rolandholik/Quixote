@@ -322,6 +322,31 @@ static bool measure(CO(SoftwareStatus, this))
 /**
  * External public method.
  *
+ * This method implements a request to generate a derived software
+ * status measurement.  This is currently used by the SGX version
+ * of the object to generate a nonce derived measurement of the
+ * enclave.
+ *
+ * \param this	The object being used to request the measurement.
+ *
+ * \param nonce	The object containing the nonce used to derive the
+ *		software measurement.
+ *
+ * \return	If an error is encountered reading the measurement file
+ *		a false value is returned.  A true value indicates the
+ *		measurement was successfully made.
+ */
+
+static _Bool measure_derived(CO(SoftwareStatus, this), CO(uint8_t *, nonce))
+
+{
+	return true;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements an accessor for returning a Buffer object which
  * holds the value of the template hash.
  *
@@ -430,7 +455,9 @@ extern SoftwareStatus NAAAIM_SoftwareStatus_Init(void)
 
 	/* Method initialization. */
 	this->open    = open;
-	this->measure = measure;
+
+	this->measure	      = measure;
+	this->measure_derived = measure_derived;
 
 	this->get_template_hash = get_template_hash;
 	this->get_file_hash	= get_file_hash;

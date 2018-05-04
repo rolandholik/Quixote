@@ -236,6 +236,96 @@ static _Bool measure(CO(SoftwareStatus, this))
 /**
  * External public method.
  *
+ * This method implements a request to generate a derived software
+ * status measurement.  This is currently used by the SGX version
+ * of the object to generate a nonce derived measurement of the
+ * enclave.
+ *
+ * \param this	The object being used to request the measurement.
+ *
+ * \param nonce	The object containing the nonce used to derive the
+ *		software measurement.
+ *
+ * \return	If an error is encountered reading the measurement file
+ *		a false value is returned.  A true value indicates the
+ *		measurement was successfully made.
+ */
+
+static _Bool measure_derived(CO(SoftwareStatus, this), CO(uint8_t *, nonce))
+
+{
+	STATE(S);
+
+	int rc;
+
+	_Bool retn = false;
+
+	char report_data[64] __attribute__((aligned(128)));
+
+	uint8_t keydata[16] __attribute__((aligned(128)));
+
+	struct SGX_targetinfo target;
+
+	struct SGX_report __attribute__((aligned(512))) report;
+
+	struct SGX_keyrequest keyrequest;
+
+	Buffer b,
+	       bufr = NULL;
+
+	Sha256 sha256 = NULL;
+
+
+	/* Request a report on the current enclave. */
+	memset(&target, '\0', sizeof(struct SGX_targetinfo));
+	memset(&report, '\0', sizeof(struct SGX_report));
+	memset(report_data, '\0', sizeof(report_data));
+	enclu_ereport(&target, &report, report_data);
+
+
+	/* Request the key. */
+	memset(keydata, '\0', sizeof(keydata));
+	memset(&keyrequest, '\0', sizeof(struct SGX_keyrequest));
+
+	keyrequest.keyname    = SGX_KEYSELECT_SEAL;
+	keyrequest.keypolicy  = SGX_KEYPOLICY_ENCLAVE;
+	keyrequest.miscselect = report.body.miscselect;
+	keyrequest.attributes = report.body.attributes;
+	memcpy(keyrequest.keyid, nonce, sizeof(keyrequest.keyid));
+
+	if ( (rc = enclu_egetkey(&keyrequest, keydata)) != 0 ) {
+		fprintf(stdout, "EGETKEY return: %d\n", rc);
+		goto done;
+	}
+
+
+	/* Derive and save the key. */
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	if ( !bufr->add(bufr, keydata, sizeof(keydata)) )
+		ERR(goto done);
+
+	INIT(NAAAIM, Sha256, sha256, ERR(goto done));
+	sha256->add(sha256, bufr);
+	if ( !sha256->compute(sha256) )
+		ERR(goto done);
+
+	b = sha256->get_Buffer(sha256);
+	if ( !S->template_hash->add_Buffer(S->template_hash, b) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	WHACK(bufr);
+	WHACK(sha256);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements an accessor for returning a Buffer object which
  * holds the value of the template hash.
  *
@@ -343,7 +433,9 @@ extern SoftwareStatus NAAAIM_SoftwareStatus_Init(void)
 
 	/* Method initialization. */
 	this->open    = open;
-	this->measure = measure;
+
+	this->measure	      = measure;
+	this->measure_derived = measure_derived;
 
 	this->get_template_hash = get_template_hash;
 	this->get_file_hash	= get_file_hash;
