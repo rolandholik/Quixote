@@ -14,12 +14,14 @@
 /* Enclave SDK include files. */
 #include <sgx_edger8r.h>
 #include <sgx_trts.h>
+#include <time.h>
 
 typedef int pid_t;
 
 
 /* Prototypes for alternate standard library functions. */
 int atexit(void (*function)(void));
+time_t time(time_t *);
 
 
 /* Prototype for the OCALL used to implement the *printf functions. */
