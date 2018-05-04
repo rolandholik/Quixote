@@ -631,6 +631,30 @@ static struct SGX_targetinfo * get_qe_targetinfo(CO(SGXquote, this))
 /**
  * External public method.
  *
+ * This method implements an accessor method for returning a pointer
+ * to the structure containing the quote information for the attesting
+ * enclave.
+ *
+ * \param this	A pointer to the object whose quote information is to
+ *		be returned.
+ *
+ * \return	A pointer to the quote information structure is returned.
+ *		This may contain all null values if the quote has not
+ *		been generated.
+ */
+
+static struct SGX_quote * get_quoteinfo(CO(SGXquote, this))
+
+{
+	STATE(S);
+
+	return &S->quote;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements the decoding and print out of an attestation
  * report
  *
@@ -844,6 +868,7 @@ extern SGXquote NAAAIM_SGXquote_Init(void)
 	this->decode_report   = decode_report;
 
 	this->get_qe_targetinfo = get_qe_targetinfo;
+	this->get_quoteinfo	= get_quoteinfo;
 
 	this->dump_report = dump_report;
 	this->whack	  = whack;

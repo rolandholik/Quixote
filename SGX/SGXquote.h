@@ -92,6 +92,7 @@ struct NAAAIM_SGXquote
 	_Bool (*decode_report)(const SGXquote, const String);
 
 	struct SGX_targetinfo * (*get_qe_targetinfo)(const SGXquote);
+	struct SGX_quote * (*get_quoteinfo)(const SGXquote);
 
 	void (*dump_report)(const SGXquote);
 	void (*whack)(const SGXquote);
