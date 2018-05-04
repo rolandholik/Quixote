@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <string.h>
+#include <time.h>
 
 #include <sgx_trts.h>
 
@@ -73,8 +74,9 @@ static sgx_status_t sgx_test_server(void *pms)
 
 
 	/* Call the trused function. */
-	ms->retn = test_server(ms->port, spid, identity_size, identity, \
-			       verifier_size, verifier);
+	ms->retn = test_server(ms->port, ms->current_time, spid,       \
+			       identity_size, identity, verifier_size, \
+			       verifier);
 	status = SGX_SUCCESS;
 
 
@@ -99,6 +101,8 @@ static sgx_status_t sgx_test_client(void *pms)
 	unsigned char *identity = NULL,
 		      *verifier = NULL;
 
+	time_t current_time = 0;
+
 	size_t identity_size = 0,
 	       verifier_size = 0;
 
@@ -112,7 +116,8 @@ static sgx_status_t sgx_test_client(void *pms)
 		goto done;
 	ms = (struct Possum_ecall1 *) pms;
 
-	port = ms->port;
+	port	     = ms->port;
+	current_time = ms->current_time;
 
 	if ( !SGXidf_untrusted_region(ms->hostname, ms->hostname_size) )
 		goto done;
@@ -152,8 +157,9 @@ static sgx_status_t sgx_test_client(void *pms)
 
 
 	/* Call trusted function. */
-	ms->retn = test_client(hostname, port, spid, identity_size, identity, \
-			       verifier_size, verifier);
+	ms->retn = test_client(hostname, port, current_time, spid,     \
+			       identity_size, identity, verifier_size, \
+			       verifier);
 	status = SGX_SUCCESS;
 
 

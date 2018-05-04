@@ -284,7 +284,8 @@ extern int main(int argc, char *argv[])
 	if ( Mode == server ) {
 		memset(&ecall0, '\0', sizeof(struct Possum_ecall0));
 
-		ecall0.port	 = 11990;
+		ecall0.port	    = 11990;
+		ecall0.current_time = time(NULL);
 
 		ecall0.spid	 = spid;
 		ecall0.spid_size = strlen(spid) + 1;
@@ -308,6 +309,7 @@ extern int main(int argc, char *argv[])
 		memset(&ecall1, '\0', sizeof(struct Possum_ecall0));
 
 		ecall1.port	     = 11990;
+		ecall1.current_time  = time(NULL);
 
 		ecall1.hostname	     = hostname;
 		ecall1.hostname_size = strlen(hostname) + 1;

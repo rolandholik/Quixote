@@ -1843,12 +1843,8 @@ static _Bool start_host_mode(CO(PossumPipe, this), CO(Buffer, spid))
 		ERR(goto done);
 #endif
 
-#if 0
 	packet->set_schedule(packet, token, time(NULL));
-#else
 	packet->create_packet1(packet, token, dhkey, spi, spid);
-	packet->set_schedule(packet, token, 1523018969);
-#endif
 
 	/* Reset the section back to the original. */
 	b = software_status->get_template_hash(software_status);
@@ -2105,13 +2101,11 @@ static _Bool start_client_mode(CO(PossumPipe, this), CO(Buffer, spid))
 
 	/* Send a session initiation packet. */
 	INIT(HurdLib, Buffer, bufr, goto done);
+
 	INIT(NAAAIM, Curve25519, dhkey, goto done);
+
 	INIT(NAAAIM, PossumPacket, packet, goto done);
-#if 0
 	packet->set_schedule(packet, token, time(NULL));
-#else
-	packet->set_schedule(packet, token, 1523019183);
-#endif
 	dhkey->generate(dhkey);
 
 #if 0

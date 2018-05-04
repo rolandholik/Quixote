@@ -69,6 +69,44 @@ size_t Verifier_size	= 0;
 unsigned char *Verifier = NULL;
 
 
+/**
+ * The seed time for the time() function.
+ */
+static time_t Current_Time;
+
+
+/**
+ * Global function.
+ *
+ * The following function implements a function for returning something
+ * that approximates monotonic time for the enclave.  The expection
+ * is for an ECALL to set the Current_Time variable to some initial
+ * value, typically when the ECAL was made.  Each time this function
+ * is called the value is incremented so a value which roughly
+ * approximately monotonic time is available.
+ *
+ * For the purposes of a PossumPiple this is sufficient since the
+ * replay defense is based on the notion that an endpoint will never
+ * see an OTEDKS key repeated.
+ *
+ * \param timeptr	If this value is non-NULL the current time
+ *			value is copied into the location specified by
+ *			this pointer.
+ *
+ * \return		The current value of the enclave time variable
+ *			is returned to the caller.
+ */
+
+time_t time(time_t *timeptr)
+
+{
+	if ( timeptr != NULL )
+		*timeptr = Current_Time;
+
+	return Current_Time++;
+}
+
+
 static _Bool ping(CO(PossumPipe, pipe))
 
 {
@@ -154,6 +192,9 @@ static _Bool ping(CO(PossumPipe, pipe))
  *
  * \param port		The port number the server is to listen on.
  *
+ * \param current_time	The time to be used as the seed for intra-enclave
+ *			time.
+ *
  * \param spid_key	A pointer to the Service Provider ID (SPID)
  *			encoded in ASCII hexadecimal form.
  *
@@ -175,8 +216,8 @@ static _Bool ping(CO(PossumPipe, pipe))
  *		conducted.
  */
 
-_Bool test_server(int port, char *spid_key, size_t id_size, \
-		  unsigned char *identity, size_t vfy_size, \
+_Bool test_server(int port, time_t current_time, char *spid_key,	    \
+		  size_t id_size, unsigned char *identity, size_t vfy_size, \
 		  unsigned char *verifier)
 
 {
@@ -187,6 +228,9 @@ _Bool test_server(int port, char *spid_key, size_t id_size, \
 	Buffer spid = NULL,
 	       bufr = NULL;
 
+
+	/* Initialize the time. */
+	Current_Time = current_time;
 
 	/* Convert the SPID value into binary form. */
 	INIT(HurdLib, Buffer, spid, ERR(goto done));
@@ -243,6 +287,9 @@ _Bool test_server(int port, char *spid_key, size_t id_size, \
  *			containing the hostname which the client is to
  *			connect to.
  *
+ * \param current_time	The time to be used as the seed for intra-enclave
+ *			time.
+ *
  * \param port		The port number to connect to on the remote
  *			server.
  *
@@ -267,9 +314,9 @@ _Bool test_server(int port, char *spid_key, size_t id_size, \
  *		conducted.
  */
 
-_Bool test_client(char *hostname, int port, char *spid_key, size_t id_size, \
-		  unsigned char *identity, size_t vfy_size,		    \
-		  unsigned char *verifier)
+_Bool test_client(char *hostname, int port, time_t current_time,	   \
+		  char *spid_key, size_t id_size, unsigned char *identity, \
+		  size_t vfy_size, unsigned char *verifier)
 
 {
 	_Bool retn = false;
@@ -282,6 +329,10 @@ _Bool test_client(char *hostname, int port, char *spid_key, size_t id_size, \
 	Ivy ivy = NULL;
 
 	IDtoken idt = NULL;
+
+
+	/* Initialize the time. */
+	Current_Time = current_time;
 
 
 	/* Convert the SPID value into binary form. */

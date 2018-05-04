@@ -16,6 +16,8 @@
 struct Possum_ecall0 {
 	_Bool retn;
 
+	time_t current_time;
+
 	int port;
 
 	char *spid;
@@ -30,6 +32,8 @@ struct Possum_ecall0 {
 
 struct Possum_ecall1 {
 	_Bool retn;
+
+	time_t current_time;
 
 	int port;
 
@@ -53,9 +57,9 @@ struct Possum_ecall2 {
 };
 
 
-_Bool test_server(unsigned int, char *, size_t, unsigned char *, size_t, \
-		  unsigned char *);
-_Bool test_client(char *, int port, char *, size_t, unsigned char *, \
+_Bool test_server(unsigned int, time_t, char *, size_t, unsigned char *, \
+		  size_t, unsigned char *);
+_Bool test_client(char *, int port, time_t, char *, size_t, unsigned char *, \
 		  size_t, unsigned char *);
 _Bool generate_identity(uint8_t *);
 #endif
