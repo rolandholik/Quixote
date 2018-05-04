@@ -152,6 +152,43 @@ IMPLEMENT_ASN1_FUNCTIONS(possum_packet)
 /**
  * Internal private method.
  *
+ * The following function is a simply replacement for the srand() function
+ * supplied by the standard C library.  It currently does nothing except
+ * return in order to avoid elimination of the function with an ifdef
+ * construct.
+ */
+
+static void srand(unsigned int unused)
+
+{
+	return;
+}
+
+
+/**
+ * Internal private method.
+ *
+ * The following function is a replacement for the rand() function from
+ * the standard C library.  It uses the rdrand() function supplied
+ * by the NAAAIM library to generate a random value for the caller.
+ */
+
+extern _Bool rdrand(uint8_t *);
+
+static unsigned int rand(void)
+
+{
+	uint8_t bufr[sizeof(uint64_t)];
+
+
+	rdrand(bufr);
+	return *(unsigned int *) bufr;
+}
+
+
+/**
+ * Internal private method.
+ *
  * This method is responsible for initializing the NAAAIM_PossumPipe_State
  * structure which holds state information for each instantiated object.
  *
@@ -205,9 +242,7 @@ static _Bool _setup_nonce(CO(PossumPipe_State, S))
 {
 	_Bool retn = false;
 
-#if 0
 	Buffer b;
-#endif
 
 	RandomBuffer rb = NULL;
 
@@ -217,10 +252,8 @@ static _Bool _setup_nonce(CO(PossumPipe_State, S))
 	/* Seed the random number generator. */
 	if ( !rb->generate(rb, sizeof(unsigned int)) )
 		ERR(goto done);
-#if 0
 	b = rb->get_Buffer(rb);
 	srand(*((unsigned int *) b->get(b)));
-#endif
 
 
 	/* Initialize the nonce generator. */
@@ -646,16 +679,13 @@ static _Bool send_packet(CO(PossumPipe, this), const PossumPipe_type type, \
 	/* Generate a per packet nonce. */
 	b = S->nonce->get_Buffer(S->nonce);
 	bufr->reset(bufr);
-#if 0
 	bufr->add(bufr, b->get(b), rand() & 0x1f);
-#endif
+
 	if ( ASN1_OCTET_STRING_set(packet->nonce, bufr->get(b), \
 				   bufr->size(b)) != 1 )
 		ERR(goto done);
-#if 0
 	if ( !S->nonce->rehash(S->nonce, (rand() & 0xf) + 1) )
 		ERR(goto done);
-#endif
 
         asn_size = i2d_possum_packet(packet, p);
         if ( asn_size < 0 )
