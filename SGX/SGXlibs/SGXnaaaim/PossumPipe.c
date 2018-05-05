@@ -108,6 +108,9 @@ struct NAAAIM_PossumPipe_State
 	/* Object status. */
 	_Bool poisoned;
 
+	/* Object debug status. */
+	_Bool debug;
+
 	/* Network connection object. */
 	Duct duct;
 
@@ -203,6 +206,7 @@ static void _init_state(CO(PossumPipe_State,S))
 	S->objid = NAAAIM_PossumPipe_OBJID;
 
 	S->poisoned = false;
+	S->debug    = false;
 
 	S->nonce = NULL;
 
@@ -454,8 +458,11 @@ static _Bool _compute_checksum(CO(PossumPipe_State, S), CO(Buffer, payload), \
 	key->reset(key);
 	if ( !key->add_Buffer(key, hmac->get_Buffer(hmac)) )
 	     ERR(goto done);
-	fputs("Checksum key:\n", stderr);
-	key->print(key);
+
+	if ( S->debug ) {
+		fputs("Checksum key:\n", stderr);
+		key->print(key);
+	}
 
 
 	/* Compute the checksum over the packet payload with the key. */
@@ -486,6 +493,10 @@ static _Bool _compute_checksum(CO(PossumPipe_State, S), CO(Buffer, payload), \
  *
  * \param S		A pointer to the object state of the object
  *			requesting checksum verification.
+ *
+ * \param debug		A flag used to indicated whether or not
+ *			debugging is enabled in the communications
+ *			object.
  *
  * \param packet	The object containing the payload containing
  *			the checksum to be verified.
@@ -593,8 +604,10 @@ static _Bool _encrypt_packet(CO(PossumPipe_State, S), CO(Buffer, payload))
 
 	/* Encrypt the packet. */
 	b = key->get_Buffer(key);
-	fputs("Encrypt key:\n", stderr);
-	b->print(b);
+	if ( S->debug ) {
+		fputs("Encrypt key:\n", stderr);
+		b->print(b);
+	}
 	if ( (cipher = NAAAIM_AES256_cbc_Init_encrypt(b, iv)) == NULL )
 		ERR(goto done);
 	if ( cipher->encrypt(cipher, payload) == NULL )
@@ -788,8 +801,10 @@ static _Bool _decrypt_packet(CO(PossumPipe_State, S), CO(Buffer, payload))
 
 	/* Decrypt the packet. */
 	b = key->get_Buffer(key);
-	fputs("Decrypt key:\n", stderr);
-	b->print(b);
+	if ( S->debug ) {
+		fputs("Decrypt key:\n", stderr);
+		b->print(b);
+	}
 	if ( (cipher = NAAAIM_AES256_cbc_Init_decrypt(b, iv)) == NULL )
 		ERR(goto done);
 	if ( cipher->decrypt(cipher, payload) == NULL )
@@ -1290,8 +1305,10 @@ static _Bool receive_platform_quote(CO(PossumPipe, this), CO(Buffer, bufr), \
 	if ( !quote->add_Buffer(quote, cipher->get_Buffer(cipher)) )
 		ERR(goto done);
 
-	fputs("\nClient platform quote:\n", stdout);
-	quote->hprint(quote);
+	if ( S->debug ) {
+		fputs("\nClient platform quote:\n", stdout);
+		quote->hprint(quote);
+	}
 
 
 #if 0
@@ -1310,10 +1327,12 @@ static _Bool receive_platform_quote(CO(PossumPipe, this), CO(Buffer, bufr), \
 	if ( !quoter->generate_report(quoter, quote, output) )
 		ERR(goto done);
 
-	fputs("\nAttestation report:\n", stdout);
 	if ( !quoter->decode_report(quoter, output) )
 		ERR(goto done);
-	quoter->dump_report(quoter);
+	if ( S->debug ) {
+		fputs("\nAttestation report:\n", stdout);
+		quoter->dump_report(quoter);
+	}
 
 	if ( !_update_measurement(S->software, nonce, \
 				  quoter->get_quoteinfo(quoter)) )
@@ -1728,23 +1747,29 @@ static _Bool start_host_mode(CO(PossumPipe, this), CO(Buffer, spid))
 	if ( !software_status->measure(software_status) )
 		ERR(goto done);
 
-	fprintf(stdout, "\n%s: Local software status:\n", __func__, stdout);
 	b = software_status->get_template_hash(software_status);
-	b->print(b);
+	if ( S->debug ) {
+		fprintf(stdout, "\n%s: Local software status:\n", __func__, \
+			stdout);
+		b->print(b);
+	}
 
 	/* Setup the network port. */
 	INIT(HurdLib, Buffer, netbufr, goto done);
 	INIT(HurdLib, Buffer, S->software, goto done);
 
 	/* Wait for a packet to arrive. */
-	fprintf(stderr, "\n%s: Waiting for initialization packet.\n", \
-		__func__);
+	if ( S->debug )
+		fprintf(stderr, "\n%s: Waiting for initialization packet.\n", \
+			__func__);
 	if ( !duct->receive_Buffer(duct, netbufr) )
 		ERR(goto done);
 
-	fprintf(stdout, "\n%s: Received client initialization packet:\n", \
-		__func__);
-	netbufr->hprint(netbufr);
+	if ( S->debug ) {
+		fprintf(stdout, "\n%s: Received client initialization " \
+			"packet:\n", __func__);
+		netbufr->hprint(netbufr);
+	}
 
 	/* Lookup the client identity. */
 	INIT(NAAAIM, IDtoken, token, goto done);
@@ -1756,9 +1781,11 @@ static _Bool start_host_mode(CO(PossumPipe, this), CO(Buffer, spid))
 		ERR(goto done);
 	S->software->add_Buffer(S->software, b);
 
-	fprintf(stdout, "\n%s: Using client software status:\n", __func__, \
-		stdout);
-	S->software->print(S->software);
+	if ( S->debug ) {
+		fprintf(stdout, "\n%s: Using client software status:\n", \
+			__func__, stdout);
+		S->software->print(S->software);
+	}
 
 
 #if 0
@@ -1782,8 +1809,10 @@ static _Bool start_host_mode(CO(PossumPipe, this), CO(Buffer, spid))
 	if ( !packet->decode_packet1(packet, token, S->software, netbufr) )
 		ERR(goto done);
 
-	fprintf(stdout, "\n%s: Incoming client packet 1:\n", __func__);
-	packet->print(packet);
+	if ( S->debug ) {
+		fprintf(stdout, "\n%s: Incoming client packet 1:\n", __func__);
+		packet->print(packet);
+	}
 
 	/* Extract the replay and quote nonces supplied by client. */
 	INIT(HurdLib, Buffer, nonce, goto done);
@@ -1851,8 +1880,10 @@ static _Bool start_host_mode(CO(PossumPipe, this), CO(Buffer, spid))
 	if ( !packet->encode_packet1(packet, b, netbufr) )
 		ERR(goto done);
 
-	fprintf(stdout, "\n%s: Sending host packet 1:\n", __func__);
-	packet->print(packet);
+	if ( S->debug ) {
+		fprintf(stdout, "\n%s: Sending host packet 1:\n", __func__);
+		packet->print(packet);
+	}
 
 	if ( !duct->send_Buffer(duct, netbufr) )
 		ERR(goto done);
@@ -1886,26 +1917,32 @@ static _Bool start_host_mode(CO(PossumPipe, this), CO(Buffer, spid))
 		ERR(goto done);
 	}
 
-	fputs("\nShared 1:\n", stderr);
-	S->shared1->print(S->shared1);
-	fputs("Shared 2:\n", stderr);
-	S->shared2->print(S->shared2);
+	if ( S->debug ) {
+		fputs("\nShared 1:\n", stderr);
+		S->shared1->print(S->shared1);
+		fputs("Shared 2:\n", stderr);
+		S->shared2->print(S->shared2);
+	}
 
 	INIT(NAAAIM, Sha256, S->sent, goto done);
 	S->sent->add(S->sent, S->shared1->get_Buffer(S->shared1));
 	S->sent->add(S->sent, S->shared2->get_Buffer(S->shared2));
 	if ( !S->sent->compute(S->sent) )
 		ERR(goto done);
-	fputs("\nTransmit root:\n", stderr);
-	S->sent->print(S->sent);
+	if ( S->debug ) {
+		fputs("\nTransmit root:\n", stderr);
+		S->sent->print(S->sent);
+	}
 
 	INIT(NAAAIM, Sha256, S->received, goto done);
 	S->received->add(S->received, S->shared2->get_Buffer(S->shared2));
 	S->received->add(S->received, S->shared1->get_Buffer(S->shared1));
 	if ( !S->received->compute(S->received) )
 		ERR(goto done);
-	fputs("Receive root:\n", stderr);
-	S->received->print(S->received);
+	if ( S->debug ) {
+		fputs("Receive root:\n", stderr);
+		S->received->print(S->received);
+	}
 
 
 	/* Setup host nonce generator. */
@@ -2094,9 +2131,12 @@ static _Bool start_client_mode(CO(PossumPipe, this), CO(Buffer, spid))
 	if ( !software_status->measure(software_status) )
 		ERR(goto done);
 
-	fprintf(stdout, "\n%s: Local software status:\n", __func__, stdout);
 	b = software_status->get_template_hash(software_status);
-	b->print(b);
+	if ( S->debug ) {
+		fprintf(stdout, "\n%s: Local software status:\n", __func__, \
+			stdout);
+		b->print(b);
+	}
 
 
 	/* Send a session initiation packet. */
@@ -2121,8 +2161,10 @@ static _Bool start_client_mode(CO(PossumPipe, this), CO(Buffer, spid))
 	if ( !duct->send_Buffer(duct, bufr) )
 		ERR(goto done);
 
-	fprintf(stdout, "\n%s: Sent client packet 1:\n", __func__);
-	packet->print(packet);
+	if ( S->debug ) {
+		fprintf(stdout, "\n%s: Sent client packet 1:\n", __func__);
+		packet->print(packet);
+	}
 
 	/* Save transmitted nonces for subsequent use. */
 	INIT(HurdLib, Buffer, nonce, goto done);
@@ -2145,9 +2187,11 @@ static _Bool start_client_mode(CO(PossumPipe, this), CO(Buffer, spid))
 	if ( !duct->receive_Buffer(duct, bufr) )
 		ERR(goto done);
 
-	fprintf(stdout, "\n%s: Received host initialization packet:\n", \
-		__func__);
-	bufr->hprint(bufr);
+	if ( S->debug ) {
+		fprintf(stdout, "\n%s: Received host initialization " \
+			"packet:\n", __func__);
+		bufr->hprint(bufr);
+	}
 
 	/* Find the host identity. */
 	INIT(NAAAIM, Ivy, ivy, goto done);
@@ -2171,15 +2215,19 @@ static _Bool start_client_mode(CO(PossumPipe, this), CO(Buffer, spid))
 		ERR(goto done);
 	S->software->add_Buffer(S->software, b);
 
-	fprintf(stdout, "\n%s: Using host software status:\n", __func__, \
-		stdout);
-	S->software->print(S->software);
+	if ( S->debug ) {
+		fprintf(stdout, "\n%s: Using host software status:\n", \
+			__func__, stdout);
+		S->software->print(S->software);
+	}
 
 	if ( !packet->decode_packet1(packet, token, S->software, bufr) )
 		ERR(goto done);
 
-	fprintf(stdout, "\n%s: Received host packet 1.\n", __func__);
-	packet->print(packet);
+	if ( S->debug ) {
+		fprintf(stdout, "\n%s: Received host packet 1.\n", __func__);
+		packet->print(packet);
+	}
 
 	if ( (b = packet->get_element(packet, PossumPacket_public)) == NULL )
 		ERR(goto done);
@@ -2209,34 +2257,42 @@ static _Bool start_client_mode(CO(PossumPipe, this), CO(Buffer, spid))
 	if ( !receive_platform_quote(this, bufr, ivy, their_nonce) )
 		ERR(goto done);
 
-	fprintf(stdout, "\n%s: Verified server:\n", __func__);
-	ivy->print(ivy);
+	if ( S->debug ) {
+		fprintf(stdout, "\n%s: Verified server:\n", __func__);
+		ivy->print(ivy);
+	}
 
 	/* Send initiation packet. */
 	bufr->reset(bufr);
 	if ( !send_connection_start(this, bufr) )
 		ERR(goto done);
 
-	fputs("\nShared 1:\n", stderr);
-	S->shared1->print(S->shared1);
-	fputs("Shared 2:\n", stderr);
-	S->shared2->print(S->shared2);
+	if ( S->debug ) {
+		fputs("\nShared 1:\n", stderr);
+		S->shared1->print(S->shared1);
+		fputs("Shared 2:\n", stderr);
+		S->shared2->print(S->shared2);
+	}
 
 	INIT(NAAAIM, Sha256, S->sent, goto done);
 	S->sent->add(S->sent, S->shared2->get_Buffer(S->shared2));
 	S->sent->add(S->sent, S->shared1->get_Buffer(S->shared1));
 	if ( !S->sent->compute(S->sent) )
 		ERR(goto done);
-	fputs("\nTransmit root:\n", stderr);
-	S->sent->print(S->sent);
+	if ( S->debug ) {
+		fputs("\nTransmit root:\n", stderr);
+		S->sent->print(S->sent);
+	}
 
 	INIT(NAAAIM, Sha256, S->received, goto done);
 	S->received->add(S->received, S->shared1->get_Buffer(S->shared1));
 	S->received->add(S->received, S->shared2->get_Buffer(S->shared2));
 	if ( !S->received->compute(S->received) )
 		ERR(goto done);
-	fputs("Receive root:\n", stderr);
-	S->received->print(S->received);
+	if ( S->debug ) {
+		fputs("Receive root:\n", stderr);
+		S->received->print(S->received);
+	}
 
 	/* Setup client nonce generator. */
 	if ( !_setup_nonce(S) )
@@ -2257,6 +2313,31 @@ static _Bool start_client_mode(CO(PossumPipe, this), CO(Buffer, spid))
 	WHACK(ivy);
 
 	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements a control method for setting the debug
+ * status of a PossumPipe instance.
+ *
+ * \param this		the communications object whose debug status
+ *			is to be set.
+ *
+ * \param debug		The value of the debug flag to be set.
+ *
+ * \return	No return value is defined.
+ */
+
+static void debug(CO(PossumPipe, this), const _Bool debug)
+
+{
+	STATE(S);
+
+
+	S->debug = debug;
+	return;
 }
 
 
@@ -2381,6 +2462,7 @@ extern PossumPipe NAAAIM_PossumPipe_Init(void)
 	this->start_host_mode	= start_host_mode;
 	this->start_client_mode = start_client_mode;
 
+	this->debug = debug;
 	this->reset = reset;
 	this->whack = whack;
 
