@@ -286,7 +286,8 @@ static _Bool load_epid(CO(QEenclave, this), CO(char *, epid_name))
 		ERR(goto done);
 	}
 
-	fprintf(stdout, "resealed: %u\n", resealed);
+	if ( resealed )
+		fputs("EPID blob resealed.\n", stderr);
 	retn = true;
 
 
