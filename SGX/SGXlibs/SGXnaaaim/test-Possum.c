@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
+#include <time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -117,7 +118,8 @@ static const struct OCALL_api ocall_table = {
 extern int main(int argc, char *argv[])
 
 {
-	_Bool debug = true;
+	_Bool debug_mode    = false,
+	      debug_enclave = true;
 
 	char *id_token	   = NULL,
 	     *spid	   = NULL,
@@ -155,7 +157,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "CMSdh:i:s:t:v:")) != EOF )
+	while ( (opt = getopt(argc, argv, "CMSdph:i:s:t:v:")) != EOF )
 		switch ( opt ) {
 			case 'C':
 				Mode = client;
@@ -168,7 +170,11 @@ extern int main(int argc, char *argv[])
 				break;
 
 			case 'd':
-				debug = debug ? false : true;
+				debug_mode = true;
+				break;
+			case 'p':
+				debug_enclave = false;
+				break;
 
 			case 'h':
 				hostname = optarg;
@@ -198,7 +204,8 @@ extern int main(int argc, char *argv[])
 	/* Handle request for measurement. */
 	if ( Mode == measure ) {
 		INIT(NAAAIM, SGXenclave, enclave, ERR(goto done));
-		if ( !enclave->setup(enclave, enclave_name, token, debug) )
+		if ( !enclave->setup(enclave, enclave_name, token, \
+				     debug_enclave) )
 			ERR(goto done);
 
 		memset(&ecall2, '\0', sizeof(struct Possum_ecall2));
@@ -276,7 +283,7 @@ extern int main(int argc, char *argv[])
 
 	/* Load the enclave. */
 	INIT(NAAAIM, SGXenclave, enclave, ERR(goto done));
-	if ( !enclave->setup(enclave, enclave_name, token, debug) )
+	if ( !enclave->setup(enclave, enclave_name, token, debug_enclave) )
 		ERR(goto done);
 
 
@@ -284,6 +291,7 @@ extern int main(int argc, char *argv[])
 	if ( Mode == server ) {
 		memset(&ecall0, '\0', sizeof(struct Possum_ecall0));
 
+		ecall0.debug_mode   = debug_mode;
 		ecall0.port	    = 11990;
 		ecall0.current_time = time(NULL);
 
@@ -308,6 +316,7 @@ extern int main(int argc, char *argv[])
 	if ( Mode == client ) {
 		memset(&ecall1, '\0', sizeof(struct Possum_ecall0));
 
+		ecall1.debug_mode    = debug_mode;
 		ecall1.port	     = 11990;
 		ecall1.current_time  = time(NULL);
 

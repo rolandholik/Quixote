@@ -190,6 +190,10 @@ static _Bool ping(CO(PossumPipe, pipe))
  * This function implements the ecall entry point for a function which
  * implements the server side of the Duct test.
  *
+ * \param debug		A flag which specifies whether or not the
+ *			PossumPipe object is to be placed in debug
+ *			mode.
+ *
  * \param port		The port number the server is to listen on.
  *
  * \param current_time	The time to be used as the seed for intra-enclave
@@ -216,8 +220,8 @@ static _Bool ping(CO(PossumPipe, pipe))
  *		conducted.
  */
 
-_Bool test_server(int port, time_t current_time, char *spid_key,	    \
-		  size_t id_size, unsigned char *identity, size_t vfy_size, \
+_Bool test_server(_Bool debug, int port, time_t current_time, char *spid_key, \
+		  size_t id_size, unsigned char *identity, size_t vfy_size,   \
 		  unsigned char *verifier)
 
 {
@@ -250,6 +254,9 @@ _Bool test_server(int port, time_t current_time, char *spid_key,	    \
 	fprintf(stdout, "Server mode: port=%d\n", port);
 
 	INIT(NAAAIM, PossumPipe, pipe, ERR(goto done));
+	if ( debug )
+		pipe->debug(pipe, debug);
+
 	if ( !pipe->init_server(pipe, NULL, port, false) )
 		ERR(goto done);
 
@@ -282,6 +289,9 @@ _Bool test_server(int port, time_t current_time, char *spid_key,	    \
  * This function implements the ecall entry point for a function which
  * implements the client side of the Duct test.
  *
+ * \param debug		A flag which specifies whether or not the
+ *			PossumPipe object is to be placed in debug
+ *			mode.
  *
  * \param hostname	A pointer to a null-terminated character buffer
  *			containing the hostname which the client is to
@@ -314,8 +324,8 @@ _Bool test_server(int port, time_t current_time, char *spid_key,	    \
  *		conducted.
  */
 
-_Bool test_client(char *hostname, int port, time_t current_time,	   \
-		  char *spid_key, size_t id_size, unsigned char *identity, \
+_Bool test_client(_Bool debug, char *hostname, int port, time_t current_time, \
+		  char *spid_key, size_t id_size, unsigned char *identity,    \
 		  size_t vfy_size, unsigned char *verifier)
 
 {
@@ -352,6 +362,9 @@ _Bool test_client(char *hostname, int port, time_t current_time,	   \
 	/* Start client mode. */
 	fprintf(stdout, "Client mode: connecting to %s:%d\n", hostname, port);
 	INIT(NAAAIM, PossumPipe, pipe, ERR(goto done));
+	if ( debug )
+		pipe->debug(pipe, debug);
+
 	if ( !pipe->init_client(pipe, hostname, port) ) {
 		fputs("Cannot initialize client pipe.\n", stderr);
 		goto done;

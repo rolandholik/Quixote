@@ -74,8 +74,8 @@ static sgx_status_t sgx_test_server(void *pms)
 
 
 	/* Call the trused function. */
-	ms->retn = test_server(ms->port, ms->current_time, spid,       \
-			       identity_size, identity, verifier_size, \
+	ms->retn = test_server(ms->debug_mode, ms->port, ms->current_time,   \
+			       spid, identity_size, identity, verifier_size, \
 			       verifier);
 	status = SGX_SUCCESS;
 
@@ -157,8 +157,8 @@ static sgx_status_t sgx_test_client(void *pms)
 
 
 	/* Call trusted function. */
-	ms->retn = test_client(hostname, port, current_time, spid,     \
-			       identity_size, identity, verifier_size, \
+	ms->retn = test_client(ms->debug_mode, hostname, port, current_time, \
+			       spid, identity_size, identity, verifier_size, \
 			       verifier);
 	status = SGX_SUCCESS;
 
