@@ -823,13 +823,15 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
 		secinfo.flags = segment->flags;
 
 		if ( loaded >= segment->phdr.p_memsz )
-			size = 0;
-		else
-			size = segment->phdr.p_memsz - segment->phdr.p_filesz;
-
-		if ( compatibility & NULL_PADDING_NEEDED )
 			size = loaded - segment->phdr.p_memsz;
+		else {
+			size = segment->phdr.p_memsz - loaded;
+		}
 
+		if ( compatibility & NULL_PADDING_NEEDED ) {
+			if ( size > 4096 )
+				size += 4096;
+		}
 		size = r2p(size);
 
 		if ( debug ) {
