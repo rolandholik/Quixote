@@ -13,8 +13,8 @@ CSRC = sgx-check.c sgx-metadata.c SGXmetadata.c SGXloader.c	    \
 ASRC = boot-sgx.s
 
 TOOLS = sgx-check sgx-metadata sgx-loader sgx-load sgx-sigstruct	     \
-	sgx-gen-token gen-white-list test-ecall test-pcr idf-sgx-fandf	     \
-	idf-sgx-fandf-unibin sgx-provision sdk-compute-size sgx-gen-verifier \
+	sgx-gen-token test-ecall test-pcr idf-sgx-fandf	idf-sgx-fandf-unibin \
+	sgx-provision sdk-compute-size sgx-gen-verifier
 
 CC = musl-gcc
 AS = as
@@ -71,7 +71,7 @@ CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I/usr/local/musl/include
 .PHONY: all tools
 
 # Targets
-all: ${COBJS} ${AOBJS} tools
+all: generate-array ${COBJS} ${AOBJS} tools
 
 tools: ${TOOLS}
 
@@ -109,7 +109,7 @@ sgx-gen-token: sgx-gen-token.o SGXenclave.o SGXloader.o SGXmetadata.o \
 	SGXsigstruct.o ../SHA256.o boot-sgx.o sgx-ocall.o
 	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB} ${SSL_CRYPTO};
 
-sgx-gen-token.o: sgx-gen-token.c
+sgx-gen-token.o: sgx-gen-token.c LE_whitelist.h
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
 
 sgx-provision: sgx-provision.o SGXenclave.o SGXloader.o SGXmetadata.o	 \
@@ -129,10 +129,10 @@ sdk-compute-size.o: sdk-compute-size.c
 	${CC} ${CFLAGS} ${SGXSDK_INCLUDES} -I/usr/local/musl/include \
 		-c $< -o $@;
 
-gen-white-list: gen-white-list.o
+generate-array: generate-array.o
 	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB} ${SSL_CRYPTO};
 
-gen-white-list.o: gen-white-list.c
+generate-array.o: generate-array.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
 
 sgx-gen-verifier: sgx-gen-verifier.o SGXmetadata.o ../IDtoken.o ../SHA256.o \
@@ -169,10 +169,19 @@ SGXaesgcm.o: SGXaesgcm.c
 	$(CC) $(CFLAGS) -I /opt/intel/sgxsdk/include -c $< -o $@;
 
 
+sigstruct.h: generate-array
+	./generate-array -i /opt/intel/sgxpsw/aesm/le_prod_css.bin \
+		-n LE_sigstruct > $@ || rm $@;
+
+LE_whitelist.h: generate-array
+	./generate-array -i sgx_white_list_cert.bin -n LE_whitelist > $@ || \
+		rm $@;
+
+
 tags:
 	/opt/emacs/bin/etags *.{h,c};
 clean:
-	rm -f *.o *~ TAGS;
+	rm -f *.o *~ TAGS sigstruct.h LE_whitelist.h;
 	rm -f ${TOOLS};
 
 
@@ -184,7 +193,7 @@ sgx-provision.o: PVEenclave.h
 SGXmetadata.o: SGX.h SGXmetadata.h
 SGXloader.o: SGX.h SGXloader.h
 SGXenclave.o: SGX.h SGXenclave.h SGXmetadata.h SGXloader.h
-SGXsigstruct.o: SGX.h SGXsigstruct.h
+SGXsigstruct.o: SGX.h SGXsigstruct.h sigstruct.h
 PVEenclave.o: SGX.h SGXenclave.h PVEenclave.h
 SGXmessage.o: SGXmessage.h
 QEenclave.o: SGX.h SGXenclave.h QEenclave.h
