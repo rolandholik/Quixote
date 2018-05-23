@@ -11,6 +11,11 @@
 #define SGX_CAST(type, item) ((type)(item))
 
 
+/* Number of enclave interfaces. */
+#define ECALL_NUMBER 3
+#define OCALL_NUMBER 2
+
+
 /* ECALL interface definitions. */
 struct ecall0_interface {
 	int test;

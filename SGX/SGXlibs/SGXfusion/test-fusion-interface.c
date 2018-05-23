@@ -40,7 +40,7 @@ SGX_EXTERNC const struct {
 	size_t nr_ecall;
 	struct {void* ecall_addr; uint8_t is_priv;} ecall_table[1];
 } g_ecall_table = {
-	2,
+	ECALL_NUMBER,
 	{
 		{(void*)(uintptr_t)sgx_test_fusion, 0},
 	}
@@ -48,12 +48,13 @@ SGX_EXTERNC const struct {
 
 
 /* OCALL interface table. */
-SGX_EXTERNC const struct {
+const struct {
 	size_t nr_ocall;
-	uint8_t entry_table[1][2];
+	uint8_t entry_table[OCALL_NUMBER][ECALL_NUMBER];
 } g_dyn_entry_table = {
-	1,
+	OCALL_NUMBER,
 	{
-		{0, 0, },
+		{0},
+		{0}
 	}
 };

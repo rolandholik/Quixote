@@ -83,6 +83,26 @@ static void test_two(void)
 }
 
 
+static void test_three(void)
+
+{
+	char inbufr[100];
+
+
+	fputs("Test number: 3\n", stdout);
+
+	fputs("\nInput:\n", stdout);
+
+	memset(inbufr, '\0', sizeof(inbufr));
+	if ( fgets(inbufr, sizeof(inbufr), stdin) == NULL )
+		fputs("NULL return\n", stdout);
+
+	fprintf(stdout, "\nInput: '%s'\n", inbufr);
+
+	return;
+}
+
+
 void test_fusion(int test)
 
 {
@@ -92,6 +112,9 @@ void test_fusion(int test)
 			break;
 		case 2:
 			test_two();
+			break;
+		case 3:
+			test_three();
 			break;
 		default:
 			fputs("Invalid test.\n", stderr);

@@ -12,7 +12,7 @@
 
 
 /* Number of tests. */
-#define NUMBER_OF_TESTS 2
+#define NUMBER_OF_TESTS 3
 
 
 /* Include files. */
@@ -47,8 +47,42 @@ int ocall1_handler(struct ocall1_interface *interface)
 	return 0;
 }
 
+
+/* Interface and handler for fgets function simulation. */
+struct SGXfusion_fgets_interface {
+	_Bool retn;
+
+	int stream;
+	char bufr_size;
+	char bufr[];
+};
+
+int fgets_handler(struct SGXfusion_fgets_interface *oc)
+
+{
+	FILE *instream = NULL;
+
+
+	if ( oc->stream == 3 )
+		instream = stdin;
+	else {
+		fprintf(stderr, "%s: Bad stream number: %d", __func__, \
+			oc->stream);
+		return 1;
+	}
+
+	if ( fgets(oc->bufr, oc->bufr_size, instream) != NULL )
+		oc->retn = true;
+	return 0;
+}
+
+
 static const struct OCALL_api ocall_table = {
-	1, {ocall1_handler}
+	2,
+	{
+		ocall1_handler,
+		fgets_handler
+	}
 };
 
 
@@ -56,7 +90,6 @@ static const struct OCALL_api ocall_table = {
 static struct ecall0_table {
 	int test;
 } ecall0_table;
-
 
 
 /**

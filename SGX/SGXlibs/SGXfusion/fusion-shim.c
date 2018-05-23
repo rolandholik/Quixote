@@ -14,6 +14,7 @@
 
 /* Include files. */
 #include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
 #include <stdarg.h>
 
@@ -28,7 +29,7 @@ int atexit(void (*function)(void))
 }
 
 
-/* 
+/*
  * Alternate printf implementation which uses an OCALL to print
  * to the standard output of the process invoking the enclave.
  */
@@ -51,7 +52,7 @@ void printf(const char *fmt, ...)
 }
 
 
-/* 
+/*
  * Alternate fprintf implementation which uses an OCALL to print
  * to the standard output of the process invoking the enclave.
  */
@@ -98,6 +99,60 @@ void fputs(const char *bufr, int stream)
 }
 
 
+/*
+ * An implementation of fgets which uses an OCALL to request services
+ * from the fgets function in untrusted space.
+ */
+char *fgets(char *bufr, int bufr_size, int stream)
+
+{
+	_Bool retn = false;
+
+	int status = SGX_ERROR_INVALID_PARAMETER;
+
+	size_t arena_size = sizeof(struct SGXfusion_fgets_interface) + \
+		bufr_size;
+
+	struct SGXfusion_fgets_interface *op = NULL;
+
+
+	/* Verify arguements and set size of arena. */
+	if ( !sgx_is_within_enclave(bufr, bufr_size) )
+		goto done;
+
+	/* Allocate and initialize the interface structure. */
+	if ( (op = sgx_ocalloc(arena_size)) == NULL )
+		goto done;
+	memset(op, '\0', arena_size);
+
+	op->stream    = stream;
+	op->bufr_size = bufr_size;
+
+
+	/* Call the user handler slot. */
+	if ( (status = sgx_ocall(1, op)) != 0 )
+		goto done;
+
+	if ( op->retn ) {
+		retn = true;
+		memcpy(bufr, op->bufr, bufr_size);
+	}
+
+
+ done:
+	if ( op != NULL )
+		memset(op, '\0', arena_size);
+	sgx_ocfree();
+
+	if ( status != 0 ) {
+		fprintf(stdout, "%s: error=%d\n", __func__, status);
+		return NULL;
+	}
+	if ( !retn )
+		return NULL;
+	return bufr;
+}
+
 
 /*
  * This function implements the OCALL which exports a formatted buffer
@@ -138,7 +193,7 @@ sgx_status_t ocall_print_string(const char* str)
 		sgx_ocfree();
 		return SGX_ERROR_INVALID_PARAMETER;
 	}
-	
+
 	status = sgx_ocall(0, ms);
 
 

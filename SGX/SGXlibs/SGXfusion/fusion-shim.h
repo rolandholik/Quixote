@@ -29,6 +29,14 @@ struct SGXfusion_ocall0_interface {
 	char *bufr;
 };
 
+struct SGXfusion_fgets_interface {
+	_Bool retn;
+
+	int stream;
+	char bufr_size;
+	char bufr[];
+};
+
 sgx_status_t ocall_print_string(const char* str);
 
 
@@ -38,8 +46,11 @@ sgx_status_t ocall_print_string(const char* str);
  */
 #define stdout 1
 #define stderr 2
+#define stdin  3
 
 void printf(const char *, ...);
 void fputs(const char *, int);
 void fputc(char, int);
 void fprintf(int, const char *, ...);
+
+char *fgets(char *, int, int);
