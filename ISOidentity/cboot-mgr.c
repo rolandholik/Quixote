@@ -36,8 +36,22 @@
 #include <NAAAIM.h>
 #include <Buffer.h>
 #include <LocalDuct.h>
+#include <IDtoken.h>
+#include <ISOmanager.h>
 
 #include "cboot.h"
+
+
+/**
+ * The following enumeration type specifies whether or not the
+ * management engine should be contact through an SGX POSSUM connection
+ * or via a local UNIX domain connection.
+ */
+ enum {
+	 internal,
+	 sgx,
+	 measure
+} Mode = internal;
 
 
 /**
@@ -269,25 +283,140 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(char *, cmd))
 extern int main(int argc, char *argv[])
 
 {
+	_Bool debug = true;
+
 	char *p,
+	     *spid     = NULL,
 	     *canister = NULL,
+	     *id_token = NULL,
+	     *verifier = NULL,
+	     *token	   = "ISOmanager.token",
+	     *hostname	   = "localhost",
+	     *enclave_name = "ISOmanager.signed.so",
 	     sockname[UNIX_PATH_MAX],
 	     inbufr[1024];
 
 	int opt,
 	    retn = 1;
 
-	Buffer cmdbufr = NULL;
+	FILE *idfile = NULL;
+
+	Buffer ivy     = NULL,
+	       id_bufr = NULL,
+	       cmdbufr = NULL;
 
 	LocalDuct mgmt = NULL;
 
+	IDtoken idt = NULL;
 
-	while ( (opt = getopt(argc, argv, "n:")) != EOF )
+	File infile = NULL;
+
+	ISOmanager enclave = NULL;
+
+
+	while ( (opt = getopt(argc, argv, "MSpe:h:i:n:s:t:v:")) != EOF )
 		switch ( opt ) {
+			case 'M':
+				Mode = measure;
+				break;
+			case 'S':
+				Mode = sgx;
+				break;
+
+			case 'e':
+				enclave_name = optarg;
+				break;
+			case 'h':
+				hostname = optarg;
+				break;
+			case 'i':
+				id_token = optarg;
+				break;
 			case 'n':
 				canister = optarg;
 				break;
+			case 'p':
+				debug = false;
+				break;
+			case 's':
+				spid = optarg;
+				break;
+			case 't':
+				token = optarg;
+				break;
+			case 'v':
+				verifier = optarg;
+				break;
 		}
+
+
+	/* Run measurement mode. */
+	if ( Mode == measure ) {
+		INIT(NAAAIM, ISOmanager, enclave, ERR(goto done));
+		if ( !enclave->load_enclave(enclave, enclave_name, token, \
+					    debug) )
+			ERR(goto done);
+
+		INIT(HurdLib, Buffer, id_bufr, ERR(goto done));
+		if ( !enclave->generate_identity(enclave, id_bufr) )
+			ERR(goto done);
+		id_bufr->print(id_bufr);
+
+		goto done;
+	}
+
+
+	/* Setup for SGX based modeling. */
+	if ( Mode == sgx ) {
+		/* Load the identity token. */
+		INIT(NAAAIM, IDtoken, idt, goto done);
+		if ( (idfile = fopen(id_token, "r")) == NULL ) {
+			fputs("Cannot open identity token file.\n", stderr);
+			goto done;
+		}
+		if ( !idt->parse(idt, idfile) ) {
+			fputs("Enable to parse identity token.\n", stderr);
+			goto done;
+		}
+
+		INIT(HurdLib, Buffer, id_bufr, ERR(goto done));
+		if ( !idt->encode(idt, id_bufr) ) {
+			fputs("Error encoding identity token.\n", stderr);
+			goto done;
+		}
+
+
+		/* Load the identifier verifier. */
+		INIT(HurdLib, Buffer, ivy, ERR(goto done));
+		INIT(HurdLib, File, infile, ERR(goto done));
+
+		infile->open_ro(infile, verifier);
+		if ( !infile->slurp(infile, ivy) ) {
+			fputs("Cannot read identity verifier.\n", stderr);
+			goto done;
+		}
+
+
+		/* Initialize enclave. */
+		INIT(NAAAIM, ISOmanager, enclave, ERR(goto done));
+		if ( !enclave->load_enclave(enclave, enclave_name, token, \
+					    debug) ) {
+			fputs("Manager enclave initialization failure.\n", \
+			      stderr);
+			goto done;
+		}
+
+
+		/* Connect to the enclave. */
+		if ( !enclave->connect(enclave, hostname, 11990, spid,
+				       id_bufr, ivy) ) {
+			fputs("Unable to connect to model manager.\n", \
+			      stderr);
+			goto done;
+		}
+
+		goto done;
+	}
 
 	if ( canister == NULL ) {
 		fputs("No canister name specified.\n", stderr);
@@ -340,8 +469,16 @@ extern int main(int argc, char *argv[])
 
 
  done:
+	if ( idfile != NULL )
+		fclose(idfile);
+
+	WHACK(ivy);
 	WHACK(cmdbufr);
+	WHACK(id_bufr);
 	WHACK(mgmt);
+	WHACK(idt);
+	WHACK(infile);
+	WHACK(enclave);
 
 	return retn;
 }

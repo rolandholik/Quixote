@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #include <sgx_trts.h>
 #include <sgx_edger8r.h>
@@ -33,6 +34,24 @@ extern _Bool get_measurement(unsigned char *);
 extern _Bool get_pid(pid_t *);
 extern void rewind(int);
 extern _Bool get_event(int, char *, size_t);
+extern _Bool manager(_Bool, int, time_t, char *, size_t, unsigned char *, \
+		     size_t, unsigned char *);
+extern _Bool generate_identity(uint8_t *);
+
+
+static _Bool SGXidf_untrusted_region(void *ptr, size_t size)
+
+{
+	_Bool retn = false;
+
+	if ( ptr == NULL )
+		goto done;
+	if ( sgx_is_within_enclave(ptr, size) )
+		goto done;
+	retn = true;
+ done:
+	return retn;
+}
 
 
 /* ECALL 0 interface function. */
@@ -311,6 +330,115 @@ static sgx_status_t sgx_get_event(void *pms)
 }
 
 
+/* ECALL10 interface function. */
+static sgx_status_t sgx_manager(void *pms)
+
+{
+	sgx_status_t status = SGX_ERROR_INVALID_PARAMETER;
+
+	char *spid = NULL;
+
+	unsigned char *identity = NULL,
+		      *verifier = NULL;
+
+	size_t identity_size = 0,
+	       verifier_size = 0;
+
+	struct ISOidentity_ecall10_interface *ms;
+
+
+	/* Verify marshalled arguements and setup parameters. */
+	if ( !SGXidf_untrusted_region(pms, \
+			      sizeof(struct ISOidentity_ecall10_interface)) )
+		goto done;
+	ms = (struct ISOidentity_ecall10_interface *) pms;
+
+	if ( !SGXidf_untrusted_region(ms->spid, ms->spid_size) )
+		goto done;
+	if ( (spid = malloc(ms->spid_size)) == NULL ) {
+		status = SGX_ERROR_OUT_OF_MEMORY;
+		goto done;
+	}
+	memcpy(spid, ms->spid, ms->spid_size);
+
+	if ( !SGXidf_untrusted_region(ms->identity, ms->identity_size) )
+		goto done;
+	if ( (identity = malloc(ms->identity_size)) == NULL ) {
+		status = SGX_ERROR_OUT_OF_MEMORY;
+		goto done;
+	}
+	identity_size = ms->identity_size;
+	memcpy(identity, ms->identity, identity_size);
+
+	if ( !SGXidf_untrusted_region(ms->verifier, ms->verifier_size) )
+		goto done;
+	if ( (verifier = malloc(ms->verifier_size)) == NULL ) {
+		status = SGX_ERROR_OUT_OF_MEMORY;
+		goto done;
+	}
+	verifier_size = ms->verifier_size;
+	memcpy(verifier, ms->verifier, verifier_size);
+
+	__builtin_ia32_lfence();
+
+
+	/* Call the trused function. */
+	ms->retn = manager(ms->debug_mode, ms->port, ms->current_time,   \
+			   spid, identity_size, identity, verifier_size, \
+			   verifier);
+	status = SGX_SUCCESS;
+
+
+ done:
+	free(spid);
+	free(identity);
+	free(verifier);
+
+	return status;
+}
+
+
+static sgx_status_t sgx_generate_identity(void *pms)
+
+{
+	sgx_status_t status = SGX_ERROR_INVALID_PARAMETER;
+
+	uint8_t *id = NULL;
+
+	struct ISOidentity_ecall11_interface *ms;
+
+
+	/* Verify marshalled arguements and setup parameters. */
+	if ( !SGXidf_untrusted_region(pms, \
+				sizeof(struct ISOidentity_ecall11_interface)) )
+		goto done;
+	ms = (struct ISOidentity_ecall11_interface *) pms;
+
+	if ( !SGXidf_untrusted_region(ms->id, 32) )
+		goto done;
+	if ( (id = malloc(32)) == NULL ) {
+		status = SGX_ERROR_OUT_OF_MEMORY;
+		goto done;
+	}
+
+	__builtin_ia32_lfence();
+
+
+	/* Call trusted function. */
+	ms->retn = generate_identity(id);
+	status = SGX_SUCCESS;
+
+	if ( ms->retn )
+		memcpy(ms->id, id, 32);
+
+
+ done:
+	free(id);
+
+	return status;
+}
+
+
 /* ECALL interface table. */
 SGX_EXTERNC const struct {
 	size_t nr_ecall;
@@ -327,7 +455,9 @@ SGX_EXTERNC const struct {
 		{(void*)(uintptr_t)sgx_get_measurement, 0},
 		{(void*)(uintptr_t)sgx_get_pid, 0},
 		{(void*)(uintptr_t)sgx_rewind, 0},
-		{(void*)(uintptr_t)sgx_get_event, 0}
+		{(void*)(uintptr_t)sgx_get_event, 0},
+		{(void*)(uintptr_t)sgx_manager, 0},
+		{(void*)(uintptr_t)sgx_generate_identity, 0}
 	}
 };
 
@@ -339,6 +469,9 @@ SGX_EXTERNC const struct {
 } g_dyn_entry_table = {
 	OCALL_NUMBER,
 	{
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 	}
 };

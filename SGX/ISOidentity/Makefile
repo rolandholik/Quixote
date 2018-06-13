@@ -4,18 +4,21 @@
 
 
 # Variable declarations.
-CSRC   = test-ISOidentity-enclave.c ISOenclave.c
-ENCSRC = ISOidentity-enclave.c ISOidentity-interface.c			\
+CSRC   = test-ISOidentity-enclave.c ISOenclave.c ISOmanager.c
+ENCSRC = ISOidentity-enclave.c ISOidentity-interface.c ISOidentity-manager.c \
 	ContourPoint.c Actor.c Subject.c ExchangeEvent.c ISOidentity.c
+
+MGRSRC = ISOmanager-enclave.c ISOmanager-interface.c
 
 TOOLS = test-ISOidentity-enclave
 
 ENCLAVE_CC = gcc64
 
 SGX_SDK	    = /opt/intel/sgxsdk
-SGX_INCLUDE = -I . -I $(SGX_SDK)/include -I $(SGX_SDK)/include/tlibc \
+SGX_INCLUDE = -I $(SGX_SDK)/include -I $(SGX_SDK)/include/tlibc \
 	-I $(SGX_SDK)/include/stlport -I ../../ISOidentity	     \
-	-I ../SGXlibs/SGXfusion -I ../SGXlibs/SGXnaaaim
+	-I ../SGXlibs/SGXfusion -I ../SGXlibs/SGXnaaaim -I ../../lib \
+	-I ..
 
 ENCLAVE_CFLAGS = -Wall -nostdinc -fvisibility=hidden -fpie -fstack-protector \
 	$(SGX_INCLUDE) -fno-builtin
@@ -27,6 +30,7 @@ SGX_CRYPTO_LIB	    = sgx_tcrypto
 SGX_SERVICE_LIBRARY = sgx_tservice
 
 ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles  \
+	-Wl,--whole-archive -lsgx_tsgxssl -Wl,--no-whole-archive	     \
 	-L${SGX_LIBRARY_PATH} -L . -L ../SGXlibs/SGXfusion		     \
 	-L ../SGXlibs/SGXnaaaim						     \
 	-Wl,--whole-archive						     \
@@ -34,7 +38,9 @@ ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles  \
 	-Wl,--no-whole-archive						     \
 	-Wl,--start-group						     \
 	-lsgx_tstdc -l${SGX_CRYPTO_LIB} -l${SGX_SERVICE_LIBRARY} -lSGXnaaaim \
+	-lsgx_tsgxssl_crypto						     \
 	-Wl,--end-group							     \
+	-lsgx_tstdcxx							     \
 	-Wl,-Bstatic -Wl,-Bsymbolic -Wl,--no-undefined			     \
 	-Wl,-pie,-eenclave_entry -Wl,--export-dynamic			     \
 	-Wl,--defsym,__ImageBase=0					     \
@@ -46,12 +52,15 @@ SGX_SIGNER = $(SGX_SDK)/bin/sgx_sign
 CC = musl-gcc
 
 CFLAGS = -Wall -O2 -fomit-frame-pointer -march=core2 -I .. -I ../.. \
-	-I ../../HurdLib -I ../../ISOidentity
+	-I ../../HurdLib -I ../../ISOidentity -I ../../lib
 
 LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib -L../../lib
 
-HURDLIB = -L../../HurdLib -lHurdLib
-ELFLIB	= -Wl,--rpath /usr/local/musl/lib -lelf
+HURDLIB	  = -L../../HurdLib -lHurdLib
+NAAAIMLIB = -L../../../lib -lNAAAIM
+ELFLIB	  = -Wl,--rpath /usr/local/musl/lib -lelf
+
+SSL_CRYPTO  = -L /usr/local/musl/lib -lcrypto
 
 
 #
@@ -69,6 +78,7 @@ ELFLIB	= -Wl,--rpath /usr/local/musl/lib -lelf
 #
 COBJS	= ${CSRC:.c=.o}
 ENCOBJS = ${ENCSRC:.c=.o}
+MGROBJS = ${MGRSRC:.c=.o}
 
 
 #
@@ -78,15 +88,22 @@ ENCOBJS = ${ENCSRC:.c=.o}
 
 
 # Targets
-all: ${LIBRARY} enclave tools
+all: ${LIBRARY} ${COBJS} enclave tools
 
-enclave: ldscript ISOidentity.signed.so
+enclave: ldscript ISOidentity.signed.so ISOmanager.signed.so
 
 ISOidentity.signed.so: ISOidentity.so
 	$(SGX_SIGNER) sign -key Private-key.pem -enclave ISOidentity.so \
 		 -out $@ -config ISOidentity-enclave.xml;
 
 ISOidentity.so: ${ENCOBJS}
+	${ENCLAVE_CC} -o $@ $^ ${ENCLAVE_LDFLAGS};
+
+ISOmanager.signed.so: ISOmanager.so
+	$(SGX_SIGNER) sign -key Private-key.pem -enclave $^ -out $@ \
+		-config ISOmanager-enclave.xml;
+
+ISOmanager.so: ${MGROBJS}
 	${ENCLAVE_CC} -o $@ $^ ${ENCLAVE_LDFLAGS};
 
 ldscript:
@@ -103,8 +120,11 @@ tools: ${TOOLS}
 
 test-ISOidentity-enclave: test-ISOidentity-enclave.o ISOenclave.o	  \
 	../SGXenclave.o ../SGXloader.o ../SGXmetadata.o ../SGXsigstruct.o \
-	../sgx-ocall.o ../boot-sgx.o ISOenclave.o
-	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB};
+	../SGXquote.o ../PCEenclave.o ../QEenclave.o ../SGXquote_sgxmgr.o \
+	../SGXepid.o ../../IDtoken.o ../../SHA256.o ../../SHA256_hmac.o	  \
+	../sgx-ocall.o ../boot-sgx.o ISOenclave.o ../../IDtoken.o
+	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${NAAAIMLIB} ${HURDLIB} \
+		${SSL_CRYPTO};
 
 test-ISOidentity-enclave.o: test-ISOidentity-enclave.c
 	${CC} ${CFLAGS} -c $< -o $@;
@@ -112,13 +132,19 @@ test-ISOidentity-enclave.o: test-ISOidentity-enclave.c
 ISOenclave.o: ISOenclave.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
+ISOmanager.o: ISOmanager.c
+	${CC} ${CFLAGS} -c $< -o $@;
+
 
 clean:
 	rm -f *.o *~ ldscript;
 	rm -f ${TOOLS};
-	rm -f ISOidentity.so ISOidentity.signed.so;
+	rm -f ISOidentity.so ISOidentity.signed.so ISOmanager.so \
+		ISOmanager.signed.so;
 
 
 # Source dependencies.
+ISOmanager.o: ISOmanager.h
+
 ISOidentity-enclave.o: ISOidentity-interface.h
 ISOidentity-interface.o: ISOidentity-interface.h

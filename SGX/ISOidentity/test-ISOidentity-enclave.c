@@ -33,6 +33,7 @@
 #include <File.h>
 
 #include <NAAAIM.h>
+#include <IDtoken.h>
 #include <SGX.h>
 #include <SGXenclave.h>
 #include <ExchangeEvent.h>
@@ -62,8 +63,11 @@ extern int main(int argc, char *argv[])
 	_Bool discipline,
 	      debug = true;
 
-	char *token	   = NULL,
+	char *spid	   = NULL,
 	     *trajectory   = NULL,
+	     *id_token	   = NULL,
+	     *verifier	   = NULL,
+	     *token	   = "ISOidentity.token",
 	     *enclave_name = "ISOidentity.signed.so";
 
 	static char *violation = VIOLATION;
@@ -73,13 +77,65 @@ extern int main(int argc, char *argv[])
 
 	pid_t pid;
 
+	FILE *idfile = NULL;
+
+	enum {test, measure} mode = test;
+
 	ISOenclave isoenclave = NULL;
 
-	Buffer bufr = NULL;
+	Buffer ivy     = NULL,
+	       bufr    = NULL,
+	       id_bufr = NULL;
 
 	String input = NULL;
 
 	File infile = NULL;
+
+	IDtoken idt = NULL;
+
+
+	/* Parse and verify arguements. */
+	while ( (opt = getopt(argc, argv, "Mdf:i:s:t:v:")) != EOF )
+		switch ( opt ) {
+			case 'M':
+				mode = measure;
+				break;
+
+			case 'd':
+				debug = debug ? false : true;
+				break;
+			case 'f':
+				trajectory = optarg;
+				break;
+			case 'i':
+				id_token = optarg;
+				break;
+			case 's':
+				spid = optarg;
+				break;
+			case 't':
+				token = optarg;
+				break;
+			case 'v':
+				verifier = optarg;
+				break;
+		}
+
+
+	/* Run measurement mode. */
+	if ( mode == measure ) {
+		INIT(NAAAIM, ISOenclave, isoenclave, ERR(goto done));
+		if ( !isoenclave->load_enclave(isoenclave, enclave_name, \
+					       token) )
+			ERR(goto done);
+
+		INIT(HurdLib, Buffer, bufr, ERR(goto done));
+		if ( !isoenclave->generate_identity(isoenclave, bufr) )
+			ERR(goto done);
+		bufr->print(bufr);
+
+		goto done;
+	}
 
 
 	/* Output header. */
@@ -90,19 +146,50 @@ extern int main(int argc, char *argv[])
 	fflush(stdout);
 
 
-	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "di:t:")) != EOF )
-		switch ( opt ) {
-			case 'd':
-				debug = debug ? false : true;
+	/* Verify arguements. */
+	if ( spid == NULL ) {
+		fputs("No SPID specified.\n", stderr);
+		goto done;
+	}
 
-			case 'i':
-				trajectory = optarg;
-				break;
-			case 't':
-				token = optarg;
-				break;
-		}
+	if ( verifier == NULL ) {
+		fputs("No identifier verified specifed.\n", stderr);
+		goto done;
+	}
+
+	if ( id_token == NULL ) {
+		fputs("No device identity specifed.\n", stderr);
+		goto done;
+	}
+
+
+	/* Load the identity token. */
+	INIT(NAAAIM, IDtoken, idt, goto done);
+	if ( (idfile = fopen(id_token, "r")) == NULL ) {
+		fputs("Cannot open identity token file.\n", stderr);
+		goto done;
+	}
+	if ( !idt->parse(idt, idfile) ) {
+		fputs("Enable to parse identity token.\n", stderr);
+		goto done;
+	}
+
+	INIT(HurdLib, Buffer, id_bufr, ERR(goto done));
+	if ( !idt->encode(idt, id_bufr) ) {
+		fputs("Error encoding identity token.\n", stderr);
+		goto done;
+	}
+
+
+	/* Load the identifier verifier. */
+	INIT(HurdLib, Buffer, ivy, ERR(goto done));
+	INIT(HurdLib, File, infile, ERR(goto done));
+
+	infile->open_ro(infile, verifier);
+	if ( !infile->slurp(infile, ivy) ) {
+		fputs("Cannot read identity verifier.\n", stderr);
+		goto done;
+	}
 
 
 	/* Open the trajectory file. */
@@ -111,7 +198,7 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
-	INIT(HurdLib, File, infile, ERR(goto done));
+	infile->reset(infile);
 	if ( !infile->open_ro(infile, trajectory) )
 		ERR(goto done);
 
@@ -184,11 +271,24 @@ extern int main(int argc, char *argv[])
 	bufr->print(bufr);
 
 
+	/* Start management interface test. */
+	if ( !isoenclave->manager(isoenclave, id_bufr, ivy, spid) )
+		ERR(goto done);
+
+	retn = true;
+
+
  done:
+	if ( idfile != NULL )
+		fclose(idfile);
+
+	WHACK(isoenclave);
+	WHACK(ivy);
 	WHACK(bufr);
+	WHACK(id_bufr);
 	WHACK(input);
 	WHACK(infile);
-	WHACK(isoenclave);
+	WHACK(idt);
 
 	return retn;
 

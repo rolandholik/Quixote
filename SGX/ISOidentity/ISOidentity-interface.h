@@ -18,8 +18,8 @@
 
 
 /* Number of enclave interfaces. */
-#define ECALL_NUMBER 10
-#define OCALL_NUMBER 1
+#define ECALL_NUMBER 12
+#define OCALL_NUMBER 4
 
 
 /* ECALL interface definitions. */
@@ -62,4 +62,28 @@ struct ISOidentity_ecall9_interface {
 	_Bool retn;
 	int type;
 	char event[512];
+};
+
+struct ISOidentity_ecall10_interface {
+	_Bool retn;
+	_Bool debug_mode;
+
+	time_t current_time;
+
+	int port;
+
+	char *spid;
+	size_t spid_size;
+
+	unsigned char *identity;
+	size_t identity_size;
+
+	unsigned char *verifier;
+	size_t verifier_size;
+};
+
+struct ISOidentity_ecall11_interface {
+	_Bool retn;
+
+	uint8_t id[32];
 };

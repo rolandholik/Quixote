@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include <time.h>
 #include <sys/types.h>
 
 #include <Origin.h>
@@ -29,9 +30,11 @@
 #include <File.h>
 
 #include <NAAAIM.h>
+#include <Duct.h>
 
 #include "../SGX/SGX.h"
 #include "../SGX/SGXenclave.h"
+#include <SGXquote.h>
 
 #include <ContourPoint.h>
 #include <ExchangeEvent.h>
@@ -53,7 +56,7 @@
 #endif
 
 
-/** OCALL interface definition. */
+/** OCALL interface definitions. */
 struct ocall1_interface {
 	char* str;
 } ocall1_string;
@@ -65,8 +68,48 @@ int ocall1_handler(struct ocall1_interface *interface)
 	return 0;
 }
 
+struct ocall2_interface {
+	int* ms_cpuinfo;
+	int ms_leaf;
+	int ms_subleaf;
+};
+
+static void cpuid(int *eax, int *ebx, int *ecx, int *edx)\
+
+{
+	__asm("cpuid\n\t"
+	      /* Output. */
+	      : "=a" (*eax), "=b" (*ebx), "=c" (*ecx), "=d" (*edx)
+	      /* Input. */
+	      : "0" (*eax), "2" (*ecx));
+
+	return;
+}
+
+
+int ocall2_handler(struct ocall2_interface *pms)
+
+{
+	struct ocall2_interface *ms = (struct ocall2_interface *) pms;
+
+
+	ms->ms_cpuinfo[0] = ms->ms_leaf;
+	ms->ms_cpuinfo[2] = ms->ms_subleaf;
+
+	cpuid(&ms->ms_cpuinfo[0], &ms->ms_cpuinfo[1], &ms->ms_cpuinfo[2], \
+	      &ms->ms_cpuinfo[3]);
+
+	return 0;
+}
+
 static const struct OCALL_api ocall_table = {
-	1, {ocall1_handler}
+	4,
+	{
+		ocall1_handler,
+		ocall2_handler,
+		Duct_sgxmgr,
+		SGXquote_sgxmgr,
+	}
 };
 
 
@@ -533,7 +576,7 @@ static void rewind_event(CO(ISOenclave, this))
 
 	struct ISOidentity_ecall8_interface ecall8;
 
-	
+
 	/* Verify object status. */
 	if ( S->poisoned )
 		ERR(goto done);
@@ -704,7 +747,7 @@ static void rewind_forensics(CO(ISOenclave, this))
 	if ( S->poisoned )
 		ERR(goto done);
 
-	
+
 	/* Call ECALL slot 8 to get forensics event. */
 	ecall8.type = ISO_IDENTITY_FORENSICS;
 	if ( !S->enclave->boot_slot(S->enclave, 8, &ocall_table, &ecall8, \
@@ -747,7 +790,7 @@ static size_t forensics_size(CO(ISOenclave, this))
 
 	struct ISOidentity_ecall4_interface ecall4;
 
-	
+
 	/* Call ECALL slot 4 to get forensics size. */
 	ecall4.type = 1;
 	ecall4.size = 0;
@@ -927,6 +970,61 @@ static void dump_contours(CO(ISOenclave, this))
 /**
  * External public method.
  *
+ * This method implements starting of the management mode of the
+ * enclave.
+ *
+ * \param this	A pointer to the object which is to be sealed.
+ *
+ */
+
+static _Bool manager(CO(ISOenclave, this), CO(Buffer, id_bufr), \
+		     CO(Buffer, ivy), char *spid)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	int rc;
+
+	struct ISOidentity_ecall10_interface ecall10;
+
+
+	memset(&ecall10, '\0', sizeof(struct ISOidentity_ecall10_interface));
+
+	ecall10.debug_mode   = true;
+	ecall10.port	     = 11990;
+	ecall10.current_time = time(NULL);
+
+	ecall10.spid	  = spid;
+	ecall10.spid_size = strlen(spid) + 1;
+
+	ecall10.identity      = id_bufr->get(id_bufr);
+	ecall10.identity_size = id_bufr->size(id_bufr);
+
+	ecall10.verifier      = ivy->get(ivy);
+	ecall10.verifier_size = ivy->size(ivy);
+
+	if ( !S->enclave->boot_slot(S->enclave, 10, &ocall_table, \
+				    &ecall10, &rc) ) {
+		fprintf(stderr, "Enclave returned: %d\n", rc);
+		goto done;
+	}
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements sealing the behavioral model in its current
  * state.  Sealing the model implies that any additional events which
  * are not in the behavioral map constitute forensic violations for
@@ -989,7 +1087,7 @@ static size_t size(CO(ISOenclave, this))
 
 	struct ISOidentity_ecall4_interface ecall4;
 
-	
+
 	/* Verify object status. */
 	if ( S->poisoned )
 		ERR(goto done);
@@ -1011,6 +1109,65 @@ static size_t size(CO(ISOenclave, this))
 		S->poisoned = true;
 
 	return ecall4.size;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements execution of the ECALL which returns the
+ * host specific identity of the enclave.
+ *
+ * \param this	A pointer to the enclave which is to be measured.
+ *
+ * \param bufr	The object which the enclave measurement is to be
+ *		loaded into.
+ *
+ * \return	A boolean value is returned to indicate if the identity
+ *		was successfully generated.  A false value indicates
+ *		the generation failed while a true value indicates the
+ *		buffer contains a valid enclave identity.
+ *
+ */
+
+static _Bool generate_identity(CO(ISOenclave, this), CO(Buffer, bufr))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	int rc;
+
+	struct ISOidentity_ecall11_interface ecall11;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+
+
+	/* Call ECALL slot 11 to get the enclave identity. */
+	memset(&ecall11, '\0', sizeof(struct ISOidentity_ecall11_interface));
+
+	if ( !S->enclave->boot_slot(S->enclave, 11, &ocall_table, \
+				    &ecall11, &rc) ) {
+		fprintf(stderr, "Enclave returned: %d\n", rc);
+		goto done;
+	}
+	if ( !ecall11.retn )
+		ERR(goto done);
+
+	if ( !bufr->add(bufr, ecall11.id, sizeof(ecall11.id)) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
 }
 
 
@@ -1095,9 +1252,13 @@ extern ISOenclave NAAAIM_ISOenclave_Init(void)
 	this->dump_contours  = dump_contours;
 	this->dump_forensics = dump_forensics;
 
+	this->manager = manager;
+
 	this->seal  = seal;
 	this->size  = size;
-	this->whack = whack;
+
+	this->generate_identity = generate_identity;
+	this->whack		= whack;
 
 	return this;
 }

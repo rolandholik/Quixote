@@ -44,7 +44,8 @@ LIBS = -lNAAAIM -lHurdLib
 
 HURDLIB = -L../lib -lHurdLib
 
-CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I/usr/local/musl/include
+CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I/usr/local/musl/include \
+	-I ../SGX/ISOidentity
 
 
 #
@@ -91,12 +92,20 @@ set-behavior: set-behavior.o
 cboot: cboot.o ../SHA256.o ISOidentity.o ContourPoint.o ExchangeEvent.o \
 	Actor.o Subject.o ../SGX/ISOidentity/ISOenclave.o		\
 	../SGX/SGXenclave.o ../SGX/SGXloader.o ../SGX/SGXmetadata.o	\
-	../SGX/SGXsigstruct.o ../SGX/boot-sgx.o ../SGX/sgx-ocall.o
+	../SGX/SGXsigstruct.o ../SGX/boot-sgx.o ../SGX/sgx-ocall.o	\
+	../SGX/SGXquote_sgxmgr.o ../SGX/SGXquote.o ../SGX/QEenclave.o	\
+	../SGX/PCEenclave.o ../SGX/SGXepid.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO}	\
 		-Wl,--rpath /usr/local/musl/lib -lelf
 
-cboot-mgr: cboot-mgr.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS}
+cboot-mgr: cboot-mgr.o ../IDtoken.o ../SHA256.o ../SHA256_hmac.o	\
+	../SGX/SGXenclave.o ../SGX/SGXloader.o ../SGX/SGXmetadata.o	\
+	../SGX/SGXsigstruct.o ../SGX/boot-sgx.o ../SGX/sgx-ocall.o	\
+	../SGX/SGXquote_sgxmgr.o ../SGX/SGXquote.o 			\
+	../SGX/ISOidentity/ISOmanager.o ../SGX/QEenclave.o		\
+	../SGX/PCEenclave.o ../SGX/SGXepid.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO} \
+		-Wl,--rpath /usr/local/musl/lib -lelf;
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};

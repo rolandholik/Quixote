@@ -49,8 +49,13 @@ struct NAAAIM_ISOenclave
 	void (*dump_contours)(const ISOenclave);
 	void (*dump_forensics)(const ISOenclave);
 
+	_Bool (*manager)(const ISOenclave, const Buffer, \
+			 const Buffer, char *);
+
 	_Bool (*seal)(const ISOenclave);
 	size_t (*size)(const ISOenclave);
+
+	_Bool (*generate_identity)(const ISOenclave, const Buffer);
 	void (*whack)(const ISOenclave);
 
 	/* Private state. */
