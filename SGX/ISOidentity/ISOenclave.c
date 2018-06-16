@@ -102,10 +102,41 @@ int ocall2_handler(struct ocall2_interface *pms)
 	return 0;
 }
 
+
+/* Interface and handler for fgets function simulation. */
+struct SGXfusion_fgets_interface {
+	_Bool retn;
+
+	int stream;
+	char bufr_size;
+	char bufr[];
+};
+
+int fgets_handler(struct SGXfusion_fgets_interface *oc)
+
+{
+	FILE *instream = NULL;
+
+
+	if ( oc->stream == 3 )
+		instream = stdin;
+	else {
+		fprintf(stderr, "%s: Bad stream number: %d", __func__, \
+			oc->stream);
+		return 1;
+	}
+
+	if ( fgets(oc->bufr, oc->bufr_size, instream) != NULL )
+		oc->retn = true;
+	return 0;
+}
+
+
 static const struct OCALL_api ocall_table = {
-	4,
+	5,
 	{
 		ocall1_handler,
+		fgets_handler,
 		ocall2_handler,
 		Duct_sgxmgr,
 		SGXquote_sgxmgr,

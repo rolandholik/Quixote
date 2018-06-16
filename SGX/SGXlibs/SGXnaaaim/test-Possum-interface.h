@@ -9,7 +9,7 @@
 
 /* Number of enclave interfaces. */
 #define ECALL_NUMBER 3
-#define OCALL_NUMBER 4
+#define OCALL_NUMBER 5
 
 
 /* ECALL interface definitions. */

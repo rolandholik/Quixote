@@ -85,9 +85,10 @@ int ocall2_handler(struct ocall2_interface *pms)
 }
 
 static const struct OCALL_api ocall_table = {
-	3,
+	4,
 	{
 		ocall1_handler,
+		NULL,
 		ocall2_handler,
 		Duct_sgxmgr
 	}

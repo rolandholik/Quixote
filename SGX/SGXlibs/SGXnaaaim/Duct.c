@@ -182,7 +182,7 @@ static int duct_ocall(struct Duct_ocall *ocall)
 
 
 	/* Call the SGX duct manager. */
-	if ( (status = sgx_ocall(2, ocp)) == 0 ) {
+	if ( (status = sgx_ocall(3, ocp)) == 0 ) {
 		retn = true;
 		*ocall = *ocp;
 	}
