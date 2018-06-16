@@ -16,6 +16,8 @@
 #include <SGX.h>
 #include <SGXfusion.h>
 
+#include <cboot.h>
+
 #include "ISOmanager-interface.h"
 
 
@@ -72,6 +74,226 @@ time_t time(time_t *timeptr)
 
 
 /**
+ * Private function.
+ *
+ * This function implements the receipt of a trajectory list from
+ * the canister management daemon.  The protocol used is for the
+ * management daemon to send the number of points in the trajectory
+ * followed by each point in ASCII form.
+ *
+ * \param mgmt		The object used to communicate with the
+ *			canister management instance.
+ *
+ * \param cmdbufr	The object used to process the remote command
+ *			response.
+ *
+ * \return		A boolean value is returned to indicate the
+ *			status of processing processing the trajectory
+ *			list.  A false value indicates an error occurred
+ *			while a true value indicates the response was
+ *			properly processed.
+ */
+
+static _Bool receive_trajectory(CO(PossumPipe, mgmt), CO(Buffer, cmdbufr))
+
+{
+	_Bool retn = false;
+
+	unsigned int cnt;
+
+
+	/* Get the number of points. */
+	cmdbufr->reset(cmdbufr);
+	if ( !mgmt->receive_packet(mgmt, cmdbufr) )
+		ERR(goto done);
+	cnt = *(unsigned int *) cmdbufr->get(cmdbufr);
+	fprintf(stderr, "Trajectory size: %u\n", cnt);
+
+
+	/* Output each point. */
+	while ( cnt ) {
+		cmdbufr->reset(cmdbufr);
+		if ( !mgmt->receive_packet(mgmt, cmdbufr) )
+			ERR(goto done);
+		fprintf(stdout, "%s\n", cmdbufr->get(cmdbufr));
+		--cnt;
+	}
+
+	cmdbufr->reset(cmdbufr);
+	retn = true;
+
+ done:
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function implements the receipt of a forensics list from
+ * the canister management daemon.  The protocol used is for the
+ * management daemon to send the number of events in the forensics
+ * patch followed by each event in ASCII form.
+ *
+ * \param mgmt		The object used to communicate with the
+ *			canister management instance.
+ *
+ * \param cmdbufr	The object used to process the remote command
+ *			response.
+ *
+ * \return		A boolean value is returned to indicate the
+ *			status of processing processing the forensics
+ *			list.  A false value indicates an error occurred
+ *			while a true value indicates the response was
+ *			properly processed.
+ */
+
+static _Bool receive_forensics(CO(PossumPipe, mgmt), CO(Buffer, cmdbufr))
+
+{
+	_Bool retn = false;
+
+	unsigned int cnt;
+
+
+	/* Get the number of points. */
+	cmdbufr->reset(cmdbufr);
+	if ( !mgmt->receive_packet(mgmt, cmdbufr) )
+		ERR(goto done);
+	cnt = *(unsigned int *) cmdbufr->get(cmdbufr);
+	fprintf(stderr, "Forensics size: %u\n", cnt);
+
+
+	/* Output each point. */
+	while ( cnt ) {
+		cmdbufr->reset(cmdbufr);
+		if ( !mgmt->receive_packet(mgmt, cmdbufr) )
+			ERR(goto done);
+		fprintf(stdout, "%s\n", cmdbufr->get(cmdbufr));
+		--cnt;
+	}
+
+	cmdbufr->reset(cmdbufr);
+	retn = true;
+
+ done:
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function implements receipt and processing of the command
+ * which was executed on the canister management daemon.
+ *
+ * \param mgmt		The socket object used to communicate with
+ *			the canister management instance.
+ *
+ * \param cmdbufr	The object used to hold the remote command
+ *			response.
+ *
+ * \return		A boolean value is returned to indicate an
+ *			error was encountered while processing receipt
+ *			of the command.  A false value indicates an
+ *			error occurred while a true value indicates the
+ *			response was properly processed.
+ */
+
+static _Bool receive_command(CO(PossumPipe, mgmt), CO(Buffer, cmdbufr), \
+			     int cmdnum)
+
+{
+	_Bool retn = false;
+
+
+	switch ( cmdnum ) {
+		case show_measurement:
+			if ( !mgmt->receive_packet(mgmt, cmdbufr) )
+				ERR(goto done);
+			cmdbufr->print(cmdbufr);
+			cmdbufr->reset(cmdbufr);
+			retn = true;
+			break;
+
+		case show_trajectory:
+			retn = receive_trajectory(mgmt, cmdbufr);
+			break;
+
+		case show_forensics:
+			retn = receive_forensics(mgmt, cmdbufr);
+			break;
+	}
+
+ done:
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function implements the parsing of the supplied command and
+ * the translation of this command to a binary expression of the
+ * command.  The binary command is sent over the PossumpPipe connection
+ * with subsequent reads from the pipe for the command response.
+ *
+ * \param mgmt		The object used to communicate with the canister
+ *			management instance.
+ *
+ * \param cmd		A character point to the null-terminated buffer
+ *			containing the ASCII version of the command.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not processing of commands should continue.  A
+ *			false value indicates the processing of commands
+ *			should be terminated while a true value indicates
+ *			an additional command cycle should be processed.
+ */
+
+static _Bool process_command(CO(PossumPipe, mgmt), CO(char *, cmd))
+
+{
+	_Bool retn = false;
+
+	int lp,
+	    cmdnum = 0;
+
+	struct cboot_cmd_definition *cp = cboot_cmd_list;
+
+	Buffer cmdbufr = NULL;
+
+
+	/* Locate the command. */
+	for (lp= 0; cp[lp].syntax != NULL; ++lp) {
+		if ( strcmp(cp[lp].syntax, cmd) == 0 )
+			cmdnum = cp[lp].command;
+	}
+	if ( cmdnum == 0 ) {
+		fprintf(stdout, "Unknown command: %s\n", cmd);
+		retn = true;
+		goto done;
+	}
+
+	/* Send the command over the management socket. */
+	INIT(HurdLib, Buffer, cmdbufr, ERR(goto done));
+
+	cmdbufr->add(cmdbufr, (unsigned char *) &cmdnum, sizeof(cmdnum));
+	if ( !mgmt->send_packet(mgmt, PossumPipe_data, cmdbufr) )
+		ERR(goto done);
+
+	cmdbufr->reset(cmdbufr);
+	if ( !receive_command(mgmt, cmdbufr, cmdnum) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	WHACK(cmdbufr);
+	return retn;
+}
+
+/**
  * ECALL 0
  *
  * This function implements the ecall entry point for a function which
@@ -119,6 +341,9 @@ _Bool connect(_Bool debug, char *hostname, int port, time_t current_time, \
 {
 	_Bool retn = false;
 
+	char *p,
+	     inbufr[80];
+
 	PossumPipe pipe = NULL;
 
 	Buffer bufr = NULL,
@@ -129,7 +354,6 @@ _Bool connect(_Bool debug, char *hostname, int port, time_t current_time, \
 	IDtoken idt = NULL;
 
 
-	fprintf(stderr, "%s: Called.\n", __func__);
 	/* Initialize the time. */
 	Current_Time = current_time;
 
@@ -149,7 +373,8 @@ _Bool connect(_Bool debug, char *hostname, int port, time_t current_time, \
 
 
 	/* Start client mode. */
-	fprintf(stdout, "Client mode: connecting to %s:%d\n", hostname, port);
+	fprintf(stdout, "SGX cboot manager: connecting to %s:%d\n", hostname, \
+		port);
 	INIT(NAAAIM, PossumPipe, pipe, ERR(goto done));
 	if ( debug )
 		pipe->debug(pipe, debug);
@@ -163,6 +388,28 @@ _Bool connect(_Bool debug, char *hostname, int port, time_t current_time, \
 		goto done;
 	}
 
+
+	/* Start command loop. */
+	while ( 1 ) {
+		memset(inbufr, '\0', sizeof(inbufr));
+
+		fprintf(stdout, "%s:cboot>", hostname);
+		if ( fgets(inbufr, sizeof(inbufr), stdin) == NULL )
+			goto done;
+		if ( (p = strchr(inbufr, '\n')) != NULL )
+			*p = '\0';
+
+		if ( inbufr[0] == '\0' )
+			continue;
+		if ( strcmp(inbufr, "quit") == 0 ) {
+			retn = true;
+			goto done;
+		}
+
+		if ( !process_command(pipe, inbufr) )
+			goto done;
+
+	}
 	retn = true;
 
 

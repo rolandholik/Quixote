@@ -66,6 +66,7 @@ int ocall1_handler(struct ocall1_interface *interface)
 
 {
 	fprintf(stdout, "%s", interface->str);
+	fflush(stdout);
 	return 0;
 }
 

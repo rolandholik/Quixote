@@ -34,10 +34,14 @@
 #include <File.h>
 
 #include <NAAAIM.h>
+#include <Duct.h>
 #include <Buffer.h>
 #include <LocalDuct.h>
 #include <IDtoken.h>
 #include <ISOmanager.h>
+
+#include <SGX.h>
+#include <SGXquote.h>
 
 #include "cboot.h"
 

@@ -45,7 +45,7 @@ LIBS = -lNAAAIM -lHurdLib
 HURDLIB = -L../lib -lHurdLib
 
 CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I/usr/local/musl/include \
-	-I ../SGX/ISOidentity
+	-I ../SGX/ISOidentity -I ../SGX
 
 
 #

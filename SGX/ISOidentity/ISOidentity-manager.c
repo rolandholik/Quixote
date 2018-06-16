@@ -32,7 +32,18 @@
 #include <SGX.h>
 #include <SGXfusion.h>
 
+#include <cboot.h>
+
 #include "ISOidentity-interface.h"
+#include "ContourPoint.h"
+#include "ExchangeEvent.h"
+#include "ISOidentity.h"
+
+
+/**
+ * A reference to the model object being maintained.
+ */
+extern ISOidentity Model;
 
 
 /**
@@ -53,6 +64,218 @@ unsigned char *Verifier = NULL;
  * The seed time for the time() function.
  */
 static time_t Current_Time;
+
+
+/**
+ * Private function.
+ *
+ * This function is responsible for returning the current trajectory
+ * list to the management endpoint.  The protocol used is to send the
+ * number of elements in the list followed by each point as an ASCII
+ * string.
+ *
+ * \param mgmt		The object used to communicate with the canister
+ *			management instance.
+ *
+ * \param cmdbufr	The object which will be used to hold the
+ *			information which will be transmitted.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not the command was processed.  A false value
+ *			indicates the processing of commands should be
+ *			terminated while a true value indicates an
+ *			additional command cycle should be processed.
+ */
+
+static _Bool send_trajectory(CO(PossumPipe, mgmt), CO(Buffer, cmdbufr))
+
+{
+	_Bool retn = false;
+
+	size_t lp,
+	       cnt = 0;
+
+	ExchangeEvent event;
+
+	String es = NULL;
+
+
+	/*
+	 * Compute the number of elements in the list and send it to
+	 * the client.
+	 */
+	cnt = Model->size(Model);
+
+	cmdbufr->reset(cmdbufr);
+	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
+	if ( !mgmt->send_packet(mgmt, PossumPipe_data, cmdbufr) )
+		ERR(goto done);
+	fprintf(stderr, "Sent trajectory size: %zu\n", cnt);
+
+
+	/* Send each trajectory point. */
+	INIT(HurdLib, String, es, ERR(goto done));
+
+	Model->rewind_event(Model);
+
+	for (lp= 0; lp < cnt; ++lp ) {
+		if ( !Model->get_event(Model, &event) )
+			ERR(goto done);
+		if ( event == NULL )
+			continue;
+		if ( !event->format(event, es) )
+			ERR(goto done);
+
+		cmdbufr->reset(cmdbufr);
+		cmdbufr->add(cmdbufr, (unsigned char *) es->get(es), \
+			     es->size(es) + 1);
+		if ( !mgmt->send_packet(mgmt, PossumPipe_data, cmdbufr) )
+			ERR(goto done);
+		es->reset(es);
+	}
+
+	retn = true;
+
+ done:
+	WHACK(es);
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function is responsible for returning the current forensics
+ * list to the caller.  The protocol used is to send the number of
+ * elements in the list followed by each point in the forensics
+ * path as an ASCII string.
+ *
+ * \param mgmt		The object used to communicate with the canister
+ *			management instance.
+ *
+ * \param cmdbufr	The object which will be used to hold the
+ *			information which will be transmitted.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not the command was processed.  A false value
+ *			indicates the processing of commands should be
+ *			terminated while a true value indicates an
+ *			additional command cycle should be processed.
+ */
+
+static _Bool send_forensics(CO(PossumPipe, mgmt), CO(Buffer, cmdbufr))
+
+{
+	_Bool retn = false;
+
+	size_t lp,
+	       cnt = 0;
+
+	ExchangeEvent event;
+
+	String es = NULL;
+
+
+	/*
+	 * Compute the number of elements in the list and send it to
+	 * the client.
+	 */
+	cnt = Model->forensics_size(Model);
+
+	cmdbufr->reset(cmdbufr);
+	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
+	if ( !mgmt->send_packet(mgmt, PossumPipe_data, cmdbufr) )
+		ERR(goto done);
+	fprintf(stderr, "Sent forensics size: %zu\n", cnt);
+
+
+	/* Send each trajectory point. */
+	INIT(HurdLib, String, es, ERR(goto done));
+
+	Model->rewind_forensics(Model);
+	for (lp= 0; lp < cnt; ++lp ) {
+		if ( !Model->get_forensics(Model, &event) )
+			ERR(goto done);
+		if ( event == NULL )
+			continue;
+		if ( !event->format(event, es) )
+			ERR(goto done);
+
+		cmdbufr->reset(cmdbufr);
+		cmdbufr->add(cmdbufr, (unsigned char *) es->get(es), \
+			     es->size(es) + 1);
+		if ( !mgmt->send_packet(mgmt, PossumPipe_data, cmdbufr) )
+			ERR(goto done);
+		es->reset(es);
+	}
+
+	retn = true;
+
+ done:
+	WHACK(es);
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function implements the processing of a command from the
+ * canister management utility.  This command comes in the form
+ * of a binary encoding of the desired command to be run.
+ *
+ * \param mgmt		The object used to communicate with the canister
+ *			management instance.
+ *
+ * \param cmdbufr	The object containing the command to be
+ *			processed.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not the command was processed.  A false value
+ *			indicates the processing of commands should be
+ *			terminated while a true value indicates an
+ *			additional command cycle should be processed.
+ */
+
+static _Bool process_command(CO(PossumPipe, mgmt), CO(Buffer, cmdbufr))
+
+{
+	_Bool retn = false;
+
+	int *cp;
+
+
+	if ( cmdbufr->size(cmdbufr) != sizeof(int) )
+		ERR(goto done);
+
+	cp = (int *) cmdbufr->get(cmdbufr);
+	switch ( *cp ) {
+		case show_measurement:
+			cmdbufr->reset(cmdbufr);
+			if ( !Model->get_measurement(Model, cmdbufr) )
+				ERR(goto done);
+
+			if ( !mgmt->send_packet(mgmt, PossumPipe_data, \
+						cmdbufr) )
+				ERR(goto done);
+			retn = true;
+			break;
+
+		case show_trajectory:
+			retn = send_trajectory(mgmt, cmdbufr);
+			break;
+
+		case show_forensics:
+			retn = send_forensics(mgmt, cmdbufr);
+			break;
+	}
+
+
+ done:
+	return retn;
+}
 
 
 /**
@@ -131,6 +354,8 @@ _Bool manager(_Bool debug, int port, time_t current_time, char *spid_key, \
 {
 	_Bool retn = false;
 
+	PossumPipe_type pipe_retn;
+
 	PossumPipe pipe = NULL;
 
 	Buffer spid = NULL,
@@ -172,6 +397,21 @@ _Bool manager(_Bool debug, int port, time_t current_time, char *spid_key, \
 	if ( !pipe->start_host_mode(pipe, spid) ) {
 		fputs("Error receiving data.\n", stderr);
 		goto done;
+	}
+
+
+	/* Receive and process host commands. */
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+
+	while ( 1 ) {
+		pipe_retn = pipe->receive_packet(pipe, bufr);
+		if ( pipe_retn == PossumPipe_failure )
+			ERR(goto done);
+		if ( pipe_retn == PossumPipe_data ) {
+			if ( !process_command(pipe, bufr) )
+				ERR(goto done);
+		}
+		bufr->reset(bufr);
 	}
 
 
