@@ -972,13 +972,13 @@ static _Bool get_thread(CO(SGXenclave, this), unsigned long int *tcs)
 
 
 	/* Copy the TCS into the caller supplied buffer. */
-	ap   = (unsigned long int *) S->threads->get(S->threads);
-	ap  += (S->thread_cnt * sizeof(unsigned long int));
+	ap  = (unsigned long int *) S->threads->get(S->threads);
+	ap += S->thread_cnt;
+
 	addr = *ap;
 	memcpy(tcs, &addr, sizeof(unsigned long int));
 
 	++S->thread_cnt;
-
 	retn = true;
 
 
