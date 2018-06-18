@@ -311,6 +311,80 @@ time_t time(time_t *timeptr)
 
 
 /**
+ * Private function.
+ *
+ * The following function is a wrapper function for one invocation of
+ * a management session.  This function is designed to be called by
+ * the management call and provides a wrapper for the creation and
+ * execution of a single PossumPipe connection.
+ *
+ * \param debug		A flag used to indicate whether or not the
+ *			PossumPipe connection is to be run in debug
+ *			mode.
+ *
+ * \param port		The port number which the PossumPipe is to
+ *			listen on.
+ *
+ * \param spid		The object containing the binary representation
+ *			of the service provider id.
+ *
+ * \return		No return value is currently defined.
+ */
+
+static void run_session(_Bool debug, int port, CO(Buffer, spid))
+
+{
+	PossumPipe_type pipe_retn;
+
+	Buffer bufr = NULL;
+
+	PossumPipe pipe = NULL;
+
+
+	INIT(NAAAIM, PossumPipe, pipe, ERR(goto done));
+	if ( debug )
+		pipe->debug(pipe, debug);
+
+	if ( !pipe->init_server(pipe, NULL, port, false) )
+		ERR(goto done);
+
+	if ( !pipe->accept_connection(pipe) ) {
+		fputs("Error accepting connection.\n", stderr);
+		ERR(goto done);
+	}
+
+	if ( !pipe->start_host_mode(pipe, spid) ) {
+		fputs("Error receiving data.\n", stderr);
+		goto done;
+	}
+
+
+	/* Receive and process host commands. */
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+
+	while ( 1 ) {
+		pipe_retn = pipe->receive_packet(pipe, bufr);
+		if ( pipe_retn == PossumPipe_failure )
+			ERR(goto done);
+		if ( pipe_retn == PossumPipe_data ) {
+			if ( !process_command(pipe, bufr) )
+				ERR(goto done);
+		}
+		bufr->reset(bufr);
+	}
+
+
+ done:
+	pipe->reset(pipe);
+
+	WHACK(bufr);
+	WHACK(pipe);
+
+	return;
+}
+
+
+/**
  * ECALL 10
  *
  * This function implements the ECALL entry point for the ISOidentity
@@ -354,12 +428,7 @@ _Bool manager(_Bool debug, int port, time_t current_time, char *spid_key, \
 {
 	_Bool retn = false;
 
-	PossumPipe_type pipe_retn;
-
-	PossumPipe pipe = NULL;
-
-	Buffer spid = NULL,
-	       bufr = NULL;
+	Buffer spid = NULL;
 
 
 	/* Initialize the time. */
@@ -382,43 +451,13 @@ _Bool manager(_Bool debug, int port, time_t current_time, char *spid_key, \
 	/* Start the management interface. */
 	fprintf(stdout, "ISOidentity manager: port=%d\n", port);
 
-	INIT(NAAAIM, PossumPipe, pipe, ERR(goto done));
-	if ( debug )
-		pipe->debug(pipe, debug);
-
-	if ( !pipe->init_server(pipe, NULL, port, false) )
-		ERR(goto done);
-
-	if ( !pipe->accept_connection(pipe) ) {
-		fputs("Error accepting connection.\n", stderr);
-		ERR(goto done);
-	}
-
-	if ( !pipe->start_host_mode(pipe, spid) ) {
-		fputs("Error receiving data.\n", stderr);
-		goto done;
-	}
-
-
-	/* Receive and process host commands. */
-	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-
 	while ( 1 ) {
-		pipe_retn = pipe->receive_packet(pipe, bufr);
-		if ( pipe_retn == PossumPipe_failure )
-			ERR(goto done);
-		if ( pipe_retn == PossumPipe_data ) {
-			if ( !process_command(pipe, bufr) )
-				ERR(goto done);
-		}
-		bufr->reset(bufr);
+		run_session(debug, port, spid);
 	}
 
 
  done:
-	WHACK(pipe);
 	WHACK(spid);
-	WHACK(bufr);
 
 	return retn;
 }

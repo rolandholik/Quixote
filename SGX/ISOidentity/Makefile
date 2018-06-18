@@ -92,7 +92,7 @@ all: ${LIBRARY} ${COBJS} enclave tools
 
 enclave: ldscript ISOidentity.signed.so ISOmanager.signed.so
 
-ISOidentity.signed.so: ISOidentity.so
+ISOidentity.signed.so: ISOidentity.so ISOidentity-enclave.xml
 	$(SGX_SIGNER) sign -key Private-key.pem -enclave ISOidentity.so \
 		 -out $@ -config ISOidentity-enclave.xml;
 

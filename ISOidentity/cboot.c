@@ -57,6 +57,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <linux/un.h>
 
 #include <HurdLib.h>
@@ -68,8 +69,9 @@
 #include <Buffer.h>
 #include <LocalDuct.h>
 #include <SHA256.h>
+#include <IDtoken.h>
 
-#include "../SGX/ISOidentity/ISOenclave.h"
+#include <ISOenclave.h>
 
 #include "ContourPoint.h"
 #include "ExchangeEvent.h"
@@ -89,6 +91,18 @@ static ISOidentity Model = NULL;
  * for the canister.
  */
 static _Bool Sealed = false;
+
+
+/**
+ * The following structure is used to define the arguements to be
+ * passed to the thread which runs the management ECALL.
+ */
+struct manager_args {
+	char *spid;
+	Buffer id;
+	Buffer ivy;
+};
+
 
 /**
  * Event definitions.
@@ -848,6 +862,37 @@ static _Bool setup_namespace(int *fdptr)
 }
 
 
+/**
+ * Private function.
+ *
+ * This function is a wrapper function which is the target of the
+ * thread that will be started to run the ISOidentity model manager.
+ *
+ * \param mgr_args	The pointer to the structure containing the
+ *			arguements for the manager.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not the invoication of the manager was
+ *			successful.  A false value indicates there was
+ *			an error in starting the manager thread.  A
+ *			true value indicates that it executed successfully.
+ */
+
+static void * sgx_mgr(void *mgr_args)
+
+{
+	struct manager_args *args = mgr_args;
+
+
+	if ( !Enclave->manager(Enclave, args->id, args->ivy, args->spid) )
+		ERR(goto done);
+
+
+ done:
+	pthread_exit(NULL);
+}
+
+
 /*
  * Program entry point begins here.
  */
@@ -857,11 +902,15 @@ extern int main(int argc, char *argv[])
 {
 	_Bool connected = false;
 
-	char *token	    = NULL,
-	     *bundle	    = NULL,
+	char *bundle	    = NULL,
 	     *canister_name = NULL,
+	     *spid	    = NULL,
+	     *id_token	    = NULL,
+	     *verifier	    = NULL,
+	     *token	    = "ISOidentity.token",
 	     bufr[1024],
 	     sockname[UNIX_PATH_MAX];
+
 
 	int opt,
 	    fd	 = 0,
@@ -869,16 +918,31 @@ extern int main(int argc, char *argv[])
 
 	pid_t canister_pid;
 
+	FILE *idfile = NULL;
+
+	struct manager_args mgr_args;
+
 	struct pollfd poll_data[2];
 
 	struct sigaction signal_action;
 
-	Buffer cmdbufr = NULL;
+	pthread_attr_t mgr_attr;
+
+	pthread_t mgr_thread;
+
+	Buffer ivy     = NULL,
+	       id_bufr = NULL,
+	       cmdbufr = NULL;
 
 	LocalDuct mgmt = NULL;
 
+	IDtoken idt = NULL;
 
-	while ( (opt = getopt(argc, argv, "Sb:n:t:")) != EOF )
+	File infile = NULL;
+
+
+
+	while ( (opt = getopt(argc, argv, "Sb:i:n:s:t:v:")) != EOF )
 		switch ( opt ) {
 			case 'S':
 				Mode = sgx;
@@ -887,13 +951,20 @@ extern int main(int argc, char *argv[])
 			case 'b':
 				bundle = optarg;
 				break;
-
+			case 'i':
+				id_token = optarg;
+				break;
 			case 'n':
 				canister_name = optarg;
 				break;
-
+			case 's':
+				spid = optarg;
+				break;
 			case 't':
 				token = optarg;
+				break;
+			case 'v':
+				verifier = optarg;
 				break;
 		}
 
@@ -923,8 +994,20 @@ extern int main(int argc, char *argv[])
 
 	/* Setup measurement enclave if SGX is being used. */
 	if ( Mode == sgx ) {
-		if ( token == NULL ) {
-			fputs("SGX mode but no token specified.\n", stderr);
+		if ( id_token == NULL ) {
+			fputs("SGX mode but no identity token specified.\n", \
+
+			      stderr);
+			goto done;
+		}
+
+		if ( verifier == NULL ) {
+			fputs("SGX mode but no verified specifed.\n", stderr);
+			goto done;
+		}
+
+		if ( spid == NULL ) {
+			fputs("SGX mode but no SPID specified.\n", stderr);
 			goto done;
 		}
 
@@ -932,6 +1015,51 @@ extern int main(int argc, char *argv[])
 		if ( !Enclave->load_enclave(Enclave, SGX_ENCLAVE, \
 					    token) ) {
 			fputs("SGX enclave initialization failure.\n", stderr);
+			goto done;
+		}
+
+		/* Load the identity token. */
+		INIT(NAAAIM, IDtoken, idt, goto done);
+		if ( (idfile = fopen(id_token, "r")) == NULL ) {
+			fputs("Cannot open identity token file.\n", stderr);
+			goto done;
+		}
+		if ( !idt->parse(idt, idfile) ) {
+			fputs("Enable to parse identity token.\n", stderr);
+			goto done;
+		}
+
+		INIT(HurdLib, Buffer, id_bufr, ERR(goto done));
+		if ( !idt->encode(idt, id_bufr) ) {
+			fputs("Error encoding identity token.\n", stderr);
+			goto done;
+		}
+
+
+		/* Load the identifier verifier. */
+		INIT(HurdLib, Buffer, ivy, ERR(goto done));
+		INIT(HurdLib, File, infile, ERR(goto done));
+
+		infile->open_ro(infile, verifier);
+		if ( !infile->slurp(infile, ivy) ) {
+			fputs("Cannot read identity verifier.\n", stderr);
+			goto done;
+		}
+
+		/* Start SGX manager thread. */
+		if ( pthread_attr_init(&mgr_attr) != 0 ) {
+			fputs("Unable to initialize thread attributes.\n", \
+			      stderr);
+			goto done;
+		}
+
+		mgr_args.spid = spid;
+		mgr_args.ivy  = ivy;
+		mgr_args.id   = id_bufr;
+
+		if ( pthread_create(&mgr_thread, &mgr_attr, sgx_mgr, \
+				    &mgr_args) != 0 ) {
+			fputs("Cannot start SGX manager thread.\n", stderr);
 			goto done;
 		}
 	}
