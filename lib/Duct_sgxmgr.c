@@ -544,6 +544,7 @@ int Duct_sgxmgr(struct Duct_ocall *ocp)
 			duct_reset(ocp);
 			break;
 		case Duct_whack:
+			sleep(2);
 			duct_whack(ocp);
 			break;
 

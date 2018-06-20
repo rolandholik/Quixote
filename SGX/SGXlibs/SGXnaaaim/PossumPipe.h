@@ -28,7 +28,8 @@ typedef enum {
 	PossumPipe_error,
 	PossumPipe_setup,
 	PossumPipe_data,
-	PossumPipe_rekey
+	PossumPipe_rekey,
+	PossumPipe_eop
 } PossumPipe_type;
 
 /**

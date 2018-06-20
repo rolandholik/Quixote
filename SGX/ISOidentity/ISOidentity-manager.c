@@ -364,6 +364,8 @@ static void run_session(_Bool debug, int port, CO(Buffer, spid))
 
 	while ( 1 ) {
 		pipe_retn = pipe->receive_packet(pipe, bufr);
+		if ( pipe_retn == PossumPipe_eop )
+			goto done;
 		if ( pipe_retn == PossumPipe_failure )
 			ERR(goto done);
 		if ( pipe_retn == PossumPipe_data ) {
