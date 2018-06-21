@@ -552,9 +552,13 @@ static _Bool process_event(char * bufr)
 
 		case seal_event:
 			fputs("Sealed domain.\n", stderr);
-			Model->seal(Model);
-			retn   = true;
-			Sealed = true;
+			if ( Mode == internal ) {
+				Model->seal(Model);
+				retn   = true;
+				Sealed = true;
+			}
+			else
+				retn = Enclave->seal(Enclave);
 			break;
 
 		default:
@@ -1234,8 +1238,13 @@ extern int main(int argc, char *argv[])
 
 
  done:
+	WHACK(ivy);
+	WHACK(id_bufr);
 	WHACK(cmdbufr);
 	WHACK(mgmt);
+	WHACK(idt);
+	WHACK(infile);
+
 	WHACK(Enclave);
 	WHACK(Model);
 
