@@ -482,6 +482,60 @@ static _Bool send_Buffer(CO(Duct, this), CO(Buffer, bf))
 
 
 /**
+ * Internal public method.
+ *
+ * This method is a helper method for the -receive_Buffer method and
+ * is designed to encapsulate the actual read from the socket.  It
+ * handles detection of SIGINT and issues with less then the specified
+ * read being delivered.
+ *
+ * \param this		The Duct object from which data is to be read.
+ *
+ * \param bufr		The object that the data from the socket is
+ *			be read into.
+ *
+ * \param outstanding	The number of bytes to be read from the socket.
+ *
+ * \return	A boolean value is used to indicate whether or not the
+ *		read was successful.  A false value indicates a
+ *		functional error was experienced during the read.  A
+ *		true value indicates the read was successful.
+ */
+
+static _Bool _receive(CO(Duct, this), CO(Buffer, bufr), size_t outstanding)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	size_t amt_read;
+
+
+	while ( outstanding > 0 ) {
+		memset(S->bufr, '\0', sizeof(S->bufr));
+		if ( (amt_read = read(S->fd, S->bufr, outstanding)) == -1 ) {
+			if ( errno == EINTR )
+				continue;
+			S->error = errno;
+			ERR(goto done);
+		}
+
+		outstanding -= amt_read;
+		if ( !bufr->add(bufr, S->bufr, amt_read) ) {
+			S->error = -2;
+			ERR(goto done);
+		}
+	}
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
  * External public method.
  *
  * This method implements loading the specified number of bytes into
@@ -534,23 +588,18 @@ static _Bool receive_Buffer(CO(Duct, this), CO(Buffer, bf))
 		ERR(S->error = -1; goto done);
 
 
-	/* Loop over the number of integral receipt blocks. */
+	/* Loop over the number of integral receive blocks. */
 	blocks	 = rsize / sizeof(S->bufr);
 	residual = rsize % sizeof(S->bufr);
 
 	for (lp= 0; lp < blocks; ++lp) {
-		if ( read(S->fd, S->bufr, sizeof(S->bufr)) != sizeof(S->bufr) )
-			ERR(S->error = errno; goto done);
-		if ( !bf->add(bf, S->bufr, sizeof(S->bufr)) )
-			ERR(S->error = -2; goto done);
+		if ( !_receive(this, bf, sizeof(S->bufr)) )
+			ERR(goto done);
 	}
 
-	/* Field the residual data. */
-	if ( read(S->fd, S->bufr, residual) != residual )
-		ERR(S->error = errno; goto done);
-	if ( !bf->add(bf, S->bufr, residual) )
-		ERR(S->error = -2; goto done);
-
+	/* Read residual data. */
+	if ( !_receive(this, bf, residual) )
+		ERR(goto done);
 	retn = true;
 
 
