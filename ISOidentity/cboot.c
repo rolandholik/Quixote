@@ -713,7 +713,11 @@ static _Bool send_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	/* Send each trajectory point. */
 	INIT(HurdLib, String, es, ERR(goto done));
 
-	Model->rewind_forensics(Model);
+	if ( Mode == internal )
+		Model->rewind_forensics(Model);
+	else
+		Enclave->rewind_forensics(Enclave);
+
 	for (lp= 0; lp < cnt; ++lp ) {
 		if ( Mode == internal ) {
 			if ( !Model->get_forensics(Model, &event) )
@@ -728,6 +732,18 @@ static _Bool send_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 				ERR(goto done);
 		}
 
+		/*
+		 * The following is a safety check to make sure that
+		 * the object event is populated in case there was
+		 * an error such as a failure to reset the cursor
+		 * between trajectory or forensics traversals.
+		 */
+		if ( es->size(es) == 0 ) {
+			if ( !es->add(es, "Unknown event.") )
+				ERR(goto done);
+		}
+
+		/* Send the contents of the string object. */
 		cmdbufr->reset(cmdbufr);
 		cmdbufr->add(cmdbufr, (unsigned char *) es->get(es), \
 			     es->size(es) + 1);
