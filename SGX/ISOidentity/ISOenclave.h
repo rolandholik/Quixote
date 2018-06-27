@@ -20,6 +20,28 @@ typedef struct NAAAIM_ISOenclave * ISOenclave;
 
 typedef struct NAAAIM_ISOenclave_State * ISOenclave_State;
 
+
+/**
+ * Enumeration type which defines the userspace action being requested.
+ */
+enum ISOenclave_ocalls {
+	ISOenclave_discipline,
+	ISOenclave_END
+};
+
+
+/**
+ * Structure which marshalls the data for the call into and out of
+ * the the ISOenclave ocall.
+ */
+struct ISOenclave_ocall {
+	_Bool retn;
+	enum ISOenclave_ocalls ocall;
+
+	pid_t pid;
+};
+
+
 /**
  * External ExchangeEvent object representation.
  */

@@ -15,12 +15,74 @@
 #include "ContourPoint.h"
 #include "ExchangeEvent.h"
 #include "ISOidentity.h"
+#include "ISOenclave.h"
 
 
 /**
  * The model being implemented.
  */
 ISOidentity Model = NULL;
+
+
+/**
+ * Internal private function.
+ *
+ * This method is responsible for marshalling arguements and generating
+ * the OCALL for a request to discipline a process which has been
+ * determined to have engaged in an extra-dimensional behavior
+ *
+ * \param ocall	The structure used to marshall the arguements for
+ *		the ocall.
+ *
+ * \return	An integer value is used to indicate the status of
+ *		the SGX call.  A value of zero indicate there was no
+ *		error while a non-zero value, particularly negative
+ *		indicates an error occurred in the call.  The return
+ *		value from the external object is embedded in the
+ *		data marshalling structure.
+ */
+
+static int discipline_ocall(struct ISOenclave_ocall *ocall)
+
+{
+	_Bool retn = false;
+
+	int status = SGX_ERROR_INVALID_PARAMETER;
+
+	size_t arena_size = sizeof(struct ISOenclave_ocall);
+
+	struct ISOenclave_ocall *ocp = NULL;
+
+
+	/* Allocate and initialize the outbound method structure. */
+	if ( (ocp = sgx_ocalloc(arena_size)) == NULL )
+		goto done;
+
+	memset(ocp, '\0', arena_size);
+	*ocp = *ocall;
+
+
+	/* Setup arena and pointers to it. */
+	if ( ocall->ocall == ISOenclave_discipline )
+		ocp->pid = ocall->pid;
+
+
+	/* Call the SGX duct manager. */
+	if ( (status = sgx_ocall(5, ocp)) == 0 ) {
+		retn = true;
+		*ocall = *ocp;
+	}
+
+
+ done:
+	sgx_ocfree();
+
+	if ( status != 0 )
+		return status;
+	if ( !retn )
+		return SGX_ERROR_UNEXPECTED;
+	return 0;
+}
 
 
 /**
@@ -76,6 +138,10 @@ _Bool update_model(char *update, _Bool *discipline)
 	_Bool updated,
 	      retn = false;
 
+	pid_t pid;
+
+	struct ISOenclave_ocall ocall;
+
 	String input = NULL;
 
 	ExchangeEvent event = NULL;
@@ -100,6 +166,16 @@ _Bool update_model(char *update, _Bool *discipline)
 		ERR(goto done);
 	if ( !updated )
 		WHACK(event);
+	if ( *discipline ) {
+		if ( !Model->discipline_pid(Model, &pid) )
+			ERR(goto done);
+
+		memset(&ocall, '\0', sizeof(struct ISOenclave_ocall));
+		ocall.pid   = pid;
+		ocall.ocall = ISOenclave_discipline;
+		if ( discipline_ocall(&ocall) != 0 )
+			ERR(goto done);
+	}
 
 	retn = true;
 

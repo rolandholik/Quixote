@@ -19,6 +19,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <unistd.h>
+#include <errno.h>
 #include <string.h>
 #include <time.h>
 #include <sys/types.h>
@@ -54,6 +56,15 @@
 #if !defined(NAAAIM_ISOenclave_OBJID)
 #error Object identifier not defined.
 #endif
+
+
+/**
+ * System call wrapper for setting the actor status of a process.
+ */
+static inline int sys_set_bad_actor(pid_t pid, unsigned long flags)
+{
+	return syscall(327, pid, flags);
+}
 
 
 /** OCALL interface definitions. */
@@ -132,14 +143,52 @@ int fgets_handler(struct SGXfusion_fgets_interface *oc)
 }
 
 
+/* OCALL interface to handle the request to discipline a process. */
+int discipline_pid_ocall(struct ISOenclave_ocall *oc)
+
+{
+	_Bool discipline,
+	      retn = false;
+
+
+	discipline = sys_set_bad_actor(oc->pid, 0);
+	if (discipline < 0 ) {
+		fprintf(stderr, "actor status error: %d:%s\n", errno, \
+			strerror(errno));
+		retn = false;
+		goto done;
+	}
+
+	if ( discipline > 0 )
+		fprintf(stderr, "PID is disciplined: %d\n", oc->pid);
+	else {
+		fprintf(stderr, "PID not disciplined: %d, disciplining.\n", \
+			oc->pid);
+		discipline = sys_set_bad_actor(oc->pid, 1);
+		if ( discipline < 0 ) {
+			fprintf(stderr, "actor status error: %d:%s\n", errno, \
+			        strerror(errno));
+			retn = false;
+			goto done;
+		}
+	}
+
+
+ done:
+	oc->retn = retn;
+	return 0;
+}
+
+
 static const struct OCALL_api ocall_table = {
-	5,
+	OCALL_NUMBER,
 	{
 		ocall1_handler,
 		fgets_handler,
 		ocall2_handler,
 		Duct_sgxmgr,
 		SGXquote_sgxmgr,
+		discipline_pid_ocall,
 	}
 };
 
