@@ -25,7 +25,7 @@
 
 /* Prototype definitions for enclave functions. */
 extern _Bool init_model(void);
-extern _Bool update_model(char *, _Bool *);
+extern _Bool update_model(struct ISOidentity_ecall1_interface *);
 extern void seal_model(void);
 extern void dump_model(void);
 extern size_t get_size(int);
@@ -34,8 +34,7 @@ extern _Bool get_measurement(unsigned char *);
 extern _Bool get_pid(pid_t *);
 extern void rewind(int);
 extern _Bool get_event(int, char *, size_t);
-extern _Bool manager(_Bool, int, time_t, char *, size_t, unsigned char *, \
-		     size_t, unsigned char *);
+extern _Bool manager(struct ISOidentity_ecall10_interface *);
 extern _Bool generate_identity(uint8_t *);
 
 
@@ -81,45 +80,43 @@ static sgx_status_t sgx_update_model(void *pms)
 {
 	sgx_status_t retn = SGX_SUCCESS;
 
-	char *update,
-	     *enclave_update = NULL;
+	size_t update_length = 0;
 
-	size_t update_len = 0;
-
-	struct ISOidentity_ecall1_interface *ms = \
-		(struct ISOidentity_ecall1_interface *) pms;
+	struct ISOidentity_ecall1_interface *ms, \
+					     ecall1;
 
 
-	/* Verify arguements. */
-	update	   = ms->update;
-	update_len = strlen(update) + 1;
+	/* Setup enclave based marshalling structure. */
+	if ( !SGXidf_untrusted_region(pms, \
+			      sizeof(struct ISOidentity_ecall1_interface)) )
+		goto done;
 
-	CHECK_REF_POINTER(pms, sizeof(struct ISOidentity_ecall0_interface));
-	CHECK_UNIQUE_POINTER(update, update_len);
+	ms = (struct ISOidentity_ecall1_interface *) pms;
+	memset(&ecall1, '\0', sizeof(struct ISOidentity_ecall1_interface));
 
+	ecall1.debug = ms->debug;
 
-	/*
-	 * Convert arguements in interface structure to enclave
-	 * local values.
-	 */
-	if ( update != NULL ) {
-		if ( (enclave_update = malloc(update_len)) == NULL ) {
-			retn = SGX_ERROR_OUT_OF_MEMORY;
-			goto done;
-		}
-
-		memset(enclave_update, '\0', update_len);
-		memcpy(enclave_update, update, update_len - 1);
+	/* Replicate update string into structure. */
+	update_length = strlen(ms->update) + 1;
+	if ( !SGXidf_untrusted_region(ms->update, update_length) ) {
+		retn = SGX_ERROR_INVALID_PARAMETER;
+		goto done;
 	}
+	if ( (ecall1.update = malloc(update_length)) == NULL ) {
+		retn = SGX_ERROR_OUT_OF_MEMORY;
+		goto done;
+	}
+	memcpy(ecall1.update, ms->update, update_length);
 
-
-	/* Call enclave function with local arguement. */
-	ms->retn = update_model(enclave_update, &ms->discipline);
+	/* Call enclave function with local structure. */
+	ms->retn = update_model(&ecall1);
+	if ( ms->retn )
+		ms->discipline = ecall1.discipline;
 
 
  done:
-	if ( enclave_update != NULL )
-		free(enclave_update);
+	if ( ecall1.update != NULL )
+		free(ecall1.update);
 
 	return retn;
 }
@@ -336,63 +333,61 @@ static sgx_status_t sgx_manager(void *pms)
 {
 	sgx_status_t status = SGX_ERROR_INVALID_PARAMETER;
 
-	char *spid = NULL;
-
-	unsigned char *identity = NULL,
-		      *verifier = NULL;
-
-	size_t identity_size = 0,
-	       verifier_size = 0;
-
-	struct ISOidentity_ecall10_interface *ms;
+	struct ISOidentity_ecall10_interface *ms,
+					     ecall10;
 
 
 	/* Verify marshalled arguements and setup parameters. */
 	if ( !SGXidf_untrusted_region(pms, \
 			      sizeof(struct ISOidentity_ecall10_interface)) )
 		goto done;
+
 	ms = (struct ISOidentity_ecall10_interface *) pms;
+	memset(&ecall10, '\0', sizeof(struct ISOidentity_ecall10_interface));
+
+	ecall10.debug	     = ms->debug;
+	ecall10.current_time = ms->current_time;
+	ecall10.port	     = ms->port;
 
 	if ( !SGXidf_untrusted_region(ms->spid, ms->spid_size) )
 		goto done;
-	if ( (spid = malloc(ms->spid_size)) == NULL ) {
+	if ( (ecall10.spid = malloc(ms->spid_size)) == NULL ) {
 		status = SGX_ERROR_OUT_OF_MEMORY;
 		goto done;
 	}
-	memcpy(spid, ms->spid, ms->spid_size);
+	ecall10.spid_size = ms->spid_size;
+	memcpy(ecall10.spid, ms->spid, ecall10.spid_size);
 
 	if ( !SGXidf_untrusted_region(ms->identity, ms->identity_size) )
 		goto done;
-	if ( (identity = malloc(ms->identity_size)) == NULL ) {
+	if ( (ecall10.identity = malloc(ms->identity_size)) == NULL ) {
 		status = SGX_ERROR_OUT_OF_MEMORY;
 		goto done;
 	}
-	identity_size = ms->identity_size;
-	memcpy(identity, ms->identity, identity_size);
+	ecall10.identity_size = ms->identity_size;
+	memcpy(ecall10.identity, ms->identity, ecall10.identity_size);
 
 	if ( !SGXidf_untrusted_region(ms->verifier, ms->verifier_size) )
 		goto done;
-	if ( (verifier = malloc(ms->verifier_size)) == NULL ) {
+	if ( (ecall10.verifier = malloc(ms->verifier_size)) == NULL ) {
 		status = SGX_ERROR_OUT_OF_MEMORY;
 		goto done;
 	}
-	verifier_size = ms->verifier_size;
-	memcpy(verifier, ms->verifier, verifier_size);
+	ecall10.verifier_size = ms->verifier_size;
+	memcpy(ecall10.verifier, ms->verifier, ecall10.verifier_size);
 
 	__builtin_ia32_lfence();
 
 
 	/* Call the trused function. */
-	ms->retn = manager(ms->debug_mode, ms->port, ms->current_time,   \
-			   spid, identity_size, identity, verifier_size, \
-			   verifier);
+	ms->retn = manager(&ecall10);
 	status = SGX_SUCCESS;
 
 
  done:
-	free(spid);
-	free(identity);
-	free(verifier);
+	free(ecall10.spid);
+	free(ecall10.identity);
+	free(ecall10.verifier);
 
 	return status;
 }

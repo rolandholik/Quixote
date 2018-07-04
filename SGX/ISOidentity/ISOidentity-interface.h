@@ -29,6 +29,8 @@ struct ISOidentity_ecall0_interface {
 
 struct ISOidentity_ecall1_interface {
 	_Bool retn;
+	_Bool debug;
+
 	_Bool discipline;
 	char *update;
 };
@@ -66,7 +68,7 @@ struct ISOidentity_ecall9_interface {
 
 struct ISOidentity_ecall10_interface {
 	_Bool retn;
-	_Bool debug_mode;
+	_Bool debug;
 
 	time_t current_time;
 

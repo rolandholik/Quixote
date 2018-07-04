@@ -80,6 +80,12 @@
 
 
 /**
+ * Variable used to indicate whether canister is to run in debug mode.
+ */
+static _Bool Debug = false;
+
+
+/**
  * The modeling object for the canister.
  */
 static ISOidentity Model = NULL;
@@ -304,7 +310,8 @@ static _Bool add_measurement(CO(char *, bufr))
 		ERR(goto done);
 
 	memcpy(Measurement, bf->get(bf), bf->size(bf));
-	fprintf(stderr, "Add measurement: %s\n", bufr);
+	if ( Debug )
+		fprintf(stderr, "Add measurement: %s\n", bufr);
 
 	retn = true;
 
@@ -411,12 +418,16 @@ static _Bool add_event(CO(char *, inbufr))
 			        retn = false;
 				goto done;
 			}
-			if ( discipline > 0 )
-				fprintf(stderr, "PID is disciplined: %d\n", \
-					pid);
+			if ( discipline > 0 ) {
+				if ( Debug )
+					fprintf(stderr, "PID is " \
+						"disciplined: %d\n", pid);
+			}
 			else {
-				fprintf(stderr, "PID not disciplined: %d, " \
-					"disciplining.\n", pid);
+				if ( Debug )
+					fprintf(stderr, "PID not "  \
+						"disciplined: %d, " \
+						"disciplining.\n", pid);
 				discipline = sys_set_bad_actor(pid, 1);
 				if ( discipline < 0 ) {
 					fprintf(stderr, "actor status error:" \
@@ -473,7 +484,9 @@ static _Bool add_aggregate(CO(char *, inbufr))
 			ERR(goto done);
 	}
 	else {
-		fputs("Setting enclave aggregate.\n", stderr);
+		if ( Debug )
+			fputs("Setting enclave aggregate.\n", stderr);
+
 		if ( !Enclave->set_aggregate(Enclave, aggregate) )
 			ERR(goto done);
 	}
@@ -551,7 +564,9 @@ static _Bool process_event(char * bufr)
 			break;
 
 		case seal_event:
-			fputs("Sealed domain.\n", stderr);
+			if ( Debug )
+				fputs("Sealed domain.\n", stderr);
+
 			if ( Mode == internal ) {
 				Model->seal(Model);
 				retn   = true;
@@ -618,7 +633,8 @@ static _Bool send_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
 	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
 		ERR(goto done);
-	fprintf(stderr, "Sent trajectory size: %zu\n", cnt);
+	if ( Debug )
+		fprintf(stderr, "Sent trajectory size: %zu\n", cnt);
 
 
 	/* Send each trajectory point. */
@@ -707,7 +723,8 @@ static _Bool send_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
 	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
 		ERR(goto done);
-	fprintf(stderr, "Sent forensics size: %zu\n", cnt);
+	if ( Debug )
+		fprintf(stderr, "Sent forensics size: %zu\n", cnt);
 
 
 	/* Send each trajectory point. */
@@ -868,7 +885,8 @@ static _Bool setup_namespace(int *fdptr)
 	if ( snprintf(fname, sizeof(fname), "/sys/fs/iso-identity/update-%u", \
 		      (unsigned int) statbuf.st_ino) >= sizeof(fname) )
 		ERR(goto done);
-	fprintf(stderr, "Update file: %s\n", fname);
+	if ( Debug )
+		fprintf(stderr, "Update file: %s\n", fname);
 
 	if ( (fd = open(fname, O_RDONLY)) < 0 )
 		ERR(goto done);
@@ -962,10 +980,13 @@ extern int main(int argc, char *argv[])
 
 
 
-	while ( (opt = getopt(argc, argv, "Sb:i:n:s:t:v:")) != EOF )
+	while ( (opt = getopt(argc, argv, "Sdb:i:n:s:t:v:")) != EOF )
 		switch ( opt ) {
 			case 'S':
 				Mode = sgx;
+				break;
+			case 'd':
+				Debug = true;
 				break;
 
 			case 'b':
@@ -1022,7 +1043,7 @@ extern int main(int argc, char *argv[])
 		}
 
 		if ( verifier == NULL ) {
-			fputs("SGX mode but no verified specifed.\n", stderr);
+			fputs("SGX mode but no verifier specifed.\n", stderr);
 			goto done;
 		}
 
@@ -1037,6 +1058,9 @@ extern int main(int argc, char *argv[])
 			fputs("SGX enclave initialization failure.\n", stderr);
 			goto done;
 		}
+
+		if ( Debug )
+			Enclave->debug(Enclave, true);
 
 		/* Load the identity token. */
 		INIT(NAAAIM, IDtoken, idt, goto done);
@@ -1166,15 +1190,19 @@ extern int main(int argc, char *argv[])
 
 
 	/* Dispatch loop. */
-	fputs("Calling loop\n", stderr);
-	fprintf(stderr, "descriptor 1: %d, descriptor 2: %d\n", \
+	if ( Debug ) {
+		fputs("Calling event loop\n", stderr);
+		fprintf(stderr, "descriptor 1: %d, descriptor 2: %d\n", \
 		poll_data[0].fd, poll_data[1].fd);
+	}
 
 	INIT(HurdLib, Buffer, cmdbufr, ERR(goto done));
 
 	opt = 0;
 	while ( 1 ) {
-		fprintf(stderr, "Poll cycle: %d\n", ++opt);
+		if ( Debug )
+			fprintf(stderr, "Poll cycle: %d\n", ++opt);
+
 		retn = poll(poll_data, 2, -1);
 		if ( retn < 0 ) {
 			if ( Signals.stop )
@@ -1190,12 +1218,15 @@ extern int main(int argc, char *argv[])
 			goto done;
 		}
 		if ( retn == 0 ) {
-			fputs("Poll timeout.\n", stderr);
+			if ( Debug )
+				fputs("Poll timeout.\n", stderr);
 			continue;
 		}
 
-		fprintf(stderr, "Events: %d, Data poll=%0x, Mgmt poll=%0x\n", \
-			retn, poll_data[0].revents, poll_data[1].revents);
+		if ( Debug )
+			fprintf(stderr, "Events: %d, Data poll=%0x, "	\
+				"Mgmt poll=%0x\n", retn,		\
+				poll_data[0].revents, poll_data[1].revents);
 
 		if ( poll_data[0].revents & POLLPRI ) {
 			while ( 1 ) {
@@ -1223,7 +1254,10 @@ extern int main(int argc, char *argv[])
 
 		if ( poll_data[1].revents & POLLIN ) {
 			if ( !connected ) {
-				fputs("Have socket connection.\n", stderr);
+				if ( Debug )
+					fputs("Have socket connection.\n", \
+					      stderr);
+
 				if ( !mgmt->accept_connection(mgmt) )
 					ERR(goto done);
 				if ( !mgmt->get_fd(mgmt, &poll_data[1].fd) )
@@ -1235,8 +1269,9 @@ extern int main(int argc, char *argv[])
 			if ( !mgmt->receive_Buffer(mgmt, cmdbufr) )
 				continue;
 			if ( mgmt->eof(mgmt) ) {
-				fputs("Terminating management.\n", \
-				      stderr);
+				if ( Debug )
+					fputs("Terminating management.\n", \
+					      stderr);
 				mgmt->reset(mgmt);
 				if ( !mgmt->get_socket(mgmt, \
 						       &poll_data[1].fd) )

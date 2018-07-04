@@ -36,6 +36,8 @@ enum ISOenclave_ocalls {
  */
 struct ISOenclave_ocall {
 	_Bool retn;
+	_Bool debug;
+
 	enum ISOenclave_ocalls ocall;
 
 	pid_t pid;
@@ -78,6 +80,7 @@ struct NAAAIM_ISOenclave
 	size_t (*size)(const ISOenclave);
 
 	_Bool (*generate_identity)(const ISOenclave, const Buffer);
+	void (*debug)(const ISOenclave, _Bool);
 	void (*whack)(const ISOenclave);
 
 	/* Private state. */

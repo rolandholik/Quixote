@@ -119,12 +119,8 @@ _Bool init_model(void)
  * This method implements adding updates to the ISOidentity model
  * being implemented inside an enclave.
  *
- * \param update	A pointer to the null-terminated character
- *			string containing the event.
- *
- * \param discipline	A pointer to a boolean value which indicates
- *			whether or not the update caused a model
- *			violation and the PID needs to be disciplined.
+ * \param ecall1	A pointer to the structure which contains
+ *			the inputs to this function.
  *
  * \return	A boolean value is used to indicate whether or not
  *		the update to the model had succeeded.  A false value
@@ -132,7 +128,7 @@ _Bool init_model(void)
  *	        indicates the enclave model had been updated.
  */
 
-_Bool update_model(char *update, _Bool *discipline)
+_Bool update_model(struct ISOidentity_ecall1_interface *ecall1)
 
 {
 	_Bool updated,
@@ -149,7 +145,7 @@ _Bool update_model(char *update, _Bool *discipline)
 
 	/* Initialize a string object with the model update. */
 	INIT(HurdLib, String, input, ERR(goto done));
-	if ( !input->add(input, update) )
+	if ( !input->add(input, ecall1->update) )
 		ERR(goto done);
 
 
@@ -162,16 +158,17 @@ _Bool update_model(char *update, _Bool *discipline)
 
 
 	/* Update the model. */
-	if ( !Model->update(Model, event, &updated, discipline) )
+	if ( !Model->update(Model, event, &updated, &ecall1->discipline) )
 		ERR(goto done);
 	if ( !updated )
 		WHACK(event);
-	if ( *discipline ) {
+	if ( ecall1->discipline ) {
 		if ( !Model->discipline_pid(Model, &pid) )
 			ERR(goto done);
 
 		memset(&ocall, '\0', sizeof(struct ISOenclave_ocall));
 		ocall.pid   = pid;
+		ocall.debug = ecall1->debug;
 		ocall.ocall = ISOenclave_discipline;
 		if ( discipline_ocall(&ocall) != 0 )
 			ERR(goto done);

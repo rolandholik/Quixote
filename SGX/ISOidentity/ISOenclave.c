@@ -159,11 +159,14 @@ int discipline_pid_ocall(struct ISOenclave_ocall *oc)
 		goto done;
 	}
 
-	if ( discipline > 0 )
-		fprintf(stderr, "PID is disciplined: %d\n", oc->pid);
+	if ( discipline > 0 ) {
+		if ( oc->debug )
+			fprintf(stderr, "PID is disciplined: %d\n", oc->pid);
+	}
 	else {
-		fprintf(stderr, "PID not disciplined: %d, disciplining.\n", \
-			oc->pid);
+		if ( oc->debug )
+			fprintf(stderr, "PID not disciplined: %d, " \
+				"disciplining.\n", oc->pid);
 		discipline = sys_set_bad_actor(oc->pid, 1);
 		if ( discipline < 0 ) {
 			fprintf(stderr, "actor status error: %d:%s\n", errno, \
@@ -207,6 +210,9 @@ struct NAAAIM_ISOenclave_State
 	/* Object status. */
 	_Bool poisoned;
 
+	/* Debug status of the enclave. */
+	_Bool debug;
+
 	/* Enclave error code. */
 	int enclave_error;
 
@@ -233,6 +239,7 @@ static void _init_state(CO(ISOenclave_State, S))
 	S->objid = NAAAIM_ISOenclave_OBJID;
 
 	S->poisoned	 = false;
+	S->debug	 = false;
 	S->enclave_error = 0;
 
 	S->enclave = NULL;
@@ -1072,7 +1079,7 @@ static _Bool manager(CO(ISOenclave, this), CO(Buffer, id_bufr), \
 
 	memset(&ecall10, '\0', sizeof(struct ISOidentity_ecall10_interface));
 
-	ecall10.debug_mode   = true;
+	ecall10.debug	     = S->debug;
 	ecall10.port	     = 11990;
 	ecall10.current_time = time(NULL);
 
@@ -1254,6 +1261,30 @@ static _Bool generate_identity(CO(ISOenclave, this), CO(Buffer, bufr))
 /**
  * External public method.
  *
+ * This method implements setting the debug status of the enclave.
+ *
+ * \param this	A pointer to the object which is to be destroyed.
+ *
+ * \param state	A boolean value specifying the debug status of the
+ *		enclave.
+ *
+ * \return	No return value is defined.
+ */
+
+static void debug(CO(ISOenclave, this), const _Bool state)
+
+{
+	STATE(S);
+
+
+	S->debug = state;
+	return;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a destructor for an ExchangeEvent object.
  *
  * \param this	A pointer to the object which is to be destroyed.
@@ -1338,6 +1369,7 @@ extern ISOenclave NAAAIM_ISOenclave_Init(void)
 	this->size  = size;
 
 	this->generate_identity = generate_identity;
+	this->debug	      	= debug;
 	this->whack		= whack;
 
 	return this;

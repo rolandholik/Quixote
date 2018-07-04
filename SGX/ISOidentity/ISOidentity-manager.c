@@ -392,29 +392,8 @@ static void run_session(_Bool debug, int port, CO(Buffer, spid))
  * This function implements the ECALL entry point for the ISOidentity
  * management interface.
  *
- * \param debug		A flag which specifies whether or not the
- *			PossumPipe object is to be run in debug mode.
- *
- * \param port		The port number the management enclave is to
- *			listen on.
- *
- * \param current_time	The time to be used as the seed for intra-enclave
- *			time.
- *
- * \param spid_key	A pointer to the Service Provider ID (SPID)
- *			encoded in ASCII hexadecimal form.
- *
- * \param id_size	The size of the buffer containing the
- *			identity token.
- *
- * \param identity	A pointer to a buffer containing the identity
- *			token which will identify the enclave.
- *
- * \param vfy_size	The size of the buffer containing the identity
- *			verifier that will be used.
- *
- * \param verifier	A pointer to a buffer containing the identity
- *			verifier that will be used.
+ * \param ecall10	A pointer to the interface structure for the
+ *			manager ECALL.
  *
  * \return	A boolean value is used to indicate the status of
  *		the management interface.  A false value indicates an
@@ -423,9 +402,7 @@ static void run_session(_Bool debug, int port, CO(Buffer, spid))
  *		interface had executed successfully.
  */
 
-_Bool manager(_Bool debug, int port, time_t current_time, char *spid_key, \
-	      size_t id_size, unsigned char *identity, size_t vfy_size,   \
-	      unsigned char *verifier)
+_Bool manager(struct ISOidentity_ecall10_interface *ecall10)
 
 {
 	_Bool retn = false;
@@ -434,27 +411,29 @@ _Bool manager(_Bool debug, int port, time_t current_time, char *spid_key, \
 
 
 	/* Initialize the time. */
-	Current_Time = current_time;
+	Current_Time = ecall10->current_time;
 
 	/* Convert the SPID value into binary form. */
 	INIT(HurdLib, Buffer, spid, ERR(goto done));
-	if ( !spid->add_hexstring(spid, spid_key) )
+	if ( !spid->add_hexstring(spid, ecall10->spid) )
 		ERR(goto done);
 
 
 	/* Stash the identity token and verifier buffer descriptions. */
-	Identity      = identity;
-	Identity_size = id_size;
+	Identity      = ecall10->identity;
+	Identity_size = ecall10->identity_size;
 
-	Verifier      = verifier;
-	Verifier_size = vfy_size;
+	Verifier      = ecall10->verifier;
+	Verifier_size = ecall10->verifier_size;
 
 
 	/* Start the management interface. */
-	fprintf(stdout, "ISOidentity manager: port=%d\n", port);
+	if ( ecall10->debug )
+		fprintf(stdout, "ISOidentity manager: port=%d\n", \
+			ecall10->port);
 
 	while ( 1 ) {
-		run_session(debug, port, spid);
+		run_session(ecall10->debug, ecall10->port, spid);
 	}
 
 
