@@ -1049,7 +1049,8 @@ static _Bool _load_group(CO(SGXmetadata_State, S), CO(layout_t *, layout), \
 			if ( S->debug )
 				fprintf(stdout, "\tGroup layout: %d\n", lp);
 			_load_layout(S, &layout[lp1].entry, enclave);
-			fputc('\n', stdout);
+			if ( S->debug )
+				fputc('\n', stdout);
 		}
 	}
 
