@@ -287,7 +287,8 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(char *, cmd))
 extern int main(int argc, char *argv[])
 
 {
-	_Bool debug = true;
+	_Bool debug	    = false,
+	      debug_enclave = true;
 
 	char *p,
 	     *spid     = NULL,
@@ -318,13 +319,20 @@ extern int main(int argc, char *argv[])
 	ISOmanager enclave = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "MSpe:h:i:n:s:t:v:")) != EOF )
+	while ( (opt = getopt(argc, argv, "MSdpe:h:i:n:s:t:v:")) != EOF )
 		switch ( opt ) {
 			case 'M':
 				Mode = measure;
 				break;
 			case 'S':
 				Mode = sgx;
+				break;
+
+			case 'd':
+				debug = true;
+				break;
+			case 'p':
+				debug_enclave = false;
 				break;
 
 			case 'e':
@@ -338,9 +346,6 @@ extern int main(int argc, char *argv[])
 				break;
 			case 'n':
 				canister = optarg;
-				break;
-			case 'p':
-				debug = false;
 				break;
 			case 's':
 				spid = optarg;
@@ -358,7 +363,7 @@ extern int main(int argc, char *argv[])
 	if ( Mode == measure ) {
 		INIT(NAAAIM, ISOmanager, enclave, ERR(goto done));
 		if ( !enclave->load_enclave(enclave, enclave_name, token, \
-					    debug) )
+					    debug_enclave) )
 			ERR(goto done);
 
 		INIT(HurdLib, Buffer, id_bufr, ERR(goto done));
@@ -409,6 +414,9 @@ extern int main(int argc, char *argv[])
 			      stderr);
 			goto done;
 		}
+
+		if ( debug )
+			enclave->debug(enclave, true);
 
 
 		/* Connect to the enclave. */

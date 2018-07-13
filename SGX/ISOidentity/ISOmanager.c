@@ -160,6 +160,9 @@ struct NAAAIM_ISOmanager_State
 	/* Object status. */
 	_Bool poisoned;
 
+	/* Debug status of instance. */
+	_Bool debug;
+
 	/* Enclave error code. */
 	int enclave_error;
 
@@ -185,7 +188,9 @@ static void _init_state(CO(ISOmanager_State, S))
 	S->libid = NAAAIM_LIBID;
 	S->objid = NAAAIM_ISOmanager_OBJID;
 
-	S->poisoned	 = false;
+	S->poisoned = false;
+	S->debug    = false;
+
 	S->enclave_error = 0;
 
 	S->enclave = NULL;
@@ -294,7 +299,7 @@ static _Bool connect(CO(ISOmanager, this), char *hostname, \
 
 	memset(&ecall0, '\0', sizeof(struct ISOmanager_ecall0));
 
-	ecall0.debug_mode    = true;
+	ecall0.debug_mode    = S->debug;
 	ecall0.port	     = port;
 	ecall0.current_time  = time(NULL);
 
@@ -389,6 +394,31 @@ static _Bool generate_identity(CO(ISOmanager, this), CO(Buffer, bufr))
 /**
  * External public method.
  *
+ * This method implements the ability to set the debug status of
+ * the object.
+ *
+ * \param this		A pointer to the object whose debug status is
+ *			to be set.
+ *
+ * \param debug		The debug status to be set.
+ *
+ * \return		No return value is defined.
+ */
+
+static void debug(CO(ISOmanager, this), const _Bool debug)
+
+{
+	STATE(S);
+
+
+	S->debug = debug;
+	return;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a destructor for an ISOmanager object.
  *
  * \param this	A pointer to the object which is to be destroyed.
@@ -449,7 +479,8 @@ extern ISOmanager NAAAIM_ISOmanager_Init(void)
 	this->connect		= connect;
 	this->generate_identity = generate_identity;
 
-	this->whack		= whack;
+	this->debug = debug;
+	this->whack = whack;
 
 	return this;
 }

@@ -33,6 +33,7 @@ struct NAAAIM_ISOmanager
 			 char *, const Buffer, const Buffer);
 	_Bool (*generate_identity)(const ISOmanager, const Buffer);
 	
+	void (*debug)(const ISOmanager, _Bool);
 	void (*whack)(const ISOmanager);
 
 	/* Private state. */
