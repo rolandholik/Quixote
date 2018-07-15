@@ -334,6 +334,8 @@ time_t time(time_t *timeptr)
 static void run_session(_Bool debug, int port, CO(Buffer, spid))
 
 {
+	_Bool done = false;
+
 	PossumPipe_type pipe_retn;
 
 	Buffer bufr = NULL;
@@ -348,37 +350,39 @@ static void run_session(_Bool debug, int port, CO(Buffer, spid))
 	if ( !pipe->init_server(pipe, NULL, port, false) )
 		ERR(goto done);
 
-	if ( !pipe->accept_connection(pipe) ) {
-		fputs("Error accepting connection.\n", stderr);
-		ERR(goto done);
-	}
-
-	if ( !pipe->start_host_mode(pipe, spid) ) {
-		fputs("Error receiving data.\n", stderr);
-		goto done;
-	}
-
 
 	/* Receive and process host commands. */
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 
 	while ( 1 ) {
-		pipe_retn = pipe->receive_packet(pipe, bufr);
-		if ( pipe_retn == PossumPipe_eop )
-			goto done;
-		if ( pipe_retn == PossumPipe_failure )
+		if ( !pipe->accept_connection(pipe) ) {
+			fputs("Error accepting connection.\n", stderr);
 			ERR(goto done);
-		if ( pipe_retn == PossumPipe_data ) {
-			if ( !process_command(pipe, bufr) )
-				ERR(goto done);
 		}
-		bufr->reset(bufr);
+		if ( !pipe->start_host_mode(pipe, spid) ) {
+			fputs("Error receiving data.\n", stderr);
+			goto done;
+		}
+
+		while ( !done ) {
+			pipe_retn = pipe->receive_packet(pipe, bufr);
+			if ( pipe_retn == PossumPipe_eop )
+				done = true;
+			if ( pipe_retn == PossumPipe_failure )
+				ERR(goto done);
+			if ( pipe_retn == PossumPipe_data ) {
+				if ( !process_command(pipe, bufr) )
+					ERR(goto done);
+			}
+			bufr->reset(bufr);
+		}
+
+		done = false;
+		pipe->reset(pipe);
 	}
 
 
  done:
-	pipe->reset(pipe);
-
 	WHACK(bufr);
 	WHACK(pipe);
 

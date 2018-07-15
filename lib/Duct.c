@@ -737,6 +737,7 @@ static void reset(CO(Duct, this))
 	S->eof = false;
 
 	if ( (S->type == server) && (S->fd != -1) ) {
+		sleep(3);
 		close(S->fd);
 		S->fd = -1;
 	}
@@ -771,9 +772,12 @@ static void whack(CO(Duct, this))
 	/* Close the I/O socket. */
 	if ( S->fd != -1 ) {
 		shutdown(S->fd, SHUT_RDWR);
-		if ( S->type == server )
+		if ( S->type == server ) {
+			sleep(3);
 			close(S->fd);
+		}
 	}
+
 	shutdown(S->sockt, SHUT_RDWR);
 	close(S->sockt);
 
