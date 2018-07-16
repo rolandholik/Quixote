@@ -67,6 +67,12 @@ static time_t Current_Time;
 
 
 /**
+ * The debug status of the manager.
+ */
+static _Bool Debug;
+
+
+/**
  * Private function.
  *
  * This function is responsible for returning the current trajectory
@@ -110,7 +116,8 @@ static _Bool send_trajectory(CO(PossumPipe, mgmt), CO(Buffer, cmdbufr))
 	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
 	if ( !mgmt->send_packet(mgmt, PossumPipe_data, cmdbufr) )
 		ERR(goto done);
-	fprintf(stderr, "Sent trajectory size: %zu\n", cnt);
+	if ( Debug )
+		fprintf(stderr, "Sent trajectory size: %zu\n", cnt);
 
 
 	/* Send each trajectory point. */
@@ -187,7 +194,8 @@ static _Bool send_forensics(CO(PossumPipe, mgmt), CO(Buffer, cmdbufr))
 	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
 	if ( !mgmt->send_packet(mgmt, PossumPipe_data, cmdbufr) )
 		ERR(goto done);
-	fprintf(stderr, "Sent forensics size: %zu\n", cnt);
+	if ( Debug )
+		fprintf(stderr, "Sent forensics size: %zu\n", cnt);
 
 
 	/* Send each trajectory point. */
@@ -318,10 +326,6 @@ time_t time(time_t *timeptr)
  * the management call and provides a wrapper for the creation and
  * execution of a single PossumPipe connection.
  *
- * \param debug		A flag used to indicate whether or not the
- *			PossumPipe connection is to be run in debug
- *			mode.
- *
  * \param port		The port number which the PossumPipe is to
  *			listen on.
  *
@@ -331,7 +335,7 @@ time_t time(time_t *timeptr)
  * \return		No return value is currently defined.
  */
 
-static void run_session(_Bool debug, int port, CO(Buffer, spid))
+static void run_session(int port, CO(Buffer, spid))
 
 {
 	_Bool done = false;
@@ -344,8 +348,8 @@ static void run_session(_Bool debug, int port, CO(Buffer, spid))
 
 
 	INIT(NAAAIM, PossumPipe, pipe, ERR(goto done));
-	if ( debug )
-		pipe->debug(pipe, debug);
+	if ( Debug )
+		pipe->debug(pipe, Debug);
 
 	if ( !pipe->init_server(pipe, NULL, port, false) )
 		ERR(goto done);
@@ -414,6 +418,9 @@ _Bool manager(struct ISOidentity_ecall10_interface *ecall10)
 	Buffer spid = NULL;
 
 
+	/* Set the debug status. */
+	Debug = ecall10->debug;
+
 	/* Initialize the time. */
 	Current_Time = ecall10->current_time;
 
@@ -432,12 +439,12 @@ _Bool manager(struct ISOidentity_ecall10_interface *ecall10)
 
 
 	/* Start the management interface. */
-	if ( ecall10->debug )
+	if ( Debug )
 		fprintf(stdout, "ISOidentity manager: port=%d\n", \
 			ecall10->port);
 
 	while ( 1 ) {
-		run_session(ecall10->debug, ecall10->port, spid);
+		run_session(ecall10->port, spid);
 	}
 
 
