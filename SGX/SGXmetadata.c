@@ -56,6 +56,16 @@
 
 
 /**
+ * Structure used to extract metadata description header.
+ */
+struct metadata_hdr {
+	uint64_t magic_num;
+	uint64_t version;
+	uint32_t size;
+};
+
+
+/**
  * Enumeration types describing layout types.  These layout types are
  * based on names for version 2 metadata.
  */
@@ -160,6 +170,7 @@ struct NAAAIM_SGXmetadata_State
 	uint8_t	version;
 	uint32_t section_size;
 
+	uint8_t *metaptrs[3];
 	metadata_t metadata;
 
 	Buffer patches;
@@ -194,6 +205,7 @@ static void _init_state(CO(SGXmetadata_State, S)) {
 
 	S->version	= 0;
 	S->section_size = 0;
+	memset(S->metaptrs, '\0', sizeof(S->metaptrs));
 	memset(&S->metadata, '\0', sizeof(S->metadata));
 
 	S->patches = NULL;
@@ -228,16 +240,14 @@ static _Bool _load_metadata(CO(SGXmetadata, this), CO(uint8_t, *metaptr))
 {
 	STATE(S);
 
-	uint8_t *mptr = (uint8_t *) metaptr;
+	uint8_t *mptr	= (uint8_t *) metaptr,
+		curptr	= 0,
+		maxptrs = sizeof(S->metaptrs)/sizeof(uint8_t *);
 
 	uint32_t minor,
 	         major;
 
-	struct {
-		uint64_t magic_num;
-		uint64_t version;
-		uint32_t size;
-	} metahdr;
+	struct metadata_hdr metahdr;
 
 
 	/* Verify there is at least one valid metadata block. */
@@ -260,6 +270,8 @@ static _Bool _load_metadata(CO(SGXmetadata, this), CO(uint8_t, *metaptr))
 			}
 		}
 
+		if ( curptr < maxptrs )
+			S->metaptrs[curptr++] = mptr;
 		if ( (major == PREFERRED_MAJOR) && (minor == PREFERRED_MINOR) )
 			return true;
 
@@ -1382,7 +1394,10 @@ static void dump(CO(SGXmetadata, this))
 	char *description;
 
 	uint32_t lp,
-		 cnt;
+		 cnt,
+		 maxptrs = sizeof(S->metaptrs)/sizeof(uint8_t *);
+
+	struct metadata_hdr metahdr;
 
 	metadata_t *mp = &S->metadata;
 
@@ -1397,9 +1412,20 @@ static void dump(CO(SGXmetadata, this))
 
 	/* Output the enlave header information. */
 	fputs("METADATA:\n", stdout);
-	fprintf(stdout, "size: 0x%x\n\n", S->section_size);
+	fprintf(stdout, "notes size: 0x%x\n", S->section_size);
 
-	fputs("HEADER:\n", stdout);
+	fputs("versions: ", stdout);
+	for (lp= 0; lp < maxptrs; ++lp) {
+		if ( S->metaptrs[lp] != NULL ) {
+			memcpy(&metahdr, S->metaptrs[lp], sizeof(metahdr));
+			fprintf(stdout, "%lu.%lu", metahdr.version >> 32, \
+				metahdr.version & UINT32_MAX);
+			if ( (lp < maxptrs-1) && (S->metaptrs[lp+1] != NULL) )
+				fputs(", ", stdout);
+		}
+	}
+
+	fputs("\n\nHEADER:\n", stdout);
 	fprintf(stdout, "magic: 0x%lx\n", mp->magic_num);
 	fprintf(stdout, "version: 0x%lx (%lu.%lu)\n", mp->version, \
 		mp->version >> 32, mp->version & 0xffffffff);
