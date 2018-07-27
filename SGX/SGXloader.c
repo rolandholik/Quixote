@@ -751,10 +751,11 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
 	 * the enclave.
 	 */
 	if ( debug )
-	     fprintf(stdout, "Building segment, vaddr=0x%lx, "	    \
-		     "hdr size=0x%lx, offset=0x%lx, size=0x%lx\n",  \
-		     segment->phdr.p_vaddr, segment->phdr.p_filesz, \
-		     offset, size);
+	     fprintf(stdout, "Building segment: vaddr=0x%lx, "		    \
+		     "file size=0x%lx, memory size=0x%lx, offset=0x%lx, "   \
+		     "size=0x%lx\n", segment->phdr.p_vaddr,		    \
+		     segment->phdr.p_filesz, segment->phdr.p_memsz, offset, \
+		     size);
 
 	memset(&secinfo, '\0', sizeof(struct SGX_secinfo));
 
@@ -828,11 +829,11 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
 			size = segment->phdr.p_memsz - loaded;
 		}
 
-		if ( compatibility & NULL_PADDING_NEEDED ) {
-			if ( size > 4096 )
-				size += 4096;
-		}
 		size = r2p(size);
+		if ( (segment->phdr.p_memsz + offset) < loaded )
+			size -= 4096;
+		if ( compatibility & NULL_PADDING_NEEDED )
+			size += 4096;
 
 		if ( debug ) {
 			fprintf(stdout, "\tMemory/file size mismatch, "	      \
@@ -844,7 +845,7 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
 			if ( compatibility & NULL_PADDING_NEEDED )
 				fputs("\tImplemented NULL padding " \
 				      "workaround.\n", stdout);
-			fprintf(stdout, "\tZero page count: %lu\n", \
+			fprintf(stdout, "\tZero page count: %lu\n\n", \
 				size / 4096);
 		}
 
