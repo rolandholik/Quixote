@@ -197,7 +197,7 @@ typedef struct _metadata_t
 	sgx_attributes_t attributes;
 	struct SGX_sigstruct enclave_css;
 	data_directory_t dirs[DIR_NUM];
-	uint8_t data[2208];
+	uint8_t data[18592];
 } __attribute__((packed)) metadata_t;
 
 

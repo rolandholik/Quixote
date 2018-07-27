@@ -12,6 +12,13 @@
  * for licensing information.
  **************************************************************************/
 
+/* Magic number identifing valid metadata. */
+#define METADATA_MAGIC 0x86a80294635d0e4cULL
+
+#define PREFERRED_MAJOR 1
+#define PREFERRED_MINOR 4
+
+
 /* Include files. */
 #include <stdint.h>
 #include <stdlib.h>
@@ -48,6 +55,83 @@
 #endif
 
 
+/**
+ * Enumeration types describing layout types.  These layout types are
+ * based on names for version 2 metadata.
+ */
+enum layout_types {
+	layout_heap_min=1,
+	layout_heap_init,
+	layout_heap_max,
+	layout_tcs,
+	layout_td,
+	layout_ssa,
+	layout_stack_max,
+	layout_stack_min,
+	layout_thread_group,
+	layout_guard,
+	layout_heap_dyn_min,
+	layout_heap_dyn_init,
+	layout_heap_dyn_max,
+	layout_tcs_dyn,
+	layout_td_dyn,
+	layout_ssa_dyn,
+	layout_stack_dyn_max,
+	layout_stack_dyn_min,
+	layout_thread_group_dyn
+};
+
+
+/**
+ * Structure definition for describing layout types.
+ */
+struct layout_description {
+	unsigned int id;
+	unsigned int type;
+	char *name;
+};
+
+
+/**
+ * Array of structures for version 1 metadata.
+ */
+struct layout_description v1_layouts[] = {
+	{1, layout_heap_min,		"HEAP"},
+	{2, layout_tcs,			"TCS"},
+	{3, layout_td,			"TD"},
+	{4, layout_ssa,			"SSA"},
+	{5, layout_stack_min,		"STACK"},
+	{6, layout_thread_group,	"THREAD GROUP"},
+	{7, layout_guard,		"GUARD"}
+};
+
+
+/**
+ * Array of structures for version 2 metadata.
+ */
+struct layout_description v2_layouts[] = {
+	{1, layout_heap_min,		"HEAP MIN"},
+	{2, layout_heap_init,		"HEAP INIT"},
+	{3, layout_heap_max,		"HEAP MAX"},
+	{4, layout_tcs,			"TCS"},
+	{5, layout_td,			"TD"},
+	{6, layout_ssa,			"SSA"},
+	{7, layout_stack_max,		"STACK MAX"},
+	{8, layout_stack_min,		"STACK MIN"},
+	{9, layout_thread_group,	"THREAD GROUP"},
+	{10, layout_guard,		"GUARD"},
+	{11, layout_heap_dyn_min,	"HEAP DYN MIN"},
+	{12, layout_heap_dyn_init,	"HEAP DYN INIT"},
+	{13, layout_heap_dyn_max,	"HEAP DYN MAX"},
+	{14, layout_tcs_dyn,		"TCS DYN"},
+	{15, layout_td_dyn,		"TD DYN"},
+	{16, layout_ssa_dyn,		"SSA DYN"},
+	{17, layout_stack_dyn_max,	"STACK DYN MAX"},
+	{18, layout_stack_dyn_min,	"STACK DYN MIN"},
+	{19, layout_thread_group_dyn,	"THREAD GROUP DYN"}
+};
+
+
 /** SGXmetadata private state information. */
 struct NAAAIM_SGXmetadata_State
 {
@@ -73,6 +157,7 @@ struct NAAAIM_SGXmetadata_State
 	Elf *elf;
 
 	/* SGX metadata structures. */
+	uint8_t	version;
 	uint32_t section_size;
 
 	metadata_t metadata;
@@ -107,6 +192,7 @@ static void _init_state(CO(SGXmetadata_State, S)) {
 	S->fd  = -1;
 	S->elf = NULL;
 
+	S->version	= 0;
 	S->section_size = 0;
 	memset(&S->metadata, '\0', sizeof(S->metadata));
 
@@ -117,6 +203,73 @@ static void _init_state(CO(SGXmetadata_State, S)) {
 	memset(&S->attributes, '\0', sizeof(S->attributes));
 
 	return;
+}
+
+
+/**
+ * External private method.
+ *
+ * This is an internal helper method which iterates through the notes
+ * section and selects a suitable or default copy of the metadata.
+ *
+ * \param this		A pointer to the object for which metadata is
+ *			to be loaded.
+ *
+ * \param metaptr	A pointer to the metadata block in the notes
+ *			section of the enclave shared image.
+ *
+ * \return	A true value is returned if the object has been
+ *		populated with a metadata structure.  A false value
+ *		indicates that valid metadata was not located.
+ */
+
+static _Bool _load_metadata(CO(SGXmetadata, this), CO(uint8_t, *metaptr))
+
+{
+	STATE(S);
+
+	uint8_t *mptr = (uint8_t *) metaptr;
+
+	uint32_t minor,
+	         major;
+
+	struct {
+		uint64_t magic_num;
+		uint64_t version;
+		uint32_t size;
+	} metahdr;
+
+
+	/* Verify there is at least one valid metadata block. */
+	memcpy(&metahdr, mptr, sizeof(metahdr));
+	if ( metahdr.magic_num != METADATA_MAGIC )
+		return false;
+
+
+	/* Scan for a preferred metadata type. */
+	while ( 1 ) {
+		memcpy(&S->metadata, mptr, metahdr.size);
+		this->get_version(this, &major, &minor);
+
+		if ( S->version == 0 ) {
+			S->version = major;
+			if ( (S->version == 1) && (S->section_size > 4096) ) {
+				S->version = 2;
+				if ( S->debug )
+					fputs("Forcing version 2.\n", stdout);
+			}
+		}
+
+		if ( (major == PREFERRED_MAJOR) && (minor == PREFERRED_MINOR) )
+			return true;
+
+		mptr += metahdr.size;
+		memcpy(&metahdr, mptr, sizeof(metahdr));
+		if ( metahdr.magic_num != METADATA_MAGIC )
+			return true;
+	}
+
+	return false;
 }
 
 
@@ -144,14 +297,14 @@ static _Bool load(CO(SGXmetadata, this), CO(char *, enclave))
 
 	_Bool retn = false;
 
-	uint8_t *dirp;
+	uint8_t *dirp,
+		*metaptr;
 
 	uint32_t cnt;
 
 	int index;
 
-	size_t name_index,
-	       offset;
+	size_t name_index;
 
 	uint32_t name_size;
 
@@ -208,23 +361,11 @@ static _Bool load(CO(SGXmetadata, this), CO(char *, enclave))
 			name_size = *((uint32_t *) data->d_buf);
 			S->section_size = *((uint32_t *) (data->d_buf + \
 							  sizeof(uint32_t)));
-			offset = (3 * sizeof(uint32_t)) + name_size;
+			metaptr = data->d_buf + (3 * sizeof(uint32_t)) + \
+				name_size;
 
-			/* Verify metadata version. */
-			memcpy(&S->metadata,			   \
-			       (uint8_t *) (data->d_buf + offset), \
-			       2 * sizeof(uint64_t));
-			if ( (S->metadata.version >> 32) == 2 ) {
-				fputs("Unsupported version 2 enclave.\n", \
-				      stderr);
-				retn = false;
-				goto done;
-			}
-
-			memcpy(&S->metadata,			   \
-			       (uint8_t *) (data->d_buf + offset), \
-			       sizeof(metadata_t));
-			retn = true;
+			if ( !_load_metadata(this, metaptr) )
+				ERR(goto done);
 		}
 	}
 
@@ -259,6 +400,8 @@ static _Bool load(CO(SGXmetadata, this), CO(char *, enclave))
 				sizeof(struct _layout_entry_t));
 		++layout;
 	}
+
+	retn = true;
 
 
  done:
@@ -834,6 +977,56 @@ static _Bool get_version(CO(SGXmetadata, this), uint32_t *major, \
 /**
  * Internal private method.
  *
+ * This method implements searching the layout description arrays for
+ * version 1 and version 1 metadata to locate the structure that defines
+ * the type of layout repreented by the layout id number.
+ *
+ * \param S		The state of the object whose layout type is
+ *			being determined.
+ *
+ * \param id		The identification number of the layout whose
+ *			description is to be located.
+ *
+ * \return		A true value is returned if the layout description
+ *			has been located.  A false value is returned if
+ *			location of the layout description fails.
+ */
+
+static struct layout_description * _find_layout(CO(SGXmetadata_State, S), \
+						const uint16_t id)
+
+{
+	uint8_t cnt;
+
+	struct layout_description *layouts;
+
+
+	/* Setup array size and pointers for available layouts. */
+	if ( S->version == 1 ) {
+		cnt = sizeof(v1_layouts) / sizeof(struct layout_description);
+		layouts = v1_layouts;
+	}
+	if ( S->version == 2 ) {
+		cnt = sizeof(v2_layouts) / sizeof(struct layout_description);
+		layouts = v2_layouts;
+	}
+
+
+	/* Search for the desired layout type. */
+	while ( cnt-- ) {
+		if ( layouts->id == id )
+			return layouts;
+		++layouts;
+	}
+
+
+	return NULL;
+}
+
+
+/**
+ * Internal private method.
+ *
  * This method implements the loading of an individual layout
  * definition.
  *
@@ -864,6 +1057,8 @@ static _Bool _load_layout(CO(SGXmetadata_State, S),		\
 	uint32_t lp,
 		 content_count;
 
+	struct layout_description *layout_description;
+
 	struct SGX_tcs *tcs;
 
 	struct SGX_secinfo secinfo;
@@ -874,30 +1069,13 @@ static _Bool _load_layout(CO(SGXmetadata_State, S),		\
 		ERR(goto done);
 
 
+	/* Locate the structure defining the type of layout. */
+	if ( (layout_description = _find_layout(S, layout->id)) == NULL )
+		ERR(goto done);
+
 	if ( S->debug ) {
-		switch ( layout->id ) {
-		case 1:
-			fputs("\tHeap\n", stdout);
-			break;
-		case 2:
-			fputs("\tTCS\n", stdout);
-			break;
-		case 3:
-			fputs("\tTD\n", stdout);
-			break;
-		case 4:
-			fputs("\tSSA\n", stdout);
-			break;
-		case 5:
-			fputs("\tStack\n", stdout);
-			break;
-		case 6:
-			fputs("\tThread group\n", stdout);
-			break;
-		case 7:
-			fputs("\tGuard\n", stdout);
-			break;
-		}
+		fprintf(stdout, "\ttype: %d (%s)\n", layout->id, \
+			layout_description->name);
 		fprintf(stdout, "\tattributes: 0x%x\n", layout->attributes);
 		fprintf(stdout, "\tpages: 0x%x\n", layout->page_count);
 		fprintf(stdout, "\trva: 0x%lx\n", layout->rva);
@@ -914,7 +1092,7 @@ static _Bool _load_layout(CO(SGXmetadata_State, S),		\
 	 *
 	 * Start with the Task Control Structure.
 	 */
-	if ( layout->id == 2 ) {
+	if ( layout_description->type == layout_tcs ) {
 		if ( layout->content_size > sizeof(page) )
 			ERR(goto done);
 		memset(page, '\0', sizeof(page));
@@ -944,9 +1122,11 @@ static _Bool _load_layout(CO(SGXmetadata_State, S),		\
 
 
 	/* If this is a guard page a hole is punched in the enclave. */
-	if ( layout->id == 7 ) {
-		if ( !enclave->add_hole(enclave) )
-			ERR(goto done);
+	if ( layout_description->type == layout_guard ) {
+		for (lp= 0; lp < layout->page_count; ++lp) {
+			if ( !enclave->add_hole(enclave) )
+				ERR(goto done);
+		}
 
 		retn = true;
 		goto done;
@@ -1199,6 +1379,8 @@ static void dump(CO(SGXmetadata, this))
 {
 	STATE(S);
 
+	char *description;
+
 	uint32_t lp,
 		 cnt;
 
@@ -1209,6 +1391,8 @@ static void dump(CO(SGXmetadata, this))
 	struct _patch_entry_t *patch;
 
 	struct _layout_entry_t *layout;
+
+	struct layout_description *descn;
 
 
 	/* Output the enlave header information. */
@@ -1296,8 +1480,14 @@ static void dump(CO(SGXmetadata, this))
 	cnt = S->layouts->size(S->layouts) / sizeof(struct _layout_entry_t);
 
 	for (lp= 0; lp < cnt; ++lp) {
+		if ( (descn = _find_layout(S, layout->id)) == NULL )
+			description = "UNKNOWN";
+		else
+			description = descn->name;
+
 		fprintf(stdout, "\tLayout %u:\n", lp);
-		fprintf(stdout, "\t\tid: 0x%x\n", layout->id);
+		fprintf(stdout, "\t\tid: 0x%x (%s)\n", layout->id, \
+			description);
 		fprintf(stdout, "\t\tattributes: 0x%x\n", layout->attributes);
 		fprintf(stdout, "\t\tpage count: 0x%x\n", layout->page_count);
 		fprintf(stdout, "\t\toffset: 0x%lx\n", layout->rva);
