@@ -826,7 +826,8 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
 		if ( loaded >= segment->phdr.p_memsz )
 			size = loaded - segment->phdr.p_memsz;
 		else {
-			size = segment->phdr.p_memsz - loaded;
+			size  = segment->phdr.p_memsz - loaded;
+			size += offset;
 		}
 
 		size = r2p(size);
