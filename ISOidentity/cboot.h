@@ -19,7 +19,8 @@
 enum {
 	show_measurement=1,
 	show_trajectory,
-	show_forensics
+	show_forensics,
+	show_contours
 } cboot_commands;
 
 struct cboot_cmd_definition {
@@ -31,6 +32,7 @@ struct cboot_cmd_definition cboot_cmd_list[] = {
 	{show_measurement, "show measurement"},
 	{show_trajectory,  "show trajectory"},
 	{show_forensics,   "show forensics"},
+	{show_contours,	   "show contours"},
 	{0, NULL}
 };
 	

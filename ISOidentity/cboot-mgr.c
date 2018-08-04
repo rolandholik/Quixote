@@ -169,6 +169,60 @@ static _Bool receive_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 /**
  * Private function.
  *
+ * This function implements the receipt of a contour list from
+ * the canister management daemon.  The protocol used is for the
+ * management daemon to send the number of points in the behavioral
+ * field followed by point in ASCII hexadecimal form.
+ *
+ * \param mgmt		The socket object used to communicate with
+ *			the canister management instance.
+ *
+ * \param cmdbufr	The object used to process the remote command
+ *			response.
+ *
+ * \return		A boolean value is returned to indicate the
+ *			status of processing processing the contour
+ *			list.  A false value indicates an error occurred
+ *			while a true value indicates the response was
+ *			properly processed.
+ */
+
+static _Bool receive_contours(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
+
+{
+	_Bool retn = false;
+
+	unsigned int cnt;
+
+
+	/* Get the number of points. */
+	cmdbufr->reset(cmdbufr);
+	if ( !mgmt->receive_Buffer(mgmt, cmdbufr) )
+		ERR(goto done);
+	cnt = *(unsigned int *) cmdbufr->get(cmdbufr);
+	fprintf(stderr, "Contour size: %u\n", cnt);
+
+
+	/* Output each point. */
+	while ( cnt ) {
+		cmdbufr->reset(cmdbufr);
+		if ( !mgmt->receive_Buffer(mgmt, cmdbufr) )
+			ERR(goto done);
+		fprintf(stdout, "%s\n", cmdbufr->get(cmdbufr));
+		--cnt;
+	}
+
+	cmdbufr->reset(cmdbufr);
+	retn = true;
+
+ done:
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
  * This function implements receipt and processing of the command
  * which was executed on the canister management daemon.
  *
@@ -207,6 +261,10 @@ static _Bool receive_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr), \
 
 		case show_forensics:
 			retn = receive_forensics(mgmt, cmdbufr);
+			break;
+
+		case show_contours:
+			retn = receive_contours(mgmt, cmdbufr);
 			break;
 	}
 

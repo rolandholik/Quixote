@@ -781,6 +781,91 @@ static _Bool send_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 /**
  * Private function.
  *
+ * This function is responsible for returning the current behavioral
+ * map to the caller.  The protocol used is to send the number of
+ * elements in the map followed by each point in the map as a hexadecimal
+ * ASCII string.
+ *
+ * \param mgmt		The socket object used to communicate with
+ *			the canister management instance.
+ *
+ * \param cmdbufr	The object which will be used to hold the
+ *			information which will be transmitted.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not the command was processed.  A false value
+ *			indicates the processing of commands should be
+ *			terminated while a true value indicates an
+ *			additional command cycle should be processed.
+ */
+
+static _Bool send_contours(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
+
+{
+	_Bool retn = false;
+
+	uint8_t *p,
+		 pi;
+
+	char point[NAAAIM_IDSIZE * 2 + 1];
+
+	size_t lp,
+	       cnt = 0;
+
+	ContourPoint cp = NULL;
+
+
+	/*
+	 * Compute the number of elements in the list and send it to
+	 * the client.
+	 */
+	if ( Mode == internal )
+		cnt = Model->size(Model);
+	else
+		cnt = Enclave->size(Enclave);
+
+	cmdbufr->reset(cmdbufr);
+	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
+	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
+		ERR(goto done);
+	if ( Debug )
+		fprintf(stderr, "Sent contour size: %zu\n", cnt);
+
+
+	/* Send each trajectory point. */
+	if ( Mode == internal )
+		Model->rewind_contours(Model);
+
+	for (lp= 0; lp < cnt; ++lp ) {
+		if ( Mode == internal ) {
+			if ( !Model->get_contour(Model, &cp) )
+				ERR(goto done);
+			if ( cp == NULL )
+				continue;
+		}
+
+		memset(point, '\0', sizeof(point));
+		p = cp->get(cp);
+		for (pi= 0; pi < NAAAIM_IDSIZE; ++pi)
+			snprintf(&point[pi*2], 3, "%02x", *p++);
+
+		cmdbufr->reset(cmdbufr);
+		cmdbufr->add(cmdbufr, (unsigned char *) point, sizeof(point));
+		if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
+			ERR(goto done);
+	}
+
+	retn = true;
+
+ done:
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
  * This function implements the processing of a command from the
  * canister management utility.  This command comes in the form
  * of a binary encoding of the desired command to be run.
@@ -833,6 +918,10 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 		case show_forensics:
 			retn = send_forensics(mgmt, cmdbufr);
+			break;
+
+		case show_contours:
+			retn = send_contours(mgmt, cmdbufr);
 			break;
 	}
 

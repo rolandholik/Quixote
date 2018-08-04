@@ -184,6 +184,60 @@ static _Bool receive_forensics(CO(PossumPipe, mgmt), CO(Buffer, cmdbufr))
 /**
  * Private function.
  *
+ * This function implements the receipt of a behavior contour map from
+ * the canister management enclave.  The protocol used is for the
+ * enclave to send the number of events in the map followed by each
+ * contour point in ASCII form.
+ *
+ * \param mgmt		The object used to communicate with the
+ *			canister management enclave.
+ *
+ * \param cmdbufr	The object used to process the remote command
+ *			response.
+ *
+ * \return		A boolean value is returned to indicate the
+ *			status of processing processing the contour map.
+ *			A false value indicates an error occurred while
+ *			a true value indicates the response was properly
+ *			processed.
+ */
+
+static _Bool receive_contours(CO(PossumPipe, mgmt), CO(Buffer, cmdbufr))
+
+{
+	_Bool retn = false;
+
+	unsigned int cnt;
+
+
+	/* Get the number of points. */
+	cmdbufr->reset(cmdbufr);
+	if ( !mgmt->receive_packet(mgmt, cmdbufr) )
+		ERR(goto done);
+	cnt = *(unsigned int *) cmdbufr->get(cmdbufr);
+	fprintf(stderr, "Contour size: %u\n", cnt);
+
+
+	/* Output each point. */
+	while ( cnt ) {
+		cmdbufr->reset(cmdbufr);
+		if ( !mgmt->receive_packet(mgmt, cmdbufr) )
+			ERR(goto done);
+		fprintf(stdout, "%s\n", cmdbufr->get(cmdbufr));
+		--cnt;
+	}
+
+	cmdbufr->reset(cmdbufr);
+	retn = true;
+
+ done:
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
  * This function implements receipt and processing of the command
  * which was executed on the canister management daemon.
  *
@@ -222,6 +276,10 @@ static _Bool receive_command(CO(PossumPipe, mgmt), CO(Buffer, cmdbufr), \
 
 		case show_forensics:
 			retn = receive_forensics(mgmt, cmdbufr);
+			break;
+
+		case show_contours:
+			retn = receive_contours(mgmt, cmdbufr);
 			break;
 	}
 
