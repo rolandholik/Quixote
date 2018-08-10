@@ -28,6 +28,7 @@ struct NAAAIM_ISOidentity
 	/* External methods. */
 	_Bool (*update)(const ISOidentity, const ExchangeEvent, _Bool *, \
 			_Bool *);
+	_Bool (*update_map)(const ISOidentity, const Buffer);
 
 	_Bool (*set_aggregate)(const ISOidentity, const Buffer);
 
@@ -39,6 +40,7 @@ struct NAAAIM_ISOidentity
 
 	void (*rewind_contours)(const ISOidentity);
 	_Bool (*get_contour)(const ISOidentity, ContourPoint *);
+	size_t (*contours_size)(const ISOidentity);
 
 	void (*rewind_forensics)(const ISOidentity);
 	_Bool (*get_forensics)(const ISOidentity, ExchangeEvent *);

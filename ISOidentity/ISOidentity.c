@@ -366,6 +366,74 @@ static _Bool update(CO(ISOidentity, this), CO(ExchangeEvent, event), \
 /**
  * External public method.
  *
+ * This method implements updating the currently maintained behavioral
+ * model with a specific contour point.
+ *
+ * \param this	A pointer to the object that is being modeled.
+ *
+ * \param point	An object containing the binary contour point that is
+ *		is to be added to the behavioral map.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the the point was registered.  A false value indicates
+ *		a failure while a true value indicates the model
+ *		was updated.
+ */
+
+static _Bool update_map(CO(ISOidentity, this), CO(Buffer, bpoint))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	ContourPoint cp = NULL;
+
+
+	/* Validate object status and inputs. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( bpoint->poisoned(bpoint) )
+		ERR(goto done);
+	if ( bpoint->size(bpoint) != NAAAIM_IDSIZE )
+		ERR(goto done);
+	if ( S->sealed )
+		ERR(goto done);
+
+
+	/* Register the binary contour point. */
+	INIT(NAAAIM, ContourPoint, cp, ERR(goto done));
+
+	cp->add(cp, bpoint);
+	if ( _is_mapped(S->contours, cp) ) {
+		retn = true;
+		goto done;
+	}
+
+
+	/* Update the platform measurement. */
+	if ( !_update_measurement(S, cp->get(cp)) )
+		ERR(goto done);
+
+
+	/* Add the contour point. */
+	if ( !S->contours->add(S->contours, (unsigned char *) &cp, \
+			       sizeof(ContourPoint)) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		WHACK(cp);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements initializing the model with an aggregate
  * measurement value.  The aggregate value typically reflects a
  * hardware root of trust value.
@@ -394,6 +462,10 @@ static _Bool set_aggregate(CO(ISOidentity, this), CO(Buffer, bufr))
 	/* Verify object status. */
 	if ( S->poisoned )
 		ERR(goto done);
+	if ( S->sealed && S->have_aggregate ) {
+		retn = true;
+		goto done;
+	}
 	if ( S->have_aggregate )
 		ERR(goto done);
 
@@ -645,6 +717,28 @@ static void rewind_contours(CO(ISOidentity, this))
 {
 	this->state->contours_cursor = 0;
 	return;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements returning the number of points in the
+ * current behavioral map.
+ *
+ * \param this	A pointer to the object whose behavioral map
+ *		size is to be returned.
+ *
+ * \return	The size of the forensics trajectory list.
+ *
+ */
+
+static size_t contours_size(CO(ISOidentity, this))
+
+{
+	STATE(S);
+
+	return S->contours->size(S->contours) / sizeof(Buffer);
 }
 
 
@@ -1017,7 +1111,8 @@ extern ISOidentity NAAAIM_ISOidentity_Init(void)
 	INIT(HurdLib, Buffer, this->state->forensics, goto fail);
 
 	/* Method initialization. */
-	this->update = update;
+	this->update	 = update;
+	this->update_map = update_map;
 
 	this->set_aggregate   = set_aggregate;
 	this->get_measurement = get_measurement;
@@ -1028,6 +1123,7 @@ extern ISOidentity NAAAIM_ISOidentity_Init(void)
 
 	this->get_contour     = get_contour;
 	this->rewind_contours = rewind_contours;
+	this->contours_size   = contours_size;
 
 	this->get_forensics	= get_forensics;
 	this->rewind_forensics	= rewind_forensics;
