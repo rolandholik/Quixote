@@ -532,6 +532,11 @@ static _Bool add_aggregate(CO(char *, inbufr))
 	if ( !aggregate->add_hexstring(aggregate, inbufr) )
 		ERR(goto done);
 
+	if ( Debug ) {
+		fputs("aggregate ", stderr);
+		aggregate->print(aggregate);
+	}
+
 	if ( Mode == internal ) {
 		if ( !Model->set_aggregate(Model, aggregate) )
 			ERR(goto done);
