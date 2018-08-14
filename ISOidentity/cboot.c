@@ -366,6 +366,10 @@ static _Bool add_contour(CO(char *, inbufr))
 		if ( !Model->update_map(Model, bufr) )
 			ERR(goto done);
 	}
+	else {
+		if ( !Enclave->update_map(Enclave, bufr) )
+			ERR(goto done);
+	}
 
 	retn = true;
 

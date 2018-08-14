@@ -404,6 +404,62 @@ static _Bool update(CO(ISOenclave, this), CO(String, update), \
 /**
  * External public method.
  *
+ * This method implements updating the currently maintained behavioral
+ * model a specific contour point.
+ *
+ * \param this		A pointer to the object which is being modeled.
+ *
+ * \param bpoint	The object containing the binary contour point
+ *			that is to be added to the model.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the the contour point was mapped.  A false value
+ *		indicates a failure while a true value indicates the
+ *		model was updated.
+ */
+
+static _Bool update_map(CO(ISOenclave, this), CO(Buffer, bpoint))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	int rc;
+
+	struct ISOidentity_ecall12_interface ecall12;
+
+
+	/* Verify object status and inputs. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( bpoint == NULL )
+		ERR(goto done);
+	if ( bpoint->poisoned(bpoint) )
+		ERR(goto done);
+
+
+	/* Call ECALL slot 0 to initialize the ISOidentity model. */
+	memcpy(ecall12.point, bpoint->get(bpoint), sizeof(ecall12.point));
+
+	if ( !S->enclave->boot_slot(S->enclave, 12, &ocall_table, &ecall12, \
+				    &rc) ) {
+		S->enclave_error = rc;
+		ERR(goto done);
+	}
+	if ( !ecall12.retn )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements initializing the model with an aggregate
  * measurement value.  The aggregate value typically reflects a
  * hardware root of trust value.
@@ -1343,7 +1399,8 @@ extern ISOenclave NAAAIM_ISOenclave_Init(void)
 	/* Method initialization. */
 	this->load_enclave = load_enclave;
 
-	this->update = update;
+	this->update	 = update;
+	this->update_map = update_map;
 
 	this->set_aggregate   = set_aggregate;
 	this->get_measurement = get_measurement;

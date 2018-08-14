@@ -53,6 +53,7 @@ struct NAAAIM_ISOenclave
 	_Bool (*load_enclave)(const ISOenclave, const char *, const char *);
 
 	_Bool (*update)(const ISOenclave, const String, _Bool *);
+	_Bool (*update_map)(const ISOenclave, const Buffer);
 
 	_Bool (*set_aggregate)(const ISOenclave, const Buffer);
 

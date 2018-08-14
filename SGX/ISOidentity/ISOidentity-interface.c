@@ -36,6 +36,7 @@ extern void rewind(int);
 extern _Bool get_event(int, char *, size_t);
 extern _Bool manager(struct ISOidentity_ecall10_interface *);
 extern _Bool generate_identity(uint8_t *);
+extern _Bool update_map(struct ISOidentity_ecall12_interface *);
 
 
 static _Bool SGXidf_untrusted_region(void *ptr, size_t size)
@@ -434,6 +435,39 @@ static sgx_status_t sgx_generate_identity(void *pms)
 }
 
 
+/* ECALL12 interface function. */
+static sgx_status_t sgx_update_map(void *pms)
+
+{
+	sgx_status_t status = SGX_ERROR_INVALID_PARAMETER;
+
+	struct ISOidentity_ecall12_interface *ms,
+					     ecall12;
+
+
+	/* Verify marshalled arguements and setup parameters. */
+	if ( !SGXidf_untrusted_region(pms, \
+			      sizeof(struct ISOidentity_ecall12_interface)) )
+		goto done;
+
+	ms = (struct ISOidentity_ecall12_interface *) pms;
+	memset(&ecall12, '\0', sizeof(struct ISOidentity_ecall12_interface));
+	memcpy(ecall12.point, ms->point, sizeof(ecall12.point));
+
+	__builtin_ia32_lfence();
+
+
+	/* Call the trusted function. */
+	ms->retn = update_map(&ecall12);
+	status = SGX_SUCCESS;
+
+
+ done:
+	memset(&ecall12, '\0',  sizeof(struct ISOidentity_ecall12_interface));
+	return status;
+}
+
+
 /* ECALL interface table. */
 SGX_EXTERNC const struct {
 	size_t nr_ecall;
@@ -452,7 +486,8 @@ SGX_EXTERNC const struct {
 		{(void*)(uintptr_t)sgx_rewind, 0},
 		{(void*)(uintptr_t)sgx_get_event, 0},
 		{(void*)(uintptr_t)sgx_manager, 0},
-		{(void*)(uintptr_t)sgx_generate_identity, 0}
+		{(void*)(uintptr_t)sgx_generate_identity, 0},
+		{(void*)(uintptr_t)sgx_update_map, 0}
 	}
 };
 
@@ -464,11 +499,11 @@ SGX_EXTERNC const struct {
 } g_dyn_entry_table = {
 	OCALL_NUMBER,
 	{
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 	}
 };

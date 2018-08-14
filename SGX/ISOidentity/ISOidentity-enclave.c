@@ -185,6 +185,48 @@ _Bool update_model(struct ISOidentity_ecall1_interface *ecall1)
 
 
 /**
+ * External ECALL.
+ *
+ * This method implements adding a contour point to the ISOidentity
+ * model implemented inside the enclave.
+ *
+ * \param ecall12	A pointer to the structure which contains
+ *			the inputs to this function.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the update to the behavioral map succeeded.  A false
+ *		value indicates the update had failed while a true
+ *		value indicates the enclave model had been updated.
+ */
+
+_Bool update_map(struct ISOidentity_ecall12_interface *ecall12)
+
+{
+	_Bool retn = false;
+
+	Buffer bpoint = NULL;
+
+
+	/* Initialize a Buffer object with the point. */
+	INIT(HurdLib, Buffer, bpoint, ERR(goto done));
+	if ( !bpoint->add(bpoint, ecall12->point, sizeof(ecall12->point)) )
+		ERR(goto done);
+
+
+	/* Update the model. */
+	if ( !Model->update_map(Model, bpoint) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	WHACK(bpoint);
+
+	return retn;
+}
+
+
+/**
  * External ECALL 2.
  *
  * This method implements sealing the current state of the model.
