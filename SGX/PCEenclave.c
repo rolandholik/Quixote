@@ -95,7 +95,7 @@ struct NAAAIM_PCEenclave_State
 	SGXenclave enclave;
 
 	/* The encrypted output from the PCE enclave. */
-	uint8_t ppid[256];
+	uint8_t ppid[384];
 
 	/* The signature scheme. */
 	uint8_t signature;
@@ -309,7 +309,7 @@ static _Bool get_info(CO(PCEenclave, this), struct SGX_pek *pekp, \
 
 	ecall0.public_key   = (uint8_t *) pekp;
 	ecall0.key_size	    = sizeof(pekp->n) + sizeof(pekp->e);
-	ecall0.crypto_suite = 0;
+	ecall0.crypto_suite = 1;
 
 	ecall0.encrypted_ppid	       = S->ppid;
 	ecall0.encrypted_ppid_buf_size = sizeof(S->ppid);

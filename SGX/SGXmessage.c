@@ -429,7 +429,7 @@ static _Bool encode_message2(CO(SGXmessage, this), CO(RandomBuffer, rnd), \
 
 	_Bool retn = false;
 
-	uint8_t pek_pub = 0;
+	uint8_t pek_pub = 3;
 
 	uint16_t pce_svn,
 		 pce_id;

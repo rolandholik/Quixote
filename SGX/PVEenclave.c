@@ -662,7 +662,7 @@ static _Bool generate_endpoint_message(CO(PVEenclave, this), \
 	 *	type: TYPE_ES_MSG1
 	 *	version: 1
 	 */
-	msg->init_request(msg, 2, 0, 1, S->endpoint.xid);
+	msg->init_request(msg, 2, 0, 2, S->endpoint.xid);
 
 	/* Add the endpoint selector message. */
 	if ( !msg->encode_es_request(msg, 0, S->endpoint.id) )

@@ -473,7 +473,7 @@ static _Bool process_message1(CO(SGXmessage, msg), CO(String, response), \
 
 	/* Process the PEK message. */
 	bufr->reset(bufr);
-	if ( !msg->get_message(msg, TLV_PEK, 1, bufr) )
+	if ( !msg->get_message(msg, TLV_PEK, 2, bufr) )
 		ERR(goto done);
 
 	if ( !_verify_pek(msg, bufr) )

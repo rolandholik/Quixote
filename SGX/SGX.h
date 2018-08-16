@@ -471,7 +471,7 @@ struct SGX_keyrequest {
  * communications with the server.
  */
 struct SGX_pek {
-	uint8_t n[256];
+	uint8_t n[384];
 	uint8_t e[4];
 	uint8_t sha1_ne[20];
 	uint8_t pek_signature[2 * 32];
