@@ -12,7 +12,8 @@
 
 
 /* Local defines. */
-#define EPID_BLOB_SIZE 2836
+#define EPID_BLOB_SIZE	  2836
+#define DEFAULT_EPID_FILE "/var/lib/IDfusion/data/EPID.bin"
 
 
 /* Include files. */
@@ -51,6 +52,38 @@
 #if !defined(NAAAIM_SGXepid_OBJID)
 #error Object identifier not defined.
 #endif
+
+
+/**
+ * The following structure defines an EPID private key.
+ */
+struct epid_private_key {
+	uint8_t gid[4];
+	uint8_t A[64];
+	uint8_t x[32];
+	uint8_t f[32];
+} __attribute__((packed));
+
+
+/**
+ * The following structure defines a precomputed group member.
+ */
+struct epid_group_member {
+	uint8_t e12[384];
+	uint8_t e22[384];
+	uint8_t e2w[384];
+	uint8_t ea2[384];
+} __attribute__((packed));
+
+
+/**
+ * The previous two structures are combined to produce a data
+ * structure which is the secret portion of the EPID blob.
+ */
+struct epid_secret {
+	struct epid_private_key private_key;
+	struct epid_group_member group_member;
+} __attribute__((packed));
 
 
 /**
@@ -185,7 +218,9 @@ static void _set_group_info(CO(SGXepid_State, S))
  *		be loaded.
  *
  * \param file	A pointer to the null-terminated character buffer
- *		containing the name of the EPID file.
+ *		containing the name of the EPID file.  Specifying a
+ *		null pointer causes the default EPID file location
+ *		to be used.
  *
  * \return	A boolean value is returned to indicate the status
  *		of the EPID load.  A false value indicates the load
@@ -199,6 +234,9 @@ static _Bool load(CO(SGXepid, this), CO(char *, file))
 	STATE(S);
 
 	_Bool retn = false;
+
+	const char *filename = \
+		file == NULL ? DEFAULT_EPID_FILE : (char *) file;
 
 	Buffer bufr = NULL;
 
@@ -215,7 +253,7 @@ static _Bool load(CO(SGXepid, this), CO(char *, file))
 	INIT(HurdLib, Buffer, S->epid, ERR(goto done));
 
 	INIT(HurdLib, File, infile, ERR(goto done));
-	if ( !infile->open_ro(infile, file) )
+	if ( !infile->open_ro(infile, filename) )
 		ERR(goto done);
 	if ( !infile->read_Buffer(infile, bufr, EPID_BLOB_SIZE) )
 		ERR(goto done);
@@ -259,7 +297,9 @@ static _Bool load(CO(SGXepid, this), CO(char *, file))
  *		be saved.
  *
  * \param file	A pointer to the null-terminated character buffer
- *		containing the name of the EPID file.
+ *		containing the name of the EPID file.  A null pointer
+ *		specification causes the default EPID file location
+ *		to be used.
  *
  * \return	A boolean value is returned to indicate the status
  *		of the EPID save.  A false value indicates the save
@@ -274,6 +314,9 @@ static _Bool save(CO(SGXepid, this), CO(char *, file))
 
 	_Bool retn = false;
 
+	const char *filename = \
+		file == NULL ? DEFAULT_EPID_FILE : (char *) file;
+
 	Buffer bufr = NULL;
 
 	File outfile = NULL;
@@ -286,7 +329,7 @@ static _Bool save(CO(SGXepid, this), CO(char *, file))
 
 	/* Open the file and save the components. */
 	INIT(HurdLib, File, outfile, ERR(goto done));
-	if ( !outfile->open_rw(outfile, file) )
+	if ( !outfile->open_rw(outfile, filename) )
 		ERR(goto done);
 
 	if ( !outfile->write_Buffer(outfile, S->epid) )
