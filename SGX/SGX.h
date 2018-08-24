@@ -505,7 +505,7 @@ struct SGX_message3 {
 	uint8_t n2[16];
 	uint8_t epid_sig_iv[12];
 	uint8_t epid_sig_mac[16];
-	uint8_t encrypted_pwk2[256];
+	uint8_t encrypted_pwk2[384];
 	struct SGX_report pwk2_report;
 	uint32_t epid_sig_output_size;
 	uint8_t is_join_proof_generated;
