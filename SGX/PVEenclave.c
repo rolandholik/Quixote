@@ -402,9 +402,12 @@ static _Bool get_message3(CO(PVEenclave, this), CO(SGXmessage, msg),	      \
 {
 	STATE(S);
 
-	_Bool retn = false;
+	_Bool retn     = false,
+	      need_sig = false;
 
 	int rc;
+
+	uint8_t sig_bufr[366];
 
 	struct msg2_blob_input input;
 
@@ -419,7 +422,10 @@ static _Bool get_message3(CO(PVEenclave, this), CO(SGXmessage, msg),	      \
 		uint32_t epid_sig_size;
 	} ecall1;
 
-	Buffer bufr = NULL;
+	Buffer b,
+	       bufr = NULL;
+
+	SGXepid epid = NULL;
 
 
 	/* Populate the input structure. */
@@ -433,13 +439,6 @@ static _Bool get_message3(CO(PVEenclave, this), CO(SGXmessage, msg),	      \
 	ecall1.sigrl	  = NULL;
 	ecall1.sigrl_size = 0;
 
-	if ( msg->message_count(msg) == 4 )
-		input.is_previous_pi_provided = false;
-	else {
-		fputs("Previous pi not supported.\n", stderr);
-		ERR(goto done);
-	}
-
 	/* Add fields from message. */
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 	if ( !msg->get_message(msg, TLV_EPID_GROUP_CERT, 1, bufr) )
@@ -452,17 +451,65 @@ static _Bool get_message3(CO(PVEenclave, this), CO(SGXmessage, msg),	      \
 	memcpy(input.challenge_nonce, bufr->get(bufr), \
 	       sizeof(input.challenge_nonce));
 
-	bufr->reset(bufr);
-	if ( !msg->get_message(msg, TLV_PLATFORM_INFO, 1, bufr) )
-		ERR(goto done);
-	memcpy(&input.equiv_pi, bufr->get(bufr), sizeof(input.equiv_pi));
-	*pi = input.equiv_pi;
 
 	/* Add PCE target information. */
 	input.pce_target_info = *tgt;
 
 	/* Add PEK. */
 	input.pek = *pek;
+
+	/* Handle previous platform information if provided. */
+	if ( msg->message_count(msg) == 4 ) {
+		bufr->reset(bufr);
+		if ( !msg->get_message(msg, TLV_PLATFORM_INFO, 1, bufr) )
+			ERR(goto done);
+		fputs("EQUIV PI:\n", stdout);
+		bufr->print(bufr);
+
+		memcpy(&input.equiv_pi, bufr->get(bufr), \
+		       sizeof(input.equiv_pi));
+		input.is_previous_pi_provided = false;
+	} else {
+		fputs("New platform info:\n", stdout);
+		bufr->reset(bufr);
+		if ( !msg->get_message(msg, TLV_EPID_GID, 1, bufr) )
+			ERR(goto done);
+		memcpy(input.previous_gid, bufr->get(bufr), \
+		       sizeof(input.previous_gid));
+		fputs("\tgid:\t\t", stdout);
+		bufr->print(bufr);
+
+		bufr->reset(bufr);
+		if ( !msg->get_message(msg, TLV_PLATFORM_INFO, 1, bufr) )
+			ERR(goto done);
+		memcpy(&input.previous_pi, bufr->get(bufr), \
+		       sizeof(input.previous_pi));
+		fputs("\tPrevious pi:\t", stdout);
+		bufr->print(bufr);
+
+		bufr->reset(bufr);
+		if ( !msg->get_message_number(msg, TLV_PLATFORM_INFO, 1, \
+					      bufr, 5) )
+			ERR(goto done);
+		memcpy(&input.equiv_pi, bufr->get(bufr), \
+		       sizeof(input.equiv_pi));
+		fputs("\tPlatform pi:\t", stdout);
+		bufr->print(bufr);
+
+		INIT(NAAAIM, SGXepid, epid, ERR(goto done));
+		if ( !epid->load(epid, "EPID.bin") )
+			ERR(goto done);
+
+		b = epid->get_epid(epid);
+		memcpy(input.old_epid_data_blob, b->get(b), \
+		       sizeof(input.old_epid_data_blob));
+
+		need_sig		      = true;
+		input.is_previous_pi_provided = true;
+	}
+
+	*pi = input.equiv_pi;
+
 
 	/*
 	 * The calculation for the default EPID signature size is
@@ -477,8 +524,14 @@ static _Bool get_message3(CO(PVEenclave, this), CO(SGXmessage, msg),	      \
 	 * EPID is not being processed the signature can be set to NULL
 	 * with a size of zero.
 	 */
-	ecall1.epid_sig	     = NULL;
-	ecall1.epid_sig_size = 0;
+	if ( need_sig ) {
+		memset(sig_bufr, '\0', sizeof(sig_bufr));
+		ecall1.epid_sig	     = sig_bufr;
+		ecall1.epid_sig_size = sizeof(sig_bufr);
+	} else {
+		ecall1.epid_sig	     = NULL;
+		ecall1.epid_sig_size = 0;
+	}
 
 	ecall1.msg3_fixed_output = message3;
 
@@ -492,14 +545,23 @@ static _Bool get_message3(CO(PVEenclave, this), CO(SGXmessage, msg),	      \
 		ERR(goto done);
 	}
 
+	if ( need_sig ) {
+		if ( !epid_sig->add(epid_sig, (unsigned char *) sig_bufr, \
+				    sizeof(sig_bufr)) )
+			ERR(goto done);
+	}
+
 	retn = true;
 
 
  done:
+	memset(sig_bufr, '\0', sizeof(sig_bufr));
+
 	if ( !retn )
 		S->poisoned = true;
 
 	WHACK(bufr);
+	WHACK(epid);
 
 	return retn;
 }

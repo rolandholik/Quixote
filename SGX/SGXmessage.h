@@ -33,13 +33,15 @@ struct NAAAIM_SGXmessage
 				 struct SGX_report *pek_report);
 	_Bool (*encode_message3)(const SGXmessage, const Buffer,      \
 				 const Buffer, struct SGX_message3 *, \
-				 const Buffer);
+				 const Buffer, const Buffer);
 
 	_Bool (*encode)(const SGXmessage, const String);
 	_Bool (*decode)(const SGXmessage, const String);
 
 	size_t (*message_count)(const SGXmessage);
 	_Bool (*get_message)(const SGXmessage, uint8_t, uint8_t, const Buffer);
+	_Bool (*get_message_number)(const SGXmessage, uint8_t, uint8_t, \
+				    const Buffer, uint8_t);
 	_Bool (*reload_messages)(const SGXmessage, const Buffer);
 
 	_Bool (*get_xid)(const SGXmessage, const Buffer);

@@ -648,6 +648,11 @@ static _Bool encode_message2(CO(SGXmessage, this), CO(RandomBuffer, rnd), \
  *			the provisioning enclave that is to be sent to
  *			the Intel provisioning servers.
  *
+ * \param epid_sig	The object containing an EPID signature that
+ *			may have been generated in instance of when
+ *			an EPID is available from previouis platform
+ *			provisioning.
+ *
  * \param report_sig	The object containing the signature generated
  *			by the PCE enclave over the report imbedded
  *			in the response.
@@ -661,14 +666,14 @@ static _Bool encode_message2(CO(SGXmessage, this), CO(RandomBuffer, rnd), \
 
 static _Bool encode_message3(CO(SGXmessage, this), CO(Buffer, nonce),	 \
 			     CO(Buffer, ek2), struct SGX_message3 *msg3, \
-			     CO(Buffer, report_sig))
+			     CO(Buffer, epid_sig), CO(Buffer, report_sig))
 
 {
 	STATE(S);
 
 	_Bool retn = false;
 
-	uint8_t pek_pub = 0;
+	uint8_t pek_pub = 3;
 
 	uint32_t size;
 
@@ -692,6 +697,8 @@ static _Bool encode_message3(CO(SGXmessage, this), CO(Buffer, nonce),	 \
 	if ( S->state != REQUEST )
 		ERR(goto done);
 	if ( nonce->poisoned(nonce) )
+		ERR(goto done);
+	if ( epid_sig->poisoned(epid_sig) )
 		ERR(goto done);
 
 
@@ -791,6 +798,32 @@ static _Bool encode_message3(CO(SGXmessage, this), CO(Buffer, nonce),	 \
 	if ( !_encode_message(S, TLV_MESSAGE_AUTHENTICATION_CODE, 1, tag, \
 			      S->msg) )
 		ERR(goto done);
+
+
+	/* Add the encrypted EPID signature and MAC if available. */
+	if ( msg3->is_epid_sig_generated ) {
+		if ( epid_sig->size(epid_sig) == 0 )
+			ERR(goto done);
+
+		bufr->reset(bufr);
+		bufr->add(bufr,				       \
+			  (unsigned char *) msg3->epid_sig_iv, \
+			  sizeof(msg3->epid_sig_iv));
+		if ( !bufr->add_Buffer(bufr, epid_sig) )
+			ERR(goto done);
+		if ( !_encode_message(S, TLV_BLOCK_CIPHER_TEXT, 1, bufr, \
+				      S->msg) )
+			ERR(goto done);
+
+		bufr->reset(bufr);
+		if ( !bufr->add(bufr, (unsigned char *) msg3->epid_sig_mac, \
+				sizeof(msg3->epid_sig_mac)) )
+			ERR(goto done);
+		if ( !_encode_message(S, TLV_MESSAGE_AUTHENTICATION_CODE, 1, \
+				      bufr, S->msg) )
+			ERR(goto done);
+	}
+
 
 	S->size = S->msg->size(S->msg);
 	retn = true;
@@ -1212,6 +1245,109 @@ static _Bool get_message(CO(SGXmessage, this), const uint8_t requested, \
 		}
 
 		++tlvp;
+	}
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method is an accessor method for returning a specific message
+ * from the stack of returned messages.  This is primarily needed
+ * to support the retrieval of the previous platform information
+ * since there are two messages with the same identifier.
+ *
+ * \param this		A pointer to the message object whose message
+ *			count is to be returned.
+ *
+ * \param type		The type of the message to be searched for.
+ *
+ * \param version	The version number of the message.
+ *
+ * \param msg		The object which the payload of the message
+ *			is to be loaded into.
+ *
+ * \param locn		The location number of the message that is
+ *			to be returned.
+ *
+ * \return		A boolean value is returned to indicate if
+ *			the object lookup was successful.  A false
+ *			value indicates the lookup failed while a
+ *			true value indicates the payload has been
+ *			loaded into the supplied object.
+ */
+
+static _Bool get_message_number(CO(SGXmessage, this),			  \
+				const uint8_t requested, uint8_t version, \
+				CO(Buffer, msg), uint8_t locn)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	uint8_t *mp,
+		*pp,
+		type,
+		mver;
+
+	uint32_t size;
+
+	size_t cnt;
+
+	struct TLVshort *smsg;
+
+	struct TLVlong *lmsg;
+
+	Buffer tlv,
+	       *tlvp;
+
+
+	/* Verify object status and state. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( S->state != RESPONSE )
+		ERR(goto done);
+
+
+	/* Loop through the available messages searching for a match. */
+	tlvp = (Buffer *) S->messages->get(S->messages);
+	cnt  = S->messages->size(S->messages) / sizeof(Buffer);
+	if ( locn >= cnt )
+		ERR(goto done);
+	tlvp += locn;
+
+	tlv = *tlvp;
+	mp  = (uint8_t *) tlv->get(tlv);
+
+	if ( *mp & 0x80 ) {
+		lmsg = (struct TLVlong *) mp;
+		type = lmsg->type & ~0x80;
+		pp   = mp + sizeof(struct TLVlong);
+		size = ntohl(lmsg->size);
+		mver = lmsg->version;
+	} else {
+		smsg = (struct TLVshort *) mp;
+		type = smsg->type;
+		pp   = mp + sizeof(struct TLVshort);
+		size = ntohs(smsg->size);
+		mver = smsg->version;
+	}
+
+
+	/* Verify the requested message. */
+	if ( (type == requested) && (mver == version) ) {
+		if ( !msg->add(msg, pp, size) )
+			ERR(goto done);
+		retn = true;
+		goto done;
 	}
 
 
@@ -1656,8 +1792,9 @@ extern SGXmessage NAAAIM_SGXmessage_Init(void)
 	this->encode = encode;
 	this->decode = decode;
 
-	this->message_count   = message_count;
-	this->get_message     = get_message;
+	this->message_count	 = message_count;
+	this->get_message	 = get_message;
+	this->get_message_number = get_message_number;
 	this->reload_messages = reload_messages;
 
 	this->get_xid	 = get_xid;

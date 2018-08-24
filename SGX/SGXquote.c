@@ -750,13 +750,15 @@ static void dump_report(CO(SGXquote, this))
 	bufr->print(bufr);
 
 
-	/* Outplut platform info report if it is available. */
-	if ( !(S->status == SGXquote_status_GROUP_OUT_OF_DATE ||
-	       S->status == SGXquote_status_GROUP_REVOKED) ) {
-		fputs("Have platform status.\n", stdout);
-		goto done;
-	}
+	/* Report platform status. */
+	fprintf(stdout, "\nPlatform status: %s\n", Quote_status[S->status]);
 
+	if ( !(S->status == SGXquote_status_GROUP_OUT_OF_DATE ||
+	       S->status == SGXquote_status_GROUP_REVOKED) )
+		goto done;
+
+
+	/* Output platform information report. */
 	fputs("\nPlatform Info Report:\n", stdout);
 	plb = &S->platform_info;
 

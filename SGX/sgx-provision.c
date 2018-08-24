@@ -1263,11 +1263,13 @@ extern int main(int argc, char *argv[])
 		INIT(NAAAIM, PVEenclave, pve, ERR(goto done));
 		if ( !pve->open(pve, pve_token) )
 			ERR(goto done);
+
 		if ( !pve->get_message3(pve, msg, &pek, &pce_tgt, epid_sig,
 					&platform_info, &msg3) )
 			ERR(goto done);
 		if ( verbose )
 			fputs("\nGenerated message three.\n", stdout);
+
 
 		/* Sign the report in the message. */
 		INIT(HurdLib, Buffer, report_sig, ERR(goto done));
@@ -1276,6 +1278,7 @@ extern int main(int argc, char *argv[])
 			ERR(goto done);
 
 		fputs("\nReport signature generated.\n", stdout);
+
 
 		/*
 		 * Initialize message 3 request:
@@ -1291,7 +1294,7 @@ extern int main(int argc, char *argv[])
 		msg->init_request(msg, 0, 2, 2, bufr->get(bufr));
 
 		if ( !msg->encode_message3(msg, nonce, sk_ek2, &msg3, \
-					   report_sig) )
+					   epid_sig, report_sig) )
 			ERR(goto done);
 
 		if ( verbose )
