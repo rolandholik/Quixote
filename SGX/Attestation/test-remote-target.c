@@ -172,11 +172,6 @@ extern int main(int argc, char *argv[])
 
 
 	/* Verify arguements. */
-	if ( epid_blob == NULL ) {
-		fputs("No EPID blob specified.\n", stderr);
-		goto done;
-	}
-
 	if ( spid_key == NULL ) {
 		fputs("No SPID specified.\n", stderr);
 		goto done;
@@ -199,7 +194,8 @@ extern int main(int argc, char *argv[])
 		source_ecall1.pce_token_size = strlen(pce_token) + 1;
 
 		source_ecall1.epid_blob	     = epid_blob;
-		source_ecall1.epid_blob_size = strlen(epid_blob) + 1;
+		if ( epid_blob != NULL )
+			source_ecall1.epid_blob_size = strlen(epid_blob) + 1;
 
 		source_ecall1.spid 	= spid_key;
 		source_ecall1.spid_size = strlen(spid_key) + 1;

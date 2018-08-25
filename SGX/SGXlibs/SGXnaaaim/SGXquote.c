@@ -145,7 +145,7 @@ static int sgxquote_ocall(struct SGXquote_ocall *ocall)
 
 	size_t quote_token_size,
 	       pce_token_size,
-	       epid_blob_size,
+	       epid_blob_size = 0,
 	       arena_size = sizeof(struct SGXquote_ocall);
 
 	struct SGXquote_ocall *ocp = NULL;
@@ -165,11 +165,13 @@ static int sgxquote_ocall(struct SGXquote_ocall *ocall)
 			goto done;
 		arena_size += pce_token_size;
 
-		epid_blob_size = strlen(ocall->epid_blob) + 1;
-		if ( !sgx_is_within_enclave(ocall->epid_blob, \
-					    epid_blob_size) )
-			goto done;
-		arena_size += epid_blob_size;
+		if ( ocall->epid_blob != NULL ) {
+			epid_blob_size = strlen(ocall->epid_blob) + 1;
+			if ( !sgx_is_within_enclave(ocall->epid_blob, \
+						    epid_blob_size) )
+				goto done;
+			arena_size += epid_blob_size;
+		}
 	}
 
 	if ( ocall->ocall == SGXquote_generate_report ) {
@@ -199,8 +201,10 @@ static int sgxquote_ocall(struct SGXquote_ocall *ocall)
 		ocp->pce_token = ap;
 		ap += pce_token_size;
 
-		memcpy(ap, ocall->epid_blob, epid_blob_size);
-		ocp->epid_blob = ap;
+		if ( ocall->epid_blob != NULL ) {
+			memcpy(ap, ocall->epid_blob, epid_blob_size);
+			ocp->epid_blob = ap;
+		}
 	}
 
 	if ( ocall->ocall == SGXquote_generate_report )
@@ -833,13 +837,15 @@ static void dump_report(CO(SGXquote, this))
 	bufr->print(bufr);
 
 
-	/* Outplut platform info report if it is available. */
-	if ( !(S->status == SGXquote_status_GROUP_OUT_OF_DATE ||
-	       S->status == SGXquote_status_GROUP_REVOKED) ) {
-		fputs("Have platform status.\n", stdout);
-		goto done;
-	}
+	/* Report platform status. */
+	fprintf(stdout, "\nPlatform status: %s\n", Quote_status[S->status]);
 
+	if ( !(S->status == SGXquote_status_GROUP_OUT_OF_DATE ||
+	       S->status == SGXquote_status_GROUP_REVOKED) )
+		goto done;
+
+
+	/* Output platform information report. */
 	fputs("\nPlatform Info Report:\n", stdout);
 	plb = &S->platform_info;
 

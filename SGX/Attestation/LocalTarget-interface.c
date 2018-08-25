@@ -105,11 +105,14 @@ static sgx_status_t sgx_test_attestation(void *arg)
 		goto done;
 	memcpy(pce_token, ms->pce_token, ms->pce_token_size);
 
-	if ( !SGXidf_untrusted_region(ms->epid_blob, ms->epid_blob_size) )
-		goto done;
-	if ( (epid_blob = malloc(ms->epid_blob_size)) == NULL )
-		goto done;
-	memcpy(epid_blob, ms->epid_blob, ms->epid_blob_size);
+	if ( ms->epid_blob != NULL ) {
+		if ( !SGXidf_untrusted_region(ms->epid_blob, \
+					      ms->epid_blob_size) )
+			goto done;
+		if ( (epid_blob = malloc(ms->epid_blob_size)) == NULL )
+			goto done;
+		memcpy(epid_blob, ms->epid_blob, ms->epid_blob_size);
+	}
 
 	if ( !SGXidf_untrusted_region(ms->spid, ms->spid_size) )
 		goto done;
