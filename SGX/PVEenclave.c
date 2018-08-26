@@ -497,7 +497,7 @@ static _Bool get_message3(CO(PVEenclave, this), CO(SGXmessage, msg),	      \
 		bufr->print(bufr);
 
 		INIT(NAAAIM, SGXepid, epid, ERR(goto done));
-		if ( !epid->load(epid, "EPID.bin") )
+		if ( !epid->load(epid, NULL) )
 			ERR(goto done);
 
 		b = epid->get_epid(epid);

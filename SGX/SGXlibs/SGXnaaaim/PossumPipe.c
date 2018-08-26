@@ -1417,7 +1417,7 @@ static _Bool _generate_quote(CO(Buffer, nonce), CO(Buffer, spid), \
 
 	/* Initialize the SGX quoting object. */
 	INIT(NAAAIM, SGXquote, quoter, ERR(goto done));
-	if ( !quoter->init(quoter, "qe.token", "pce.token", "EPID.bin") )
+	if ( !quoter->init(quoter, "qe.token", "pce.token", NULL) )
 		ERR(goto done);
 	tp = quoter->get_qe_targetinfo(quoter);
 	target = *tp;
