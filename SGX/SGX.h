@@ -25,6 +25,8 @@
 
 #define SGX_HASH_SIZE 32
 
+#define SPID_FILENAME "/opt/IDfusion/etc/spid.txt"
+
 
 /**
  * Definition of an enclaves attributes.

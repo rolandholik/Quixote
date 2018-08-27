@@ -349,10 +349,10 @@ extern int main(int argc, char *argv[])
 	      debug_enclave = true;
 
 	char *p,
-	     *spid     = NULL,
-	     *canister = NULL,
-	     *id_token = NULL,
-	     *verifier = NULL,
+	     *canister	   = NULL,
+	     *id_token	   = NULL,
+	     *verifier	   = NULL,
+	     *spid_fname   = SPID_FILENAME,
 	     *token	   = "ISOmanager.token",
 	     *hostname	   = "localhost",
 	     *enclave_name = "ISOmanager.signed.so",
@@ -367,6 +367,8 @@ extern int main(int argc, char *argv[])
 	Buffer ivy     = NULL,
 	       id_bufr = NULL,
 	       cmdbufr = NULL;
+
+	String spid = NULL;
 
 	LocalDuct mgmt = NULL;
 
@@ -406,7 +408,7 @@ extern int main(int argc, char *argv[])
 				canister = optarg;
 				break;
 			case 's':
-				spid = optarg;
+				spid_fname = optarg;
 				break;
 			case 't':
 				token = optarg;
@@ -464,6 +466,22 @@ extern int main(int argc, char *argv[])
 		}
 
 
+		/* Setup the SPID key. */
+		INIT(HurdLib, String, spid, ERR(goto done));
+
+		infile->reset(infile);
+		if ( !infile->open_ro(infile, spid_fname) )
+			ERR(goto done);
+		if ( !infile->read_String(infile, spid) )
+			ERR(goto done);
+
+		if ( spid->size(spid) != 32 ) {
+			fputs("Invalid SPID size: ", stdout);
+			spid->print(spid);
+			goto done;
+		}
+
+
 		/* Initialize enclave. */
 		INIT(NAAAIM, ISOmanager, enclave, ERR(goto done));
 		if ( !enclave->load_enclave(enclave, enclave_name, token, \
@@ -478,8 +496,8 @@ extern int main(int argc, char *argv[])
 
 
 		/* Connect to the enclave. */
-		if ( !enclave->connect(enclave, hostname, 11990, spid,
-				       id_bufr, ivy) ) {
+		if ( !enclave->connect(enclave, hostname, 11990, \
+				       spid->get(spid), id_bufr, ivy) ) {
 			fputs("Unable to connect to model manager.\n", \
 			      stderr);
 			goto done;
@@ -543,8 +561,9 @@ extern int main(int argc, char *argv[])
 		fclose(idfile);
 
 	WHACK(ivy);
-	WHACK(cmdbufr);
 	WHACK(id_bufr);
+	WHACK(cmdbufr);
+	WHACK(spid);
 	WHACK(mgmt);
 	WHACK(idt);
 	WHACK(infile);

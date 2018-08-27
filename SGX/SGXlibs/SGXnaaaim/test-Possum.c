@@ -123,8 +123,8 @@ extern int main(int argc, char *argv[])
 	      debug_enclave = true;
 
 	char *id_token	   = NULL,
-	     *spid	   = NULL,
 	     *verifier	   = NULL,
+	     *spid_fname   = SPID_FILENAME,
 	     *token	   = "test-Possum.token",
 	     *hostname	   = "localhost",
 	     *enclave_name = "test-Possum.signed.so";
@@ -142,9 +142,12 @@ extern int main(int argc, char *argv[])
 	       id_bufr	= NULL,
 	       vfy_bufr = NULL;
 
+	String spid = NULL;
+
 	IDtoken idt = NULL;
 
-	File infile = NULL;
+	File infile    = NULL,
+	     spid_file = NULL;
 
 	SGXenclave enclave = NULL;
 
@@ -153,8 +156,6 @@ extern int main(int argc, char *argv[])
 	struct Possum_ecall1 ecall1;
 
 	struct Possum_ecall2 ecall2;
-
-
 
 
 	/* Parse and verify arguements. */
@@ -184,7 +185,7 @@ extern int main(int argc, char *argv[])
 				id_token = optarg;
 				break;
 			case 's':
-				spid = optarg;
+				spid_fname = optarg;
 				break;
 			case 't':
 				token = optarg;
@@ -237,11 +238,6 @@ extern int main(int argc, char *argv[])
 	fprintf(stdout, "%s: (C)Copyright 2018, IDfusion, LLC. All rights "
 		"reserved.\n\n", PGM);
 
-	if ( spid == NULL ) {
-		fputs("No SPID specified.\n", stderr);
-		goto done;
-	}
-
 	if ( verifier == NULL ) {
 		fputs("No identifier verified specifed.\n", stderr);
 		goto done;
@@ -249,6 +245,22 @@ extern int main(int argc, char *argv[])
 
 	if ( id_token == NULL ) {
 		fputs("No device identity specifed.\n", stderr);
+		goto done;
+	}
+
+
+	/* Setup the SPID. */
+	INIT(HurdLib, String, spid, ERR(goto done));
+
+	INIT(HurdLib, File, spid_file, ERR(goto done));
+	if ( !spid_file->open_ro(spid_file, spid_fname) )
+		ERR(goto done);
+	if ( !spid_file->read_String(spid_file, spid) )
+		ERR(goto done);
+
+	if ( spid->size(spid) != 32 ) {
+		fputs("Invalid SPID size: ", stdout);
+		spid->print(spid);
 		goto done;
 	}
 
@@ -296,8 +308,8 @@ extern int main(int argc, char *argv[])
 		ecall0.port	    = 11990;
 		ecall0.current_time = time(NULL);
 
-		ecall0.spid	 = spid;
-		ecall0.spid_size = strlen(spid) + 1;
+		ecall0.spid	 = spid->get(spid);
+		ecall0.spid_size = spid->size(spid) + 1;
 
 		ecall0.identity	     = id_bufr->get(id_bufr);
 		ecall0.identity_size = id_bufr->size(id_bufr);
@@ -324,8 +336,8 @@ extern int main(int argc, char *argv[])
 		ecall1.hostname	     = hostname;
 		ecall1.hostname_size = strlen(hostname) + 1;
 
-		ecall1.spid	     = spid;
-		ecall1.spid_size     = strlen(spid) + 1;
+		ecall1.spid	     = spid->get(spid);
+		ecall1.spid_size     = spid->size(spid) + 1;
 
 		ecall1.identity	     = id_bufr->get(id_bufr);
 		ecall1.identity_size = id_bufr->size(id_bufr);
@@ -348,11 +360,13 @@ extern int main(int argc, char *argv[])
 		fclose(idfile);
 
 	WHACK(bufr);
+	WHACK(ivy);
 	WHACK(id_bufr);
 	WHACK(vfy_bufr);
+	WHACK(spid);
 	WHACK(idt);
-	WHACK(ivy);
 	WHACK(infile);
+	WHACK(spid_file);
 	WHACK(enclave);
 
 	return retn;

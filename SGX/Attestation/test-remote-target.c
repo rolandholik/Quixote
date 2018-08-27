@@ -108,8 +108,8 @@ extern int main(int argc, char *argv[])
 {
 	_Bool debug = true;
 
-	char *spid_key	     = NULL,
-	     *epid_blob	     = NULL,
+	char *epid_blob	     = NULL,
+	     *spid_fname     = SPID_FILENAME,
 	     *source_token   = "target.token",
 	     *quote_token    = "qe.token",
 	     *pce_token	     = "pce.token",
@@ -135,7 +135,10 @@ extern int main(int argc, char *argv[])
 	       http_in	= NULL,
 	       http_out = NULL;
 
-	String output = NULL;
+	String output	= NULL,
+	       spid_key = NULL;
+
+	File spid_file = NULL;
 
 	RandomBuffer nonce = NULL;
 
@@ -161,7 +164,7 @@ extern int main(int argc, char *argv[])
 				quote_token = optarg;
 				break;
 			case 's':
-				spid_key = optarg;
+				spid_fname = optarg;
 				break;
 		}
 
@@ -171,9 +174,18 @@ extern int main(int argc, char *argv[])
 	fprintf(stdout, "%s: (C)2018 IDfusion, LLC\n", PGM);
 
 
-	/* Verify arguements. */
-	if ( spid_key == NULL ) {
-		fputs("No SPID specified.\n", stderr);
+	/* Setup SPID key. */
+	INIT(HurdLib, String, spid_key, ERR(goto done));
+
+	INIT(HurdLib, File, spid_file, ERR(goto done));
+	if ( !spid_file->open_ro(spid_file, spid_fname) )
+		ERR(goto done);
+	if ( !spid_file->read_String(spid_file, spid_key) )
+		ERR(goto done);
+
+	if ( spid_key->size(spid_key) != 32 ) {
+		fputs("Invalid SPID size: ", stdout);
+		spid_key->print(spid_key);
 		goto done;
 	}
 
@@ -197,8 +209,8 @@ extern int main(int argc, char *argv[])
 		if ( epid_blob != NULL )
 			source_ecall1.epid_blob_size = strlen(epid_blob) + 1;
 
-		source_ecall1.spid 	= spid_key;
-		source_ecall1.spid_size = strlen(spid_key) + 1;
+		source_ecall1.spid 	= spid_key->get(spid_key);
+		source_ecall1.spid_size = spid_key->size(spid_key) + 1;
 
 		if ( !source->boot_slot(source, 1, &ocall_table, \
 					&source_ecall1, &rc) ) {
@@ -247,18 +259,15 @@ extern int main(int argc, char *argv[])
 	 * Convert the SPID into a binary buffer and generate the
 	 * nonce to be used.
 	 */
-	if ( strlen(spid_key) != 32 ) {
-		fputs("Invalid SPID size.\n", stderr);
+	INIT(HurdLib, Buffer, spid, ERR(goto done));
+	if ( !spid->add_hexstring(spid, spid_key->get(spid_key)) ) {
+		fputs("Invalid SPID format.\n", stderr);
 		goto done;
 	}
 
-	INIT(HurdLib, Buffer, spid, ERR(goto done));
-	if ( !spid->add_hexstring(spid, spid_key) ) {
-		fputs("Invalid SPID.\n", stderr);
-		goto done;
-	}
 	fputs("\nGenerating quote with:\n", stdout);
-	fprintf(stdout, "\tSPID:  %s\n", spid_key);
+	fputs("\tSPID:  \n", stdout);
+	spid_key->print(spid_key);
 
 
 	INIT(NAAAIM, RandomBuffer, nonce, ERR(goto done));
@@ -305,6 +314,8 @@ extern int main(int argc, char *argv[])
 	WHACK(nonce);
 	WHACK(source);
 	WHACK(output);
+	WHACK(spid_key);
+	WHACK(spid_file);
 	WHACK(base64);
 	WHACK(quoter);
 	WHACK(http_in);

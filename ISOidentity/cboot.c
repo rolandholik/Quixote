@@ -71,6 +71,7 @@
 #include <SHA256.h>
 #include <IDtoken.h>
 
+#include <SGX.h>
 #include <ISOenclave.h>
 
 #include "ContourPoint.h"
@@ -1146,10 +1147,10 @@ extern int main(int argc, char *argv[])
 
 	char *bundle	    = NULL,
 	     *canister_name = NULL,
-	     *spid	    = NULL,
 	     *id_token	    = NULL,
 	     *verifier	    = NULL,
 	     *map	    = NULL,
+	     *spid_fname    = SPID_FILENAME,
 	     *token	    = "ISOidentity.token",
 	     bufr[1024],
 	     sockname[UNIX_PATH_MAX];
@@ -1177,12 +1178,13 @@ extern int main(int argc, char *argv[])
 	       id_bufr = NULL,
 	       cmdbufr = NULL;
 
+	String spid = NULL;
+
 	LocalDuct mgmt = NULL;
 
 	IDtoken idt = NULL;
 
 	File infile = NULL;
-
 
 
 	while ( (opt = getopt(argc, argv, "Sdb:i:m:n:s:t:v:")) != EOF )
@@ -1207,7 +1209,7 @@ extern int main(int argc, char *argv[])
 				canister_name = optarg;
 				break;
 			case 's':
-				spid = optarg;
+				spid_fname = optarg;
 				break;
 			case 't':
 				token = optarg;
@@ -1255,11 +1257,6 @@ extern int main(int argc, char *argv[])
 			goto done;
 		}
 
-		if ( spid == NULL ) {
-			fputs("SGX mode but no SPID specified.\n", stderr);
-			goto done;
-		}
-
 		INIT(NAAAIM, ISOenclave, Enclave, ERR(goto done));
 		if ( !Enclave->load_enclave(Enclave, SGX_ENCLAVE, \
 					    token) ) {
@@ -1298,6 +1295,23 @@ extern int main(int argc, char *argv[])
 			goto done;
 		}
 
+
+		/* Setup the SPID key. */
+		INIT(HurdLib, String, spid, ERR(goto done));
+
+		infile->reset(infile);
+		if ( !infile->open_ro(infile, spid_fname) )
+			ERR(goto done);
+		if ( !infile->read_String(infile, spid) )
+			ERR(goto done);
+
+		if ( spid->size(spid) != 32 ) {
+			fputs("Invalid SPID size: ", stdout);
+			spid->print(spid);
+			goto done;
+		}
+
+
 		/* Start SGX manager thread. */
 		if ( pthread_attr_init(&mgr_attr) != 0 ) {
 			fputs("Unable to initialize thread attributes.\n", \
@@ -1305,7 +1319,7 @@ extern int main(int argc, char *argv[])
 			goto done;
 		}
 
-		mgr_args.spid = spid;
+		mgr_args.spid = spid->get(spid);
 		mgr_args.ivy  = ivy;
 		mgr_args.id   = id_bufr;
 
@@ -1507,6 +1521,7 @@ extern int main(int argc, char *argv[])
 	WHACK(ivy);
 	WHACK(id_bufr);
 	WHACK(cmdbufr);
+	WHACK(spid);
 	WHACK(mgmt);
 	WHACK(idt);
 	WHACK(infile);
