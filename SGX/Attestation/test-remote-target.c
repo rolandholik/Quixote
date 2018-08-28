@@ -109,10 +109,10 @@ extern int main(int argc, char *argv[])
 	_Bool debug = true;
 
 	char *epid_blob	     = NULL,
+	     *quote_token    = NULL,
+	     *pce_token	     = NULL,
 	     *spid_fname     = SPID_FILENAME,
 	     *source_token   = "target.token",
-	     *quote_token    = "qe.token",
-	     *pce_token	     = "pce.token",
 	     *source_enclave = "LocalTarget.signed.so";
 
 	int rc,
@@ -200,10 +200,12 @@ extern int main(int argc, char *argv[])
 			ERR(goto done);
 
 		source_ecall1.qe_token	    = quote_token;
-		source_ecall1.qe_token_size = strlen(quote_token) + 1;
+		if ( quote_token != NULL )
+			source_ecall1.qe_token_size = strlen(quote_token) + 1;
 
 		source_ecall1.pce_token	     = pce_token;
-		source_ecall1.pce_token_size = strlen(pce_token) + 1;
+		if ( pce_token != NULL )
+			source_ecall1.pce_token_size = strlen(pce_token) + 1;
 
 		source_ecall1.epid_blob	     = epid_blob;
 		if ( epid_blob != NULL )

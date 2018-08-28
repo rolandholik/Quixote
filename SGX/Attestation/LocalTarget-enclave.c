@@ -155,7 +155,7 @@ _Bool test_attestation(char *qe_token, char *pce_token, char *epid_blob, \
 
 	fputs("\nInitializing quote.\n", stdout);
 	INIT(NAAAIM, SGXquote, quoter, ERR(goto done));
-	if ( !quoter->init(quoter, "qe.token", "pce.token", epid_blob) )
+	if ( !quoter->init(quoter, qe_token, pce_token, epid_blob) )
 		ERR(goto done);
 
 	fputs("\nGetting quoting enclave target information.\n", stdout);

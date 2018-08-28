@@ -51,6 +51,10 @@
 #include "intel-messages.h"
 
 
+/* Name and location of launch token. */
+#define TOKEN_FILE SGX_TOKEN_DIRECTORY"/libsgx_pve.token"
+
+
 /* Object state extraction macro. */
 #define STATE(var) CO(PVEenclave_State, var) = this->state
 
@@ -236,6 +240,8 @@ static _Bool open(CO(PVEenclave, this), CO(char *, token))
 
 	_Bool retn = false;
 
+	const char *token_name = token == NULL ? TOKEN_FILE : token;
+
 	struct SGX_einittoken *einit;
 
 	Buffer bufr = NULL;
@@ -247,7 +253,7 @@ static _Bool open(CO(PVEenclave, this), CO(char *, token))
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 	INIT(HurdLib, File, token_file, ERR(goto done));
 
-	token_file->open_ro(token_file, token);
+	token_file->open_ro(token_file, token_name);
 	if ( !token_file->slurp(token_file, bufr) )
 		ERR(goto done);
 	einit = (void *) bufr->get(bufr);

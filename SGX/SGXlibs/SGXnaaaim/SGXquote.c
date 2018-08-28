@@ -143,27 +143,31 @@ static int sgxquote_ocall(struct SGXquote_ocall *ocall)
 
 	void *ap;
 
-	size_t quote_token_size,
-	       pce_token_size,
-	       epid_blob_size = 0,
-	       arena_size = sizeof(struct SGXquote_ocall);
+	size_t quote_token_size = 0,
+	       pce_token_size	= 0,
+	       epid_blob_size	= 0,
+	       arena_size	= sizeof(struct SGXquote_ocall);
 
 	struct SGXquote_ocall *ocp = NULL;
 
 
 	/* Verify arguements and set size of arena. */
 	if ( ocall->ocall == SGXquote_init ) {
-		quote_token_size = strlen(ocall->quote_token) + 1;
-		if ( !sgx_is_within_enclave(ocall->quote_token, \
-					    quote_token_size) )
-			goto done;
-		arena_size += quote_token_size;
+		if ( ocall->quote_token != NULL ) {
+			quote_token_size = strlen(ocall->quote_token) + 1;
+			if ( !sgx_is_within_enclave(ocall->quote_token, \
+						    quote_token_size) )
+				goto done;
+			arena_size += quote_token_size;
+		}
 
-		pce_token_size = strlen(ocall->pce_token) + 1;
-		if ( !sgx_is_within_enclave(ocall->pce_token, \
-					    pce_token_size) )
-			goto done;
-		arena_size += pce_token_size;
+		if ( ocall->pce_token != NULL ) {
+			pce_token_size = strlen(ocall->pce_token) + 1;
+			if ( !sgx_is_within_enclave(ocall->pce_token, \
+						    pce_token_size) )
+				goto done;
+			arena_size += pce_token_size;
+		}
 
 		if ( ocall->epid_blob != NULL ) {
 			epid_blob_size = strlen(ocall->epid_blob) + 1;
@@ -193,13 +197,17 @@ static int sgxquote_ocall(struct SGXquote_ocall *ocall)
 	if ( ocall->ocall == SGXquote_init ) {
 		ap = ocp->arena;
 
-		memcpy(ap, ocall->quote_token, quote_token_size);
-		ocp->quote_token = ap;
-		ap += quote_token_size;
+		if ( ocall->quote_token != NULL ) {
+			memcpy(ap, ocall->quote_token, quote_token_size);
+			ocp->quote_token = ap;
+			ap += quote_token_size;
+		}
 
-		memcpy(ap, ocall->pce_token, pce_token_size);
-		ocp->pce_token = ap;
-		ap += pce_token_size;
+		if ( ocall->pce_token != NULL ) {
+			memcpy(ap, ocall->pce_token, pce_token_size);
+			ocp->pce_token = ap;
+			ap += pce_token_size;
+		}
 
 		if ( ocall->epid_blob != NULL ) {
 			memcpy(ap, ocall->epid_blob, epid_blob_size);

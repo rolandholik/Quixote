@@ -93,17 +93,23 @@ static sgx_status_t sgx_test_attestation(void *arg)
 		goto done;
 	ms = (struct LocalTarget_ecall1 *) arg;
 
-	if ( !SGXidf_untrusted_region(ms->qe_token, ms->qe_token_size) )
-		goto done;
-	if ( (qe_token = malloc(ms->qe_token_size)) == NULL )
-		goto done;
-	memcpy(qe_token, ms->qe_token, ms->qe_token_size);
+	if ( ms->qe_token != NULL ) {
+		if ( !SGXidf_untrusted_region(ms->qe_token, \
+					      ms->qe_token_size) )
+			goto done;
+		if ( (qe_token = malloc(ms->qe_token_size)) == NULL )
+			goto done;
+		memcpy(qe_token, ms->qe_token, ms->qe_token_size);
+	}
 
-	if ( !SGXidf_untrusted_region(ms->pce_token, ms->pce_token_size) )
-		goto done;
-	if ( (pce_token = malloc(ms->pce_token_size)) == NULL )
-		goto done;
-	memcpy(pce_token, ms->pce_token, ms->pce_token_size);
+	if ( ms->pce_token != NULL ) {
+		if ( !SGXidf_untrusted_region(ms->pce_token, \
+					      ms->pce_token_size) )
+			goto done;
+		if ( (pce_token = malloc(ms->pce_token_size)) == NULL )
+			goto done;
+		memcpy(pce_token, ms->pce_token, ms->pce_token_size);
+	}
 
 	if ( ms->epid_blob != NULL ) {
 		if ( !SGXidf_untrusted_region(ms->epid_blob, \

@@ -1042,8 +1042,8 @@ extern int main(int argc, char *argv[])
 	     *msg_output    = NULL,
 	     *sk_value	    = NULL,
 	     *pek_fname	    = NULL,
-	     *pve_token	    = "pve.token",
-	     *pce_token	    = "pce.token";
+	     *pve_token	    = NULL,
+	     *pce_token	    = NULL;
 
 	int opt,
 	    retn;

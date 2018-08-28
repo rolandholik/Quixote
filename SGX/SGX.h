@@ -25,7 +25,8 @@
 
 #define SGX_HASH_SIZE 32
 
-#define SPID_FILENAME "/opt/IDfusion/etc/spid.txt"
+#define SPID_FILENAME	    "/opt/IDfusion/etc/spid.txt"
+#define SGX_TOKEN_DIRECTORY "/var/lib/IDfusion/tokens"
 
 
 /**
