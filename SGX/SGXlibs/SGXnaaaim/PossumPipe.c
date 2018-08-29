@@ -87,10 +87,9 @@ extern unsigned char *Identity;
 
 
 /**
- * Reference to the device verified.
+ * References to verified devices.
  */
-extern size_t Verifier_size;
-extern unsigned char *Verifier;
+extern Buffer Verifiers;
 
 
 /** PossumPipe private state information. */
@@ -930,42 +929,106 @@ static PossumPipe_type receive_packet(CO(PossumPipe, this), CO(Buffer, bufr))
  *			the identity token which identifies the
  *			client.
  *
- * \param ivy		The identify verifier object which will be
- *			loaded with the verifier which matches the
- *			client.
+ * \param match		A pointer to the identify verifier object that
+ *			will be loaded with the verifier which matches
+ *			the client.
  *
  * \return		A true value is used to indicate the search
  *			for the client was successful.  A false value
  *			is returned if the search was unsuccessful.
  */
 
-static _Bool find_client(CO(Buffer, packet), CO(IDtoken, token), CO(Ivy, ivy))
+static _Bool find_client(CO(Buffer, packet), CO(IDtoken, token), \
+			 CO(Ivy, match))
 
 {
 	_Bool retn = false;
 
+	size_t lp,
+	       cnt;
+
 	Buffer b,
-	       bufr = NULL;
+	       idkey	= NULL,
+	       identity = NULL;
+
+	Ivy ivy,
+	    *ivyp;
+
+	SHA256_hmac idf = NULL;
 
 
-	/* Use verifier provided by the enclave startup code. */
-	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	if ( !bufr->add(bufr, Verifier, Verifier_size) )
+	/* Verify packet status. */
+	if ( packet->poisoned(packet) )
 		ERR(goto done);
-	if ( !ivy->decode(ivy, bufr) )
+	if ( Verifiers == NULL )
 		ERR(goto done);
-
-	/* Extract identity token. */
-	if ( (b = ivy->get_element(ivy, Ivy_id)) == NULL )
-		ERR(goto done);
-	if ( !token->decode(token, b) )
+	if ( Verifiers->size(Verifiers) == 0 )
 		ERR(goto done);
 
-	retn = true;
+
+	/* Initialize objects to be used. */
+	INIT(HurdLib, Buffer, idkey, ERR(goto done));
+	INIT(HurdLib, Buffer, identity, ERR(goto done));
+
+
+	/* Load the identity key/salt and the asserted client identity. */
+	if ( !idkey->add(idkey, packet->get(packet), NAAAIM_IDSIZE) )
+		ERR(goto done);
+	if ( !identity->add(identity, packet->get(packet) + NAAAIM_IDSIZE, \
+			    NAAAIM_IDSIZE) )
+		ERR(goto done);
+	if ( (idf = NAAAIM_SHA256_hmac_Init(idkey)) == NULL )
+		ERR(goto done);
+
+
+	/*
+	 * Loop over the list of counter-party identities and determine
+	 * which of the identities match the identity assertion issued
+	 * by the POSSUM counter-party.
+	 */
+	ivyp = (Ivy *) Verifiers->get(Verifiers);
+	cnt  = Verifiers->size(Verifiers) / sizeof(Ivy);
+
+	for (lp= 0; lp < cnt; ++lp) {
+		ivy = *ivyp;
+		token->reset(token);
+
+		/* Extract identity token. */
+		if ( (b = ivy->get_element(ivy, Ivy_id)) == NULL )
+			ERR(goto done);
+		if ( !token->decode(token, b) )
+			ERR(goto done);
+
+		if ( (b = token->get_element(token, IDtoken_orgkey)) == NULL )
+			ERR(goto done);
+		idf->add_Buffer(idf, b);
+
+		if ( (b = token->get_element(token, IDtoken_orgid)) == NULL )
+			ERR(goto done);
+		idf->add_Buffer(idf, b);
+
+		if ( !idf->compute(idf) )
+			ERR(goto done);
+
+		if ( identity->equal(identity, idf->get_Buffer(idf)) ) {
+			identity->reset(identity);
+			if ( !ivy->encode(ivy, identity) )
+				ERR(goto done);
+			if ( !match->decode(match, identity) )
+				ERR(goto done);
+			retn = true;
+			goto done;
+		}
+
+		++ivyp;
+		idf->reset(idf);
+	}
 
 
  done:
-	WHACK(bufr);
+	WHACK(idkey);
+	WHACK(identity);
+	WHACK(idf);
 
 	return retn;
 }

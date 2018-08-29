@@ -39,6 +39,17 @@
 #include "PossumPipe.h"
 
 
+/* Macro to clear an array object. */
+#define GWHACK(type, var) {			\
+	size_t i=var->size(var) / sizeof(type);	\
+	type *o=(type *) var->get(var);		\
+	while ( i-- ) {				\
+		(*o)->whack((*o));		\
+		o+=1;				\
+	}					\
+}
+
+
 /** Provide a local definition for the socket address structure. */
 struct in_addr {
 	uint32_t s_addr;
@@ -65,14 +76,71 @@ unsigned char *Identity = NULL;
 /**
  * The device verified for the communication counter-party.
  */
-size_t Verifier_size	= 0;
-unsigned char *Verifier = NULL;
+Buffer Verifiers = NULL;
 
 
 /**
  * The seed time for the time() function.
  */
 static time_t Current_Time;
+
+
+/**
+ * Static function.
+ *
+ * The following function is used to add a host verifier to the
+ * current list of hosts that are permitted to connect to the
+ * enclave.
+ *
+ * \param verifier	A character pointer to the buffer containing
+ *			the raw Ivy blob that will be added to the
+ *			verifier list.
+ *
+ * \param size		The number of bytes in the verifier buffer.
+ *
+ * \return		A boolean value is returned to indicate
+ *			whether or not addition of the identity
+ *			verifier succeed.  A true value indicates the
+ *			addition was successful while a false value
+ *			indicates the identity was not registered.
+ */
+
+static _Bool add_verifier(uint8_t *verifier, size_t size)
+
+{
+	_Bool retn = false;
+
+	Buffer bufr = NULL;
+
+	Ivy ivy = NULL;
+
+
+	/* Decode the raw Ivy buffer. */
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	INIT(NAAAIM, Ivy, ivy, ERR(goto done));
+
+	if ( !bufr->add(bufr, verifier, size) )
+		ERR(goto done);
+	if ( !ivy->decode(ivy, bufr) )
+		ERR(goto done);
+
+
+	/* Add the Ivy object to the verifier list. */
+	if ( Verifiers == NULL )
+		INIT(HurdLib, Buffer, Verifiers, ERR(goto done));
+
+	if ( !Verifiers->add(Verifiers, (unsigned char *) &ivy, sizeof(Ivy)) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		WHACK(ivy);
+	WHACK(bufr);
+
+	return retn;
+}
 
 
 /**
@@ -246,8 +314,10 @@ _Bool test_server(_Bool debug, int port, time_t current_time, char *spid_key, \
 	Identity      = identity;
 	Identity_size = id_size;
 
-	Verifier      = verifier;
-	Verifier_size = vfy_size;
+	if ( vfy_size != 0 ) {
+		if ( !add_verifier(verifier, vfy_size) )
+			ERR(goto done);
+	}
 
 
 	/* Start the server listening. */
@@ -275,6 +345,8 @@ _Bool test_server(_Bool debug, int port, time_t current_time, char *spid_key, \
 
 
  done:
+	GWHACK(Ivy, Verifiers);
+
 	WHACK(pipe);
 	WHACK(spid);
 	WHACK(bufr);
@@ -355,8 +427,10 @@ _Bool test_client(_Bool debug, char *hostname, int port, time_t current_time, \
 	Identity      = identity;
 	Identity_size = id_size;
 
-	Verifier      = verifier;
-	Verifier_size = vfy_size;
+	if ( vfy_size > 0 ) {
+		if ( !add_verifier(verifier, vfy_size) )
+			ERR(goto done);
+	}
 
 
 	/* Start client mode. */
@@ -381,6 +455,8 @@ _Bool test_client(_Bool debug, char *hostname, int port, time_t current_time, \
 
 
  done:
+	GWHACK(Ivy, Verifiers);
+
 	WHACK(pipe);
 	WHACK(bufr);
 	WHACK(spid);
@@ -389,7 +465,6 @@ _Bool test_client(_Bool debug, char *hostname, int port, time_t current_time, \
 
 	return retn ? 0 : 1;
 }
-
 
 
 /**
