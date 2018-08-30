@@ -38,6 +38,8 @@
 
 #include "PossumPipe.h"
 
+#include "test-Possum-interface.h"
+
 
 /* Macro to clear an array object. */
 #define GWHACK(type, var) {			\
@@ -86,7 +88,7 @@ static time_t Current_Time;
 
 
 /**
- * Static function.
+ * Static private function.
  *
  * The following function is used to add a host verifier to the
  * current list of hosts that are permitted to connect to the
@@ -105,7 +107,7 @@ static time_t Current_Time;
  *			indicates the identity was not registered.
  */
 
-static _Bool add_verifier(uint8_t *verifier, size_t size)
+static _Bool _add_verifier(uint8_t *verifier, size_t size)
 
 {
 	_Bool retn = false;
@@ -288,9 +290,9 @@ static _Bool ping(CO(PossumPipe, pipe))
  *		conducted.
  */
 
-_Bool test_server(_Bool debug, int port, time_t current_time, char *spid_key, \
-		  size_t id_size, unsigned char *identity, size_t vfy_size,   \
-		  unsigned char *verifier)
+_Bool test_server(_Bool debug, unsigned int port, time_t current_time,	   \
+		  char *spid_key, size_t id_size, unsigned char *identity, \
+		  size_t vfy_size, unsigned char *verifier)
 
 {
 	_Bool retn = false;
@@ -315,7 +317,7 @@ _Bool test_server(_Bool debug, int port, time_t current_time, char *spid_key, \
 	Identity_size = id_size;
 
 	if ( vfy_size != 0 ) {
-		if ( !add_verifier(verifier, vfy_size) )
+		if ( !_add_verifier(verifier, vfy_size) )
 			ERR(goto done);
 	}
 
@@ -428,7 +430,7 @@ _Bool test_client(_Bool debug, char *hostname, int port, time_t current_time, \
 	Identity_size = id_size;
 
 	if ( vfy_size > 0 ) {
-		if ( !add_verifier(verifier, vfy_size) )
+		if ( !_add_verifier(verifier, vfy_size) )
 			ERR(goto done);
 	}
 
@@ -468,7 +470,7 @@ _Bool test_client(_Bool debug, char *hostname, int port, time_t current_time, \
 
 
 /**
- * ECALL 3
+ * ECALL 2
  *
  * This function implements the ecall entry point for a function which
  * generates the platform specific device identity.
@@ -548,5 +550,40 @@ _Bool generate_identity(uint8_t *id)
 	WHACK(bufr);
 	WHACK(sha256);
 
+	return retn;
+}
+
+
+/**
+ * ECALL 3
+ *
+ * This function implements the ecall entry point for a function which
+ * adds an identity verifier to the list of valid POSSUM communication
+ * parties.  It wraps the _add_verifier() private function which
+ * implements the addition of the identity verifier.
+ *
+ * \param ecall3	A pointer to the input structure to the ECALL.
+ *
+ * \return	A boolean value is used to indicate the status of the
+ *		registration of the identity verifier.  A false value
+ *		indicates an error was encountered while registering
+ *		the verifier while a true value indicates the verifier
+ *		was successfully registered.
+ */
+
+_Bool add_verifier(struct Possum_ecall3 *ecall3)
+
+{
+	_Bool retn = false;
+
+
+	/* Verify arguements. */
+	if ( ecall3->verifier_size == 0 )
+		ERR(goto done);
+
+	retn = _add_verifier(ecall3->verifier, ecall3->verifier_size);
+
+
+ done:
 	return retn;
 }

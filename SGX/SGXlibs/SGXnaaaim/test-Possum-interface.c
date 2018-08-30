@@ -4,6 +4,8 @@
 
 #include <sgx_trts.h>
 
+#include <HurdLib.h>
+
 #include "test-Possum-interface.h"
 
 
@@ -61,14 +63,17 @@ static sgx_status_t sgx_test_server(void *pms)
 	identity_size = ms->identity_size;
 	memcpy(identity, ms->identity, identity_size);
 
-	if ( !SGXidf_untrusted_region(ms->verifier, ms->verifier_size) )
-		goto done;
-	if ( (verifier = malloc(ms->verifier_size)) == NULL ) {
-		status = SGX_ERROR_OUT_OF_MEMORY;
-		goto done;
+	if ( ms->verifier_size != 0 ) {
+		if ( !SGXidf_untrusted_region(ms->verifier, \
+					      ms->verifier_size) )
+			goto done;
+		if ( (verifier = malloc(ms->verifier_size)) == NULL ) {
+			status = SGX_ERROR_OUT_OF_MEMORY;
+			goto done;
+		}
+		verifier_size = ms->verifier_size;
+		memcpy(verifier, ms->verifier, verifier_size);
 	}
-	verifier_size = ms->verifier_size;
-	memcpy(verifier, ms->verifier, verifier_size);
 
 	__builtin_ia32_lfence();
 
@@ -144,14 +149,17 @@ static sgx_status_t sgx_test_client(void *pms)
 	identity_size = ms->identity_size;
 	memcpy(identity, ms->identity, identity_size);
 
-	if ( !SGXidf_untrusted_region(ms->verifier, ms->verifier_size) )
-		goto done;
-	if ( (verifier = malloc(ms->verifier_size)) == NULL ) {
-		status = SGX_ERROR_OUT_OF_MEMORY;
-		goto done;
+	if ( ms->verifier_size != 0 ) {
+		if ( !SGXidf_untrusted_region(ms->verifier, \
+					      ms->verifier_size) )
+			goto done;
+		if ( (verifier = malloc(ms->verifier_size)) == NULL ) {
+			status = SGX_ERROR_OUT_OF_MEMORY;
+			goto done;
+		}
+		verifier_size = ms->verifier_size;
+		memcpy(verifier, ms->verifier, verifier_size);
 	}
-	verifier_size = ms->verifier_size;
-	memcpy(verifier, ms->verifier, verifier_size);
 
 	__builtin_ia32_lfence();
 
@@ -213,6 +221,52 @@ static sgx_status_t sgx_generate_identity(void *pms)
 }
 
 
+/* ECALL 3 interface function */
+static sgx_status_t sgx_add_verifier(void *pms)
+
+{
+	sgx_status_t status = SGX_ERROR_INVALID_PARAMETER;
+
+	struct Possum_ecall3 *ms,
+			     ecall3;
+
+
+	/* Verify marshalled arguements and setup parameters. */
+	memset(&ecall3, '\0', sizeof(struct Possum_ecall3));
+
+	if ( !SGXidf_untrusted_region(pms, sizeof(struct Possum_ecall3)) )
+		goto done;
+	ms = (struct Possum_ecall3 *) pms;
+
+
+	/* Replicate the identifier verifier. */
+	ecall3.verifier_size = ms->verifier_size;
+
+	if ( !SGXidf_untrusted_region(ms->verifier, ecall3.verifier_size) )
+		goto done;
+
+	if ( (ecall3.verifier = malloc(ecall3.verifier_size)) == NULL )
+		goto done;
+	memcpy(ecall3.verifier, ms->verifier, ecall3.verifier_size);
+
+	__builtin_ia32_lfence();
+
+
+	/* Call the trusted function. */
+	ms->retn = add_verifier(&ecall3);
+	status = SGX_SUCCESS;
+
+
+ done:
+	memset(ecall3.verifier, '\0', ecall3.verifier_size);
+	free(ecall3.verifier);
+
+	memset(&ecall3, '\0', sizeof(struct Possum_ecall3));
+
+	return status;
+}
+
+
 /* ECALL interface table. */
 const struct {
 	size_t nr_ecall;
@@ -222,7 +276,8 @@ const struct {
 	{
 		{(void *)(uintptr_t)sgx_test_server, 0},
 		{(void *)(uintptr_t)sgx_test_client, 0},
-		{(void *)(uintptr_t)sgx_generate_identity, 0}
+		{(void *)(uintptr_t)sgx_generate_identity, 0},
+		{(void *)(uintptr_t)sgx_add_verifier, 0}
 	}
 };
 
@@ -234,10 +289,10 @@ const struct {
 } g_dyn_entry_table = {
 	OCALL_NUMBER,
 	{
-		{0, 0, 0},
-		{0, 0, 0},
-		{0, 0, 0},
-		{0, 0, 0},
-		{0, 0, 0}
+		{0, 0, 0, 0},
+		{0, 0, 0, 0},
+		{0, 0, 0, 0},
+		{0, 0, 0, 0},
+		{0, 0, 0, 0}
 	}
 };

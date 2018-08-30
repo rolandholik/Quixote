@@ -157,6 +157,8 @@ extern int main(int argc, char *argv[])
 
 	struct Possum_ecall2 ecall2;
 
+	struct Possum_ecall3 ecall3;
+
 
 	/* Parse and verify arguements. */
 	while ( (opt = getopt(argc, argv, "CMSdph:i:s:t:v:")) != EOF )
@@ -300,6 +302,18 @@ extern int main(int argc, char *argv[])
 		ERR(goto done);
 
 
+	/* Load the identity verifiers. */
+	memset(&ecall3, '\0', sizeof(struct Possum_ecall3));
+	ecall3.verifier	     = ivy->get(ivy);
+	ecall3.verifier_size = ivy->size(ivy);
+
+	if ( !enclave->boot_slot(enclave, 3, &ocall_table, \
+				 &ecall3, &rc) ) {
+		fprintf(stderr, "Ecall 3 returned: %d\n", rc);
+		goto done;
+	}
+
+
 	/* Test server mode. */
 	if ( Mode == server ) {
 		memset(&ecall0, '\0', sizeof(struct Possum_ecall0));
@@ -314,12 +328,12 @@ extern int main(int argc, char *argv[])
 		ecall0.identity	     = id_bufr->get(id_bufr);
 		ecall0.identity_size = id_bufr->size(id_bufr);
 
-		ecall0.verifier	     = ivy->get(ivy);
-		ecall0.verifier_size = ivy->size(ivy);
+		ecall0.verifier	     = NULL;
+		ecall0.verifier_size = 0;
 
 		if ( !enclave->boot_slot(enclave, 0, &ocall_table, \
 					 &ecall0, &rc) ) {
-			fprintf(stderr, "Enclave returned: %d\n", rc);
+			fprintf(stderr, "Ecall 0 returned: %d\n", rc);
 			goto done;
 		}
 	}
@@ -342,12 +356,12 @@ extern int main(int argc, char *argv[])
 		ecall1.identity	     = id_bufr->get(id_bufr);
 		ecall1.identity_size = id_bufr->size(id_bufr);
 
-		ecall1.verifier	     = ivy->get(ivy);
-		ecall1.verifier_size = ivy->size(ivy);
+		ecall1.verifier	     = NULL;
+		ecall1.verifier_size = 0;
 
 		if ( !enclave->boot_slot(enclave, 1, &ocall_table, \
 					 &ecall1, &rc) ) {
-			fprintf(stderr, "Enclave returned: %d\n", rc);
+			fprintf(stderr, "Ecall 1 returned: %d\n", rc);
 			goto done;
 		}
 	}
