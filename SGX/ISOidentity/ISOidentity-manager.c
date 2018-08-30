@@ -54,10 +54,9 @@ unsigned char *Identity = NULL;
 
 
 /**
- * The device verified for the communication counter-party.
+ * The list of verified management counter-parties.
  */
-size_t Verifier_size	= 0;
-unsigned char *Verifier = NULL;
+Buffer Verifiers = NULL;
 
 
 /**
@@ -513,12 +512,9 @@ _Bool manager(struct ISOidentity_ecall10_interface *ecall10)
 		ERR(goto done);
 
 
-	/* Stash the identity token and verifier buffer descriptions. */
+	/* Stash the identity token. */
 	Identity      = ecall10->identity;
 	Identity_size = ecall10->identity_size;
-
-	Verifier      = ecall10->verifier;
-	Verifier_size = ecall10->verifier_size;
 
 
 	/* Start the management interface. */
@@ -617,6 +613,60 @@ _Bool generate_identity(uint8_t *id)
  done:
 	WHACK(bufr);
 	WHACK(sha256);
+
+	return retn;
+}
+
+
+/**
+ * ECALL 13
+ *
+ * This function implements the ecall entry point for a function which
+ * adds an identity verifier to the list of valid POSSUM communication
+ * parties.
+ *
+ * \param ecall13	A pointer to the input structure to the ECALL.
+ *
+ * \return	A boolean value is used to indicate the status of the
+ *		registration of the identity verifier.  A false value
+ *		indicates an error was encountered while registering
+ *		the verifier while a true value indicates the verifier
+ *		was successfully registered.
+ */
+
+_Bool add_verifier(struct ISOidentity_ecall13 *ecall13)
+
+{
+	_Bool retn = false;
+
+	Buffer bufr = NULL;
+
+	Ivy ivy = NULL;
+
+
+	/* Decode the raw Ivy buffer. */
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	INIT(NAAAIM, Ivy, ivy, ERR(goto done));
+
+	if ( !bufr->add(bufr, ecall13->verifier, ecall13->verifier_size) )
+		ERR(goto done);
+	if ( !ivy->decode(ivy, bufr) )
+		ERR(goto done);
+
+
+	/* Add the Ivy object to the verifier list. */
+	if ( Verifiers == NULL )
+		INIT(HurdLib, Buffer, Verifiers, ERR(goto done));
+
+	if ( !Verifiers->add(Verifiers, (unsigned char *) &ivy, sizeof(Ivy)) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		WHACK(ivy);
+	WHACK(bufr);
 
 	return retn;
 }

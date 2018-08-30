@@ -18,7 +18,7 @@
 
 
 /* Number of enclave interfaces. */
-#define ECALL_NUMBER 13
+#define ECALL_NUMBER 14
 #define OCALL_NUMBER 6
 
 
@@ -79,9 +79,6 @@ struct ISOidentity_ecall10_interface {
 
 	unsigned char *identity;
 	size_t identity_size;
-
-	unsigned char *verifier;
-	size_t verifier_size;
 };
 
 struct ISOidentity_ecall11_interface {
@@ -94,4 +91,11 @@ struct ISOidentity_ecall12_interface {
 	_Bool retn;
 
 	uint8_t point[32];
+};
+
+struct ISOidentity_ecall13 {
+	_Bool retn;
+
+	uint8_t *verifier;
+	size_t verifier_size;
 };

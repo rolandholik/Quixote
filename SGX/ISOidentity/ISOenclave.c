@@ -1168,6 +1168,50 @@ static _Bool manager(CO(ISOenclave, this), CO(Buffer, id_bufr), \
 /**
  * External public method.
  *
+ * This method implements starting of the management mode of the
+ * enclave.
+ *
+ * \param this	A pointer to the object which is to be sealed.
+ *
+ */
+
+static _Bool add_verifier(CO(ISOenclave, this), CO(Buffer, verifier))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	int rc;
+
+	struct ISOidentity_ecall13 ecall13;
+
+
+	memset(&ecall13, '\0', sizeof(struct ISOidentity_ecall13));
+
+	ecall13.verifier      = verifier->get(verifier);
+	ecall13.verifier_size = verifier->size(verifier);
+
+	if ( !S->enclave->boot_slot(S->enclave, 13, &ocall_table, \
+				    &ecall13, &rc) ) {
+		fprintf(stderr, "Enclave returned: %d\n", rc);
+		goto done;
+	}
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements sealing the behavioral model in its current
  * state.  Sealing the model implies that any additional events which
  * are not in the behavioral map constitute forensic violations for
@@ -1420,7 +1464,8 @@ extern ISOenclave NAAAIM_ISOenclave_Init(void)
 	this->dump_contours  = dump_contours;
 	this->dump_forensics = dump_forensics;
 
-	this->manager = manager;
+	this->manager	   = manager;
+	this->add_verifier = add_verifier;
 
 	this->seal  = seal;
 	this->size  = size;

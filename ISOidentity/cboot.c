@@ -1295,6 +1295,9 @@ extern int main(int argc, char *argv[])
 			goto done;
 		}
 
+		if ( !Enclave->add_verifier(Enclave, ivy) )
+			ERR(goto done);
+
 
 		/* Setup the SPID key. */
 		INIT(HurdLib, String, spid, ERR(goto done));

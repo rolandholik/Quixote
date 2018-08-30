@@ -76,6 +76,7 @@ struct NAAAIM_ISOenclave
 
 	_Bool (*manager)(const ISOenclave, const Buffer, \
 			 const Buffer, char *);
+	_Bool (*add_verifier)(const ISOenclave, const Buffer);
 
 	_Bool (*seal)(const ISOenclave);
 	size_t (*size)(const ISOenclave);

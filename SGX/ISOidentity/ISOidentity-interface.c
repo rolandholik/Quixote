@@ -37,6 +37,7 @@ extern _Bool get_event(int, char *, size_t);
 extern _Bool manager(struct ISOidentity_ecall10_interface *);
 extern _Bool generate_identity(uint8_t *);
 extern _Bool update_map(struct ISOidentity_ecall12_interface *);
+extern _Bool add_verifier(struct ISOidentity_ecall13 *);
 
 
 static _Bool SGXidf_untrusted_region(void *ptr, size_t size)
@@ -368,15 +369,6 @@ static sgx_status_t sgx_manager(void *pms)
 	ecall10.identity_size = ms->identity_size;
 	memcpy(ecall10.identity, ms->identity, ecall10.identity_size);
 
-	if ( !SGXidf_untrusted_region(ms->verifier, ms->verifier_size) )
-		goto done;
-	if ( (ecall10.verifier = malloc(ms->verifier_size)) == NULL ) {
-		status = SGX_ERROR_OUT_OF_MEMORY;
-		goto done;
-	}
-	ecall10.verifier_size = ms->verifier_size;
-	memcpy(ecall10.verifier, ms->verifier, ecall10.verifier_size);
-
 	__builtin_ia32_lfence();
 
 
@@ -388,7 +380,6 @@ static sgx_status_t sgx_manager(void *pms)
  done:
 	free(ecall10.spid);
 	free(ecall10.identity);
-	free(ecall10.verifier);
 
 	return status;
 }
@@ -468,6 +459,53 @@ static sgx_status_t sgx_update_map(void *pms)
 }
 
 
+/* ECALL13 interface function. */
+static sgx_status_t sgx_add_verifier(void *pms)
+
+{
+	sgx_status_t status = SGX_ERROR_INVALID_PARAMETER;
+
+	struct ISOidentity_ecall13 *ms,
+				   ecall13;
+
+
+	/* Verify marshalled arguements and setup parameters. */
+	memset(&ecall13, '\0', sizeof(struct ISOidentity_ecall13));
+
+	if ( !SGXidf_untrusted_region(pms, \
+				      sizeof(struct ISOidentity_ecall13)) )
+		goto done;
+	ms = (struct ISOidentity_ecall13 *) pms;
+
+
+	/* Replicate the identifier verifier. */
+	ecall13.verifier_size = ms->verifier_size;
+
+	if ( !SGXidf_untrusted_region(ms->verifier, ecall13.verifier_size) )
+		goto done;
+
+	if ( (ecall13.verifier = malloc(ecall13.verifier_size)) == NULL )
+		goto done;
+	memcpy(ecall13.verifier, ms->verifier, ecall13.verifier_size);
+
+	__builtin_ia32_lfence();
+
+
+	/* Call the trusted function. */
+	ms->retn = add_verifier(&ecall13);
+	status = SGX_SUCCESS;
+
+
+ done:
+	memset(ecall13.verifier, '\0', ecall13.verifier_size);
+	free(ecall13.verifier);
+
+	memset(&ecall13, '\0', sizeof(struct ISOidentity_ecall13));
+
+	return status;
+}
+
+
 /* ECALL interface table. */
 SGX_EXTERNC const struct {
 	size_t nr_ecall;
@@ -487,7 +525,8 @@ SGX_EXTERNC const struct {
 		{(void*)(uintptr_t)sgx_get_event, 0},
 		{(void*)(uintptr_t)sgx_manager, 0},
 		{(void*)(uintptr_t)sgx_generate_identity, 0},
-		{(void*)(uintptr_t)sgx_update_map, 0}
+		{(void*)(uintptr_t)sgx_update_map, 0},
+		{(void*)(uintptr_t)sgx_add_verifier, 0}
 	}
 };
 
@@ -499,11 +538,11 @@ SGX_EXTERNC const struct {
 } g_dyn_entry_table = {
 	OCALL_NUMBER,
 	{
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 	}
 };
