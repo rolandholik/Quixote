@@ -233,7 +233,7 @@ static _Bool add_verifiers(CO(ISOenclave, enclave), CO(File, infile), \
 		if ( !infile->slurp(infile, bufr) )
 			ERR(goto done);
 
-		if ( !Enclave->add_verifier(Enclave, bufr) )
+		if ( !enclave->add_verifier(enclave, bufr) )
 			ERR(goto done);
 
 		retn = true;
@@ -252,7 +252,7 @@ static _Bool add_verifiers(CO(ISOenclave, enclave), CO(File, infile), \
 		if ( !infile->slurp(infile, bufr) )
 			ERR(goto done);
 
-		if ( !Enclave->add_verifier(Enclave, bufr) )
+		if ( !enclave->add_verifier(enclave, bufr) )
 			ERR(goto done);
 
 		bufr->reset(bufr);
