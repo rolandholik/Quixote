@@ -273,10 +273,6 @@ static _Bool load_enclave(CO(ISOmanager, this), CO(char *, enclave), \
  * \param identity	A pointer to the object containing the identity
  *			token to be used to authenticate the connection.
  *
- * \param verifier	A pointer to the object containing the identity
- *			verifier to be used to authenticate the remote
- *			host.
- *
  * \return	A boolean value is used to indicate whether or not
  *		the enclave was successfully loaded..  A false value
  *		indicates a failure while a true value indicates
@@ -285,7 +281,7 @@ static _Bool load_enclave(CO(ISOmanager, this), CO(char *, enclave), \
 
 static _Bool connect(CO(ISOmanager, this), char *hostname, \
 		     const unsigned int port, char * spid, \
-		     CO(Buffer, id_bufr), CO(Buffer, ivy))
+		     CO(Buffer, id_bufr))
 
 {
 	STATE(S);
@@ -311,9 +307,6 @@ static _Bool connect(CO(ISOmanager, this), char *hostname, \
 
 	ecall0.identity	     = id_bufr->get(id_bufr);
 	ecall0.identity_size = id_bufr->size(id_bufr);
-
-	ecall0.verifier	     = ivy->get(ivy);
-	ecall0.verifier_size = ivy->size(ivy);
 
 	if ( !S->enclave->boot_slot(S->enclave, 0, &ocall_table, \
 				    &ecall0, &rc) ) {
@@ -380,6 +373,67 @@ static _Bool generate_identity(CO(ISOmanager, this), CO(Buffer, bufr))
 
 	if ( !bufr->add(bufr, ecall1.id, sizeof(ecall1.id)) )
 		ERR(goto done);
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements adding an identity verifier to the list
+ * of valid POSSUM communication counter-parties for the enclave.
+ *
+ * \param this		A pointer to the object which is to have an
+ *			identity verifier added to it.
+ *
+ * \param verifier	The object containing the verifier to be
+ *			added
+ *
+ * \return	A boolean value is returned to indicate if the verifier
+ *		was successfully added.  A false value indicates
+ *		addition failed while a true value indicates the
+ *		verifier was successfully added.
+ *
+ */
+
+static _Bool add_verifier(CO(ISOmanager, this), CO(Buffer, verifier))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	int rc;
+
+	struct ISOmanager_ecall2 ecall2;
+
+
+	/* Verify arguement status. */
+	if ( verifier == NULL )
+		ERR(goto done);
+	if ( verifier->poisoned(verifier) )
+		ERR(goto done);
+
+
+	/* Call the add_verifier() enclave function. */
+	memset(&ecall2, '\0', sizeof(struct ISOmanager_ecall2));
+
+	ecall2.verifier      = verifier->get(verifier);
+	ecall2.verifier_size = verifier->size(verifier);
+
+	if ( !S->enclave->boot_slot(S->enclave, 2, &ocall_table, \
+				    &ecall2, &rc) ) {
+		fprintf(stderr, "Enclave returned: %d\n", rc);
+		goto done;
+	}
+
 	retn = true;
 
 
@@ -478,6 +532,7 @@ extern ISOmanager NAAAIM_ISOmanager_Init(void)
 	this->load_enclave	= load_enclave;
 	this->connect		= connect;
 	this->generate_identity = generate_identity;
+	this->add_verifier	= add_verifier;
 
 	this->debug = debug;
 	this->whack = whack;

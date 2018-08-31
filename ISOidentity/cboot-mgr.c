@@ -495,6 +495,11 @@ extern int main(int argc, char *argv[])
 			enclave->debug(enclave, true);
 
 
+		/* Load the identity verifier. */
+		if ( !enclave->add_verifier(enclave, ivy) )
+			ERR(goto done);
+
+
 		/* Connect to the enclave. */
 		if ( !enclave->connect(enclave, hostname, 11990, \
 				       spid->get(spid), id_bufr, ivy) ) {

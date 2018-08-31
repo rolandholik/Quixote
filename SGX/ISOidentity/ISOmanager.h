@@ -30,8 +30,9 @@ struct NAAAIM_ISOmanager
 	_Bool (*load_enclave)(const ISOmanager, const char *, const char *, \
 			      _Bool);
 	_Bool (*connect)(const ISOmanager, char *, const unsigned int, \
-			 char *, const Buffer, const Buffer);
+			 char *, const Buffer);
 	_Bool (*generate_identity)(const ISOmanager, const Buffer);
+	_Bool (*add_verifier)(const ISOmanager, const Buffer);
 	
 	void (*debug)(const ISOmanager, _Bool);
 	void (*whack)(const ISOmanager);

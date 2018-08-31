@@ -29,10 +29,9 @@ unsigned char *Identity = NULL;
 
 
 /**
- * The device verified for the communication counter-party.
+ * The valid identity verifiers of the communication counter-parties
  */
-size_t Verifier_size	= 0;
-unsigned char *Verifier = NULL;
+Buffer Verifiers = NULL;
 
 
 /**
@@ -380,12 +379,6 @@ static _Bool process_command(CO(PossumPipe, mgmt), CO(char *, cmd))
  * \param identity	A pointer to a buffer containing the identity
  *			token which will identify the enclave.
  *
- * \param vfy_size	The size of the buffer containing the identity
- *			verifier that will be used.
- *
- * \param verifier	A pointer to a buffer containing the identity
- *			verifier that will be used.
- *
  * \return	A boolean value is used to indicate the status of the
  *		test.  A false value indicates an error was encountered
  *		while a true value indicates the test was successfully
@@ -393,8 +386,7 @@ static _Bool process_command(CO(PossumPipe, mgmt), CO(char *, cmd))
  */
 
 _Bool connect(_Bool debug, char *hostname, int port, time_t current_time, \
-	      char *spid_key, size_t id_size, unsigned char *identity,    \
-	      size_t vfy_size, unsigned char *verifier)
+	      char *spid_key, size_t id_size, unsigned char *identity)
 
 {
 	_Bool retn = false;
@@ -425,9 +417,6 @@ _Bool connect(_Bool debug, char *hostname, int port, time_t current_time, \
 	/* Stash the identity token and verifier buffer descriptions. */
 	Identity      = identity;
 	Identity_size = id_size;
-
-	Verifier      = verifier;
-	Verifier_size = vfy_size;
 
 
 	/* Start client mode. */
@@ -561,6 +550,62 @@ _Bool generate_identity(uint8_t *id)
  done:
 	WHACK(bufr);
 	WHACK(sha256);
+
+	return retn;
+}
+
+
+/**
+ * ECALL 2
+ *
+ * This function implements the ecall entry point for a function which
+ * adds an identity verifier to the list of valid POSSUM communication
+ * parties.
+ *
+ * \param ecall13	A pointer to the input structure to the ECALL.
+ *
+ * \return	A boolean value is used to indicate the status of the
+ *		registration of the identity verifier.  A false value
+ *		indicates an error was encountered while registering
+ *		the verifier while a true value indicates the verifier
+ *		was successfully registered.
+ */
+
+_Bool add_verifier(struct ISOmanager_ecall2 *ecall2)
+
+{
+	_Bool retn = false;
+
+	Buffer bufr = NULL;
+
+	Ivy ivy = NULL;
+
+
+	/* Decode the raw Ivy buffer. */
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	INIT(NAAAIM, Ivy, ivy, ERR(goto done));
+
+	if ( !bufr->add(bufr, ecall2->verifier, ecall2->verifier_size) )
+		ERR(goto done);
+	if ( !ivy->decode(ivy, bufr) )
+		ERR(goto done);
+	fputs("Adding verifier:\n", stdout);
+	ivy->print(ivy);
+
+
+	/* Add the Ivy object to the verifier list. */
+	if ( Verifiers == NULL )
+		INIT(HurdLib, Buffer, Verifiers, ERR(goto done));
+
+	if ( !Verifiers->add(Verifiers, (unsigned char *) &ivy, sizeof(Ivy)) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		WHACK(ivy);
+	WHACK(bufr);
 
 	return retn;
 }

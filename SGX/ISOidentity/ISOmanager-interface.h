@@ -12,7 +12,7 @@
 
 
 /* Number of enclave interfaces. */
-#define ECALL_NUMBER 2
+#define ECALL_NUMBER 3
 #define OCALL_NUMBER 5
 
 
@@ -33,9 +33,6 @@ struct ISOmanager_ecall0 {
 
 	unsigned char *identity;
 	size_t identity_size;
-
-	unsigned char *verifier;
-	size_t verifier_size;
 };
 
 struct ISOmanager_ecall1 {
@@ -44,3 +41,9 @@ struct ISOmanager_ecall1 {
 	uint8_t id[32];
 };
 
+struct ISOmanager_ecall2 {
+	_Bool retn;
+
+	uint8_t *verifier;
+	size_t verifier_size;
+};
