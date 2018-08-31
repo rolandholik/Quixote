@@ -1240,7 +1240,7 @@ extern int main(int argc, char *argv[])
 	     *map	    = NULL,
 	     *id_token	    = "/opt/IDfusion/etc/host.idt",
 	     *spid_fname    = SPID_FILENAME,
-	     *token	    = "ISOidentity.token",
+	     *token	    = SGX_TOKEN_DIRECTORY"/ISOidentity.token",
 	     bufr[1024],
 	     sockname[UNIX_PATH_MAX];
 

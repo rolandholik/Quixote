@@ -446,7 +446,7 @@ extern int main(int argc, char *argv[])
 	     *verifier	   = NULL,
 	     *id_token	   = "/opt/IDfusion/etc/host.idt",
 	     *spid_fname   = SPID_FILENAME,
-	     *token	   = "ISOmanager.token",
+	     *token	   = SGX_TOKEN_DIRECTORY"/ISOmanager.token",
 	     *hostname	   = "localhost",
 	     *enclave_name = "ISOmanager.signed.so",
 	     sockname[UNIX_PATH_MAX],
