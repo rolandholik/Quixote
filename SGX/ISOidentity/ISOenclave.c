@@ -1120,8 +1120,7 @@ static void dump_contours(CO(ISOenclave, this))
  *
  */
 
-static _Bool manager(CO(ISOenclave, this), CO(Buffer, id_bufr), \
-		     CO(Buffer, ivy), char *spid)
+static _Bool manager(CO(ISOenclave, this), CO(Buffer, id_bufr), char *spid)
 
 {
 	STATE(S);
@@ -1144,9 +1143,6 @@ static _Bool manager(CO(ISOenclave, this), CO(Buffer, id_bufr), \
 
 	ecall10.identity      = id_bufr->get(id_bufr);
 	ecall10.identity_size = id_bufr->size(id_bufr);
-
-	ecall10.verifier      = ivy->get(ivy);
-	ecall10.verifier_size = ivy->size(ivy);
 
 	if ( !S->enclave->boot_slot(S->enclave, 10, &ocall_table, \
 				    &ecall10, &rc) ) {

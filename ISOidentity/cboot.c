@@ -25,7 +25,8 @@
 
 
 /* Local defines. */
-#define SGX_ENCLAVE "/lib/ISOidentity.signed.so"
+#define SGX_ENCLAVE	"/lib/ISOidentity.signed.so"
+#define VERIFIERS	"/opt/IDfusion/etc/verifiers/ISOmanager/*.ivy"
 
 #define CLONE_BEHAVIOR 0x00001000
 
@@ -53,6 +54,7 @@
 #include <signal.h>
 #include <limits.h>
 #include <sched.h>
+#include <glob.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -107,7 +109,6 @@ static _Bool Sealed = false;
 struct manager_args {
 	char *spid;
 	Buffer id;
-	Buffer ivy;
 };
 
 
@@ -177,6 +178,94 @@ static ISOenclave Enclave = NULL;
 static inline int sys_set_bad_actor(pid_t pid, unsigned long flags)
 {
 	return syscall(327, pid, flags);
+}
+
+
+/**
+ * Private function.
+ *
+ * This function implements loading of loading identifier verifiers
+ * that will be used to specify the set of counter-parties that are
+ * permitted access to the SGX management thread.  This function is
+ * only called when the utility is running in SGX mode.
+ *
+ * If the identity verifier arguement is a NULL pointer this function
+ * will attempt to load all verifiers from the following directory:
+ *
+ * /opt/IDfusion/etc/verifiers/ISOmanager
+ *
+ * \param enclave	The object representing the enclave that the
+ *			identity verifiers were to be loaded into.
+ *
+ * \param infile	The object that will be used for doing I/O to
+ *			the identity verifiers.
+ *
+ * \param verifier	A character pointer to the name of the file
+ *			containing the specific identity verifier
+ *			to use.  Otherwise the default set is
+ *			loaded per the discussion above.
+ *
+ * \return		A boolean value is used to indicate the status
+ *			of the verifier load.  A false value indicates
+ *			an error was encounter while a true value
+ *			indicates all of the identity verifiers were
+ *			loaded.
+ */
+
+static _Bool add_verifiers(CO(ISOenclave, enclave), CO(File, infile), \
+			   CO(char *, verifier))
+
+{
+	_Bool retn = false;
+
+	glob_t identities;
+
+	uint16_t lp;
+
+	Buffer bufr = NULL;
+
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+
+	/* Load the specified verifier. */
+	if ( verifier != NULL ) {
+		infile->open_ro(infile, verifier);
+		if ( !infile->slurp(infile, bufr) )
+			ERR(goto done);
+
+		if ( !Enclave->add_verifier(Enclave, bufr) )
+			ERR(goto done);
+
+		retn = true;
+		goto done;
+	}
+
+
+	/* Load a verifier list. */
+	if ( glob(VERIFIERS, 0, NULL, &identities) != 0 )
+		ERR(goto done);
+	if ( identities.gl_pathc == 0 )
+		ERR(goto done);
+
+	for (lp= 0; lp < identities.gl_pathc; ++lp) {
+		infile->open_ro(infile, identities.gl_pathv[lp]);
+		if ( !infile->slurp(infile, bufr) )
+			ERR(goto done);
+
+		if ( !Enclave->add_verifier(Enclave, bufr) )
+			ERR(goto done);
+
+		bufr->reset(bufr);
+		infile->reset(infile);
+	}
+
+	retn = true;
+
+
+ done:
+	WHACK(bufr);
+
+	return retn;
 }
 
 
@@ -1127,7 +1216,7 @@ static void * sgx_mgr(void *mgr_args)
 	struct manager_args *args = mgr_args;
 
 
-	if ( !Enclave->manager(Enclave, args->id, args->ivy, args->spid) )
+	if ( !Enclave->manager(Enclave, args->id, args->spid) )
 		ERR(goto done);
 
 
@@ -1252,11 +1341,6 @@ extern int main(int argc, char *argv[])
 			goto done;
 		}
 
-		if ( verifier == NULL ) {
-			fputs("SGX mode but no verifier specifed.\n", stderr);
-			goto done;
-		}
-
 		INIT(NAAAIM, ISOenclave, Enclave, ERR(goto done));
 		if ( !Enclave->load_enclave(Enclave, SGX_ENCLAVE, \
 					    token) ) {
@@ -1284,20 +1368,12 @@ extern int main(int argc, char *argv[])
 			goto done;
 		}
 
-
-		/* Load the identifier verifier. */
-		INIT(HurdLib, Buffer, ivy, ERR(goto done));
+		/* Load the identifier verifiers. */
 		INIT(HurdLib, File, infile, ERR(goto done));
-
-		infile->open_ro(infile, verifier);
-		if ( !infile->slurp(infile, ivy) ) {
-			fputs("Cannot read identity verifier.\n", stderr);
+		if ( !add_verifiers(Enclave, infile, verifier) ) {
+			fputs("Unable to load identity verifiers.\n", stderr);
 			goto done;
 		}
-
-		if ( !Enclave->add_verifier(Enclave, ivy) )
-			ERR(goto done);
-
 
 		/* Setup the SPID key. */
 		INIT(HurdLib, String, spid, ERR(goto done));
@@ -1323,7 +1399,6 @@ extern int main(int argc, char *argv[])
 		}
 
 		mgr_args.spid = spid->get(spid);
-		mgr_args.ivy  = ivy;
 		mgr_args.id   = id_bufr;
 
 		if ( pthread_create(&mgr_thread, &mgr_attr, sgx_mgr, \
