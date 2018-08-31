@@ -589,8 +589,6 @@ _Bool add_verifier(struct ISOmanager_ecall2 *ecall2)
 		ERR(goto done);
 	if ( !ivy->decode(ivy, bufr) )
 		ERR(goto done);
-	fputs("Adding verifier:\n", stdout);
-	ivy->print(ivy);
 
 
 	/* Add the Ivy object to the verifier list. */

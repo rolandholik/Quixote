@@ -15,6 +15,10 @@
  **************************************************************************/
 
 
+/* The location of the identity verifiers for the ISOidentity enclave. */
+#define VERIFIERS "/opt/IDfusion/etc/verifiers/ISOidentity/*.ivy"
+
+
 /* Include files. */
 #include <stdio.h>
 #include <string.h>
@@ -23,6 +27,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <poll.h>
+#include <glob.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -56,6 +61,94 @@
 	 sgx,
 	 measure
 } Mode = internal;
+
+
+/**
+ * Private function.
+ *
+ * This function implements loading of loading identifier verifiers
+ * that will be used to specify the set of counter-parties that are
+ * permitted access to the management thread of an SGX ISOidentity
+ * modeling engine.
+ *
+ * If the identity verifier arguement is a NULL pointer this function
+ * will attempt to load all verifiers from the following directory:
+ *
+ * /opt/IDfusion/etc/verifiers/ISOidentity
+ *
+ * \param enclave	The object representing the enclave that the
+ *			identity verifiers were to be loaded into.
+ *
+ * \param infile	The object that will be used for doing I/O to
+ *			the identity verifiers.
+ *
+ * \param verifier	A character pointer to the name of the file
+ *			containing the specific identity verifier
+ *			to use.  Otherwise the default set is
+ *			loaded per the discussion above.
+ *
+ * \return		A boolean value is used to indicate the status
+ *			of the verifier load.  A false value indicates
+ *			an error was encounter while a true value
+ *			indicates all of the identity verifiers were
+ *			loaded.
+ */
+
+static _Bool add_verifiers(CO(ISOmanager, enclave), CO(File, infile), \
+			   CO(char *, verifier))
+
+{
+	_Bool retn = false;
+
+	glob_t identities;
+
+	uint16_t lp;
+
+	Buffer bufr = NULL;
+
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+
+	/* Load the specified verifier. */
+	if ( verifier != NULL ) {
+		infile->open_ro(infile, verifier);
+		if ( !infile->slurp(infile, bufr) )
+			ERR(goto done);
+
+		if ( !enclave->add_verifier(enclave, bufr) )
+			ERR(goto done);
+
+		retn = true;
+		goto done;
+	}
+
+
+	/* Load a verifier list. */
+	if ( glob(VERIFIERS, 0, NULL, &identities) != 0 )
+		ERR(goto done);
+	if ( identities.gl_pathc == 0 )
+		ERR(goto done);
+
+	for (lp= 0; lp < identities.gl_pathc; ++lp) {
+		infile->open_ro(infile, identities.gl_pathv[lp]);
+		if ( !infile->slurp(infile, bufr) )
+			ERR(goto done);
+
+		if ( !enclave->add_verifier(enclave, bufr) )
+			ERR(goto done);
+
+		bufr->reset(bufr);
+		infile->reset(infile);
+	}
+
+	retn = true;
+
+
+ done:
+	WHACK(bufr);
+
+	return retn;
+}
 
 
 /**
@@ -364,8 +457,7 @@ extern int main(int argc, char *argv[])
 
 	FILE *idfile = NULL;
 
-	Buffer ivy     = NULL,
-	       id_bufr = NULL,
+	Buffer id_bufr = NULL,
 	       cmdbufr = NULL;
 
 	String spid = NULL;
@@ -454,22 +546,10 @@ extern int main(int argc, char *argv[])
 			goto done;
 		}
 
-
-		/* Load the identifier verifier. */
-		INIT(HurdLib, Buffer, ivy, ERR(goto done));
-		INIT(HurdLib, File, infile, ERR(goto done));
-
-		infile->open_ro(infile, verifier);
-		if ( !infile->slurp(infile, ivy) ) {
-			fputs("Cannot read identity verifier.\n", stderr);
-			goto done;
-		}
-
-
 		/* Setup the SPID key. */
 		INIT(HurdLib, String, spid, ERR(goto done));
+		INIT(HurdLib, File, infile, ERR(goto done));
 
-		infile->reset(infile);
 		if ( !infile->open_ro(infile, spid_fname) )
 			ERR(goto done);
 		if ( !infile->read_String(infile, spid) )
@@ -480,7 +560,6 @@ extern int main(int argc, char *argv[])
 			spid->print(spid);
 			goto done;
 		}
-
 
 		/* Initialize enclave. */
 		INIT(NAAAIM, ISOmanager, enclave, ERR(goto done));
@@ -494,15 +573,16 @@ extern int main(int argc, char *argv[])
 		if ( debug )
 			enclave->debug(enclave, true);
 
-
-		/* Load the identity verifier. */
-		if ( !enclave->add_verifier(enclave, ivy) )
-			ERR(goto done);
-
+		/* Load the identifier verifiers. */
+		infile->reset(infile);
+		if ( !add_verifiers(enclave, infile, verifier) ) {
+			fputs("Unable to load identity verifiers.\n", stderr);
+			goto done;
+		}
 
 		/* Connect to the enclave. */
 		if ( !enclave->connect(enclave, hostname, 11990, \
-				       spid->get(spid), id_bufr, ivy) ) {
+				       spid->get(spid), id_bufr) ) {
 			fputs("Unable to connect to model manager.\n", \
 			      stderr);
 			goto done;
@@ -565,7 +645,6 @@ extern int main(int argc, char *argv[])
 	if ( idfile != NULL )
 		fclose(idfile);
 
-	WHACK(ivy);
 	WHACK(id_bufr);
 	WHACK(cmdbufr);
 	WHACK(spid);
