@@ -443,8 +443,8 @@ extern int main(int argc, char *argv[])
 
 	char *p,
 	     *canister	   = NULL,
-	     *id_token	   = NULL,
 	     *verifier	   = NULL,
+	     *id_token	   = "/opt/IDfusion/etc/host.idt",
 	     *spid_fname   = SPID_FILENAME,
 	     *token	   = "ISOmanager.token",
 	     *hostname	   = "localhost",

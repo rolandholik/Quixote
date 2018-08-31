@@ -1236,9 +1236,9 @@ extern int main(int argc, char *argv[])
 
 	char *bundle	    = NULL,
 	     *canister_name = NULL,
-	     *id_token	    = NULL,
 	     *verifier	    = NULL,
 	     *map	    = NULL,
+	     *id_token	    = "/opt/IDfusion/etc/host.idt",
 	     *spid_fname    = SPID_FILENAME,
 	     *token	    = "ISOidentity.token",
 	     bufr[1024],
