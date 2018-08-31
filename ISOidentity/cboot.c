@@ -25,7 +25,7 @@
 
 
 /* Local defines. */
-#define SGX_ENCLAVE	"/lib/ISOidentity.signed.so"
+#define ENCLAVE_NAME	"/opt/IDfusion/lib/enclaves/ISOidentity.signed.so"
 #define VERIFIERS	"/opt/IDfusion/etc/verifiers/ISOmanager/*.ivy"
 
 #define CLONE_BEHAVIOR 0x00001000
@@ -1241,6 +1241,7 @@ extern int main(int argc, char *argv[])
 	     *id_token	    = "/opt/IDfusion/etc/host.idt",
 	     *spid_fname    = SPID_FILENAME,
 	     *token	    = SGX_TOKEN_DIRECTORY"/ISOidentity.token",
+	     *enclave_name  = ENCLAVE_NAME,
 	     bufr[1024],
 	     sockname[UNIX_PATH_MAX];
 
@@ -1276,7 +1277,7 @@ extern int main(int argc, char *argv[])
 	File infile = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "Sdb:i:m:n:s:t:v:")) != EOF )
+	while ( (opt = getopt(argc, argv, "Sdb:e:i:m:n:s:t:v:")) != EOF )
 		switch ( opt ) {
 			case 'S':
 				Mode = sgx;
@@ -1287,6 +1288,9 @@ extern int main(int argc, char *argv[])
 
 			case 'b':
 				bundle = optarg;
+				break;
+			case 'e':
+				enclave_name = optarg;
 				break;
 			case 'i':
 				id_token = optarg;
@@ -1342,8 +1346,7 @@ extern int main(int argc, char *argv[])
 		}
 
 		INIT(NAAAIM, ISOenclave, Enclave, ERR(goto done));
-		if ( !Enclave->load_enclave(Enclave, SGX_ENCLAVE, \
-					    token) ) {
+		if ( !Enclave->load_enclave(Enclave, enclave_name, token) ) {
 			fputs("SGX enclave initialization failure.\n", stderr);
 			goto done;
 		}

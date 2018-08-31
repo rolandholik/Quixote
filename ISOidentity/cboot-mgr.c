@@ -16,7 +16,8 @@
 
 
 /* The location of the identity verifiers for the ISOidentity enclave. */
-#define VERIFIERS "/opt/IDfusion/etc/verifiers/ISOidentity/*.ivy"
+#define ENCLAVE_NAME	"/opt/IDfusion/lib/enclaves/ISOmanager.signed.so"
+#define VERIFIERS	"/opt/IDfusion/etc/verifiers/ISOidentity/*.ivy"
 
 
 /* Include files. */
@@ -448,7 +449,7 @@ extern int main(int argc, char *argv[])
 	     *spid_fname   = SPID_FILENAME,
 	     *token	   = SGX_TOKEN_DIRECTORY"/ISOmanager.token",
 	     *hostname	   = "localhost",
-	     *enclave_name = "ISOmanager.signed.so",
+	     *enclave_name = ENCLAVE_NAME,
 	     sockname[UNIX_PATH_MAX],
 	     inbufr[1024];
 
