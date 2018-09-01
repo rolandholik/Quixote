@@ -164,7 +164,8 @@ struct {
  */
  enum {
 	 internal,
-	 sgx
+	 sgx,
+	 measure
 } Mode = sgx;
 
 /**
@@ -1226,6 +1227,60 @@ static void * sgx_mgr(void *mgr_args)
 }
 
 
+/**
+ * Private function.
+ *
+ * This function implements the measurement mode of the cboot utility.
+ * Measurement mode generates a software attestation value for the
+ * enclave specific to the host it is run on.
+ *
+ * \param enclave_name	A pointer to a character buffer containing the
+ *			name of the enclave to be loaded.
+ *
+ * \param token		A pointer to a character buffer containing the
+ *			name of the file holding the launch token for
+ *			the enclave.
+ *
+ * \return		This function exits the program with a status
+ *			code indicating whether or not generation
+ *			of the measurement succeeded.  A non-zero value
+ *			indicates an error was encountered while a
+ *			zero return value indicates the measurement
+ *			was succesfully generated.
+ */
+
+static void * measurement_mode(CO(char *, enclave_name), CO(char *, token))
+
+{
+	int retn = 1;
+
+	Buffer bufr = NULL;
+
+
+	INIT(NAAAIM, ISOenclave, Enclave, ERR(goto done));
+	if ( !Enclave->load_enclave(Enclave, enclave_name, token) ) {
+		fputs("Enclave measurement initialization failure.\n", stderr);
+		goto done;
+	}
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	if ( !Enclave->generate_identity(Enclave, bufr) ) {
+		fputs("Error generating enclave measurement.\n", stderr);
+		goto done;
+	}
+
+	bufr->print(bufr);
+	retn = 0;
+
+
+ done:
+	WHACK(Enclave);
+	WHACK(bufr);
+
+	exit(retn);
+}
+
+
 /*
  * Program entry point begins here.
  */
@@ -1280,10 +1335,13 @@ extern int main(int argc, char *argv[])
 	File infile = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "Ldb:c:e:i:m:n:s:t:v:")) != EOF )
+	while ( (opt = getopt(argc, argv, "LMdb:c:e:i:m:n:s:t:v:")) != EOF )
 		switch ( opt ) {
 			case 'L':
 				Mode = internal;
+				break;
+			case 'M':
+				Mode = measure;
 				break;
 			case 'd':
 				Debug = true;
@@ -1317,6 +1375,11 @@ extern int main(int argc, char *argv[])
 				verifier = optarg;
 				break;
 		}
+
+
+	/* Execute measurement mode. */
+	if ( Mode == measure )
+		measurement_mode(enclave_name, token);
 
 
 	/*
