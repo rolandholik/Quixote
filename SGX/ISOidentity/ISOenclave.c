@@ -1116,11 +1116,26 @@ static void dump_contours(CO(ISOenclave, this))
  * This method implements starting of the management mode of the
  * enclave.
  *
- * \param this	A pointer to the object which is to be sealed.
+ * \param this		A pointer to the object which is to be sealed.
  *
+ * \param id_bufr	The object containing the identity of the
+ *			host the enclave is being run on.
+ *
+ * \param port		The number of the port the management daemon
+ *			is to run on.
+ *
+ * \param spid		The Service Provider IDentity to be used for
+ *			generating platform attestation quotes.
+ *
+ * \return		A boolean value is used to indicate the
+ *			status of starting of the management thread.
+ *			A false value indicates an error was encountered
+ *			while a true indicates the thread was
+ *			successfully initiated.
  */
 
-static _Bool manager(CO(ISOenclave, this), CO(Buffer, id_bufr), char *spid)
+static _Bool manager(CO(ISOenclave, this), CO(Buffer, id_bufr), \
+		     uint16_t port, char *spid)
 
 {
 	STATE(S);
@@ -1135,7 +1150,7 @@ static _Bool manager(CO(ISOenclave, this), CO(Buffer, id_bufr), char *spid)
 	memset(&ecall10, '\0', sizeof(struct ISOidentity_ecall10_interface));
 
 	ecall10.debug	     = S->debug;
-	ecall10.port	     = 11990;
+	ecall10.port	     = port;
 	ecall10.current_time = time(NULL);
 
 	ecall10.spid	  = spid;

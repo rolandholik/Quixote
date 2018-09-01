@@ -25,6 +25,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
 #include <poll.h>
@@ -445,6 +446,7 @@ extern int main(int argc, char *argv[])
 	char *p,
 	     *canister	   = NULL,
 	     *verifier	   = NULL,
+	     *port	   = "11990",
 	     *id_token	   = "/opt/IDfusion/etc/host.idt",
 	     *spid_fname   = SPID_FILENAME,
 	     *token	   = SGX_TOKEN_DIRECTORY"/ISOmanager.token",
@@ -454,6 +456,7 @@ extern int main(int argc, char *argv[])
 	     inbufr[1024];
 
 	int opt,
+	    portnum,
 	    retn = 1;
 
 	FILE *idfile = NULL;
@@ -472,7 +475,7 @@ extern int main(int argc, char *argv[])
 	ISOmanager enclave = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "MLdpe:h:i:n:s:t:v:")) != EOF )
+	while ( (opt = getopt(argc, argv, "MLdre:h:i:n:p:s:t:v:")) != EOF )
 		switch ( opt ) {
 			case 'M':
 				Mode = measure;
@@ -484,7 +487,7 @@ extern int main(int argc, char *argv[])
 			case 'd':
 				debug = true;
 				break;
-			case 'p':
+			case 'r':
 				debug_enclave = false;
 				break;
 
@@ -499,6 +502,9 @@ extern int main(int argc, char *argv[])
 				break;
 			case 'n':
 				canister = optarg;
+				break;
+			case 'p':
+				port = optarg;
 				break;
 			case 's':
 				spid_fname = optarg;
@@ -582,7 +588,17 @@ extern int main(int argc, char *argv[])
 		}
 
 		/* Connect to the enclave. */
-		if ( !enclave->connect(enclave, hostname, 11990, \
+		portnum = strtol(port, NULL, 0);
+		if ( (errno == ERANGE) || (errno == EINVAL) ) {
+			fputs("Error in port specification.\n", stderr);
+			goto done;
+		}
+		if ( (portnum < 0) || (portnum > UINT16_MAX)) {
+			fputs("Invalid port number specified.\n", stderr);
+			goto done;
+		}
+
+		if ( !enclave->connect(enclave, hostname, portnum, \
 				       spid->get(spid), id_bufr) ) {
 			fputs("Unable to connect to model manager.\n", \
 			      stderr);

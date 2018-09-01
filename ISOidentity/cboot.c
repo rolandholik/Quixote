@@ -108,6 +108,7 @@ static _Bool Sealed = false;
  * passed to the thread which runs the management ECALL.
  */
 struct manager_args {
+	uint16_t port;
 	char *spid;
 	Buffer id;
 };
@@ -1220,7 +1221,7 @@ static void * sgx_mgr(void *mgr_args)
 	struct manager_args *args = mgr_args;
 
 
-	if ( !Enclave->manager(Enclave, args->id, args->spid) )
+	if ( !Enclave->manager(Enclave, args->id, args->port, args->spid) )
 		ERR(goto done);
 
 
@@ -1374,6 +1375,7 @@ extern int main(int argc, char *argv[])
 	     *canister_name = NULL,
 	     *verifier	    = NULL,
 	     *map	    = NULL,
+	     *port	    = "11990",
 	     *id_token	    = "/opt/IDfusion/etc/host.idt",
 	     *spid_fname    = SPID_FILENAME,
 	     *token	    = SGX_TOKEN_DIRECTORY"/ISOidentity.token",
@@ -1414,7 +1416,7 @@ extern int main(int argc, char *argv[])
 	File infile = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "LMSdb:c:e:i:m:n:s:t:v:")) != EOF )
+	while ( (opt = getopt(argc, argv, "LMSdb:c:e:i:m:n:p:s:t:v:")) != EOF )
 		switch ( opt ) {
 			case 'L':
 				Mode = internal;
@@ -1446,6 +1448,9 @@ extern int main(int argc, char *argv[])
 				break;
 			case 'n':
 				canister_name = optarg;
+				break;
+			case 'p':
+				port = optarg;
 				break;
 			case 's':
 				spid_fname = optarg;
@@ -1579,6 +1584,16 @@ extern int main(int argc, char *argv[])
 
 		mgr_args.spid = spid->get(spid);
 		mgr_args.id   = id_bufr;
+
+		mgr_args.port = strtol(port, NULL, 0);
+		if ( (errno == ERANGE) || (errno == EINVAL) ) {
+			fputs("Error in port specification.\n", stderr);
+			goto done;
+		}
+		if ( (mgr_args.port < 0) || (mgr_args.port > UINT16_MAX)) {
+			fputs("Invalid port number specified.\n", stderr);
+			goto done;
+		}
 
 		if ( pthread_create(&mgr_thread, &mgr_attr, sgx_mgr, \
 				    &mgr_args) != 0 ) {
