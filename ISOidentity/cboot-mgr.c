@@ -61,7 +61,7 @@
 	 internal,
 	 sgx,
 	 measure
-} Mode = internal;
+} Mode = sgx;
 
 
 /**
@@ -472,13 +472,13 @@ extern int main(int argc, char *argv[])
 	ISOmanager enclave = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "MSdpe:h:i:n:s:t:v:")) != EOF )
+	while ( (opt = getopt(argc, argv, "MLdpe:h:i:n:s:t:v:")) != EOF )
 		switch ( opt ) {
 			case 'M':
 				Mode = measure;
 				break;
-			case 'S':
-				Mode = sgx;
+			case 'L':
+				Mode = internal;
 				break;
 
 			case 'd':

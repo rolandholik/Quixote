@@ -165,7 +165,7 @@ struct {
  enum {
 	 internal,
 	 sgx
-} Mode = internal;
+} Mode = sgx;
 
 /**
  * The following object is used to manage the measurement enclave
@@ -1280,10 +1280,10 @@ extern int main(int argc, char *argv[])
 	File infile = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "Sdb:c:e:i:m:n:s:t:v:")) != EOF )
+	while ( (opt = getopt(argc, argv, "Ldb:c:e:i:m:n:s:t:v:")) != EOF )
 		switch ( opt ) {
-			case 'S':
-				Mode = sgx;
+			case 'L':
+				Mode = internal;
 				break;
 			case 'd':
 				Debug = true;
