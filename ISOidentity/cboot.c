@@ -27,6 +27,7 @@
 /* Local defines. */
 #define ENCLAVE_NAME	"/opt/IDfusion/lib/enclaves/ISOidentity.signed.so"
 #define VERIFIERS	"/opt/IDfusion/etc/verifiers/ISOmanager/*.ivy"
+#define CANISTERS	"/var/run/Canisters"
 
 #define CLONE_BEHAVIOR 0x00001000
 
@@ -1235,6 +1236,7 @@ extern int main(int argc, char *argv[])
 	_Bool connected = false;
 
 	char *bundle	    = NULL,
+	     *canister	    = NULL,
 	     *canister_name = NULL,
 	     *verifier	    = NULL,
 	     *map	    = NULL,
@@ -1268,7 +1270,8 @@ extern int main(int argc, char *argv[])
 	       id_bufr = NULL,
 	       cmdbufr = NULL;
 
-	String spid = NULL;
+	String spid	    = NULL,
+	       canister_dir = NULL;
 
 	LocalDuct mgmt = NULL;
 
@@ -1277,7 +1280,7 @@ extern int main(int argc, char *argv[])
 	File infile = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "Sdb:e:i:m:n:s:t:v:")) != EOF )
+	while ( (opt = getopt(argc, argv, "Sdb:c:e:i:m:n:s:t:v:")) != EOF )
 		switch ( opt ) {
 			case 'S':
 				Mode = sgx;
@@ -1288,6 +1291,9 @@ extern int main(int argc, char *argv[])
 
 			case 'b':
 				bundle = optarg;
+				break;
+			case 'c':
+				canister = optarg;
 				break;
 			case 'e':
 				enclave_name = optarg;
@@ -1313,6 +1319,26 @@ extern int main(int argc, char *argv[])
 		}
 
 
+	/*
+	 * If this is a canister invocation setup the name of the
+	 * budle directory and the canister name.
+	 */
+	if ( canister != NULL ) {
+		if ( canister_name == NULL )
+			canister_name = canister;
+
+		INIT(HurdLib, String, canister_dir, ERR(goto done));
+		canister_dir->add(canister_dir, CANISTERS);
+		canister_dir->add(canister_dir, "/");
+		if ( !canister_dir->add(canister_dir, canister) ) {
+			fputs("Unable to setup canister location.\n", stderr);
+			goto done;
+		}
+
+		bundle = canister_dir->get(canister_dir);
+	}
+
+			
 	/* Verify we have a canister name. */
 	if ( canister_name == NULL ) {
 		fputs("No canister name specified.\n", stderr);
@@ -1603,6 +1629,7 @@ extern int main(int argc, char *argv[])
 	WHACK(id_bufr);
 	WHACK(cmdbufr);
 	WHACK(spid);
+	WHACK(canister_dir);
 	WHACK(mgmt);
 	WHACK(idt);
 	WHACK(infile);
