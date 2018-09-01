@@ -165,7 +165,8 @@ struct {
  enum {
 	 internal,
 	 sgx,
-	 measure
+	 measure,
+	 show
 } Mode = sgx;
 
 /**
@@ -265,6 +266,7 @@ static _Bool add_verifiers(CO(ISOenclave, enclave), CO(File, infile), \
 
 
  done:
+	globfree(&identities);
 	WHACK(bufr);
 
 	return retn;
@@ -1281,6 +1283,83 @@ static void * measurement_mode(CO(char *, enclave_name), CO(char *, token))
 }
 
 
+/**
+ * Private function.
+ *
+ * This function implements the show mode of the cboot utility.
+ * This mode displays the set of Canisters that are currently
+ * provisioned on the host.
+ *
+ * \param root	A pointer to the buffer containing the root directory
+ *		to be used to display the canisters.
+ *
+ * \return	This function exits the program with a status code
+ *		indicating whether or not the generation of the
+ *		canister list was successful.  A non-zero return value
+ *		indicates an error was encountered while a return
+ *		value of zero indicates the list was successfully
+ *		generated.
+ */
+
+static void * show_mode(CO(char *, root))
+
+{
+	char *p;
+
+	int retn = 1;
+
+	uint16_t lp;
+
+	glob_t canisters;
+
+	String str = NULL;
+
+
+	/* Generate the list of canisters. */
+	INIT(HurdLib, String, str, ERR(goto done));
+	str->add(str, root);
+	if ( !str->add(str, "/*") )
+		ERR(goto done);
+
+	if ( glob(str->get(str), 0, NULL, &canisters) != 0 ) {
+		fprintf(stderr, "Failed read of canister directory: %s\n", \
+			root);
+		goto done;
+	}
+	if ( canisters.gl_pathc == 0 ) {
+		fputs("No canisters found:\n", stderr);
+		goto done;
+	}
+
+
+	/* Iterate through and print the canisters found .*/
+	fprintf(stdout, "%s:\n", root);
+	for (lp= 0; lp < canisters.gl_pathc; ++lp) {
+		str->reset(str);
+		if ( !str->add(str, canisters.gl_pathv[lp]) ) {
+			fputs("Error processing canister list\n", stderr);
+			goto done;
+		}
+
+		p = str->get(str);
+		if ( (p = strrchr(str->get(str), '/')) == NULL )
+			p = str->get(str);
+		else
+			++p;
+		fprintf(stdout, "%s\n", p);
+	}
+
+	retn = 0;
+
+
+ done:
+	globfree(&canisters);
+	WHACK(str);
+
+	exit(retn);
+}
+
+
 /*
  * Program entry point begins here.
  */
@@ -1335,13 +1414,16 @@ extern int main(int argc, char *argv[])
 	File infile = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "LMdb:c:e:i:m:n:s:t:v:")) != EOF )
+	while ( (opt = getopt(argc, argv, "LMSdb:c:e:i:m:n:s:t:v:")) != EOF )
 		switch ( opt ) {
 			case 'L':
 				Mode = internal;
 				break;
 			case 'M':
 				Mode = measure;
+				break;
+			case 'S':
+				Mode = show;
 				break;
 			case 'd':
 				Debug = true;
@@ -1382,6 +1464,11 @@ extern int main(int argc, char *argv[])
 		measurement_mode(enclave_name, token);
 
 
+	/* Execute canister display mode. */
+	if ( Mode == show )
+		show_mode(CANISTERS);
+
+
 	/*
 	 * If this is a canister invocation setup the name of the
 	 * budle directory and the canister name.
@@ -1401,7 +1488,7 @@ extern int main(int argc, char *argv[])
 		bundle = canister_dir->get(canister_dir);
 	}
 
-			
+
 	/* Verify we have a canister name. */
 	if ( canister_name == NULL ) {
 		fputs("No canister name specified.\n", stderr);
