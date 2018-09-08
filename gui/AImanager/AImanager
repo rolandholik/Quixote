@@ -1,0 +1,18 @@
+#! /bin/bash
+
+#
+# Wrapper script for execution of the AImanager graphical canister
+# management tool.
+#
+
+# Installation root.
+# declare -r Root="/opt/IDfusion";
+
+
+# Java defines.
+# declare Java_Defines="-cp $Root/lib//AImanager.jar";
+# -Djavax.net.debug=all used to requesting debug information.
+
+
+# Execute client.
+java $Java_Defines AImanager 2>&1 | tee AImanager.log;
