@@ -282,6 +282,9 @@ public class AImanager
 
 	this.setLocation(228, 0);
 	this.setVisible(true);
+
+	CanisterMonitor monitor = new CanisterMonitor(TargetTabs);
+	monitor.start();
     }
 
 

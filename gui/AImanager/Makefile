@@ -5,8 +5,9 @@
 #
 # Java source definitions.
 #
-SRCS = AImanager.java LoginPanel.java Target.java CbootManager.java \
-	ContourManager.java TrajectoryManager.java ForensicsManager.java
+SRCS = AImanager.java LoginPanel.java Target.java CbootManager.java	 \
+	ContourManager.java TrajectoryManager.java ForensicsManager.java \
+	CanisterMonitor.java
 
 
 #

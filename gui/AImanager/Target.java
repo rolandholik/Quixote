@@ -14,9 +14,9 @@ import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 
 import javax.swing.JPanel;
-import javax.swing.JScrollPane;
 import javax.swing.JTabbedPane;
 import javax.swing.JTextArea;
+import javax.swing.JScrollPane;
 
 import javax.swing.JTree;
 import javax.swing.tree.DefaultTreeModel;
@@ -36,6 +36,8 @@ import javax.swing.tree.TreePath;
 
 public class Target
     extends JPanel {
+
+    private int forensics_cnt = 0;
 
     private String Error_Message;
     private String host = null;
@@ -131,15 +133,43 @@ public class Target
 	if ( !login() )
 	    return false;
 
-	if ( !Contours.update_contours() )
-	    return false;
-	if ( !Trajectory.update_trajectory() )
-	    return false;
-	if ( !Forensics.update_forensics() )
-	    return false;
+	synchronized ( this ) {
+	    if ( !Contours.update_contours() )
+		return false;
+	    if ( !Trajectory.update_trajectory() )
+		return false;
+	    if ( !Forensics.update_forensics() )
+		return false;
+	}
 
 
 	return true;
+    }
+
+
+    /**
+     * The <code>poll_forensics</code> is a method that implements the
+     * polling of a remote canister instance for the presence of behavioral
+     * violations.
+     *
+     * @return A <code>boolean</code> value is returned to indicate the
+     * status of whether or not additional forensics information has
+     * become available.  A true value indicates that new entries are
+     * present for this target.
+     */
+    public synchronized boolean poll_forensics() {
+
+	boolean retn = false;
+
+	synchronized ( this ) {
+	    System.err.println("\tPolling: " + host + ":" + port);
+	    retn = Forensics.update_forensics();
+
+	    System.err.println("Forensics lines: " + Forensics.getLineCount());
+	    System.err.println("Forensics rows:  " + Forensics.getRows());
+	}
+
+	return Forensics.have_forensics();
     }
 
 
