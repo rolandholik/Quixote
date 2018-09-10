@@ -72,18 +72,20 @@ public class Target
 //	    });
 
 	Contours = new ContourManager(Remote);
- 	ModelTabs.addTab("Contours", Contours);
+	ModelTabs.addTab("Contours", new JScrollPane(Contours));
 
 	Trajectory = new TrajectoryManager(Remote);
-	ModelTabs.addTab("Trajectory", Trajectory);
+	ModelTabs.addTab("Trajectory", new JScrollPane(Trajectory));
 
 	Forensics = new ForensicsManager(Remote);
-	ModelTabs.addTab("Forensics", Forensics);
+	ModelTabs.addTab("Forensics", new JScrollPane(Forensics));
 
 
 	/* Layout the panes containing the two trees. */
 	this.setLayout(new BoxLayout(this, BoxLayout.X_AXIS));
 	this.add(ModelTabs);
+	this.revalidate();
+	this.repaint();
 
 
 	return;
