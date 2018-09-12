@@ -741,6 +741,8 @@ static _Bool send_packet(CO(PossumPipe, this), const PossumPipe_type type, \
 		S->poisoned = true;
 	if ( packet != NULL )
 		possum_packet_free(packet);
+	if ( asn != NULL )
+		OPENSSL_free(asn);
 
 	return retn;
 }

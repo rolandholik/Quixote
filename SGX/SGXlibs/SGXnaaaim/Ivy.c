@@ -345,6 +345,8 @@ static _Bool encode(CO(Ivy, this), CO(Buffer, bufr))
  done:
 	if ( verifier != NULL )
 		asn1_ivy_free(verifier);
+	if ( asn != NULL )
+		OPENSSL_free(asn);
 
 	return retn;
 }

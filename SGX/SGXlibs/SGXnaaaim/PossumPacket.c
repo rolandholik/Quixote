@@ -570,6 +570,8 @@ static _Bool create_authenticator(CO(PossumPacket_State, S), CO(Buffer, bufr))
 		S->poisoned = true;
 	if ( packet1 != NULL )
 		packet1_payload_free(packet1);
+	if ( asn != NULL )
+		OPENSSL_free(asn);
 
 	WHACK(auth);
 	WHACK(cipher);

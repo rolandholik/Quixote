@@ -378,6 +378,8 @@ static _Bool encode(CO(IDtoken, this), CO(Buffer, bufr))
  done:
 	if ( identity != NULL )
 		asn1_identity_free(identity);
+	if ( asn != NULL )
+		OPENSSL_free(asn);
 
 	return retn;
 }
