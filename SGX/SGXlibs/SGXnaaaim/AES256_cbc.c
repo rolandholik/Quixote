@@ -254,6 +254,8 @@ static void whack(CO(AES256_cbc, this))
 	STATE(S);
 
 
+	EVP_CIPHER_CTX_free(S->context);
+
 	if ( S->buffer != NULL )
 		S->buffer->whack(S->buffer);
 
