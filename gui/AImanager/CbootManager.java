@@ -1,5 +1,5 @@
 /**
-* \file
+
 * This file contains the entry point for managing an instance of
 * the cboot-mgr utility.  This utility is used to implement
 * enclave<-> based communications with a remote canister instance.
@@ -28,6 +28,9 @@ import java.util.ArrayList;
  */
 
 public class CbootManager {
+
+    private String Hostname;
+    private String Port;
 
     /**
      * The cboot-mgr process descriptor.
@@ -80,7 +83,10 @@ public class CbootManager {
 	System.out.println("Port: " + port);
 	if ( port == null )
 	    port = "11990";
-	String cmd[] = {"/home/greg/cboot-mgr", "-h", hostname, "-p", port};
+	String cmd[] = {"cboot-mgr", "-h", hostname, "-p", port};
+
+	Hostname = hostname;
+	Port = port;
 
 
 	try {

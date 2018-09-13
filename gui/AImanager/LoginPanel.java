@@ -43,9 +43,9 @@ public class LoginPanel
 
     private JTextField hosttext,
 		       porttext,
-		       usertext;
+		       canname;
 
-    private JPasswordField pwdtext;
+    private JPasswordField pintext;
 
     private JTabbedPane TargetTabs;
 
@@ -82,7 +82,9 @@ public class LoginPanel
         	BorderFactory.createEmptyBorder(5,5,5,5))
 	);
 
-        java.awt.Dimension ptfs = new java.awt.Dimension(200, 20);
+	/*        java.awt.Dimension ptfs = new java.awt.Dimension(200, 20); */
+
+	java.awt.Dimension ptfs = new java.awt.Dimension(200, 30);
 
         JLabel hostlabel = new JLabel("Hostname:");
         hostlabel.setHorizontalAlignment(SwingConstants.RIGHT);
@@ -126,18 +128,18 @@ public class LoginPanel
 
         UserLoginPane.setLayout(gbl);
         UserLoginPane.setBorder(BorderFactory.createCompoundBorder(
-        	BorderFactory.createTitledBorder("Administrator Login"),
+		BorderFactory.createTitledBorder("Canister:"),
 		BorderFactory.createEmptyBorder(5,5,5,5))
 	);
 
-        JLabel Userl = new JLabel("User Name:");
+        JLabel Userl = new JLabel("Name:");
         Userl.setHorizontalAlignment(SwingConstants.RIGHT);
-        JLabel Passwordl = new JLabel("Password:");
+        JLabel Passwordl = new JLabel("Pincode:");
         Passwordl.setHorizontalAlignment(SwingConstants.RIGHT);
-        usertext = new JTextField();
-        usertext.setPreferredSize(ptfs);
-        pwdtext = new JPasswordField();
-        pwdtext.setPreferredSize(ptfs);
+        canname = new JTextField();
+        canname.setPreferredSize(ptfs);
+        pintext = new JPasswordField();
+        pintext.setPreferredSize(ptfs);
 
         gbc.insets = new Insets(5,5,5,5);
         gbc.fill = GridBagConstraints.NONE;
@@ -159,12 +161,12 @@ public class LoginPanel
         gbc.weightx = 1.0;
         gbc.gridx = 1;
         gbc.gridy = 0;
-        gbl.setConstraints(usertext, gbc);
-        UserLoginPane.add(usertext);
+        gbl.setConstraints(canname, gbc);
+        UserLoginPane.add(canname);
 
         gbc.gridy = 1;
-        gbl.setConstraints(pwdtext, gbc);
-        UserLoginPane.add(pwdtext);
+        gbl.setConstraints(pintext, gbc);
+        UserLoginPane.add(pintext);
 
         /* Configure button panel. */
         JPanel ButtonPane = new JPanel();
@@ -218,16 +220,16 @@ public class LoginPanel
 	implements ActionListener, KeyListener {
 
 	/**
-	 * The <code>user</code> variable holds the username to be used to
+	 * The <code>canister</code> variable holds the username to be used to
 	 * authenticate to the target.
 	 */
-	private String user;
+	private String canister;
 
 	/**
-	 * The <code>pwd</code> variable holds teh password to be used with
-	 * the specified username to authenticate the user.
+	 * The <code>pin</code> variable holds pincode to be used to
+	 * authenticate the user.
 	 */
-	private String pwd;
+	private String pin;
 
 
 	/**
@@ -244,15 +246,15 @@ public class LoginPanel
 
 	    /* Fetch the username and password to be used for the login. */
 	    try {
-		user = usertext.getText();
-		pwd = new String(pwdtext.getPassword());
-		usertext.setText("");
-		pwdtext.setText("");
+		canister = canname.getText();
+		pin = new String(pintext.getPassword());
+		canname.setText("");
+		pintext.setText("");
 	    } catch ( NullPointerException e ) {
 		return(true);
 	    }
 
-	    if ( user.equals("") )
+	    if ( canister.equals("") )
 		return(true);
 
  	    return(true);
@@ -281,11 +283,11 @@ public class LoginPanel
 	    if ( getCredentials() != true )
 		return;
 
-	    if ( user.equals("") )
+	    if ( canister.equals("") )
 		return;
 
-	    target = new Target(hosttext.getText(), porttext.getText(), user,
-				pwd);
+	    target = new Target(hosttext.getText(), porttext.getText(),
+				canister, pin);
 
 	    if ( !target.init() ) {
 		JOptionPane.showMessageDialog(loginb, "Target connection "
@@ -298,7 +300,8 @@ public class LoginPanel
 		return;
 	    }
 
-	    TargetTabs.addTab(hosttext.getText(), target);
+	    TargetTabs.addTab(hosttext.getText() + "[" + porttext.getText() +
+			      "]:" + canister, target);
 
 	    LoginPanel.this.setVisible(false);
 	    LoginPanel.this.dispose();
