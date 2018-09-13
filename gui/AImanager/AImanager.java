@@ -218,19 +218,42 @@ public class AImanager
         EditMenu.setEnabled(false);
         mbMain.add(EditMenu);
 
-        ViewMenu = new JMenu("View");
 
-        JMenuItem miSystem = new JMenuItem("System Status");
+	/* Configure view options. */
+        ViewMenu = new JMenu("View");
+	FileMenu.setMnemonic(KeyEvent.VK_V);
+
+        JMenuItem clear = new JMenuItem("Clear", KeyEvent.VK_C);
+        clear.addActionListener(new ActionListener() {
+		public void actionPerformed(ActionEvent evt) {
+		    int cnt = TargetTabs.getTabCount();
+		    System.err.println("Clear tabs: " + cnt);
+		    if ( cnt == 0 )
+			return;
+
+		    int index = TargetTabs.getSelectedIndex();
+		    System.err.println("Clear index: " + index);
+		    TargetTabs.setForegroundAt(index, java.awt.Color.BLACK);
+
+		    Target tgt = (Target) TargetTabs.getSelectedComponent();
+		    tgt.clear_forensics();
+		}
+	    });
+        ViewMenu.add(clear);
+
+//        JMenuItem miSystem = new JMenuItem("System Status");
 //         miSystem.addActionListener(new ActionListener() {
 //             public void actionPerformed(ActionEve/usr/srnt evt) {
 //                 jTabbedPane1.setSelectedIndex(1);
 //             }
 //         });
-        ViewMenu.add(miSystem);
-        // disable Editing until logged in
-        ViewMenu.setEnabled(false);
+//        ViewMenu.add(miSystem);
+
+        ViewMenu.setEnabled(true);
         mbMain.add(ViewMenu);
 
+
+	/* Configure help menu. */
         HelpMenu = new JMenu("Help");
 
         JMenuItem miAbout = new JMenuItem("About");

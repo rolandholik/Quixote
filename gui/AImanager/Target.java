@@ -42,8 +42,8 @@ public class Target
     private String Error_Message;
     private String host = null;
     private String port = null;
-    private String user = null;
-    private String pwd  = null;
+    private String canister = null;
+    private String pincode  = null;
 
     private CbootManager Remote;
 
@@ -99,17 +99,17 @@ public class Target
      * the host to initiate a connection to.
      * @param port <code>String</code> value containing the port number
      * on the remote host to connect to.
-     * @param user <code>String</code> value containing the username
-     * to be used to log into the target server.
-     * @param pwd <code>String></code> value containing the password to
-     * be used with the specified username to authenticate the login.
+     * @param canister <code>String</code> value containing the name of
+     * the canister to be used to identify the remote instance..
+     * @param pncode <code>String></code> value containing the password to
+     * be used with the specified canister name to authenticate the login.
      */
-    public Target(String host, String port, String user, String pwd) {
+    public Target(String host, String port, String canister, String pincode) {
 
         this.host = host;
         this.port = port;
-	this.user = user;
-	this.pwd  = pwd;
+	this.canister = canister;
+	this.pincode  = pincode;
 
 	Remote = new CbootManager();
 	initialize_graphics();
@@ -120,8 +120,8 @@ public class Target
      * The <code>init</code> method initializes a secured conduit
      * connection to a remote ISME implementation.
      *
-     * @param user a <code>String</code> value containing the name of
-     * the user which will be used to initiate the secured conduit.
+     * @param canister a <code>String</code> value containing the name of
+     * the canister which will be used to initiate the secured conduit.
      * @return a <code>boolean</code> value indicating whether or not the
      * connection conduit was properly setup.
      */
@@ -172,6 +172,17 @@ public class Target
 	}
 
 	return Forensics.have_forensics();
+    }
+
+
+    /**
+     * The <code>clear_forensics</code> is a method that implements clearing
+     * of the forensics trigger state of the target.
+     */
+    public void clear_forensics() {
+
+	Forensics.clear_forensics();
+	return;
     }
 
 
