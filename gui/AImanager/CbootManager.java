@@ -301,6 +301,52 @@ public class CbootManager {
 
 
     /**
+     * The <code>get_connection</code> method that returns the connection
+     * information from the remote canister instances.
+     *
+     * @param lines is a <code>ArrayList<String></code> object that
+     * will be loaded with the connection information..
+     *
+     * @return a <code>boolean</code> value is used to indicate the
+     * status of the transaction.
+     */
+    public boolean get_connection(ArrayList<String> lines) {
+
+	boolean retn = false;
+
+	int lp,
+	    linecnt;
+
+	String output,
+	       size = "size: ";
+
+
+	try {
+	    /* Send command to the cboot-mgr. */
+	    System.err.println("Sending connection request.");
+	    Stdin.write("show connection\n".getBytes());
+	    Stdin.flush();
+
+
+	    /* Extract command output. */
+	    output = Stdout.readLine();
+	    while ( !retn ) {
+		output = Stdout.readLine();
+		lines.add(output);
+		if ( output.matches(".*Extended group id.*") )
+		    return true;
+	    }
+	}
+	catch (IOException ex) {
+	    System.err.println("Execution error: " + ex);
+	}
+
+
+	return true;
+    }
+
+
+    /**
      * The <code>logout</code> method is a no arguement method that
      * sends a termination command to the remote canister instance.
      *

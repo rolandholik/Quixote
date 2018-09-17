@@ -187,6 +187,28 @@ public class Target
 
 
     /**
+     * The <code>display_connection</code> method implements the display
+     * of the connection status for a given canister instance.  This
+     * is a summary of the remote attestation information from the
+     * enclave that is being communicated with.
+     *
+     * @return A <code>boolean</code> value is returned to indicate the
+     * status of whether or not connection information is available.
+     */
+    public synchronized boolean display_connection(ConnectionManager mgr) {
+
+	boolean retn = false;
+
+	synchronized ( this ) {
+	    System.err.println("\tConnection: " + host + ":" + port);
+	    retn = mgr.display_connection(Remote);
+	}
+
+	return retn;
+    }
+
+
+    /**
      * The <code>get_error</code> is an accessor method which returns
      * the error status of the underying connection.
      *

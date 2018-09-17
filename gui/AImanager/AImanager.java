@@ -241,6 +241,28 @@ public class AImanager
 	    });
         ViewMenu.add(clear);
 
+	JMenuItem connection = new JMenuItem("cOnnection", KeyEvent.VK_O);
+	connection.addActionListener(new ActionListener() {
+		public void actionPerformed(ActionEvent evt) {
+		    int cnt = TargetTabs.getTabCount();
+		    if ( cnt == 0 )
+			return;
+
+		    Target tgt = (Target) TargetTabs.getSelectedComponent();
+		    ConnectionManager mgr = new ConnectionManager();
+		    tgt.display_connection(mgr);
+
+		    Component cmpt = (Component) ViewMenu.getComponent();
+		    Point pt = cmpt.getLocationOnScreen();
+
+		    mgr.setLocation(pt);
+		    mgr.pack();
+		    mgr.setVisible(true);
+		}
+	    });
+	ViewMenu.add(connection);
+
+
 //        JMenuItem miSystem = new JMenuItem("System Status");
 //         miSystem.addActionListener(new ActionListener() {
 //             public void actionPerformed(ActionEve/usr/srnt evt) {
