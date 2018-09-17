@@ -321,6 +321,14 @@ static _Bool process_command(CO(PossumPipe, mgmt), CO(char *, cmd))
 	Buffer cmdbufr = NULL;
 
 
+	/* Process local commands. */
+	if ( strcmp("show connection", cmd) == 0 ) {
+		mgmt->display_connection(mgmt);
+		retn = true;
+		goto done;
+	}
+
+
 	/* Locate the command. */
 	for (lp= 0; cp[lp].syntax != NULL; ++lp) {
 		if ( strcmp(cp[lp].syntax, cmd) == 0 )

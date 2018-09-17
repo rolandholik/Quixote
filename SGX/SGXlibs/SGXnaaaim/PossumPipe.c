@@ -113,6 +113,9 @@ struct NAAAIM_PossumPipe_State
 	/* Network connection object. */
 	Duct duct;
 
+	/* Remote software quote. */
+	SGXquote remote;
+
 	/* Packet transmission nonce. */
 	Sha256 nonce;
 
@@ -207,7 +210,8 @@ static void _init_state(CO(PossumPipe_State,S))
 	S->poisoned = false;
 	S->debug    = false;
 
-	S->nonce = NULL;
+	S->remote = NULL;
+	S->nonce  = NULL;
 
 	S->sent	    = NULL;
 	S->received = NULL;
@@ -1330,8 +1334,6 @@ static _Bool receive_platform_quote(CO(PossumPipe, this), CO(Buffer, bufr), \
 	TPMcmd tpmcmd = NULL;
 #else
 	String output = NULL;
-
-	SGXquote quoter = NULL;
 #endif
 
 	AES256_cbc cipher = NULL;
@@ -1393,19 +1395,19 @@ static _Bool receive_platform_quote(CO(PossumPipe, this), CO(Buffer, bufr), \
 #else
 	INIT(HurdLib, String, output, ERR(goto done));
 
-	INIT(NAAAIM, SGXquote, quoter, ERR(goto done));
-	if ( !quoter->generate_report(quoter, quote, output) )
+	INIT(NAAAIM, SGXquote, S->remote, ERR(goto done));
+	if ( !S->remote->generate_report(S->remote, quote, output) )
 		ERR(goto done);
 
-	if ( !quoter->decode_report(quoter, output) )
+	if ( !S->remote->decode_report(S->remote, output) )
 		ERR(goto done);
 	if ( S->debug ) {
 		fputs("\nAttestation report:\n", stdout);
-		quoter->dump_report(quoter);
+		S->remote->dump_report(S->remote);
 	}
 
 	if ( !_update_measurement(S->software, nonce, \
-				  quoter->get_quoteinfo(quoter)) )
+				  S->remote->get_quoteinfo(S->remote)) )
 		ERR(goto done);
 #endif
 	retn = true;
@@ -1419,7 +1421,6 @@ static _Bool receive_platform_quote(CO(PossumPipe, this), CO(Buffer, bufr), \
 	WHACK(tpmcmd);
 #else
 	WHACK(output);
-	WHACK(quoter);
 #endif
 	WHACK(cipher);
 	WHACK(hmac);
@@ -2389,6 +2390,28 @@ static _Bool start_client_mode(CO(PossumPipe, this), CO(Buffer, spid))
 /**
  * External public method.
  *
+ * This method implements a method for displaying the current
+ * attestation status of the remote connection.
+ *
+ * \param this		The communications object whose status is to
+ *			be dumped.
+ * \return	No return value is defined.
+ */
+
+static void display_connection(CO(PossumPipe, this))
+
+{
+	STATE(S);
+
+
+	S->remote->dump_report(S->remote);
+	return;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a control method for setting the debug
  * status of a PossumPipe instance.
  *
@@ -2465,6 +2488,7 @@ static void whack(CO(PossumPipe, this))
 
 
 	S->duct->whack(S->duct);
+	S->remote->whack(S->remote);
 
 	WHACK(S->nonce);
 
@@ -2531,6 +2555,8 @@ extern PossumPipe NAAAIM_PossumPipe_Init(void)
 
 	this->start_host_mode	= start_host_mode;
 	this->start_client_mode = start_client_mode;
+
+	this->display_connection = display_connection;
 
 	this->debug = debug;
 	this->reset = reset;
