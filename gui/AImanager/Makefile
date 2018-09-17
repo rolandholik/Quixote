@@ -34,6 +34,10 @@ CLASSES = ${SRCS:java=class}
 #
 classes: $(CLASSES)
 
+jar: classes
+	rm -f AImanager.jar;
+	jar cf AImanager.jar *.class;
+
 docs:
 	javadoc ${SRCS}
 
