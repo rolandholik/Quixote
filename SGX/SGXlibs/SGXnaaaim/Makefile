@@ -119,7 +119,7 @@ test-Duct.so: ${DUCTOBJS} ${LIBRARY}
 
 test-Possum.signed.so: test-Possum.so
 	${SGX_SIGNER} sign -key Private-key.pem -enclave $^ -out $@ \
-		-config test-Duct-enclave.xml;
+		-config test-Possum-enclave.xml;
 
 test-Possum.so: ${POSSUMOBJS} ${LIBRARY}
 	${ENCLAVE_CC} -o $@ ${POSSUMOBJS} ${ENCLAVE_LDFLAGS};
