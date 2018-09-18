@@ -24,7 +24,8 @@ MUSL_INCLUDE = /usr/local/musl/include
 CDEBUG = -g -O2 -fomit-frame-pointer -march=core2
 CFLAGS = -Wall ${CDEBUG}
 
-LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib -L../lib -L../HurdLib
+LDFLAGS = ${STATIC} -g -Wl,--rpath-link /usr/local/musl/lib -L../lib \
+	-L../HurdLib
 
 # OpenSSL crypto library
 SSL_CRYPTO  = -L /usr/local/musl/lib -lcrypto
