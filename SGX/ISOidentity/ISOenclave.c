@@ -522,6 +522,65 @@ static _Bool set_aggregate(CO(ISOenclave, this), CO(Buffer, bufr))
 /**
  * External public method.
  *
+ * This method implements adding an AI introspection event to the
+ * current behavioral model.
+ *
+ * \param this	A pointer to the canister which is to have an
+ *		introspection event added to it.
+ *
+ * \param event	The object containing the description of the AI event.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		addition of the AI event was successful.  A false value
+ *		indicates a failure in adding the event while a true
+ *		value indicates the model was successfully updated.
+ */
+
+static _Bool add_ai_event(CO(ISOenclave, this), CO(String, event))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	int rc;
+
+	struct ISOidentity_ecall14 ecall14;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( event == NULL )
+		ERR(goto done);
+	if ( event->poisoned(event) )
+		ERR(goto done);
+
+
+	/* Call ECALL slot 15 to set the AI event. */
+	ecall14.ai_event      = (uint8_t *) event->get(event);
+	ecall14.ai_event_size = event->size(event) + 1;
+
+	if ( !S->enclave->boot_slot(S->enclave, 14, &ocall_table, &ecall14, \
+				    &rc) ) {
+		S->enclave_error = rc;
+		ERR(goto done);
+	}
+	if ( !ecall14.retn )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method is an accessor method for accessing the currrent
  * measurement of the model.
  *
@@ -1456,6 +1515,8 @@ extern ISOenclave NAAAIM_ISOenclave_Init(void)
 
 	this->update	 = update;
 	this->update_map = update_map;
+
+	this->add_ai_event = add_ai_event;
 
 	this->set_aggregate   = set_aggregate;
 	this->get_measurement = get_measurement;

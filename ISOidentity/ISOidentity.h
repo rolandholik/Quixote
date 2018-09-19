@@ -32,6 +32,11 @@ struct NAAAIM_ISOidentity
 
 	_Bool (*set_aggregate)(const ISOidentity, const Buffer);
 
+	_Bool (*add_ai_event)(const ISOidentity, const String);
+	_Bool (*get_ai_event)(const ISOidentity, String *);
+	size_t (*ai_events_size)(const ISOidentity);
+	void (*ai_rewind_event)(const ISOidentity);
+
 	_Bool (*get_measurement)(const ISOidentity, const Buffer);
 	_Bool (*discipline_pid)(const ISOidentity, pid_t *);
 

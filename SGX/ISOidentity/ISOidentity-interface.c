@@ -38,6 +38,7 @@ extern _Bool manager(struct ISOidentity_ecall10_interface *);
 extern _Bool generate_identity(uint8_t *);
 extern _Bool update_map(struct ISOidentity_ecall12_interface *);
 extern _Bool add_verifier(struct ISOidentity_ecall13 *);
+extern _Bool add_ai_event(struct ISOidentity_ecall14 *);
 
 
 static _Bool SGXidf_untrusted_region(void *ptr, size_t size)
@@ -506,6 +507,53 @@ static sgx_status_t sgx_add_verifier(void *pms)
 }
 
 
+/* ECALL14 interface function. */
+static sgx_status_t sgx_add_ai_event(void *pms)
+
+{
+	sgx_status_t status = SGX_ERROR_INVALID_PARAMETER;
+
+	struct ISOidentity_ecall14 *ms,
+				   ecall14;
+
+
+	/* Verify marshalled arguements and setup parameters. */
+	memset(&ecall14, '\0', sizeof(struct ISOidentity_ecall14));
+
+	if ( !SGXidf_untrusted_region(pms, \
+				      sizeof(struct ISOidentity_ecall14)) )
+		goto done;
+	ms = (struct ISOidentity_ecall14 *) pms;
+
+
+	/* Replicate the identifier verifier. */
+	ecall14.ai_event_size = ms->ai_event_size;
+
+	if ( !SGXidf_untrusted_region(ms->ai_event, ecall14.ai_event_size) )
+		goto done;
+
+	if ( (ecall14.ai_event = malloc(ecall14.ai_event_size)) == NULL )
+		goto done;
+	memcpy(ecall14.ai_event, ms->ai_event, ecall14.ai_event_size);
+
+	__builtin_ia32_lfence();
+
+
+	/* Call the trusted function. */
+	ms->retn = add_ai_event(&ecall14);
+	status = SGX_SUCCESS;
+
+
+ done:
+	memset(ecall14.ai_event, '\0', ecall14.ai_event_size);
+	free(ecall14.ai_event);
+
+	memset(&ecall14, '\0', sizeof(struct ISOidentity_ecall14));
+
+	return status;
+}
+
+
 /* ECALL interface table. */
 SGX_EXTERNC const struct {
 	size_t nr_ecall;
@@ -526,7 +574,8 @@ SGX_EXTERNC const struct {
 		{(void*)(uintptr_t)sgx_manager, 0},
 		{(void*)(uintptr_t)sgx_generate_identity, 0},
 		{(void*)(uintptr_t)sgx_update_map, 0},
-		{(void*)(uintptr_t)sgx_add_verifier, 0}
+		{(void*)(uintptr_t)sgx_add_verifier, 0},
+		{(void*)(uintptr_t)sgx_add_ai_event, 0}
 	}
 };
 
@@ -538,11 +587,11 @@ SGX_EXTERNC const struct {
 } g_dyn_entry_table = {
 	OCALL_NUMBER,
 	{
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 	}
 };

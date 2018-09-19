@@ -363,6 +363,53 @@ _Bool set_aggregate(unsigned char *aggregate, size_t length)
 
 
 /**
+ * External ECALL 14
+ *
+ * This method implements adding an AI event to the ISOidentity model
+ * being implemented inside the enclave being managed by an instance
+ * of this object.
+ *
+ * \param ecall14	A pointer to the structure which marshalls
+ *			the inputs to this function.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the update to the model succeeded.  A false value
+ *		indicates the update had failed while a true value
+ *	        indicates the enclave model had been updated.
+ */
+
+_Bool add_ai_event(struct ISOidentity_ecall14 *ecall14)
+
+{
+	_Bool retn = false;
+
+	String event = NULL;
+
+
+	/* Verify the model is initialized. */
+	if ( Model == NULL )
+		ERR(goto done);
+
+
+	/*
+	 * Load the aggregate value into an object for submission
+	 * to the model and then set the aggregate value.
+	 */
+	INIT(HurdLib, String, event, ERR(goto done));
+	if ( !event->add(event, (char *) ecall14->ai_event) )
+		ERR(goto done);
+
+	if ( !Model->add_ai_event(Model, event) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
  * External ECALL.
  *
  * This method implements retrieving the current measurement value

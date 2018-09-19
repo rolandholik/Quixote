@@ -90,6 +90,10 @@ struct NAAAIM_ISOidentity_State
 	/* Forensics event map. */
 	size_t forensics_cursor;
 	Buffer forensics;
+
+	/* AI events. */
+	size_t ai_events_cursor;
+	Buffer ai_events;
 };
 
 
@@ -126,6 +130,9 @@ static void _init_state(CO(ISOidentity_State, S))
 
 	S->contours	   = NULL;
 	S->contours_cursor = 0;
+
+	S->ai_events	    = NULL;
+	S->ai_events_cursor = 0;
 
 	return;
 }
@@ -485,6 +492,157 @@ static _Bool set_aggregate(CO(ISOidentity, this), CO(Buffer, bufr))
 /**
  * External public method.
  *
+ * This method implements adding an AI event to the current behavioral
+ * description.
+ *
+ * \param this	A pointer to the canister to which an event is to be
+ *		added.
+ *
+ * \param event	The object containing the event description to be
+ *		added.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the aggregate measurement was successfully set.  A
+ *		false value indicate a failure in returning measurement
+ *		while a true value indicates the object contains a valid
+ *		measurement.
+ */
+
+static _Bool add_ai_event(CO(ISOidentity, this), CO(String, event))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( event->poisoned(event) )
+		ERR(goto done);
+
+	if ( !S->ai_events->add(S->ai_events, (unsigned char *) &event, \
+			sizeof(String)) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method is an accessor method for retrieving the AI events which
+ * have been injected into the model.  This method is designed to be
+ * called repeatedly until the list of AI events is completely traversed.
+ * The traversal can be reset by calling the ->rewind_ai_event method.
+ *
+ * \param this	A pointer to the canister whose AI events are to be
+ *		retrieved.
+ *
+ * \param event	The object which the event will be copied to.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		a valid event was returned.  A false value
+ *		indicates a failure occurred and a valid event is
+ *		not available.  A true value indicates the event
+ *		object contains a valid value.
+ *
+ *		The end of the event list is signified by a NULL
+ *		event object being set.
+ */
+
+static _Bool get_ai_event(CO(ISOidentity, this), String * const event)
+
+{
+	STATE(S);
+
+	_Bool retn = true;
+
+	size_t size;
+
+	String *event_ptr,
+	       return_event = NULL;
+
+
+	/* Check object status. */
+	if ( S->poisoned )
+		goto done;
+
+
+	/* Get and verify cursor position. */
+	size = S->ai_events->size(S->ai_events) / sizeof(String);
+	if ( S->ai_events_cursor >= size ) {
+		retn = true;
+		goto done;
+	}
+
+	event_ptr  = (String *) S->ai_events->get(S->ai_events);
+	event_ptr += S->ai_events_cursor;
+	return_event = *event_ptr;
+	++S->ai_events_cursor;
+	retn = true;
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+	else
+		*event = return_event;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements returning the number of AI events in the
+ * current behavioral model.
+ *
+ * \param this	A pointer to the object whose IA event size is to
+ *		be returned.
+ *
+ * \return	The size of the AI events list.
+ *
+ */
+
+static void ai_rewind_event(CO(ISOidentity, this))
+
+{
+	this->state->ai_events_cursor = 0;
+	return;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements returning the number of AI events in the
+ * current behavioral model.
+ *
+ * \param this	A pointer to the object whose IA event size is to
+ *		be returned.
+ *
+ * \return	The size of the AI events list.
+ *
+ */
+
+static size_t ai_events_size(CO(ISOidentity, this))
+
+{
+	STATE(S);
+
+	return S->ai_events->size(S->ai_events) / sizeof(String);
+}
+
+
+/**
+ * External public method.
+ *
  * This method is an accessor method for accessing the currrent
  * measurement of the model.
  *
@@ -826,7 +984,6 @@ static void rewind_forensics(CO(ISOidentity, this))
 }
 
 
-
 /**
  * External public method.
  *
@@ -1065,6 +1222,9 @@ static void whack(CO(ISOidentity, this))
 	GWHACK(ContourPoint, S->contours);
 	WHACK(S->contours);
 
+	GWHACK(String, S->ai_events);
+	WHACK(S->ai_events);
+
 	S->root->whack(S->root, this, S);
 	return;
 }
@@ -1109,12 +1269,19 @@ extern ISOidentity NAAAIM_ISOidentity_Init(void)
 	INIT(HurdLib, Buffer, this->state->trajectory, goto fail);
 	INIT(HurdLib, Buffer, this->state->contours, goto fail);
 	INIT(HurdLib, Buffer, this->state->forensics, goto fail);
+	INIT(HurdLib, Buffer, this->state->ai_events, goto fail);
 
 	/* Method initialization. */
 	this->update	 = update;
 	this->update_map = update_map;
 
 	this->set_aggregate   = set_aggregate;
+
+	this->add_ai_event    = add_ai_event;
+	this->get_ai_event    = get_ai_event;
+	this->ai_events_size  = ai_events_size;
+	this->ai_rewind_event = ai_rewind_event;
+
 	this->get_measurement = get_measurement;
 	this->discipline_pid  = discipline_pid;
 

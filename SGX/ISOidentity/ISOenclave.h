@@ -57,6 +57,8 @@ struct NAAAIM_ISOenclave
 
 	_Bool (*set_aggregate)(const ISOenclave, const Buffer);
 
+	_Bool (*add_ai_event)(const ISOenclave, const String);
+
 	_Bool (*get_measurement)(const ISOenclave, const Buffer);
 	_Bool (*discipline_pid)(const ISOenclave, pid_t *);
 

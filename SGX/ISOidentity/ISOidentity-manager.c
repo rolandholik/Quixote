@@ -308,6 +308,74 @@ static _Bool send_contours(CO(PossumPipe, mgmt), CO(Buffer, cmdbufr))
 /**
  * Private function.
  *
+ * This function is responsible for returning the current set of
+ * AI events to the caller.  The protocol used is to send the number of
+ * elements in the event list followed by each event as an ASCII string.
+ *
+ * \param mgmt		The socket object used to communicate with
+ *			the canister management instance.
+ *
+ * \param cmdbufr	The object which will be used to hold the
+ *			information which will be transmitted.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not the command was processed.  A false value
+ *			indicates an error was encountered while sending
+ *			the event list while a true value indicates the
+ *			event list was succesfully sent.
+ */
+
+static _Bool send_events(CO(PossumPipe, mgmt), CO(Buffer, cmdbufr))
+
+{
+	_Bool retn = false;
+
+	size_t lp,
+	       cnt = 0;
+
+	String event = NULL;
+
+
+	/*
+	 * Compute the number of elements in the AI list and send it to
+	 * the client.
+	 */
+	cnt = Model->ai_events_size(Model);
+
+	cmdbufr->reset(cmdbufr);
+	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
+	if ( !mgmt->send_packet(mgmt, PossumPipe_data, cmdbufr) )
+		ERR(goto done);
+	if ( Debug )
+		fprintf(stderr, "Sent event size: %zu\n", cnt);
+
+
+	/* Send each event. */
+	Model->ai_rewind_event(Model);
+	for (lp= 0; lp < cnt; ++lp) {
+		if ( !Model->get_ai_event(Model, &event) )
+			ERR(goto done);
+		if ( event == NULL )
+			continue;
+
+		cmdbufr->reset(cmdbufr);
+		cmdbufr->add(cmdbufr, (unsigned char *) event->get(event), \
+			     event->size(event));
+		if ( !mgmt->send_packet(mgmt, PossumPipe_data, cmdbufr) )
+			ERR(goto done);
+	}
+
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
  * This function implements the processing of a command from the
  * canister management utility.  This command comes in the form
  * of a binary encoding of the desired command to be run.
@@ -359,6 +427,10 @@ static _Bool process_command(CO(PossumPipe, mgmt), CO(Buffer, cmdbufr))
 
 		case show_contours:
 			retn = send_contours(mgmt, cmdbufr);
+			break;
+
+		case show_events:
+			retn = send_events(mgmt, cmdbufr);
 			break;
 	}
 
