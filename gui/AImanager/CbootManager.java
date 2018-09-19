@@ -347,6 +347,56 @@ public class CbootManager {
 
 
     /**
+     * The <code>get_events</code> method that returns the current
+     * forensics path in the form of a list of events.
+     *
+     * @param events is a <code>ArrayList<String></code> object that
+     * will be loaded with the contours.
+     *
+     * @return a <code>boolean</code> value is used to indicate the
+     * status of the transaction.
+     */
+    public boolean get_events(ArrayList<String> events) {
+
+	boolean retn = false;
+
+	int lp,
+	    linecnt;
+
+	String output,
+	       size = "size: ";
+
+
+	try {
+	    /* Send command to the cboot-mgr. */
+	    System.err.println("Sending events request.");
+	    Stdin.write("show events\n".getBytes());
+	    Stdin.flush();
+
+
+	    /* Extract command output. */
+	    output = Stdout.readLine();
+	    if ( !output.matches(".*AI event size: [0-9]*") )
+		return false;
+
+	    linecnt = output.lastIndexOf(size);
+	    linecnt = Integer.parseInt(output.substring(linecnt +
+							size.length()));
+	    for (lp= 0; lp < linecnt; ++lp) {
+		output = Stdout.readLine();
+		events.add(output);
+	    }
+	}
+	catch (IOException ex) {
+	    System.err.println("Execution error: " + ex);
+	}
+
+
+	return true;
+    }
+
+
+    /**
      * The <code>logout</code> method is a no arguement method that
      * sends a termination command to the remote canister instance.
      *

@@ -209,6 +209,27 @@ public class Target
 
 
     /**
+     * The <code>display_events</code> method implements the display
+     * of the autonomous introspection events for a given canister
+     * instance.
+     *
+     * @return A <code>boolean</code> value is returned to indicate the
+     * status of whether or not connection information is available.
+     */
+    public synchronized boolean display_events(EventManager mgr) {
+
+	boolean retn = false;
+
+	synchronized ( this ) {
+	    System.err.println("\tEvents: " + host + ":" + port);
+	    retn = mgr.display_events(Remote);
+	}
+
+	return retn;
+    }
+
+
+    /**
      * The <code>get_error</code> is an accessor method which returns
      * the error status of the underying connection.
      *
