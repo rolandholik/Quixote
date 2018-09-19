@@ -478,6 +478,8 @@ static _Bool encode_message2(CO(SGXmessage, this), CO(RandomBuffer, rnd), \
 		ERR(goto done);
 	if ( !_encode_message(S, TLV_BLOCK_CIPHER_INFO, 1, sk, submsg) )
 		ERR(goto done);
+	fputs("SK: \n", stdout);
+	b->print(b);
 
 	/* Hash the exponent and modulus of the PEK. */
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
