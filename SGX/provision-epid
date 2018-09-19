@@ -1,0 +1,29 @@
+#! /bin/bash
+
+#
+# This file contains the implementation of a utility which ties the
+# four separate messages phases of the provisioning of an Enhanced
+# Privacy ID (EPID).  This functionality ultimately needs to be
+# integrated into a single binary in the sgx-provision utility but
+# this script currently can automate the process and make EPID
+# provisioning more straight forward.
+#
+# This script currently does not handle the case of where the
+# provisioning servers will return the completed EPID as the message
+# 2 output
+#
+# (C)Copyright 2018, IDfusion, LLC. All rights reserved.
+#
+
+
+sgx-provision -E -v -o endpoint;
+
+sgx-provision -1 -v -i endpoint -o msg1 -k pek | tee msg1.output;
+sed -n '/SK:/ {n;p}' msg1.output > key.txt;
+rm msg1.output;
+
+sgx-provision -2 -v -i msg1 -o msg2 -k pek -s `cat key.txt`;
+sgx-provision -3 -v -i msg2 -o EPID.bin -k pek -s `cat key.txt`;
+
+rm -f endpoint msg1 msg2 pek key.txt;
+exit 0;
