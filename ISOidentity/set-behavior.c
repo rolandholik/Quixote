@@ -39,6 +39,7 @@
 
 #define IMA_SET_CONTOUR		0x1
 #define IMA_SET_PSEUDONYM	0x2
+#define IMA_SET_AI		0x4
 
 /* Flag for cloning the system behavior. */
 #define CLONE_BEHAVIOR		0x00001000
@@ -74,31 +75,46 @@ extern int main(int argc, char *argv[])
 
 	char *contour	= NULL,
 	     *pseudonym = NULL,
-	     *command	= NULL;
+	     *command	= NULL,
+	     *ai_hook	= NULL,
+	     *ai_value	= NULL;
 
 	unsigned char *p;
 
 	int opt,
 	    retn = 1;
 
+	long int opt_arg;
+
 	String value = NULL;
+
+	struct ai_control {
+		unsigned int hook;
+		unsigned int value;
+	} ctl;
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "nc:p:r:")) != EOF )
+	while ( (opt = getopt(argc, argv, "na:c:p:r:v:")) != EOF )
 		switch ( opt ) {
 			case 'n':
 				namespace = true;
 				break;
+
+			case 'a':
+				ai_hook = optarg;
+				break;
 			case 'c':
 				contour = optarg;
 				break;
-
 			case 'p':
 				pseudonym = optarg;
 				break;
 			case 'r':
 				command = optarg;
+				break;
+			case 'v':
+				ai_value = optarg;
 				break;
 		}
 
@@ -124,6 +140,37 @@ extern int main(int argc, char *argv[])
 			fprintf(stdout, "Running command: %s\n", command);
 			system(command);
 		}
+		goto done;
+	}
+
+	/* Set an introspection hook. */
+	if ( ai_hook != NULL ) {
+		if ( ai_value == NULL ) {
+			fputs("No AI hook behavior specified.\n", stderr);
+			goto done;
+		}
+
+		opt_arg = strtol(ai_hook, NULL, 0);
+		if ( (errno == ERANGE) || (errno == EINVAL) ) {
+			fputs("Error in hook value specification.\n", stderr);
+			goto done;
+		}
+		ctl.hook = opt_arg;
+
+		opt_arg = strtol(ai_value, NULL, 0);
+		if ( (errno == ERANGE) || (errno == EINVAL) ) {
+			fputs("Error in hook value specification.\n", stderr);
+			goto done;
+		}
+		ctl.value = opt_arg;
+
+		if ( (retn = sys_behavior((void *) &ctl, sizeof(ctl), \
+					  IMA_SET_AI)) != 0 ) {
+			fprintf(stdout, "Set ai hook returned: %s\n", \
+				strerror(errno));
+			goto done;
+		}
+
 		goto done;
 	}
 
