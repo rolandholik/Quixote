@@ -1,0 +1,128 @@
+From b7f6291105352cfff77f598d05060ff66d8b6988 Mon Sep 17 00:00:00 2001
+From: "Dr. Greg Wettstein" <greg@enjellic.com>
+Date: Fri, 1 Sep 2017 16:36:03 -0500
+Subject: [PATCH 26/37] Implement process actor status.
+
+The changes in this commit implement tagging of a process with
+its 'actor' status.  A process is considered a 'bad actor' if the
+current behavior domain is sealed and the information exchange
+event which the process is executing is not in the permitted
+behavioral mapping.
+
+The actor status is defined as a single bit bitfield in the task
+structure.  In the case of a forked process the status of the
+field is propagated from the parent to the child process.
+This implements a 'fruit of the poison vine' model where all
+subordinate processes are considered to be 'bad actors' if they
+derive from a process which has engaged in an extra-dimensional
+behavior.
+
+The /proc/PID/self pseudo-file has a 'bad_actor:' field added to
+it which allows the status of the actor to be interrogated.
+---
+ fs/proc/array.c                       |  7 +++++++
+ include/linux/sched.h                 |  3 +++
+ kernel/fork.c                         |  3 +++
+ security/integrity/ima/ima_identity.c | 26 ++++++++++++++++++++++++++
+ 4 files changed, 39 insertions(+)
+
+diff --git a/fs/proc/array.c b/fs/proc/array.c
+index d73291f5f0fc..fe322f98c09c 100644
+--- a/fs/proc/array.c
++++ b/fs/proc/array.c
+@@ -343,6 +343,12 @@ static inline void task_context_switch_counts(struct seq_file *m,
+ 			p->nivcsw);
+ }
+ 
++static inline void task_behavior_status(struct seq_file *m,
++					struct task_struct *p)
++{
++	seq_printf(m, "bad_actor:\t%u\n", p->bad_actor);
++}
++
+ static void task_cpus_allowed(struct seq_file *m, struct task_struct *task)
+ {
+ 	seq_printf(m, "Cpus_allowed:\t%*pb\n",
+@@ -369,6 +375,7 @@ int proc_pid_status(struct seq_file *m, struct pid_namespace *ns,
+ 	task_cpus_allowed(m, task);
+ 	cpuset_task_status_allowed(m, task);
+ 	task_context_switch_counts(m, task);
++	task_behavior_status(m, task);
+ 	return 0;
+ }
+ 
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index fa39434e3fdd..90e8f524dc2e 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -1473,6 +1473,9 @@ struct task_struct {
+ #ifdef CONFIG_COMPAT_BRK
+ 	unsigned brk_randomized:1;
+ #endif
++#ifdef CONFIG_IMA
++	unsigned bad_actor:1;
++#endif
+ 
+ 	unsigned long atomic_flags; /* Flags needing atomic access. */
+ 
+diff --git a/kernel/fork.c b/kernel/fork.c
+index d4052628e0c9..0639ffcb08a7 100644
+--- a/kernel/fork.c
++++ b/kernel/fork.c
+@@ -1415,6 +1415,9 @@ static struct task_struct *copy_process(unsigned long clone_flags,
+ 	p->sequential_io	= 0;
+ 	p->sequential_io_avg	= 0;
+ #endif
++#ifdef CONFIG_IMA
++	p->bad_actor = current->bad_actor;
++#endif
+ 
+ 	/* Perform scheduler related setup. Assign this task to a CPU. */
+ 	retval = sched_fork(clone_flags, p);
+diff --git a/security/integrity/ima/ima_identity.c b/security/integrity/ima/ima_identity.c
+index 7e774cc9950d..2cd2f2c87ac2 100644
+--- a/security/integrity/ima/ima_identity.c
++++ b/security/integrity/ima/ima_identity.c
+@@ -1382,6 +1382,30 @@ static int ima_map_identity(int function, struct integrity_iint_cache *iint,
+ 	return retn;
+ }
+ 
++static void ima_set_actor_status(int function, const char *pathname,
++				 struct subject_identity *subject,
++				 char *mapping)
++{
++	struct iso_identity_map *map = current_map();
++
++	if (!current->in_execve)
++		return;
++	if (!map->domain_sealed)
++		return;
++	if ((function != BPRM_CHECK) && (function != MMAP_CHECK))
++		return;
++
++	pr_debug("[%s]: Actor %d:%s function=%d, subject=%*phN, status=%u\n",
++		 __func__, current->pid, pathname, function, WP256_DIGEST_SIZE,
++		 subject->digest, current->bad_actor);
++	if (!have_valid_contour(mapping)) {
++		current->bad_actor = 1;
++		pr_debug("[%s]: Setting bad actor status.\n", __func__);
++	}
++
++	return;
++}
++
+ int ima_identity_is_mapped(int function, struct integrity_iint_cache *iint,
+ 			   struct file *file, const char *pathname)
+ {
+@@ -1398,6 +1422,8 @@ int ima_identity_is_mapped(int function, struct integrity_iint_cache *iint,
+ 			     &subject, mapping) != 0)
+ 		return 0;
+ 
++	ima_set_actor_status(function, pathname, &subject, mapping);
++
+ 	if (have_contour(mapping)) {
+ #if 0
+ 		pr_info("[%s]: Contour cache hit path=%s, mapping=%*phN\n",
+-- 
+2.16.2
+

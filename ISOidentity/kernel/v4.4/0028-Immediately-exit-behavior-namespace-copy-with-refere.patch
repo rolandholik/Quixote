@@ -1,0 +1,43 @@
+From 4a45ec7910858cdca0a20732b865444f2bc7692c Mon Sep 17 00:00:00 2001
+From: "Dr. Greg Wettstein" <greg@enjellic.com>
+Date: Mon, 25 Sep 2017 17:16:05 -0500
+Subject: [PATCH 28/37] Immediately exit behavior namespace copy with
+ reference.
+
+After acquiring a reference to the old namespace the
+ima_copy_ns_behavior() function would exit through the standard
+function cleanup code via the done: label if a new behavior
+namespace was not created.  This caused an error if a new namespace
+domain was being created which did not include a behavior
+namespace.
+
+The code now immediately returns after obtaining a reference to
+the old namespace if a new behavior namespace is not being
+created.  This is not only cleaner but code analysis suggests
+that the exit code was improperly modifying the root behavior
+namespace by exiting through function cleanup code.
+---
+ security/integrity/ima/ima_identity.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/security/integrity/ima/ima_identity.c b/security/integrity/ima/ima_identity.c
+index 2cd2f2c87ac2..09d4c9154b67 100644
+--- a/security/integrity/ima/ima_identity.c
++++ b/security/integrity/ima/ima_identity.c
+@@ -1638,10 +1638,9 @@ struct iso_identity_namespace *ima_copy_behavior_ns(unsigned long flags,
+ 
+ 	if (behavior_ns)
+ 		ima_get_ns(behavior_ns);
+-	if (!(flags & CLONE_BEHAVIOR)) {
+-		ns = behavior_ns;
+-		goto done;
+-	}
++
++	if (!(flags & CLONE_BEHAVIOR))
++		return behavior_ns;
+ 
+ 	ns = kzalloc(sizeof(struct iso_identity_namespace), GFP_KERNEL);
+ 	if (!ns) {
+-- 
+2.16.2
+

@@ -1,0 +1,207 @@
+From f2cdc3baec47b111cf1f3857c25de65f5bb54eab Mon Sep 17 00:00:00 2001
+From: "Dr. Greg Wettstein" <greg@enjellic.com>
+Date: Fri, 29 Sep 2017 18:12:46 -0500
+Subject: [PATCH 29/37] Initial support for export of information exchange
+ events.
+
+This commit begins the process of modifying the code which
+exports canister based measurement events to userspace into a
+more general form.  The goal is to have the ability to export
+multiple event types.
+
+The 'struct measurement' structure was renamed to 'struct event'
+which is designed to be a generic container for the description
+of canister events.  This structure is desgined to implement a
+tagged union where a type identifier is used to specify which
+member of a union is populated for the exported event.
+
+A new function named add_exchange_event() was implemented to add
+an information exchange event to the event list.  An information
+exchange event consists of a description of an actor and subject
+process which interact to create a measurement event.
+
+The show_ns_update() function was modified to interpret the event
+tag type and output ASCII values based on that tag type.
+
+The ima_measure_ns() function was modified to populate the generic
+event description structure.
+---
+ security/integrity/ima/ima_identity.c | 113 +++++++++++++++++++++++++++++-----
+ 1 file changed, 99 insertions(+), 14 deletions(-)
+
+diff --git a/security/integrity/ima/ima_identity.c b/security/integrity/ima/ima_identity.c
+index 09d4c9154b67..cc65432d417d 100644
+--- a/security/integrity/ima/ima_identity.c
++++ b/security/integrity/ima/ima_identity.c
+@@ -79,12 +79,6 @@ static struct dentry *trajectory;
+ 
+ static struct kobject *iso_identity_kobject;
+ 
+-/* Structure defining a measurement entry. */
+-struct measurement {
+-	struct list_head list;
+-	char measurement[TPM_DIGEST_SIZE];
+-};
+-
+ /* Structure defining a behavior contour point. */
+ struct contour {
+ 	struct list_head list;
+@@ -101,6 +95,24 @@ struct trajectory {
+ 	struct subject_identity subject;
+ };
+ 
++/* Types of events. */
++enum event_types {
++	measurement_event=1,
++	exchange_event
++};
++
++/* Structure defining a model event. */
++struct event {
++	struct list_head list;
++
++	enum event_types type;
++
++	union {
++		char measurement[TPM_DIGEST_SIZE];
++		struct trajectory *exchange;
++	} u;
++};
++
+ /*
+  * The following structure encapsulates all of the information needed
+  * to support a behavior namespace.
+@@ -404,6 +416,43 @@ static int add_forensic_point(const char *filename,
+ 	return retn;
+ }
+ 
++static int add_exchange_event(const char *filename,
++			      struct actor_identity *actor,
++			      struct subject_identity *subject)
++{
++	int retn = 1;
++	struct iso_identity_map *map;
++	struct event *mp;
++	struct trajectory *event;
++
++	if (!current->nsproxy->behavior_ns)
++		return 0;
++	map = current_map();
++
++	mp = kzalloc(sizeof(struct event), GFP_KERNEL);
++	if (!mp) {
++		retn = -ENOMEM;
++		goto done;
++	}
++
++	event = create_point(filename, actor, subject);
++	if (!event) {
++		retn = -ENOMEM;
++		goto done;
++	}
++	mp->type = exchange_event;
++	mp->u.exchange = event;
++
++	mutex_lock(&map->measurement_mutex);
++	list_add_tail(&mp->list, &map->measurement_list);
++	mutex_unlock(&map->measurement_mutex);
++
++	sysfs_notify(iso_identity_kobject, NULL, map->update.attr.name);
++
++ done:
++	return retn;
++}
++
+ static int get_host_measurement(struct crypto_shash *tfm, char *id,
+ 				size_t idlength, char *digest)
+ {
+@@ -627,16 +676,49 @@ static ssize_t show_ns_update(struct kobject *kobj,
+ 			      struct kobj_attribute *attr, char *page)
+ {
+ 	ssize_t retn = -ENODATA;
+-	struct measurement *mp;
++	struct event *mp;
+ 	struct iso_identity_map *map = current_map();
+ 
+ 	mutex_lock(&map->measurement_mutex);
+ 	if (list_empty(&map->measurement_list))
+ 		goto done;
+-	mp = list_first_entry(&map->measurement_list, struct measurement,
+-			      list);
+-	retn = sprintf(page, "%*phN\n", (int) sizeof(mp->measurement),
+-		       mp->measurement);
++	mp = list_first_entry(&map->measurement_list, struct event, list);
++
++	switch ( mp->type ) {
++		case measurement_event:
++			retn = sprintf(page, "measurement %*phN\n",
++				       (int) sizeof(mp->u.measurement),
++				       mp->u.measurement);
++			break;
++		case exchange_event:
++			retn = sprintf(page, "exchange event{%s:%s} actor{uid=%d, euid=%d, suid=%d, gid=%d, egid=%d, sgid=%d, fsuid=%d, fsgid=%d, cap=0x%llx} subject{uid=%d, gid=%d, mode=0%o, name_length=%u, name=%*phN, s_id=%s, s_uuid=%*phN, digest=%*phN}\n",
++				       mp->u.exchange->process,
++				       mp->u.exchange->filename,
++				       mp->u.exchange->actor.uid,
++				       mp->u.exchange->actor.euid,
++				       mp->u.exchange->actor.suid,
++				       mp->u.exchange->actor.gid,
++				       mp->u.exchange->actor.egid,
++
++				       mp->u.exchange->actor.sgid,
++				       mp->u.exchange->actor.fsuid,
++				       mp->u.exchange->actor.fsgid,
++				       mp->u.exchange->actor.capability.value,
++
++				       mp->u.exchange->subject.uid,
++				       mp->u.exchange->subject.gid,
++				       mp->u.exchange->subject.mode,
++				       mp->u.exchange->subject.name_length,
++				       WP256_DIGEST_SIZE,
++				       mp->u.exchange->subject.name,
++				       mp->u.exchange->subject.s_id,
++				       (int) sizeof(mp->u.exchange->subject.s_uuid),
++				       mp->u.exchange->subject.s_uuid,
++				       WP256_DIGEST_SIZE,
++				       mp->u.exchange->subject.digest);
++			break;
++	}
++
+ 	list_del(&mp->list);
+ 
+  done:
+@@ -1424,6 +1506,8 @@ int ima_identity_is_mapped(int function, struct integrity_iint_cache *iint,
+ 
+ 	ima_set_actor_status(function, pathname, &subject, mapping);
+ 
++	add_exchange_event(pathname, &actor, &subject);
++
+ 	if (have_contour(mapping)) {
+ #if 0
+ 		pr_info("[%s]: Contour cache hit path=%s, mapping=%*phN\n",
+@@ -1552,18 +1636,19 @@ int ima_measure_ns(const u8 *hash)
+ {
+ 	int retn = 1;
+ 	struct iso_identity_map *map;
+-	struct measurement *mp;
++	struct event *mp;
+ 
+ 	if (!current->nsproxy->behavior_ns)
+ 		return 0;
+ 
+ 	map = current_map();
+-	mp = kzalloc(sizeof(struct measurement), GFP_KERNEL);
++	mp = kzalloc(sizeof(struct event), GFP_KERNEL);
+ 	if (!mp) {
+ 		retn = -ENOMEM;
+ 		goto done;
+ 	}
+-	memcpy(mp->measurement, hash, sizeof(map->measurement));
++	mp->type = measurement_event;
++	memcpy(mp->u.measurement, hash, sizeof(map->measurement));
+ 
+ 	mutex_lock(&map->measurement_mutex);
+ 	list_add_tail(&mp->list, &map->measurement_list);
+-- 
+2.16.2
+

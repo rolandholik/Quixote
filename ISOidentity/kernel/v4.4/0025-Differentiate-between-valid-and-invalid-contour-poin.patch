@@ -1,0 +1,116 @@
+From cf3ac85be36e49315ca499de861639ffc9d44895 Mon Sep 17 00:00:00 2001
+From: "Dr. Greg Wettstein" <greg@enjellic.com>
+Date: Fri, 1 Sep 2017 15:50:22 -0500
+Subject: [PATCH 25/37] Differentiate between valid and invalid contour points.
+
+The current mapping code adds an expressed behavior contour point
+without specification of whether or not the behavior was for a
+valid or invalid behavior.  The changes in this update implements
+a boolean value into the contour point description structure
+which indicates whether or not the point represents a valid
+behavior.
+
+This will allow subsequent changes to interrogate the contour
+point to determine whether or not a mapping is for a valid or
+invalid behavior.
+---
+ security/integrity/ima/ima_identity.c | 44 ++++++++++++++++++++++++++++++-----
+ 1 file changed, 38 insertions(+), 6 deletions(-)
+
+diff --git a/security/integrity/ima/ima_identity.c b/security/integrity/ima/ima_identity.c
+index ba3b58e226c0..7e774cc9950d 100644
+--- a/security/integrity/ima/ima_identity.c
++++ b/security/integrity/ima/ima_identity.c
+@@ -89,6 +89,7 @@ struct measurement {
+ struct contour {
+ 	struct list_head list;
+ 	char identity[WP256_DIGEST_SIZE];
++	bool valid;
+ };
+ 
+ /* Structure defining an execution trajectory point. */
+@@ -227,14 +228,44 @@ static int have_contour(char *point)
+ 	return retn;
+ }
+ 
++/**
++ *	have_valid_contour - Search contour list for a given point.
++ *	@point: buffer containing the contour point to search for.
++ *
++ *	Search the current contour list attempting to find the
++ *	point specified by the caller.  Return true if the point
++ *	is located.
++ */
++
++static int have_valid_contour(char *point)
++{
++	int retn = 0;
++	struct contour *entry;
++	struct iso_identity_map *map = current_map();
++
++	mutex_lock(&map->contour_list_mutex);
++	list_for_each_entry(entry, &map->contour_list, list) {
++		if (memcmp(entry->identity, point, WP256_DIGEST_SIZE) == 0 &&
++		    entry->valid) {
++			retn = 1;
++			goto done;
++		}
++	}
++
++ done:
++	mutex_unlock(&map->contour_list_mutex);
++	return retn;
++}
++
+ /**
+  *	add_countour_point - Add a point to the contour list.
+- *	@point: buffer containing the contour point to add..
++ *	@point: buffer containing the contour point to add.
++ *	@valid: The status of the point.
+  *
+  *	Returns a non-zero value on a failure to add a point.
+  */
+ 
+-static int add_contour_point(char *point)
++static int add_contour_point(char *point, bool valid)
+ {
+ 	int retn = 1;
+ 	struct contour *entry;
+@@ -246,6 +277,7 @@ static int add_contour_point(char *point)
+ 
+ 	mutex_lock(&map->contour_list_mutex);
+ 	memcpy(entry->identity, point, WP256_DIGEST_SIZE);
++	entry->valid = valid;
+ 	list_add_tail(&entry->list, &map->contour_list);
+ 	++map->contour_count;
+ 	mutex_unlock(&map->contour_list_mutex);
+@@ -546,11 +578,11 @@ static int load_contour(const char __user *contour, size_t datalen)
+ 		goto done;
+ 	}
+ 
+-	if (have_contour(mapping)) {
++	if (have_valid_contour(mapping)) {
+ 		retn = datalen;
+ 		goto done;
+ 	}
+-	if (add_contour_point(mapping)) {
++	if (add_contour_point(mapping, true)) {
+ 		retn = -ENOMEM;
+ 		goto done;
+ 	}
+@@ -1388,10 +1420,10 @@ int ima_identity_is_mapped(int function, struct integrity_iint_cache *iint,
+ 	if (map->domain_sealed) {
+ 		retn = add_forensic_point(pathname, &actor, &subject);
+ 		if (retn == 0 )
+-			retn = add_contour_point(mapping);
++			retn = add_contour_point(mapping, false);
+ 	}
+ 	else {
+-		retn = add_contour_point(mapping);
++		retn = add_contour_point(mapping, true);
+ 		if (retn == 0)
+ 			retn = add_trajectory_point(pathname, &actor,
+ 						    &subject);
+-- 
+2.16.2
+

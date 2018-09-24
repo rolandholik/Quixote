@@ -1,0 +1,287 @@
+From 7e050cca7174844e2afe7ee53efcd8cb32d30fa9 Mon Sep 17 00:00:00 2001
+From: "Dr. Greg Wettstein" <greg@enjellic.com>
+Date: Tue, 18 Sep 2018 01:21:56 -0500
+Subject: [PATCH 36/37] Initial implementation of configurable AI hooks.
+
+This changes in this update implement support for exporting AI
+events to userspace.  The groundwork is also laid for
+configurable responses to introspection events.
+
+The ima_identity_process_ai() function was added to allow the ai
+LSM access to common management of introspection events.  This
+function adds an entry onto the measurement list describing the
+AI event.  This event is made available to the namespace specific
+pseudo-file which is exporting events for a behavioral namespace.
+
+An array of structures named AI_events is maintained that defines
+the response to each of the available introspection events.  Each
+structure contains the name of the introspection event and the
+available action for the event.  The currently available actions
+are to log the event or return EPERM in order to deny the event.
+---
+ include/linux/ima.h                   |   2 +
+ security/ai/ai.c                      |  59 +++++++++++--------
+ security/integrity/ima/ima_identity.c | 104 +++++++++++++++++++++++++++++++++-
+ 3 files changed, 141 insertions(+), 24 deletions(-)
+
+diff --git a/include/linux/ima.h b/include/linux/ima.h
+index e4feaa0e5431..97340fd9f350 100644
+--- a/include/linux/ima.h
++++ b/include/linux/ima.h
+@@ -12,6 +12,7 @@
+ 
+ #include <linux/fs.h>
+ #include <linux/ns_common.h>
++#include <linux/kref.h>
+ struct linux_binprm;
+ 
+ #ifdef CONFIG_IMA
+@@ -45,6 +46,7 @@ static inline void ima_put_ns(struct iso_identity_namespace *ns)
+ {
+ 	kref_put(&ns->kref, ima_free_ns);
+ }
++extern int ima_identity_process_ai(unsigned int);
+ 
+ #else
+ static inline int ima_bprm_check(struct linux_binprm *bprm)
+diff --git a/security/ai/ai.c b/security/ai/ai.c
+index b3d18b059792..3a2e6f68ffb9 100644
+--- a/security/ai/ai.c
++++ b/security/ai/ai.c
+@@ -9,10 +9,24 @@
+  * published by the Free Software Foundation, version 2 of the
+  * License.
+  */
++
+ #include <linux/sched.h>
+ #include <linux/fs.h>
+ #include <linux/socket.h>
+ #include <linux/lsm_hooks.h>
++#include <linux/ima.h>
++
++
++/*
++ * The following defines the type of events that have been triggered.
++ * This enumeration must agree with the enumeration in the
++ * security/integrity/ima/ima_identity.c file.
++ */
++enum AIevent_type {
++	AI_file_open=0,
++	AI_socket_connect,
++	AI_undefined
++};
+ 
+ 
+ /**
+@@ -25,32 +39,30 @@
+  */
+ static int ai_file_open(struct file *f, const struct cred *cred)
+ {
+-	if ( current->bad_actor ) {
+-		pr_info("%s: Bad actor=%s, subject=%s, flags=0x%x\n", __func__,
+-			current->comm, f->f_path.dentry->d_name.name,
+-			f->f_flags);
+-
+-		if ( ((f->f_flags & O_ACCMODE) == O_RDONLY) ||
+-		     (f->f_flags & O_RDWR) ) {
+-			pr_info("%s: Restricting read %s access to %s.\n",
+-				__func__, current->comm,
+-				f->f_path.dentry->d_name.name);
+-			return -EPERM;
+-		}
+-
+-		if ( f->f_flags & (O_CREAT | O_TRUNC | O_WRONLY | O_RDWR) ) {
+-			pr_info("%s: Restricting write %s access to %s.\n",
+-				__func__, current->comm,
+-				f->f_path.dentry->d_name.name);
+-			return -EPERM;
+-		}
+-	}
+-	return 0;
++	if ( !current->bad_actor )
++		return 0;
++
++	pr_info("%s: Bad actor=%s, subject=%s, flags=0x%x\n", __func__,
++		current->comm, f->f_path.dentry->d_name.name,
++		f->f_flags);
++
++	if ( ((f->f_flags & O_ACCMODE) == O_RDONLY) ||
++	     (f->f_flags & O_RDWR) )
++		pr_info("%s: Restricting read %s access to %s.\n",
++			__func__, current->comm,
++			f->f_path.dentry->d_name.name);
++
++	if ( f->f_flags & (O_CREAT | O_TRUNC | O_WRONLY | O_RDWR) )
++		pr_info("%s: Restricting write %s access to %s.\n",
++			__func__, current->comm,
++			f->f_path.dentry->d_name.name);
++
++	return ima_identity_process_ai(AI_file_open);
+ }
+ 
+ 
+ /**
+- * ai_file_open - Introspection hook to intercept socket connections.
++ * ai_socket_open - Introspection hook to intercept socket connections.
+  *
+  * @sock:	A pointer to the socket structure being used to
+  *	        implement the connection.
+@@ -70,7 +82,8 @@ static int ai_socket_connect(struct socket *sock, struct sockaddr *addr,
+ 
+ 	pr_info("%s: Refused socket open, family=%u, length=%d, addr=%*phN\n", 
+ 		__func__, addr->sa_family, addr_len, addr_len, addr->sa_data);
+-	return -EPERM;
++
++	return ima_identity_process_ai(AI_socket_connect);
+ }
+ 
+ 
+diff --git a/security/integrity/ima/ima_identity.c b/security/integrity/ima/ima_identity.c
+index f8398574e719..be44708b4ae2 100644
+--- a/security/integrity/ima/ima_identity.c
++++ b/security/integrity/ima/ima_identity.c
+@@ -85,6 +85,43 @@ static struct dentry *trajectory;
+ 
+ static struct kobject *iso_identity_kobject;
+ 
++
++/* Structure defining an ai security event. */
++
++/* Types of AI events. */
++enum AIevent_type {
++	AI_file_open=0,
++	AI_socket_connect,
++	AI_undefined
++};
++
++enum AIevent_action {
++	AI_action_log=0,
++	AI_action_eperm,
++};
++
++const char *AI_actions[] = {
++	"LOG",
++	"EPERM"
++};
++
++struct AIevent {
++	enum AIevent_type action;
++	char *description;
++};
++
++struct AIdescription {
++	char process[TASK_COMM_LEN];
++	struct AIevent *descn;
++};
++
++/* Array of structures defining the possible events. */
++struct AIevent AI_events[] = {
++	{AI_action_log, "file_open"},
++	{AI_action_eperm, "socket_connect"}
++};
++
++
+ /* Structure defining a behavior contour point. */
+ struct contour {
+ 	struct list_head list;
+@@ -107,7 +144,8 @@ enum event_types {
+ 	measurement_event=1,
+ 	exchange_event,
+ 	aggregate_event,
+-	seal_event
++	seal_event,
++	ai_event
+ };
+ 
+ /* Structure defining a model event. */
+@@ -119,9 +157,11 @@ struct event {
+ 	union {
+ 		char measurement[TPM_DIGEST_SIZE];
+ 		struct trajectory *exchange;
++		struct AIdescription ai;
+ 	} u;
+ };
+ 
++
+ /*
+  * The following structure encapsulates all of the information needed
+  * to support a behavior namespace.
+@@ -772,6 +812,13 @@ static ssize_t show_ns_update(struct kobject *kobj,
+ 		case seal_event:
+ 			retn = sprintf(page, "%s", "sealed\n");
+ 			break;
++
++		case ai_event:
++			retn = sprintf(page, "ai_event actor{%s} event{%s} action{%s}\n",
++				       mp->u.ai.process,
++				       mp->u.ai.descn->description,
++				       AI_actions[mp->u.ai.descn->action]);
++			break;
+ 	}
+ 
+ 	list_del(&mp->list);
+@@ -1926,6 +1973,61 @@ struct iso_identity_namespace *ima_copy_behavior_ns(unsigned long flags,
+ 	return ns;
+ }
+ 
++/*
++ * The following section handles requests to report on the status
++ * of processing of AI security events.
++ */
++
++int ima_identity_process_ai(unsigned int event)
++{
++	int retn = 0;
++
++	struct iso_identity_map *map;
++
++	struct event *ep;
++
++	/* Verify a valid event. */
++	if ( event >= AI_undefined ) {
++		pr_warn("[%s]: Undefined event\n", __func__);
++		goto done;
++	}
++
++	if (!current->nsproxy->behavior_ns)
++		goto done;
++
++
++	/* Add the event to the list. */
++	map = current_map();
++	ep = kzalloc(sizeof(struct event), GFP_KERNEL);
++	if (!ep)
++		return -ENOMEM;
++
++	ep->type = ai_event;
++	ep->u.ai.descn = &AI_events[event];
++	strcpy(ep->u.ai.process, current->comm);
++
++	switch ( AI_events[event].action ) {
++		case AI_action_log:
++			retn = 0;
++			break;
++		case AI_action_eperm:
++			retn = -EPERM;
++			break;
++		case AI_undefined:
++			break;
++	}
++
++	mutex_lock(&map->measurement_mutex);
++	list_add_tail(&ep->list, &map->measurement_list);
++	mutex_unlock(&map->measurement_mutex);
++
++	sysfs_notify(iso_identity_kobject, NULL, map->update.attr.name);
++
++ done:
++	return retn;
++}
++
++
+ SYSCALL_DEFINE2(set_bad_actor, pid_t, pid, unsigned long, flags)
+ {
+ 	int retn = -ESRCH;
+-- 
+2.16.2
+
