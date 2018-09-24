@@ -333,6 +333,8 @@ public class CbootManager {
 	    while ( !retn ) {
 		output = Stdout.readLine();
 		lines.add(output);
+		if ( output.matches("Platform status: OK") )
+			return true;
 		if ( output.matches(".*Extended group id.*") )
 		    return true;
 	    }
