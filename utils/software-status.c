@@ -21,6 +21,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <string.h>
+#include <stdint.h>
 
 #include <Origin.h>
 #include <HurdLib.h>
