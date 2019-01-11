@@ -35,8 +35,8 @@ NAAAIM_LIB = -L../lib -lNAAAIM
 
 # Sources for SGX include files, used by sdk-compute-size utility.
 SGXSDK = /u/usr/src/SGX/linux-sgx
-SGXSDK_INCLUDES = -I/opt/intel/sgxsdk/include			    \
-	-I ${SGXSDK}/psw/ae/inc/internal -I ${SGXSDK}/external/epid \
+SGXSDK_INCLUDES = -I/opt/intel/sgxsdk/include				\
+	-I ${SGXSDK}/psw/ae/inc/internal -I ${SGXSDK}/external/epid-sdk \
 	-I ${SGXSDK}/common/inc/internal -I ${SGXSDK}/psw/ae/pve
 
 
