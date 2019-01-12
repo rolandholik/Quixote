@@ -191,3 +191,24 @@ boot_sgx:
 	 * Define the size of the boot_sgx 'function'.
 	 */
 	.size	boot_sgx, .-boot_sgx
+
+
+	/*
+	 * The following function is the call point for a C compatible
+	 * function that returns the address of the Asynchronous Enclave
+	 * Exit handler.
+	 *
+	 * No arguements are specified to this function.
+	 *
+	 * The address of the the aep_handler lable is returned in the
+	 * RAX register.
+	 */
+
+	.global	boot_sgx_get_exit_handler
+	.type	boot_sgx_get_exit_handler,@function
+
+boot_sgx_get_exit_handler:
+	lea	.Laep_handler(%rip), %rax
+	ret
+
+	.size	boot_sgx_get_exit_handler, .-boot_sgx_get_exit_handler

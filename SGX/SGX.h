@@ -30,6 +30,12 @@
 
 
 /**
+ * Prototype for the function to initialize the SGX exception handler.
+ */
+extern _Bool sgx_configure_exception(void);
+
+
+/**
  * Definition of an enclaves attributes.
  */
 typedef uint32_t sgx_misc_select_t;
