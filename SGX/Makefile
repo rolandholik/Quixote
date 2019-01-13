@@ -4,13 +4,14 @@
 
 
 # Variable declarations.
-CSRC = sgx-check.c sgx-metadata.c SGXmetadata.c SGXloader.c	    \
-	SGXenclave.c SGXsigstruct.c test-ecall.c sgx-ocall.c	    \
-	PVEenclave.c SGXmessage.c SGXecdsa.c PCEenclave.c SGXcmac.c \
-	SGXaesgcm.c SGXrsa.c QEenclave.c SGXepid.c SGXquote.c	    \
-	SGXquote_sgxmgr.c sgx_exception.c
+CSRC = SGXmetadata.c SGXloader.c SGXenclave.c SGXsigstruct.c PVEenclave.c   \
+	SGXmessage.c SGXecdsa.c PCEenclave.c SGXcmac.c SGXaesgcm.c SGXrsa.c \
+	QEenclave.c SGXepid.c SGXquote.c SGXquote_sgxmgr.c sgx_exception.c  \
+	sgx-ocall.c
 
 ASRC = boot-sgx.s
+
+LIBRARY = lib${LIBNAME}.a
 
 TOOLS = sgx-check sgx-metadata sgx-loader sgx-load sgx-sigstruct	     \
 	sgx-gen-token test-ecall test-pcr idf-sgx-fandf	idf-sgx-fandf-unibin \
@@ -32,6 +33,9 @@ SSL_CRYPTO  = -L /usr/local/musl/lib -lcrypto
 
 # NAAAIM library definition
 NAAAIM_LIB = -L../lib -lNAAAIM
+
+# SGXrdk library definition.
+RDKLIB = -L . -lSGXrdk
 
 # Sources for SGX include files, used by sdk-compute-size utility.
 SGXSDK = /u/usr/src/SGX/linux-sgx
@@ -56,12 +60,12 @@ SGXSDK_INCLUDES = -I/opt/intel/sgxsdk/include				\
 COBJS = ${CSRC:.c=.o}
 AOBJS = ${ASRC:.s=.o}
 
-LIBS = -lNAAAIM -lHurdLib
 ELFLIB = -Wl,--rpath /usr/local/musl/lib -lelf
 
 HURDLIB = -L../lib -lHurdLib
 INTEL_CRYPTO = -L/opt/intel/sgxsdk/lib64 -lsgx_tcrypto
 
+LIBS = ${RDKLIB} ${ELFLIB} ${HURDLIB}
 
 CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I/usr/local/musl/include
 
@@ -72,7 +76,11 @@ CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I/usr/local/musl/include
 .PHONY: all tools
 
 # Targets
-all: generate-array ${COBJS} ${AOBJS} tools
+all: generate-array ${COBJS} ${AOBJS} ${LIBRARY} tools
+
+${LIBRARY}: ${COBJS} ${AOBJS}
+	ar r ${LIBRARY} $^;
+	ranlib ${LIBRARY};
 
 tools: ${TOOLS}
 
@@ -81,84 +89,73 @@ demos: idf-sgx-fandf idf-sgx-fandf-unibin
 sgx-check: sgx-check.o
 	${CC} ${LDFLAGS} -o $@ $^;
 
-sgx-metadata: sgx-metadata.o SGXmetadata.o ../SHA256.o
-	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB} ${SSL_CRYPTO};
+sgx-metadata: sgx-metadata.o ../SHA256.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 sgx-metadata.o: sgx-metadata.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
 
-sgx-loader: sgx-loader.o SGXloader.o SGXmetadata.o
-	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB};
+sgx-loader: sgx-loader.o ${LIBRARY}
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
 
 sgx-loader.o: sgx-loader.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
 
-sgx-load: sgx-load.o SGXenclave.o SGXloader.o SGXmetadata.o SGXsigstruct.o \
-	boot-sgx.o sgx-ocall.o
-	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB};
+sgx-load: sgx-load.o ${LIBRARY}
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
 
 sgx-load.o: sgx-load.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
 
-sgx-sigstruct: sgx-sigstruct.o SGXsigstruct.o
-	${CC} ${LDFLAGS} -o $@ $^ ${HURDLIB};
+sgx-sigstruct: sgx-sigstruct.o ${LIBRARY}
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
 
 sgx-sigstruct.o: sgx-sigstruct.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
 
-sgx-gen-token: sgx-gen-token.o SGXenclave.o SGXloader.o SGXmetadata.o \
-	SGXsigstruct.o ../SHA256.o boot-sgx.o sgx-ocall.o
-	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB} ${SSL_CRYPTO};
+sgx-gen-token: sgx-gen-token.o ../SHA256.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 sgx-gen-token.o: sgx-gen-token.c LE_whitelist.h
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
 
-sgx-provision: sgx-provision.o SGXenclave.o SGXloader.o SGXmetadata.o	 \
-	SGXsigstruct.o PVEenclave.o PCEenclave.o SGXmessage.o SGXecdsa.o \
-	SGXcmac.o SGXaesgcm.o SGXrsa.o SGXepid.o ../SHA256.o		 \
-	../RandomBuffer.o boot-sgx.o sgx-ocall.o
-	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${LIBS} ${SSL_CRYPTO} \
+sgx-provision: sgx-provision.o ../SHA256.o ../RandomBuffer.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO} \
 		${INTEL_CRYPTO};
 
 sgx-provision.o: sgx-provision.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
 
 sdk-compute-size: sdk-compute-size.o
-	${CC} ${LDFLAGS} -o $@ $^;
+	${CC} ${LDFLAGS} -o $@ $<;
 
 sdk-compute-size.o: sdk-compute-size.c
 	${CC} ${CFLAGS} ${SGXSDK_INCLUDES} -I/usr/local/musl/include \
 		-c $< -o $@;
 
 generate-array: generate-array.o
-	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $< ${HURDLIB};
 
 generate-array.o: generate-array.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
 
-sgx-gen-verifier: sgx-gen-verifier.o SGXmetadata.o ../IDtoken.o ../SHA256.o \
-	../SHA256_hmac.o
-	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB} ${SSL_CRYPTO} \
-		${NAAAIM_LIB}
+sgx-gen-verifier: sgx-gen-verifier.o ../IDtoken.o ../SHA256.o ../SHA256_hmac.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO};
 
 sgx-gen-verifier.o: sgx-gen-verifier.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
-test-ecall: test-ecall.o SGXenclave.o SGXloader.o SGXmetadata.o \
-	SGXsigstruct.o sgx-ocall.o boot-sgx.o
-	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB};
+test-ecall: test-ecall.o
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
 
-test-pcr: test-pcr.o SGXenclave.o SGXloader.o SGXmetadata.o \
-	SGXsigstruct.o sgx-ocall.o boot-sgx.o
-	${CC} ${LDFLAGS} -static -o $@ $^ ${ELFLIB} ${HURDLIB};
+test-pcr: test-pcr.o
+	${CC} ${LDFLAGS} -static -o $@ $^ ${LIBS};
 
-idf-sgx-fandf: idf-sgx-fandf.o SGXenclave.o SGXloader.o SGXmetadata.o \
-	SGXsigstruct.o sgx-ocall.o boot-sgx.o ../SHA256.o
-	${CC} -static ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB} ${SSL_CRYPTO};
+idf-sgx-fandf: idf-sgx-fandf.o ../SHA256.o
+	${CC} -static ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
-idf-sgx-fandf-unibin: idf-sgx-fandf-unibin.o SGXenclave.o SGXloader.o \
-	SGXmetadata.o SGXsigstruct.o sgx-ocall.o boot-sgx.o ../SHA256.o
-	${CC} -static ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB} ${SSL_CRYPTO};
+idf-sgx-fandf-unibin: idf-sgx-fandf-unibin.o ../SHA256.o
+	${CC} -static ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 SGXecdsa.o: SGXecdsa.c
 	$(CC) $(CFLAGS) -I /opt/intel/sgxsdk/include -c $< -o $@;
@@ -183,6 +180,7 @@ tags:
 	/opt/emacs/bin/etags *.{h,c};
 clean:
 	rm -f *.o *~ TAGS sigstruct.h LE_whitelist.h;
+	rm -f ${LIBRARY};
 	rm -f ${TOOLS};
 
 
