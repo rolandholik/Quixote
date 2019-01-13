@@ -4,6 +4,8 @@
 
 
 # Variable declarations.
+SUBDIRS = SGXlibs Attestation ISOidentity
+
 CSRC = SGXmetadata.c SGXloader.c SGXenclave.c SGXsigstruct.c PVEenclave.c   \
 	SGXmessage.c SGXecdsa.c PCEenclave.c SGXcmac.c SGXaesgcm.c SGXrsa.c \
 	QEenclave.c SGXepid.c SGXquote.c SGXquote_sgxmgr.c sgx_exception.c  \
@@ -73,10 +75,10 @@ CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I/usr/local/musl/include
 #
 # Target directives.
 #
-.PHONY: all tools
+.PHONY: all tools ${SUBDIRS}
 
 # Targets
-all: generate-array ${COBJS} ${AOBJS} ${LIBRARY} tools
+all: generate-array ${COBJS} ${AOBJS} ${LIBRARY} tools ${SUBDIRS}
 
 ${LIBRARY}: ${COBJS} ${AOBJS}
 	ar r ${LIBRARY} $^;
@@ -176,10 +178,24 @@ LE_whitelist.h: generate-array
 		rm $@;
 
 
+#
+# Subdirectory targets.
+#
+SGXlibs:
+	${MAKE} -C $@;
+
+Attestation:
+	${MAKE} -C $@;
+
+ISOidentity:
+	${MAKE} -C $@;
+
+
 tags:
 	/opt/emacs/bin/etags *.{h,c};
 clean:
 	rm -f *.o *~ TAGS sigstruct.h LE_whitelist.h;
+	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i clean; done
 	rm -f ${LIBRARY};
 	rm -f ${TOOLS};
 
