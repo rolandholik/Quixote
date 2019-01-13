@@ -20,7 +20,6 @@ typedef int pid_t;
 
 
 /* Prototypes for alternate standard library functions. */
-int atexit(void (*function)(void));
 time_t time(time_t *);
 
 

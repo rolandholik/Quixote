@@ -22,14 +22,16 @@ LIBRARY = lib${LIBNAME}.a
 ENCLAVE_CC = gcc64
 
 SGX_SDK	    = /opt/intel/sgxsdk
+SGX_SSL	= /opt/intel/sgxssl
 SGX_INCLUDE = -I . -I ${SGX_SDK}/include -I ${SGX_SDK}/include/tlibc \
 	-I ${SGX_SDK}/include/stlport -I ../SGXfusion -I ../../../lib \
-	-I ../..
+	-I ../.. -I ${SGX_SSL}/include
 
 ENCLAVE_CFLAGS = -Wall -nostdinc -fvisibility=hidden -fpie -fstack-protector \
 	${SGX_INCLUDE} -fno-builtin
 
 SGX_LIBRARY_PATH = ${SGX_SDK}/lib64
+SSL_LIBRARY_PATH = ${SGX_SSL}/lib64
 
 SGX_TRTS_LIB	    = sgx_trts
 SGX_CRYPTO_LIB	    = sgx_tcrypto
@@ -37,15 +39,15 @@ SGX_SERVICE_LIBRARY = sgx_tservice
 
 ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles  \
 	-Wl,--whole-archive -lsgx_tsgxssl -Wl,--no-whole-archive	     \
-	-L${SGX_LIBRARY_PATH} -L . -L ../SGXfusion			     \
+	-L${SGX_LIBRARY_PATH} -L${SSL_LIBRARY_PATH} -L . -L ../SGXfusion     \
 	-Wl,--whole-archive						     \
 	-l${SGX_TRTS_LIB} -lSGXfusion					     \
 	-Wl,--no-whole-archive						     \
 	-Wl,--start-group						     \
 	-lsgx_tstdc -l${SGX_CRYPTO_LIB} -l${SGX_SERVICE_LIBRARY} -lSGXnaaaim \
 	-lsgx_tsgxssl_crypto						     \
+	-lsgx_tcxx							     \
 	-Wl,--end-group							     \
-	-lsgx_tstdcxx							     \
 	-Wl,-Bstatic -Wl,-Bsymbolic -Wl,--no-undefined			     \
 	-Wl,-pie,-eenclave_entry -Wl,--export-dynamic			     \
 	-Wl,--defsym,__ImageBase=0					     \
@@ -138,7 +140,7 @@ tools: ${TOOLS}
 
 test-naaaim: test-naaaim.o ../../SGXenclave.o ../../SGXloader.o	   \
 	../../SGXmetadata.o ../../SGXsigstruct.o ../../sgx-ocall.o \
-	../../boot-sgx.o
+	../../boot-sgx.o ../../sgx_exception.o
 	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB};
 
 test-naaaim.o: test-naaaim.c

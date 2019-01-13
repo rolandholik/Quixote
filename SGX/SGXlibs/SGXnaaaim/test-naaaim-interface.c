@@ -56,7 +56,6 @@ SGX_EXTERNC const struct {
 	{
 		{0},
 		{0},
-		{0},
 		{0}
 	}
 };

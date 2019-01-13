@@ -21,14 +21,6 @@
 #include "fusion-shim.h"
 
 
-/* Stub function for registering exit handler. */
-int atexit(void (*function)(void))
-
-{
-	return 0;
-}
-
-
 /*
  * Alternate printf implementation which uses an OCALL to print
  * to the standard output of the process invoking the enclave.
