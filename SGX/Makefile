@@ -13,7 +13,7 @@ CSRC = SGXmetadata.c SGXloader.c SGXenclave.c SGXsigstruct.c PVEenclave.c   \
 
 ASRC = boot-sgx.s
 
-LIBRARY = lib${LIBNAME}.a
+LIBRARY = libSGXrdk.a
 
 TOOLS = sgx-check sgx-metadata sgx-loader sgx-load sgx-sigstruct	     \
 	sgx-gen-token test-ecall test-pcr idf-sgx-fandf	idf-sgx-fandf-unibin \
