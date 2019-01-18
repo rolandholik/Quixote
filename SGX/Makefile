@@ -197,7 +197,7 @@ clean:
 	rm -f *.o *~ TAGS sigstruct.h LE_whitelist.h;
 	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i clean; done
 	rm -f ${LIBRARY};
-	rm -f ${TOOLS};
+	rm -f generate-array ${TOOLS};
 
 
 # Source dependencies.
