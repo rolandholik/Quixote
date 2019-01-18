@@ -53,8 +53,13 @@ CFLAGS = -Wall -O2 -fomit-frame-pointer -march=core2 -I ../.. -I ../../.. \
 
 LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib -L../../../lib
 
-HURDLIB = -L../../../HurdLib -lHurdLib
 ELFLIB	= -Wl,--rpath /usr/local/musl/lib -lelf
+
+HURD_LIBRARY = ../../../HurdLib
+HURDLIB	     = -L ../../../HurdLib -lHurdLib
+
+RDK_LIBRARY = ../../libSGXrdk.a
+RDKLIB	    = -L ../../ -lSGXrdk
 
 
 #
@@ -105,10 +110,8 @@ ldscript:
 
 tools: ${TOOLS}
 
-test-fusion: test-fusion.o ../../SGXenclave.o ../../SGXloader.o	   \
-	../../SGXmetadata.o ../../SGXsigstruct.o ../../sgx-ocall.o \
-	../../boot-sgx.o
-	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB};
+test-fusion: test-fusion.o ${RDK_LIBRARY} ${HURD_LIBRARY}
+	${CC} ${LDFLAGS} -o $@ $< ${RDKLIB} ${ELFLIB} ${HURDLIB};
 
 test-fusion.o: test-fusion.c
 	${CC} ${CFLAGS} -c $< -o $@;

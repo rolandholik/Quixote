@@ -57,13 +57,23 @@ CC = musl-gcc
 CFLAGS = -Wall -O2 -fomit-frame-pointer -march=core2 -I .. -I ../.. \
 	-I ../../HurdLib -I ../../ISOidentity -I ../../lib
 
-LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib -L../../lib
+LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib
 
-HURDLIB	  = -L../../HurdLib -lHurdLib
-NAAAIMLIB = -L../../../lib -lNAAAIM
-ELFLIB	  = -Wl,--rpath /usr/local/musl/lib -lelf
+ELFLIB = -Wl,--rpath /usr/local/musl/lib -lelf
 
-SSL_CRYPTO  = -L /usr/local/musl/lib -lcrypto
+HURD_LIBRARY = ../../HurdLib/libHurdLib.a
+HURDLIB	     = -L ../../HurdLib -lHurdLib
+
+NAAAIM_LIBRARY = ../../lib/libNAAAIM.a
+NAAAIMLIB      = -L ../../lib -lNAAAIM
+
+RDK_LIBRARY = ../libSGXrdk.a
+RDKLIB	    = -L ../ -lSGXrdk
+
+SSL_CRYPTO = -L /usr/local/musl/lib -lcrypto
+
+LIBRARY_DEPENDS = ${HURD_LIBRARY} ${NAAAIM_LIBRARY} ${RDK_LIBRARY}
+LIBS		= ${RDKLIB} ${ELFLIB} ${NAAAIMLIB} ${HURDLIB}
 
 
 #
@@ -121,13 +131,10 @@ ldscript:
 
 tools: ${TOOLS}
 
-test-ISOidentity-enclave: test-ISOidentity-enclave.o ISOenclave.o	  \
-	../SGXenclave.o ../SGXloader.o ../SGXmetadata.o ../SGXsigstruct.o \
-	../SGXquote.o ../PCEenclave.o ../QEenclave.o ../SGXquote_sgxmgr.o \
-	../SGXepid.o ../../IDtoken.o ../../SHA256.o ../../SHA256_hmac.o	  \
-	../sgx-ocall.o ../boot-sgx.o ISOenclave.o ../../IDtoken.o
-	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${NAAAIMLIB} ${HURDLIB} \
-		${SSL_CRYPTO};
+test-ISOidentity-enclave: test-ISOidentity-enclave.o ISOenclave.o \
+	../../IDtoken.o ../../SHA256.o ../../SHA256_hmac.o
+	${CC} ${LDFLAGS} -o $@ $< ISOenclave.o ../../IDtoken.o ../../SHA256.o \
+		../../SHA256_hmac.o ${LIBS} ${SSL_CRYPTO};
 
 test-ISOidentity-enclave.o: test-ISOidentity-enclave.c
 	${CC} ${CFLAGS} -c $< -o $@;

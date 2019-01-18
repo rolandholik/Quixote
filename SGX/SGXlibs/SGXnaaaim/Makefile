@@ -61,13 +61,23 @@ CC = musl-gcc
 CFLAGS = -Wall -O2 -fomit-frame-pointer -march=core2 -I ../.. -I ../../.. \
 	-I ../../../HurdLib 
 
-LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib -L../../../lib
+LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib
 
-HURDLIB	  = -L../../../HurdLib -lHurdLib
-NAAAIMLIB = -L../../../lib -lNAAAIM
-ELFLIB	  = -Wl,--rpath /usr/local/musl/lib -lelf
+ELFLIB = -Wl,-rpath /usr/local/musl/lib -lelf
+
+HURD_LIBRARY = ../../../HurdLib/libHurdLib.a
+HURDLIB	     = -L ../../../HurdLib -lHurdLib
+
+NAAAIM_LIBRARY = ../../../lib/libNAAAIM.a
+NAAAIMLIB      = -L ../../../lib -lNAAAIM
+
+RDK_LIBRARY = ../../libSGXrdk.a
+RDKLIB	    = -L ../../ -lSGXrdk
 
 SSL_CRYPTO  = -L /usr/local/musl/lib -lcrypto
+
+LIBRARY_DEPENDS = ${HURD_LIBRARY} ${NAAAIM_LIBRARY} ${RDK_LIBRARY}
+LIBS		= ${RDKLIB} ${ELFLIB} ${NAAAIMLIB} ${HURDLIB}
 
 
 #
@@ -136,31 +146,25 @@ ldscript:
 	echo "*;"			>> ldscript;
 	echo "};"			>> ldscript;
 
+
 tools: ${TOOLS}
 
-test-naaaim: test-naaaim.o ../../SGXenclave.o ../../SGXloader.o	   \
-	../../SGXmetadata.o ../../SGXsigstruct.o ../../sgx-ocall.o \
-	../../boot-sgx.o ../../sgx_exception.o
-	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB};
+test-naaaim: test-naaaim.o ${LIBRARY_DEPENDS}
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
 
 test-naaaim.o: test-naaaim.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
-test-Duct: test-Duct.o ../../SGXenclave.o ../../SGXloader.o	   \
-	../../SGXmetadata.o ../../SGXsigstruct.o ../../sgx-ocall.o \
-	../../boot-sgx.o
-	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${NAAAIMLIB} ${HURDLIB};
+test-Duct: test-Duct.o ${LIBRARY_DEPDNDS}
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
 
 test-Duct.o: test-Duct.c
 	${CC} ${CFLAGS} -I ../../../lib -c $< -o $@;
 
-test-Possum: test-Possum.o ../../SGXenclave.o ../../SGXloader.o		      \
-	../../SGXmetadata.o ../../SGXsigstruct.o ../../SGXquote_sgxmgr.o      \
-	../../SGXquote.o ../../QEenclave.o ../../PCEenclave.o ../../SGXepid.o \
-	../../../IDtoken.o ../../../SHA256.o ../../../SHA256_hmac.o	      \
-	../../sgx-ocall.o ../../boot-sgx.o
-	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${NAAAIMLIB} ${HURDLIB} \
-		${SSL_CRYPTO};
+test-Possum: test-Possum.o ../../../IDtoken.o ../../../SHA256.o \
+	../../../SHA256_hmac.o ${LIBRARY_DEPENDS}
+	${CC} ${LDFLAGS} -o $@ $< ../../../IDtoken.o ../../../SHA256.o \
+		../../../SHA256_hmac.o ${LIBS} ${SSL_CRYPTO};
 
 test-Possum.o: test-Possum.c
 	${CC} ${CFLAGS} -I ../../../lib -c $< -o $@;

@@ -53,14 +53,23 @@ CC = musl-gcc
 CFLAGS = -Wall -O2 -fomit-frame-pointer -march=core2 -I .. -I ../.. \
 	-I ../../HurdLib -I ../../ISOidentity -I ../../lib
 
-LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib -L../../lib
+LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib
 
-HURDLIB = -L../../HurdLib -lHurdLib
-ELFLIB	= -Wl,--rpath /usr/local/musl/lib -lelf
-NAAAIM_LIB = -L../../lib -lNAAAIM
+ELFLIB = -Wl,--rpath /usr/local/musl/lib -lelf
 
-# OpenSSL crypto library
-SSL_CRYPTO  = -L /usr/local/musl/lib -lcrypto
+HURD_LIBRARY = ../../HurdLib/libHurdLib.a
+HURDLIB	     = -L ../../HurdLib -lHurdLib
+
+NAAAIM_LIBRARY = ../../lib/libNAAAIM.a
+NAAAIMLIB      = -L ../../lib -lNAAAIM
+
+RDK_LIBRARY = ../libSGXrdk.a
+RDKLIB	    = -L ../ -lSGXrdk
+
+SSL_CRYPTO = -L /usr/local/musl/lib -lcrypto
+
+LIBRARY_DEPENDS = ${HURD_LIBRARY} ${NAAAIM_LIBRARY} ${RDK_LIBRARY}
+LIBS		= ${RDKLIB} ${ELFLIB} ${NAAAIMLIB} ${HURDLIB}
 
 
 #
@@ -115,20 +124,15 @@ ldscript:
 
 tools: ${TOOLS}
 
-test-local-target: test-local-target.o					  \
-	../SGXenclave.o ../SGXloader.o ../SGXmetadata.o ../SGXsigstruct.o \
-	../sgx-ocall.o ../boot-sgx.o
-	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${HURDLIB};
+test-local-target: test-local-target.o ${LIBRARY_DEPENDS}
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
 test-local-target.o: test-local-target.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
-test-remote-target: test-remote-target.o				  \
-	../SGXenclave.o ../SGXloader.o ../SGXmetadata.o ../SGXsigstruct.o \
-	../QEenclave.o ../SGXepid.o ../PCEenclave.o ../SGXquote.o	  \
-	../../RandomBuffer.o ../SGXquote_sgxmgr.o ../sgx-ocall.o ../boot-sgx.o
-	${CC} ${LDFLAGS} -o $@ $^ ${ELFLIB} ${NAAAIM_LIB} ${HURDLIB} \
-		${SSL_CRYPTO};
+test-remote-target: test-remote-target.o ../../RandomBuffer.o \
+	${LIBRARY_DEPENDS}
+	${CC} ${LDFLAGS} -o $@ $< ../../RandomBuffer.o ${LIBS} ${SSL_CRYPTO};
 
 test-remote-target.o: test-remote-target.c
 	${CC} ${CFLAGS} -c $< -o $@;
