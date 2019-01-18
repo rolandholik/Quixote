@@ -41,6 +41,13 @@
 #include "SGXenclave.h"
 
 
+/**
+ * Static state variable to indicate the SGX exception handler has
+ * been installed.
+ */
+static _Bool Handler_installed = false;
+
+
 /*
  * Prototypes for the assembler functions returning the address of the
  * Asynchronous Enclave eXit (AEX) handler and for entering an enclave.
@@ -176,6 +183,11 @@ _Bool sgx_configure_exception(void)
 	struct sigaction signal_action;
 
 
+	/* Only install the handler once. */
+	if ( Handler_installed )
+		return true;
+
+
 	/* Initialize structures. */
 	memset(&signal_action, '\0', sizeof(struct sigaction));
 
@@ -200,7 +212,8 @@ _Bool sgx_configure_exception(void)
 	if ( sigaction(SIGTRAP, &signal_action, NULL) == -1 )
 		goto done;
 
-	retn = true;
+	retn	    	  = true;
+	Handler_installed = true;
 
 
  done:

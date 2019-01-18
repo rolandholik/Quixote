@@ -175,16 +175,32 @@ static void _init_state(CO(SGXenclave_State, S)) {
 /**
  * External public method.
  *
- * This method implements setting the debug status of the enclave.
- * Enabling debug in the enclave also causes debug status to be set
- * on the metadata manager and the loader.
+ * This method implements a comprehensive setup and initialization of
+ * an enclave.  It is designed to reduce the amount of boilerplate
+ * code needed in an application to get an enclave to the point where
+ * it can be called.   This also includes configuring a global
+ * exception handler.
  *
- * \param this	A pointer to the object whose debug status is
- *		to be modified.
+ * \param this		A pointer to the enclave object that is to be
+ *			setup.
  *
- * \param debug	The debug status to be set for the object.
+ * \param name		A pointer to a null terminated buffer
+ *			containing the pathname to the enclave to
+ *			be loaded.
  *
- * \return	No return value is defined.
+ * \param token		A pointer to a null terminated buffer
+ *			containing the pathname to the file containing
+ *			the initialization token.
+ *
+ * \param debug		A boolean flag valued used to indicate whether
+ *			or not the enclave is to be initialized in
+ *			debug mode.
+ *
+ * \return	A boolean value is returned to indicate whether or not
+ *		setup of the enclave was successful.  A false value
+ *		indicates the setup failed while a true value
+ *		indicates the enclave is initialized and ready to be
+ *		called.
  */
 
 static _Bool setup(CO(SGXenclave, this), CO(char *, name), CO(char *, token), \
@@ -200,6 +216,12 @@ static _Bool setup(CO(SGXenclave, this), CO(char *, name), CO(char *, token), \
 	File token_file = NULL;
 
 
+	/* Install the SGX exception handler. */
+	if ( !sgx_configure_exception() )
+		ERR(goto done);
+
+
+	/* Load the initialization token. */
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 	INIT(HurdLib, File, token_file, ERR(goto done));
 
