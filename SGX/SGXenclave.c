@@ -395,9 +395,6 @@ static _Bool create_enclave(CO(SGXenclave, this))
 
 	void *address;
 
-	uint64_t addr,
-		 base;
-
 	struct SGX_create_param create_param;
 
 
@@ -406,19 +403,11 @@ static _Bool create_enclave(CO(SGXenclave, this))
 		ERR(goto done);
 
 	/* Create an appropriate memory mapping for the enclave. */
-	if ( (address = mmap(NULL, S->secs.size * 2,		 \
+	if ( (address = mmap(NULL, S->secs.size,		 \
 			     PROT_READ | PROT_WRITE | PROT_EXEC, \
 			     MAP_SHARED, S->fd, 0)) == NULL )
 		ERR(goto done);
-
-	addr = (uint64_t) address;
-	base = addr + (S->secs.size - (addr % S->secs.size));
-	S->secs.base = base;
-
-	munmap(address, S->secs.base - addr);
-	if ( (addr + S->secs.size*2) != (S->secs.base + S->secs.size) )
-		munmap((void *) (S->secs.base + S->secs.size), \
-		       addr + S->secs.size - S->secs.base);
+	S->secs.base = (uint64_t) address;
 
 
 	/* Create the enclave based on the SECS parameters. */
