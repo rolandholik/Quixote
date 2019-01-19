@@ -193,6 +193,11 @@ extern int main(int argc, char *argv[])
 	einit = (void *) bufr->get(bufr);
 
 
+	/* Setup the exception handler. */
+	if ( !sgx_configure_exception() )
+		ERR(goto done);
+
+
 	/* Load an initialize the enclave. */
 	INIT(NAAAIM, SGXenclave, enclave, ERR(goto done));
 
