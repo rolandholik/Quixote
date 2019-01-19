@@ -77,6 +77,7 @@ extern int main(int argc, char *argv[])
 
 {
 	_Bool debug	    = false,
+	      init	    = true,
 	      debug_enclave = true;
 
 	char *token	   = NULL,
@@ -86,7 +87,7 @@ extern int main(int argc, char *argv[])
 	int opt,
 	    retn = 1;
 
-	struct SGX_einittoken *einit;
+	struct SGX_einittoken *einit = NULL;
 
 	SGXenclave enclave = NULL;
 
@@ -96,8 +97,11 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "dpe:n:t:")) != EOF )
+	while ( (opt = getopt(argc, argv, "Ndpe:n:t:")) != EOF )
 		switch ( opt ) {
+			case 'N':
+				init = false;
+				break;
 			case 'd':
 				debug = true;
 				break;
@@ -123,7 +127,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Load the launch token. */
-	if ( token == NULL ) {
+	if ( init && (token == NULL) ) {
 		usage("No token specified.\n");
 		goto done;
 	}
@@ -131,13 +135,16 @@ extern int main(int argc, char *argv[])
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 	INIT(HurdLib, File, token_file, ERR(goto done));
 
-	if ( debug )
-		fprintf(stdout, "Loading enclave token: %s\n\n", token);
+	if ( init ) {
+		if ( debug )
+			fprintf(stdout, "Loading enclave token: %s\n\n", \
+				token);
 
-	token_file->open_ro(token_file, token);
-	if ( !token_file->slurp(token_file, bufr) )
-		ERR(goto done);
-	einit = (void *) bufr->get(bufr);
+		token_file->open_ro(token_file, token);
+		if ( !token_file->slurp(token_file, bufr) )
+			ERR(goto done);
+		einit = (void *) bufr->get(bufr);
+	}
 
 
 	/* Load and initialize the enclave. */
@@ -151,17 +158,23 @@ extern int main(int argc, char *argv[])
 	if ( !enclave->open_enclave(enclave, sgx_device, enclave_name, \
 				    debug_enclave) )
 		ERR(goto done);
+	fputs("Enclave opened.\n", stdout);
 
 	if ( !enclave->create_enclave(enclave) )
 		ERR(goto done);
+	fputs("Enclave created.\n", stdout);
 
 	if ( !enclave->load_enclave(enclave) )
 		ERR(goto done);
+	fputs("Enclave loaded.\n", stdout);
 
+	if ( !init )
+		fputs("Non-token initialization requested.\n", stdout);
 	if ( !enclave->init_enclave(enclave, einit) )
 		ERR(goto done);
+	fputs("Enclave initialized.\n", stdout);
 
-	fputs("Enclave loaded.\n", stdout);
+	fputs("OK\n", stdout);
 	retn = 0;
 
 
