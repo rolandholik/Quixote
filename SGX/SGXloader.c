@@ -823,15 +823,15 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
 		memset(page, '\0', sizeof(page));
 		secinfo.flags = segment->flags;
 
-		if ( loaded >= segment->phdr.p_memsz )
-			size = loaded - segment->phdr.p_memsz;
+		if ( loaded >= (segment->phdr.p_memsz + offset) )
+			size = loaded - (segment->phdr.p_memsz + offset);
 		else {
 			size  = segment->phdr.p_memsz - loaded;
 			size += offset;
 		}
 
 		size = r2p(size);
-		if ( (segment->phdr.p_memsz + offset) < loaded )
+		if ( segment->phdr.p_memsz < loaded )
 			size -= 4096;
 		if ( compatibility & NULL_PADDING_NEEDED )
 			size += 4096;
