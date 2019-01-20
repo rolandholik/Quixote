@@ -321,7 +321,7 @@ void test_six()
 
 	if ( !base64->decode(base64, ascii, bufr) )
 		ERR(goto done);
-	fputs("\nDecoded ranom buffer:\n", stdout);
+	fputs("\nDecoded random buffer:\n", stdout);
 	bufr->print(bufr);
 
 
