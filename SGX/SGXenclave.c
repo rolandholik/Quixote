@@ -209,7 +209,7 @@ static _Bool setup(CO(SGXenclave, this), CO(char *, name), CO(char *, token), \
 {
 	_Bool retn = false;
 
-	struct SGX_einittoken *einit;
+	struct SGX_einittoken *einit = NULL;
 
 	Buffer bufr = NULL;
 
@@ -222,13 +222,15 @@ static _Bool setup(CO(SGXenclave, this), CO(char *, name), CO(char *, token), \
 
 
 	/* Load the initialization token. */
-	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	INIT(HurdLib, File, token_file, ERR(goto done));
+	if ( (token != NULL) && (token[0] != '\0') ) {
+		INIT(HurdLib, Buffer, bufr, ERR(goto done));
+		INIT(HurdLib, File, token_file, ERR(goto done));
 
-	token_file->open_ro(token_file, token);
-	if ( !token_file->slurp(token_file, bufr) )
-		ERR(goto done);
-	einit = (void *) bufr->get(bufr);
+		token_file->open_ro(token_file, token);
+		if ( !token_file->slurp(token_file, bufr) )
+			ERR(goto done);
+		einit = (void *) bufr->get(bufr);
+	}
 
 
 	/* Load and initialize the enclave. */
@@ -649,10 +651,13 @@ static _Bool init_enclave(CO(SGXenclave, this), struct SGX_einittoken *token)
 
 	/* Update SECS structure based on initialized enclave. */
 	S->secs.attributes |= 1;
-	memcpy(S->secs.mrsigner, token->mr_signer.m, sizeof(S->secs.mrsigner));
-	memcpy(S->secs.mrenclave, token->mr_enclave.m, \
-	       sizeof(S->secs.mrenclave));
-	memcpy(S->cpu_svn, token->cpusvnle, sizeof(S->cpu_svn));
+	if ( token != NULL ) {
+		memcpy(S->secs.mrsigner, token->mr_signer.m, \
+		       sizeof(S->secs.mrsigner));
+		memcpy(S->secs.mrenclave, token->mr_enclave.m, \
+		       sizeof(S->secs.mrenclave));
+		memcpy(S->cpu_svn, token->cpusvnle, sizeof(S->cpu_svn));
+	}
 
 	retn = true;
 

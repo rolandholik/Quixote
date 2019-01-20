@@ -77,7 +77,6 @@ extern int main(int argc, char *argv[])
 
 {
 	_Bool debug	    = false,
-	      init	    = true,
 	      debug_enclave = true;
 
 	char *token	   = NULL,
@@ -99,9 +98,6 @@ extern int main(int argc, char *argv[])
 	/* Parse and verify arguements. */
 	while ( (opt = getopt(argc, argv, "Ndpe:n:t:")) != EOF )
 		switch ( opt ) {
-			case 'N':
-				init = false;
-				break;
 			case 'd':
 				debug = true;
 				break;
@@ -127,15 +123,10 @@ extern int main(int argc, char *argv[])
 
 
 	/* Load the launch token. */
-	if ( init && (token == NULL) ) {
-		usage("No token specified.\n");
-		goto done;
-	}
+	if ( (token != NULL) && (token[0] != '\0') ) {
 
-	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	INIT(HurdLib, File, token_file, ERR(goto done));
-
-	if ( init ) {
+		INIT(HurdLib, Buffer, bufr, ERR(goto done));
+		INIT(HurdLib, File, token_file, ERR(goto done));
 		if ( debug )
 			fprintf(stdout, "Loading enclave token: %s\n\n", \
 				token);
@@ -168,7 +159,7 @@ extern int main(int argc, char *argv[])
 		ERR(goto done);
 	fputs("Enclave loaded.\n", stdout);
 
-	if ( !init )
+	if ( (token == NULL) || (token[0] == '\0') )
 		fputs("Non-token initialization requested.\n", stdout);
 	if ( !enclave->init_enclave(enclave, einit) )
 		ERR(goto done);

@@ -130,7 +130,7 @@ extern int main(int argc, char *argv[])
 
 	unsigned int test;
 
-	struct SGX_einittoken *einit;
+	struct SGX_einittoken *einit = NULL;
 
 	SGXenclave enclave = NULL;
 
@@ -162,19 +162,16 @@ extern int main(int argc, char *argv[])
 		}
 
 
-	/* Load the launch token. */
-	if ( token == NULL ) {
-		fputs("No EINIT token specified.\n", stderr);
-		goto done;
+	/* Load a launch token if specified.. */
+	if ( (token != NULL) && (token[0] != '\0') ) {
+		INIT(HurdLib, Buffer, bufr, ERR(goto done));
+		INIT(HurdLib, File, token_file, ERR(goto done));
+
+		token_file->open_ro(token_file, token);
+		if ( !token_file->slurp(token_file, bufr) )
+			ERR(goto done);
+		einit = (void *) bufr->get(bufr);
 	}
-
-	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	INIT(HurdLib, File, token_file, ERR(goto done));
-
-	token_file->open_ro(token_file, token);
-	if ( !token_file->slurp(token_file, bufr) )
-		ERR(goto done);
-	einit = (void *) bufr->get(bufr);
 
 
 	/* Setup the exception handler. */
