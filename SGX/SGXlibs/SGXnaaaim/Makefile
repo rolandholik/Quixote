@@ -21,7 +21,9 @@ LIBRARY = lib${LIBNAME}.a
 
 ENCLAVE_CC = gcc64
 
-SGX_SDK	    = /opt/intel/sgxsdk
+SGXDIR = ../..
+include ${SGXDIR}/Make.sgx
+
 SGX_SSL	= /opt/intel/sgxssl
 SGX_INCLUDE = -I . -I ${SGX_SDK}/include -I ${SGX_SDK}/include/tlibc \
 	-I ${SGX_SDK}/include/stlport -I ../SGXfusion -I ../../../lib \
@@ -52,8 +54,6 @@ ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles  \
 	-Wl,-pie,-eenclave_entry -Wl,--export-dynamic			     \
 	-Wl,--defsym,__ImageBase=0					     \
 	-Wl,--version-script=ldscript
-
-SGX_SIGNER = ${SGX_SDK}/bin/sgx_sign
 
 
 CC = musl-gcc
@@ -116,21 +116,21 @@ enclave: ldscript test-naaaim.signed.so test-Duct.signed.so \
 	test-Possum.signed.so
 
 test-naaaim.signed.so: test-naaaim.so
-	${SGX_SIGNER} sign -key Private-key.pem -enclave $^ -out $@ \
+	${SGX_SIGNER} sign -key ${SGXKEY} -enclave $^ -out $@ \
 		-config test-naaaim-enclave.xml;
 
 test-naaaim.so: ${ENCOBJS} ${LIBRARY}
 	${ENCLAVE_CC} -o $@ ${ENCOBJS} ${ENCLAVE_LDFLAGS};
 
 test-Duct.signed.so: test-Duct.so
-	${SGX_SIGNER} sign -key Private-key.pem -enclave $^ -out $@ \
+	${SGX_SIGNER} sign -key ${SGXKEY} -enclave $^ -out $@ \
 		-config test-Duct-enclave.xml;
 
 test-Duct.so: ${DUCTOBJS} ${LIBRARY}
 	${ENCLAVE_CC} -o $@ ${DUCTOBJS} ${ENCLAVE_LDFLAGS};
 
 test-Possum.signed.so: test-Possum.so
-	${SGX_SIGNER} sign -key Private-key.pem -enclave $^ -out $@ \
+	${SGX_SIGNER} sign -key ${SGXKEY} -enclave $^ -out $@ \
 		-config test-Possum-enclave.xml;
 
 test-Possum.so: ${POSSUMOBJS} ${LIBRARY}

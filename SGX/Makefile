@@ -19,6 +19,9 @@ TOOLS = sgx-check sgx-metadata sgx-loader sgx-load sgx-sigstruct	     \
 	sgx-gen-token test-ecall test-pcr idf-sgx-fandf	idf-sgx-fandf-unibin \
 	sgx-provision sdk-compute-size sgx-gen-verifier
 
+SGXKEY = ${CURDIR}/Signing-key.pem
+export SGXKEY
+
 CC = musl-gcc
 AS = as
 

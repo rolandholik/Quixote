@@ -12,9 +12,12 @@ MGRSRC = ISOmanager-enclave.c ISOmanager-interface.c
 
 TOOLS = test-ISOidentity-enclave
 
+
 ENCLAVE_CC = gcc64
 
-SGX_SDK	= /opt/intel/sgxsdk
+SGXDIR = ..
+include ${SGXDIR}/Make.sgx
+
 SGX_SSL = /opt/intel/sgxssl
 
 SGX_INCLUDE = -I $(SGX_SDK)/include -I $(SGX_SDK)/include/tlibc \
@@ -48,8 +51,6 @@ ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles  \
 	-Wl,-pie,-eenclave_entry -Wl,--export-dynamic			     \
 	-Wl,--defsym,__ImageBase=0					     \
 	-Wl,--version-script=ldscript
-
-SGX_SIGNER = $(SGX_SDK)/bin/sgx_sign
 
 
 CC = musl-gcc
@@ -106,14 +107,14 @@ all: ${LIBRARY} ${COBJS} enclave tools
 enclave: ldscript ISOidentity.signed.so ISOmanager.signed.so
 
 ISOidentity.signed.so: ISOidentity.so ISOidentity-enclave.xml
-	$(SGX_SIGNER) sign -key Private-key.pem -enclave ISOidentity.so \
-		 -out $@ -config ISOidentity-enclave.xml;
+	$(SGX_SIGNER) sign -key ${SGXKEY} -enclave $< -out $@ \
+		-config ISOidentity-enclave.xml;
 
 ISOidentity.so: ${ENCOBJS}
 	${ENCLAVE_CC} -o $@ $^ ${ENCLAVE_LDFLAGS};
 
 ISOmanager.signed.so: ISOmanager.so
-	$(SGX_SIGNER) sign -key Private-key.pem -enclave $^ -out $@ \
+	$(SGX_SIGNER) sign -key ${SGXKEY} -enclave $< -out $@ \
 		-config ISOmanager-enclave.xml;
 
 ISOmanager.so: ${MGROBJS}

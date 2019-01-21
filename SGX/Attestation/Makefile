@@ -12,7 +12,9 @@ TOOLS = test-local-target test-remote-target
 
 ENCLAVE_CC = gcc64
 
-SGX_SDK	= /opt/intel/sgxsdk
+SGXDIR = ..
+include ${SGXDIR}/Make.sgx
+
 SGX_SSL	= /opt/intel/sgxssl
 
 SGX_INCLUDE = -I . -I $(SGX_SDK)/include -I $(SGX_SDK)/include/tlibc \
@@ -44,8 +46,6 @@ ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles  \
 	-Wl,-pie,-eenclave_entry -Wl,--export-dynamic			     \
 	-Wl,--defsym,__ImageBase=0					     \
 	-Wl,--version-script=ldscript
-
-SGX_SIGNER = $(SGX_SDK)/bin/sgx_sign
 
 
 CC = musl-gcc
@@ -99,14 +99,14 @@ all: ${LIBRARY} enclave tools
 enclave: ldscript LocalTarget.signed.so LocalSource.signed.so
 
 LocalTarget.signed.so: LocalTarget.so
-	$(SGX_SIGNER) sign -key Private-key.pem -enclave LocalTarget.so \
-		 -out $@ -config LocalTarget-enclave.xml;
+	$(SGX_SIGNER) sign -key ${SGXKEY} -enclave $< -out $@ \
+		-config LocalTarget-enclave.xml;
 
 LocalTarget.so: ${ENCOBJS1}
 	${ENCLAVE_CC} -o $@ $^ ${ENCLAVE_LDFLAGS}
 
 LocalSource.signed.so: LocalSource.so
-	$(SGX_SIGNER) sign -key Private-key.pem -enclave $^ -out $@ \
+	$(SGX_SIGNER) sign -key ${SGXKEY} -enclave $< -out $@ \
 	-config LocalTarget-enclave.xml;
 
 LocalSource.so: ${ENCOBJS2}

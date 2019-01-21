@@ -17,7 +17,9 @@ LIBRARY = lib${LIBNAME}.a
 
 ENCLAVE_CC = gcc64
 
-SGX_SDK	    = /opt/intel/sgxsdk
+SGXDIR = ../..
+include ${SGXDIR}/Make.sgx
+
 SGX_INCLUDE = -I . -I ${SGX_SDK}/include -I ${SGX_SDK}/include/tlibc \
 	-I ${SGX_SDK}/include/stlport
 
@@ -42,8 +44,6 @@ ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles  \
 	-Wl,-pie,-eenclave_entry -Wl,--export-dynamic			     \
 	-Wl,--defsym,__ImageBase=0					     \
 	-Wl,--version-script=ldscript
-
-SGX_SIGNER = ${SGX_SDK}/bin/sgx_sign
 
 
 CC = musl-gcc
@@ -92,7 +92,7 @@ all: ${LIBRARY} enclave tools
 enclave: ldscript test-fusion.signed.so
 
 test-fusion.signed.so: test-fusion.so
-	${SGX_SIGNER} sign -key Private-key.pem -enclave $^ -out $@ \
+	${SGX_SIGNER} sign -key ${SGXKEY} -enclave $< -out $@ \
 		-config test-fusion-enclave.xml;
 
 test-fusion.so: ${ENCOBJS}

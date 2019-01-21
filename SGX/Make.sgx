@@ -1,0 +1,16 @@
+# ***************************************************************************
+# (C)Copyright IDfusion, LLC. All rights reserved.
+# ***************************************************************************
+
+#
+# Consolidate SGX definitions here in order to avoid replication
+# throughout all of the subordinate directories that build enclave.
+#
+
+# The directory where the Intel SDK is located.
+SGX_SDK	    = /opt/intel/sgxsdk
+
+
+# The location of the default signing key and tool.
+SGXKEY ?= ${SGXDIR}/Signing-key.pem
+SGX_SIGNER = ${SGX_SDK}/bin/sgx_sign
