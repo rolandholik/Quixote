@@ -51,7 +51,7 @@ CC = musl-gcc
 CFLAGS = -Wall -O2 -fomit-frame-pointer -march=core2 -I ../.. -I ../../.. \
 	-I ../../../HurdLib 
 
-LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib -L../../../lib
+LDFLAGS = ${STATIC} -g -Wl,--rpath-link /usr/local/musl/lib -L../../../lib
 
 ELFLIB	= -Wl,--rpath /usr/local/musl/lib -lelf
 
