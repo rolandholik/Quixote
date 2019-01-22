@@ -114,7 +114,8 @@ static const struct OCALL_api ocall_table = {
 extern int main(int argc, char *argv[])
 
 {
-	_Bool debug = true;
+	_Bool debug	    = false,
+	      debug_enclave = true;
 
 	char *token	   = NULL,
 	     *hostname	   = "localhost",
@@ -147,7 +148,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "CSdh:e:n:t:")) != EOF )
+	while ( (opt = getopt(argc, argv, "CSdph:e:n:t:")) != EOF )
 		switch ( opt ) {
 			case 'C':
 				Mode = client;
@@ -157,7 +158,12 @@ extern int main(int argc, char *argv[])
 				break;
 
 			case 'd':
-				debug = debug ? false : true;
+				debug = true;
+				break;
+			case 'p':
+				debug_enclave = false;
+				break;
+
 			case 'h':
 				hostname = optarg;
 				break;
@@ -198,8 +204,11 @@ extern int main(int argc, char *argv[])
 
 	/* Load an initialize the enclave. */
 	INIT(NAAAIM, SGXenclave, enclave, ERR(goto done));
+	if ( debug )
+		enclave->debug(enclave, true);
 
-	if ( !enclave->open_enclave(enclave, sgx_device, enclave_name, debug) )
+	if ( !enclave->open_enclave(enclave, sgx_device, enclave_name, \
+				    debug_enclave) )
 		ERR(goto done);
 
 	if ( !enclave->create_enclave(enclave) )

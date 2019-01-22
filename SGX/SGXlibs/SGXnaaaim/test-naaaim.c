@@ -120,7 +120,8 @@ static struct ecall0_table {
 extern int main(int argc, char *argv[])
 
 {
-	_Bool debug = true;
+	_Bool debug	    = false,
+	      debug_enclave = true;
 
 	char *token	   = NULL,
 	     *sgx_device   = "/dev/isgx",
@@ -148,13 +149,15 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "dne:t:")) != EOF )
+	while ( (opt = getopt(argc, argv, "dpn:t:")) != EOF )
 		switch ( opt ) {
 			case 'd':
-				debug = debug ? false : true;
-			case 'e':
-				enclave_name = optarg;
+				debug = true;
 				break;
+			case 'p':
+				debug_enclave = false;
+				break;
+
 			case 'n':
 				sgx_device = optarg;
 				break;
@@ -181,10 +184,13 @@ extern int main(int argc, char *argv[])
 		ERR(goto done);
 
 
-	/* Load an initialize the enclave. */
+	/* Load and initialize the enclave. */
 	INIT(NAAAIM, SGXenclave, enclave, ERR(goto done));
+	if ( debug )
+		enclave->debug(enclave, true);
 
-	if ( !enclave->open_enclave(enclave, sgx_device, enclave_name, debug) )
+	if ( !enclave->open_enclave(enclave, sgx_device, enclave_name, \
+				    debug_enclave) )
 		ERR(goto done);
 
 	if ( !enclave->create_enclave(enclave) )
