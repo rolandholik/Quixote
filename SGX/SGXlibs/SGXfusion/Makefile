@@ -49,7 +49,11 @@ ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles  \
 CC = musl-gcc
 
 CFLAGS = -Wall -O2 -fomit-frame-pointer -march=core2 -I ../.. -I ../../.. \
-	-I ../../../HurdLib 
+	-I ../../../HurdLib
+ifdef ENCLAVE_DIR
+CFLAGS += -DENCLAVE_DIR=\"${ENCLAVE_DIR}\"
+endif
+
 
 LDFLAGS = ${STATIC} -g -Wl,--rpath-link /usr/local/musl/lib -L../../../lib
 

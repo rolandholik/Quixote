@@ -14,6 +14,10 @@
 /* Number of tests. */
 #define NUMBER_OF_TESTS 3
 
+/* Name of program and associated enclave. */
+#define PGM "test-fusion"
+#define ENCLAVE PGM".signed.so"
+
 
 /* Include files. */
 #include <stdio.h>
@@ -114,7 +118,7 @@ extern int main(int argc, char *argv[])
 
 	char *token	   = NULL,
 	     *sgx_device   = "/dev/isgx",
-	     *enclave_name = "test-fusion.signed.so";
+	     *enclave_name = ENCLAVE_NAME;
 
 	int opt,
 	    rc,

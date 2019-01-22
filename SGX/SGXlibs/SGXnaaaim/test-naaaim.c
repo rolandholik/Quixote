@@ -12,9 +12,11 @@
 
 
 /* Number of tests. */
-#define PGM "test-naaaim"
-
 #define NUMBER_OF_TESTS 6
+
+/* Program and enclave name. */
+#define PGM "test-naaaim"
+#define ENCLAVE PGM".signed.so"
 
 
 /* Include files. */
@@ -122,7 +124,7 @@ extern int main(int argc, char *argv[])
 
 	char *token	   = NULL,
 	     *sgx_device   = "/dev/isgx",
-	     *enclave_name = "test-naaaim.signed.so";
+	     *enclave_name = ENCLAVE_NAME;
 
 	int opt,
 	    rc,

@@ -11,8 +11,9 @@
  **************************************************************************/
 
 
-/* Number of tests. */
+/* Definition of program and primary enclave. */
 #define PGM "test-Duct"
+#define ENCLAVE PGM".signed.so"
 
 
 /* Include files. */
@@ -118,7 +119,7 @@ extern int main(int argc, char *argv[])
 	char *token	   = NULL,
 	     *hostname	   = "localhost",
 	     *sgx_device   = "/dev/isgx",
-	     *enclave_name = "test-Duct.signed.so";
+	     *enclave_name = ENCLAVE_NAME;
 
 	int opt,
 	    rc,

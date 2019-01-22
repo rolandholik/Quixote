@@ -11,8 +11,9 @@
  **************************************************************************/
 
 
-/* Number of tests. */
+/* Program name and associated enclave. */
 #define PGM "test-Possum"
+#define ENCLAVE PGM".signed.so"
 
 
 /* Include files. */
@@ -127,7 +128,7 @@ extern int main(int argc, char *argv[])
 	     *spid_fname   = SPID_FILENAME,
 	     *token	   = "test-Possum.token",
 	     *hostname	   = "localhost",
-	     *enclave_name = "test-Possum.signed.so";
+	     *enclave_name = ENCLAVE_NAME;
 
 	int opt,
 	    rc,

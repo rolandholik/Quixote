@@ -28,6 +28,12 @@
 #define SPID_FILENAME	    "/opt/IDfusion/etc/spid.txt"
 #define SGX_TOKEN_DIRECTORY "/var/lib/IDfusion/tokens"
 
+#if defined(ENCLAVE_DIR)
+#define ENCLAVE_NAME ENCLAVE_DIR"/"ENCLAVE
+#else
+#define ENCLAVE_NAME ENCLAVE
+#endif
+
 
 /**
  * Prototype for the function to initialize the SGX exception handler.
