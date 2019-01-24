@@ -37,12 +37,12 @@
 #include <File.h>
 
 #include <IDtoken.h>
-#include <SHA256_hmac.h>
 #include <AES256_cbc.h>
 #include <RandomBuffer.h>
 
 #include "NAAAIM.h"
 #include "SHA256.h"
+#include "SHA256_hmac.h"
 #include "Duct.h"
 #include "SoftwareStatus.h"
 #include "Curve25519.h"

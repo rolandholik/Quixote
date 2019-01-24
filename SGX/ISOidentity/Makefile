@@ -133,9 +133,9 @@ ldscript:
 tools: ${TOOLS}
 
 test-ISOidentity-enclave: test-ISOidentity-enclave.o ISOenclave.o \
-	../../IDtoken.o ../../SHA256_hmac.o
-	${CC} ${LDFLAGS} -o $@ $< ISOenclave.o ../../IDtoken.o \
-		../../SHA256_hmac.o ${LIBS} ${SSL_CRYPTO};
+	../../IDtoken.o
+	${CC} ${LDFLAGS} -o $@ $< ISOenclave.o ../../IDtoken.o ${LIBS} \
+		${SSL_CRYPTO};
 
 test-ISOidentity-enclave.o: test-ISOidentity-enclave.c
 	${CC} ${CFLAGS} -c $< -o $@;

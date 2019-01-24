@@ -144,7 +144,7 @@ generate-array: generate-array.o
 generate-array.o: generate-array.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
 
-sgx-gen-verifier: sgx-gen-verifier.o ../IDtoken.o ../SHA256_hmac.o
+sgx-gen-verifier: sgx-gen-verifier.o ../IDtoken.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO};
 
 sgx-gen-verifier.o: sgx-gen-verifier.c

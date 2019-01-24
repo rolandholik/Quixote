@@ -6,9 +6,8 @@
 
 
 # Variable declarations.
-CSRC = 	SHA256_hmac.c OrgID.c PatientID.c RandomBuffer.c	\
-	IDtoken.c Authenticator.c AES256_cbc.c AuthenReply.c	\
-	IDqueryReply.c ProviderQuery.c SSLDuct.c 
+CSRC = 	OrgID.c PatientID.c RandomBuffer.c IDtoken.c Authenticator.c \
+	AES256_cbc.c AuthenReply.c IDqueryReply.c ProviderQuery.c SSLDuct.c 
 
 # SERVERS = root-referral device-broker user-broker identity-broker \
 # 	provider-server
@@ -170,11 +169,10 @@ clean:
 
 
 # Source dependencies.
-SHA256_hmac.o: NAAAIM.h SHA256_hmac.h
 OrgID.o: NAAAIM.h OrgID.h
 PatientID.o: NAAAIM.h OrgID.h PatientID.h
 RandomBuffer.o: NAAAIM.h RandomBuffer.h
-IDtoken.o: NAAAIM.h IDtoken.h SHA256_hmac.h
+IDtoken.o: NAAAIM.h IDtoken.h
 SSLDuct.o: NAAAIM.h SSLDuct.h
 Authenticator.o: NAAAIM.h Authenticator.h RandomBuffer.h IDtoken.h \
 	AES256_cbc.h
@@ -190,16 +188,13 @@ query-client.o: NAAAIM.h SSLDuct.h IDtoken.h Authenticator.h IDqueryReply.h \
 
 root-referral.o: NAAAIM.h SSLDuct.h IDtoken.h Authenticator.h AuthenReply.h \
 	IDqueryReply.h
-device-broker.o: NAAAIM.h SSLDuct.h IDtoken.h Authenticator.h \
-	SHA256_hmac.h AuthenReply.h
-user-broker.o: NAAAIM.h SSLDuct.h IDtoken.h Authenticator.h \
-	SHA256_hmac.h AuthenReply.h
+device-broker.o: NAAAIM.h SSLDuct.h IDtoken.h Authenticator.h AuthenReply.h
+user-broker.o: NAAAIM.h SSLDuct.h IDtoken.h Authenticator.h AuthenReply.h
 identity-broker.o: NAAAIM.h SSLDuct.h IDtoken.h Authenticator.h AuthenReply.h \
 	OrgSearch.h IDqueryReply.h DBduct.h
 provider-server.o: NAAAIM.h SSLDuct.h DBduct.h ProviderQuery.h
 
-genid.o: NAAAIM.h SHA256_hmac.h OrgID.h PatientID.h \
-	RandomBuffer.h DBduct.o
+genid.o: NAAAIM.h OrgID.h PatientID.h RandomBuffer.h DBduct.o
 sha256key.o: NAAAIM.h
 
 DBduct.o: DBduct.h

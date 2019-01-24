@@ -98,17 +98,16 @@ sha-tool: sha-tool.o
 set-behavior: set-behavior.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS}
 
-cboot: cboot.o ../SHA256_hmac.o ../IDtoken.o ../SGX/ISOidentity/ISOenclave.o \
-	ISOidentity.o ContourPoint.o ExchangeEvent.o Actor.o Subject.o	     \
-	${RDK_LIBRARY} ${NAAAIM_LIBRARY} ${HURD_LIBRARY}
-	${CC} ${LDFLAGS} -o $@ $< ../SHA256_hmac.o ../IDtoken.o ISOidentity.o \
-		ContourPoint.o ExchangeEvent.o Actor.o Subject.o	      \
+cboot: cboot.o ../IDtoken.o ../SGX/ISOidentity/ISOenclave.o ISOidentity.o \
+	ContourPoint.o ExchangeEvent.o Actor.o Subject.o ${RDK_LIBRARY}   \
+	${NAAAIM_LIBRARY} ${HURD_LIBRARY}
+	${CC} ${LDFLAGS} -o $@ $< ../IDtoken.o ISOidentity.o ContourPoint.o \
+		ExchangeEvent.o Actor.o Subject.o 			    \
 		../SGX/ISOidentity/ISOenclave.o ${RDKLIB} ${LIBS} ${SSL_CRYPTO}
 
-cboot-mgr: cboot-mgr.o ../IDtoken.o ../SHA256_hmac.o			 \
-	../SGX/ISOidentity/ISOmanager.o ${RDK_LIBRARY} ${NAAAIM_LIBRARY} \
-	${HURD_LIBRARY}
-	${CC} ${LDFLAGS} -o $@ $< ../IDtoken.o ../SHA256_hmac.o \
+cboot-mgr: cboot-mgr.o ../IDtoken.o ../SGX/ISOidentity/ISOmanager.o \
+	${RDK_LIBRARY} ${NAAAIM_LIBRARY} ${HURD_LIBRARY}
+	${CC} ${LDFLAGS} -o $@ $< ../IDtoken.o \
 		../SGX/ISOidentity/ISOmanager.o ${RDKLIB} ${LIBS} ${SSL_CRYPTO}
 
 tags:
