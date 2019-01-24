@@ -25,7 +25,10 @@
 
 
 /* Local defines. */
-#define ENCLAVE_NAME	"/opt/IDfusion/lib/enclaves/ISOidentity.signed.so"
+#if !defined(ENCLAVE_DIR)
+#define ENCLAVE_DIR	"/opt/IDfusion/lib/enclaves"
+#endif
+#define ENCLAVE		"ISOidentity.signed.so"
 #define VERIFIERS	"/opt/IDfusion/etc/verifiers/ISOmanager/*.ivy"
 #define CANISTERS	"/var/run/Canisters"
 

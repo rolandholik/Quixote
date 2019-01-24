@@ -16,7 +16,10 @@
 
 
 /* The location of the identity verifiers for the ISOidentity enclave. */
-#define ENCLAVE_NAME	"/opt/IDfusion/lib/enclaves/ISOmanager.signed.so"
+#if !defined(ENCLAVE_DIR)
+#define ENCLAVE_DIR	"/opt/IDfusion/lib/enclaves"
+#endif
+#define ENCLAVE		"ISOmanager.signed.so"
 #define VERIFIERS	"/opt/IDfusion/etc/verifiers/ISOidentity/*.ivy"
 
 
