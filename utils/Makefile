@@ -65,11 +65,11 @@ all: ${COBJS} tools
 tools: ${TOOLS}
 
 gen-image: gen-image.o
-	${CC} ${LDFLAGS} -o $@ $^ ../AES256_cbc.o ${LIBS} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 load-image: load-image.o
-	${CC} ${LDFLAGS} -Wl,-rpath-link /usr/local/musl/lib -o $@ $^ \
-		../AES256_cbc.o ${LIBS} -ltpm_unseal ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -Wl,-rpath-link /usr/local/musl/lib -o $@ $^ ${LIBS} \
+		-ltpm_unseal ${SSL_CRYPTO};
 
 boot: boot.o Netconfig.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
@@ -81,8 +81,8 @@ init: init.o Netconfig.o SoftwareTPM.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl -ltspi ${SSL_CRYPTO} -lssl;
 
 possum: possum.o Netconfig.o IPsec.o
-	${CC} ${LDFLAGS} -o $@ $^ ../IDtoken.o ../AES256_cbc.o ${SSL_CRYPTO} \
-		${LIBS} -ltspi -lfl;
+	${CC} ${LDFLAGS} -o $@ $^ ../IDtoken.o ${SSL_CRYPTO} ${LIBS} -ltspi \
+		-lfl;
 
 gen-id-verifier: gen-id-verifier.o ../IDtoken.o
 	${CC} ${LDFLAGS} -o $@ $^ ${SSL_CRYPTO} ${LIBS} -ltspi;
@@ -138,7 +138,7 @@ Netconfig.o: Netconfig.h
 IPsec.o: IPsec.h
 MGMTsupvr.o: MGMTsupvr.h
 
-possum.o: Netconfig.h IPsec.h ../IDtoken.h ../AES256_cbc.h
+possum.o: Netconfig.h IPsec.h ../IDtoken.h
 mgmt-supvr.o: MGMTsupvr.h
 
 gen-id-verifier.o:

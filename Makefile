@@ -6,8 +6,8 @@
 
 
 # Variable declarations.
-CSRC = 	OrgID.c PatientID.c IDtoken.c Authenticator.c AES256_cbc.c \
-	AuthenReply.c IDqueryReply.c ProviderQuery.c SSLDuct.c
+CSRC = 	OrgID.c PatientID.c IDtoken.c Authenticator.c AuthenReply.c \
+	IDqueryReply.c ProviderQuery.c SSLDuct.c
 
 # SERVERS = root-referral device-broker user-broker identity-broker \
 # 	provider-server
@@ -173,8 +173,7 @@ OrgID.o: NAAAIM.h OrgID.h
 PatientID.o: NAAAIM.h OrgID.h PatientID.h
 IDtoken.o: NAAAIM.h IDtoken.h
 SSLDuct.o: NAAAIM.h SSLDuct.h
-Authenticator.o: NAAAIM.h Authenticator.h IDtoken.h AES256_cbc.h
-AES256_cbc.o: AES256_cbc.h
+Authenticator.o: NAAAIM.h Authenticator.h IDtoken.h
 AuthenReply.o: NAAAIM.h AuthenReply.h
 OrgSearch.o: NAAAIM.h OrgSearch.h IDtoken.h
 IDqueryReply.o: NAAAIM.h IDqueryReply.h
