@@ -164,10 +164,10 @@ test-Duct: test-Duct.o ${LIBRARY_DEPDNDS}
 test-Duct.o: test-Duct.c
 	${CC} ${CFLAGS} -I ../../../lib -c $< -o $@;
 
-test-Possum: test-Possum.o ../../../IDtoken.o ../../../SHA256.o \
-	../../../SHA256_hmac.o ${LIBRARY_DEPENDS}
-	${CC} ${LDFLAGS} -o $@ $< ../../../IDtoken.o ../../../SHA256.o \
-		../../../SHA256_hmac.o ${LIBS} ${SSL_CRYPTO};
+test-Possum: test-Possum.o ../../../IDtoken.o ../../../SHA256_hmac.o \
+	${LIBRARY_DEPENDS}
+	${CC} ${LDFLAGS} -o $@ $< ../../../IDtoken.o ../../../SHA256_hmac.o \
+		${LIBS} ${SSL_CRYPTO};
 
 test-Possum.o: test-Possum.c
 	${CC} ${CFLAGS} -I ../../../lib -c $< -o $@;

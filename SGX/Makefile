@@ -94,8 +94,8 @@ demos: idf-sgx-fandf idf-sgx-fandf-unibin
 sgx-check: sgx-check.o
 	${CC} ${LDFLAGS} -o $@ $^;
 
-sgx-metadata: sgx-metadata.o ../SHA256.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
+sgx-metadata: sgx-metadata.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO};
 
 sgx-metadata.o: sgx-metadata.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
@@ -118,13 +118,13 @@ sgx-sigstruct: sgx-sigstruct.o ${LIBRARY}
 sgx-sigstruct.o: sgx-sigstruct.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
 
-sgx-gen-token: sgx-gen-token.o ../SHA256.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
+sgx-gen-token: sgx-gen-token.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO};
 
 sgx-gen-token.o: sgx-gen-token.c LE_whitelist.h
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
 
-sgx-provision: sgx-provision.o ../SHA256.o ../RandomBuffer.o
+sgx-provision: sgx-provision.o ../RandomBuffer.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO} \
 		${INTEL_CRYPTO};
 
@@ -144,7 +144,7 @@ generate-array: generate-array.o
 generate-array.o: generate-array.c
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
 
-sgx-gen-verifier: sgx-gen-verifier.o ../IDtoken.o ../SHA256.o ../SHA256_hmac.o
+sgx-gen-verifier: sgx-gen-verifier.o ../IDtoken.o ../SHA256_hmac.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO};
 
 sgx-gen-verifier.o: sgx-gen-verifier.c
@@ -156,11 +156,11 @@ test-ecall: test-ecall.o
 test-pcr: test-pcr.o
 	${CC} ${LDFLAGS} -static -o $@ $^ ${LIBS};
 
-idf-sgx-fandf: idf-sgx-fandf.o ../SHA256.o
-	${CC} -static ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
+idf-sgx-fandf: idf-sgx-fandf.o
+	${CC} -static ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO};
 
-idf-sgx-fandf-unibin: idf-sgx-fandf-unibin.o ../SHA256.o
-	${CC} -static ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
+idf-sgx-fandf-unibin: idf-sgx-fandf-unibin.o
+	${CC} -static ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO};
 
 SGXecdsa.o: SGXecdsa.c
 	$(CC) $(CFLAGS) -I /opt/intel/sgxsdk/include -c $< -o $@;

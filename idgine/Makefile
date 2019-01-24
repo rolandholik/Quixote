@@ -56,19 +56,19 @@ all: ${COBJS} binaries
 
 binaries: ${BINARIES}
 
-idgine: idgine.o IDengine.o Identity.o ../OrgID.o ../SHA256.o
+idgine: idgine.o IDengine.o Identity.o ../OrgID.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO} -lfl;
 
 gen-id: gen-id.o IDengine.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
-idsvr: idsvr.o IDengine.o Identity.o ../SHA256.o
+idsvr: idsvr.o IDengine.o Identity.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 fetch-id: fetch-id.o IDengine.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
-recip-svr: recip-svr.o IDengine.o Identity.o ../SHA256.o
+recip-svr: recip-svr.o IDengine.o Identity.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 fwd-id: fwd-id.o IDengine.o

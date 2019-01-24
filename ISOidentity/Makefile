@@ -59,37 +59,37 @@ all: ${COBJS} tools
 tools: ${TOOLS}
 
 test-actor: test-actor.o Actor.o
-	${CC} ${LDFLAGS} -o $@ $^ ../SHA256.o ${HURDLIB} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 test-subject: test-subject.o Subject.o
-	${CC} ${LDFLAGS} -o $@ $^ ../SHA256.o ${HURDLIB} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 test-event: test-event.o ExchangeEvent.o Actor.o Subject.o
-	${CC} ${LDFLAGS} -o $@ $^ ../SHA256.o ${HURDLIB} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 test-ISOidentity: test-ISOidentity.o ISOidentity.o ContourPoint.o \
 	ExchangeEvent.o Actor.o Subject.o
-	${CC} ${LDFLAGS} -o $@ $^ ../SHA256.o ${HURDLIB} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 generate-contours: generate-contours.o ExchangeEvent.o Actor.o Subject.o
-	${CC} ${LDFLAGS} -o $@ $^ ../SHA256.o ${HURDLIB} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
-compute-measurement: compute-measurement.o Actor.o Subject.o ../SHA256.o
-	${CC} ${LDFLAGS} -o $@ $^ ${HURDLIB} ${SSL_CRYPTO};
+compute-measurement: compute-measurement.o Actor.o Subject.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
-compute-aggregate: compute-aggregate.o ../SHA256.o
-	${CC} ${LDFLAGS} -o $@ $^ ${HURDLIB} ${SSL_CRYPTO};
+compute-aggregate: compute-aggregate.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 bad-actor: bad-actor.o
-	${CC} ${LDFLAGS} -o $@ $^ ${HURDLIB} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
-sha-tool: sha-tool.o ../SHA256.o
-	${CC} ${LDFLAGS} -o $@ $^ ${HURDLIB} ${SSL_CRYPTO};
+sha-tool: sha-tool.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 set-behavior: set-behavior.o
-	${CC} ${LDFLAGS} -o $@ $^ ${HURDLIB}
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS}
 
-cboot: cboot.o ../SHA256.o ../SHA256_hmac.o ISOidentity.o ContourPoint.o  \
+cboot: cboot.o ../SHA256_hmac.o ISOidentity.o ContourPoint.o		  \
 	ExchangeEvent.o Actor.o Subject.o ../IDtoken.o			  \
 	../SGX/ISOidentity/ISOenclave.o	../SGX/SGXenclave.o		  \
 	../SGX/SGXloader.o ../SGX/SGXmetadata.o ../SGX/SGXsigstruct.o 	  \
@@ -99,7 +99,7 @@ cboot: cboot.o ../SHA256.o ../SHA256_hmac.o ISOidentity.o ContourPoint.o  \
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO}	\
 		-Wl,--rpath /usr/local/musl/lib -lelf
 
-cboot-mgr: cboot-mgr.o ../IDtoken.o ../SHA256.o ../SHA256_hmac.o	\
+cboot-mgr: cboot-mgr.o ../IDtoken.o ../SHA256_hmac.o			\
 	../SGX/SGXenclave.o ../SGX/SGXloader.o ../SGX/SGXmetadata.o	\
 	../SGX/SGXsigstruct.o ../SGX/boot-sgx.o ../SGX/sgx-ocall.o	\
 	../SGX/SGXquote_sgxmgr.o ../SGX/SGXquote.o 			\

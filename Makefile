@@ -6,8 +6,8 @@
 
 
 # Variable declarations.
-CSRC = 	SHA256.c SHA256_hmac.c OrgID.c PatientID.c RandomBuffer.c  \
-	IDtoken.c Authenticator.c AES256_cbc.c AuthenReply.c	   \
+CSRC = 	SHA256_hmac.c OrgID.c PatientID.c RandomBuffer.c	\
+	IDtoken.c Authenticator.c AES256_cbc.c AuthenReply.c	\
 	IDqueryReply.c ProviderQuery.c SSLDuct.c 
 
 # SERVERS = root-referral device-broker user-broker identity-broker \
@@ -100,7 +100,7 @@ provider-server: provider-server.o DBduct.o ${COBJS}
 query-client: query-client.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl ${SSL_LIBRARY};
 
-genrandom: genrandom.o RandomBuffer.o SHA256.o
+genrandom: genrandom.o RandomBuffer.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 genid: genid.o ${COBJS} DBduct.o
@@ -128,7 +128,7 @@ SSLDuct_test: SSLDuct_test.o ${COBJS}
 DBduct_test: DBduct_test.o DBduct.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${POSTGRES_LIBRARY};
 
-sha256key: sha256key.o SHA256.o
+sha256key: sha256key.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 DBduct.o: DBduct.c
@@ -170,10 +170,9 @@ clean:
 
 
 # Source dependencies.
-SHA256.o: NAAAIM.h SHA256.h
 SHA256_hmac.o: NAAAIM.h SHA256_hmac.h
-OrgID.o: NAAAIM.h OrgID.h SHA256.h
-PatientID.o: NAAAIM.h OrgID.h PatientID.h SHA256.h
+OrgID.o: NAAAIM.h OrgID.h
+PatientID.o: NAAAIM.h OrgID.h PatientID.h
 RandomBuffer.o: NAAAIM.h RandomBuffer.h
 IDtoken.o: NAAAIM.h IDtoken.h SHA256_hmac.h
 SSLDuct.o: NAAAIM.h SSLDuct.h
@@ -191,16 +190,16 @@ query-client.o: NAAAIM.h SSLDuct.h IDtoken.h Authenticator.h IDqueryReply.h \
 
 root-referral.o: NAAAIM.h SSLDuct.h IDtoken.h Authenticator.h AuthenReply.h \
 	IDqueryReply.h
-device-broker.o: NAAAIM.h SSLDuct.h IDtoken.h Authenticator.h SHA256.h \
+device-broker.o: NAAAIM.h SSLDuct.h IDtoken.h Authenticator.h \
 	SHA256_hmac.h AuthenReply.h
-user-broker.o: NAAAIM.h SSLDuct.h IDtoken.h Authenticator.h SHA256.h \
+user-broker.o: NAAAIM.h SSLDuct.h IDtoken.h Authenticator.h \
 	SHA256_hmac.h AuthenReply.h
 identity-broker.o: NAAAIM.h SSLDuct.h IDtoken.h Authenticator.h AuthenReply.h \
 	OrgSearch.h IDqueryReply.h DBduct.h
-provider-server.o: NAAAIM.h SSLDuct.h DBduct.h SHA256.h ProviderQuery.h
+provider-server.o: NAAAIM.h SSLDuct.h DBduct.h ProviderQuery.h
 
-genid.o: NAAAIM.h SHA256.h SHA256_hmac.h OrgID.h PatientID.h \
+genid.o: NAAAIM.h SHA256_hmac.h OrgID.h PatientID.h \
 	RandomBuffer.h DBduct.o
-sha256key.o: NAAAIM.h SHA256.h
+sha256key.o: NAAAIM.h
 
 DBduct.o: DBduct.h
