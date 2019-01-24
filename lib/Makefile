@@ -6,7 +6,8 @@
 # Variable declarations.
 CSRC = Duct.c OTEDKS.c Curve25519.c IPC.c SoftwareStatus.c Ivy.c IDmgr.c    \
 	TPMcmd.c TPM2cmd.c PossumPacket.c PossumPipe.c RSAkey.c SmartCard.c \
-	LocalDuct.c HTTP.c Base64.c Duct_sgxmgr.c SHA256.c SHA256_hmac.c
+	LocalDuct.c HTTP.c Base64.c Duct_sgxmgr.c SHA256.c SHA256_hmac.c    \
+	RandomBuffer.c
 
 TESTS = Duct_test OTEDKS_test Curve25519_test IPC_test PossumPipe_test \
 	RSAkey_test LocalDuct_test #SmartCard_test
@@ -73,14 +74,13 @@ LocalDuct_test: LocalDuct_test.o LocalDuct.o
 OTEDKS_test: OTEDKS_test.o OTEDKS.o ../IDtoken.o
 	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${SSL_CRYPTO};
 
-Curve25519_test: Curve25519_test.o Curve25519.o ../RandomBuffer.o
+Curve25519_test: Curve25519_test.o Curve25519.o RandomBuffer.o
 	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${SSL_CRYPTO};
 
 IPC_test: IPC_test.o IPC.o
 	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib -lrt;
 
-PossumPipe_test: PossumPipe_test.o PossumPipe.o ../AES256_cbc.o \
-	../RandomBuffer.o ../IDtoken.o
+PossumPipe_test: PossumPipe_test.o PossumPipe.o ../AES256_cbc.o ../IDtoken.o
 	${CC} ${LDFLAGS} -o $@ $^ -L . -lNAAAIM -L../HurdLib -lHurdLib \
 	${SSL_CRYPTO} -lrt -ltspi;
 

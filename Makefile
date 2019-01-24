@@ -6,8 +6,8 @@
 
 
 # Variable declarations.
-CSRC = 	OrgID.c PatientID.c RandomBuffer.c IDtoken.c Authenticator.c \
-	AES256_cbc.c AuthenReply.c IDqueryReply.c ProviderQuery.c SSLDuct.c 
+CSRC = 	OrgID.c PatientID.c IDtoken.c Authenticator.c AES256_cbc.c \
+	AuthenReply.c IDqueryReply.c ProviderQuery.c SSLDuct.c
 
 # SERVERS = root-referral device-broker user-broker identity-broker \
 # 	provider-server
@@ -62,7 +62,7 @@ LDFLAGS = -g ${DMALLOC_LIBS} -Wl,-rpath-link /usr/local/musl/lib -L./HurdLib \
 #
 COBJS = ${CSRC:.c=.o}
 
-LIBS = -l HurdLib -lNAAAIM
+LIBS = -lNAAAIM -lHurdLib
 
 CFLAGS := ${CFLAGS} -I./HurdLib -I${SSL_INCLUDE} -I./lib
 
@@ -99,7 +99,7 @@ provider-server: provider-server.o DBduct.o ${COBJS}
 query-client: query-client.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl ${SSL_LIBRARY};
 
-genrandom: genrandom.o RandomBuffer.o
+genrandom: genrandom.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 genid: genid.o ${COBJS} DBduct.o
@@ -171,15 +171,13 @@ clean:
 # Source dependencies.
 OrgID.o: NAAAIM.h OrgID.h
 PatientID.o: NAAAIM.h OrgID.h PatientID.h
-RandomBuffer.o: NAAAIM.h RandomBuffer.h
 IDtoken.o: NAAAIM.h IDtoken.h
 SSLDuct.o: NAAAIM.h SSLDuct.h
-Authenticator.o: NAAAIM.h Authenticator.h RandomBuffer.h IDtoken.h \
-	AES256_cbc.h
+Authenticator.o: NAAAIM.h Authenticator.h IDtoken.h AES256_cbc.h
 AES256_cbc.o: AES256_cbc.h
 AuthenReply.o: NAAAIM.h AuthenReply.h
 OrgSearch.o: NAAAIM.h OrgSearch.h IDtoken.h
-IDqueryReply.o: NAAAIM.h IDqueryReply.h RandomBuffer.h
+IDqueryReply.o: NAAAIM.h IDqueryReply.h
 DBDuct.o: NAAAIM.h DBduct.h
 ProviderQuery.o: NAAAIM.h ProviderQuery.h
 
@@ -194,7 +192,7 @@ identity-broker.o: NAAAIM.h SSLDuct.h IDtoken.h Authenticator.h AuthenReply.h \
 	OrgSearch.h IDqueryReply.h DBduct.h
 provider-server.o: NAAAIM.h SSLDuct.h DBduct.h ProviderQuery.h
 
-genid.o: NAAAIM.h OrgID.h PatientID.h RandomBuffer.h DBduct.o
+genid.o: NAAAIM.h OrgID.h PatientID.h DBduct.o
 sha256key.o: NAAAIM.h
 
 DBduct.o: DBduct.h

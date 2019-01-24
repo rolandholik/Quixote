@@ -124,7 +124,7 @@ sgx-gen-token: sgx-gen-token.o
 sgx-gen-token.o: sgx-gen-token.c LE_whitelist.h
 	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
 
-sgx-provision: sgx-provision.o ../RandomBuffer.o
+sgx-provision: sgx-provision.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO} \
 		${INTEL_CRYPTO};
 

@@ -14,12 +14,10 @@ include ../Makefile.mak
 edi-engine: edi-engine.o EDIpacket.o ../AES256_cbc.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
-edi-transmitter: edi-transmitter.o EDIpacket.o ../RandomBuffer.o \
-	../AES256_cbc.o ../IDtoken.o
+edi-transmitter: edi-transmitter.o EDIpacket.o ../AES256_cbc.o ../IDtoken.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi;
 
-edi-receiver: edi-receiver.o EDIpacket.o ../RandomBuffer.o ../AES256_cbc.o \
-	../IDtoken.o
+edi-receiver: edi-receiver.o EDIpacket.o ../AES256_cbc.o ../IDtoken.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi;
 
 send-edi: send-edi.o

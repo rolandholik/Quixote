@@ -130,9 +130,8 @@ test-local-target: test-local-target.o ${LIBRARY_DEPENDS}
 test-local-target.o: test-local-target.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
-test-remote-target: test-remote-target.o ../../RandomBuffer.o \
-	${LIBRARY_DEPENDS}
-	${CC} ${LDFLAGS} -o $@ $< ../../RandomBuffer.o ${LIBS} ${SSL_CRYPTO};
+test-remote-target: test-remote-target.o ${LIBRARY_DEPENDS}
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS} ${SSL_CRYPTO};
 
 test-remote-target.o: test-remote-target.c
 	${CC} ${CFLAGS} -c $< -o $@;
