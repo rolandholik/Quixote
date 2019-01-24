@@ -18,7 +18,7 @@ MUSL_INCLUDE = /usr/local/musl/include
 CDEBUG = -g -O2 -fomit-frame-pointer -march=core2
 CFLAGS = -Wall ${CDEBUG}
 
-LDFLAGS = ${STATIC} -g -Wl,--rpath-link /usr/local/musl/lib -L../lib -L../HurdLib
+LDFLAGS = ${STATIC} -g -Wl,--rpath-link /usr/local/musl/lib
 
 # OpenSSL crypto library
 SSL_CRYPTO  = -L /usr/local/musl/lib -lcrypto
@@ -40,9 +40,18 @@ SSL_CRYPTO  = -L /usr/local/musl/lib -lcrypto
 COBJS = ${CSRC:.c=.o}
 AOBJS = ${ASRC:.s=.o}
 
-LIBS = -lNAAAIM -lHurdLib 
+ELFLIB = -Wl,-rpath /usr/local/musl/lib -lelf
 
-HURDLIB = -L../lib -lHurdLib
+HURD_LIBRARY = ../HurdLib/libHurdLib.a
+HURDLIB	     = -L ../HurdLib -lHurdLib
+
+RDK_LIBRARY = ../SGX/libSGXrdk.a
+RDKLIB	    = -L ../SGX -lSGXrdk ${ELFLIB}
+
+NAAAIM_LIBRARY = ../lib/libNAAAIM.a
+NAAAIMLIB      = -L ../lib -lNAAAIM
+
+LIBS = ${NAAAIMLIB} ${HURDLIB}
 
 CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I/usr/local/musl/include \
 	-I ../SGX/ISOidentity -I ../SGX
@@ -89,24 +98,18 @@ sha-tool: sha-tool.o
 set-behavior: set-behavior.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS}
 
-cboot: cboot.o ../SHA256_hmac.o ISOidentity.o ContourPoint.o		  \
-	ExchangeEvent.o Actor.o Subject.o ../IDtoken.o			  \
-	../SGX/ISOidentity/ISOenclave.o	../SGX/SGXenclave.o		  \
-	../SGX/SGXloader.o ../SGX/SGXmetadata.o ../SGX/SGXsigstruct.o 	  \
-	../SGX/boot-sgx.o ../SGX/sgx-ocall.o ../SGX/SGXquote_sgxmgr.o	  \
-	../SGX/SGXquote.o ../SGX/QEenclave.o ../SGX/PCEenclave.o	  \
-	../SGX/SGXepid.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO}	\
-		-Wl,--rpath /usr/local/musl/lib -lelf
+cboot: cboot.o ../SHA256_hmac.o ../IDtoken.o ../SGX/ISOidentity/ISOenclave.o \
+	ISOidentity.o ContourPoint.o ExchangeEvent.o Actor.o Subject.o	     \
+	${RDK_LIBRARY} ${NAAAIM_LIBRARY} ${HURD_LIBRARY}
+	${CC} ${LDFLAGS} -o $@ $< ../SHA256_hmac.o ../IDtoken.o ISOidentity.o \
+		ContourPoint.o ExchangeEvent.o Actor.o Subject.o	      \
+		../SGX/ISOidentity/ISOenclave.o ${RDKLIB} ${LIBS} ${SSL_CRYPTO}
 
-cboot-mgr: cboot-mgr.o ../IDtoken.o ../SHA256_hmac.o			\
-	../SGX/SGXenclave.o ../SGX/SGXloader.o ../SGX/SGXmetadata.o	\
-	../SGX/SGXsigstruct.o ../SGX/boot-sgx.o ../SGX/sgx-ocall.o	\
-	../SGX/SGXquote_sgxmgr.o ../SGX/SGXquote.o 			\
-	../SGX/ISOidentity/ISOmanager.o ../SGX/QEenclave.o		\
-	../SGX/PCEenclave.o ../SGX/SGXepid.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO} \
-		-Wl,--rpath /usr/local/musl/lib -lelf;
+cboot-mgr: cboot-mgr.o ../IDtoken.o ../SHA256_hmac.o			 \
+	../SGX/ISOidentity/ISOmanager.o ${RDK_LIBRARY} ${NAAAIM_LIBRARY} \
+	${HURD_LIBRARY}
+	${CC} ${LDFLAGS} -o $@ $< ../IDtoken.o ../SHA256_hmac.o \
+		../SGX/ISOidentity/ISOmanager.o ${RDKLIB} ${LIBS} ${SSL_CRYPTO}
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};
