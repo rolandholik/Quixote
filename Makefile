@@ -6,8 +6,8 @@
 
 
 # Variable declarations.
-CSRC = 	OrgID.c PatientID.c IDtoken.c Authenticator.c AuthenReply.c \
-	IDqueryReply.c ProviderQuery.c SSLDuct.c
+CSRC = 	OrgID.c PatientID.c Authenticator.c AuthenReply.c IDqueryReply.c \
+	ProviderQuery.c SSLDuct.c
 
 # SERVERS = root-referral device-broker user-broker identity-broker \
 # 	provider-server
@@ -171,23 +171,22 @@ clean:
 # Source dependencies.
 OrgID.o: NAAAIM.h OrgID.h
 PatientID.o: NAAAIM.h OrgID.h PatientID.h
-IDtoken.o: NAAAIM.h IDtoken.h
 SSLDuct.o: NAAAIM.h SSLDuct.h
-Authenticator.o: NAAAIM.h Authenticator.h IDtoken.h
+Authenticator.o: NAAAIM.h Authenticator.h
 AuthenReply.o: NAAAIM.h AuthenReply.h
-OrgSearch.o: NAAAIM.h OrgSearch.h IDtoken.h
+OrgSearch.o: NAAAIM.h OrgSearch.h
 IDqueryReply.o: NAAAIM.h IDqueryReply.h
 DBDuct.o: NAAAIM.h DBduct.h
 ProviderQuery.o: NAAAIM.h ProviderQuery.h
 
-query-client.o: NAAAIM.h SSLDuct.h IDtoken.h Authenticator.h IDqueryReply.h \
+query-client.o: NAAAIM.h SSLDuct.h Authenticator.h IDqueryReply.h \
 	ProviderQuery.h
 
-root-referral.o: NAAAIM.h SSLDuct.h IDtoken.h Authenticator.h AuthenReply.h \
+root-referral.o: NAAAIM.h SSLDuct.h Authenticator.h AuthenReply.h \
 	IDqueryReply.h
-device-broker.o: NAAAIM.h SSLDuct.h IDtoken.h Authenticator.h AuthenReply.h
-user-broker.o: NAAAIM.h SSLDuct.h IDtoken.h Authenticator.h AuthenReply.h
-identity-broker.o: NAAAIM.h SSLDuct.h IDtoken.h Authenticator.h AuthenReply.h \
+device-broker.o: NAAAIM.h SSLDuct.h Authenticator.h AuthenReply.h
+user-broker.o: NAAAIM.h SSLDuct.h Authenticator.h AuthenReply.h
+identity-broker.o: NAAAIM.h SSLDuct.h Authenticator.h AuthenReply.h \
 	OrgSearch.h IDqueryReply.h DBduct.h
 provider-server.o: NAAAIM.h SSLDuct.h DBduct.h ProviderQuery.h
 

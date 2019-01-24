@@ -7,7 +7,7 @@
 CSRC = Duct.c OTEDKS.c Curve25519.c IPC.c SoftwareStatus.c Ivy.c IDmgr.c    \
 	TPMcmd.c TPM2cmd.c PossumPacket.c PossumPipe.c RSAkey.c SmartCard.c \
 	LocalDuct.c HTTP.c Base64.c Duct_sgxmgr.c SHA256.c SHA256_hmac.c    \
-	RandomBuffer.c AES256_cbc.c
+	RandomBuffer.c AES256_cbc.c IDtoken.c
 
 TESTS = Duct_test OTEDKS_test Curve25519_test IPC_test PossumPipe_test \
 	RSAkey_test LocalDuct_test #SmartCard_test
@@ -120,3 +120,4 @@ SHA256.o: SHA256.h ../NAAAIM.h
 SHA256_hmac.o: SHA256_hmac.h ../NAAAIM.h
 RandomBuffer.o: RandomBuffer.h ../NAAAIM.h
 AES256_cbc.o: AES256_cbc.h ../NAAAIM.h
+IDtoken.o: IDtoken.h SHA256.h SHA256_hmac.h ../NAAAIM.h

@@ -98,17 +98,17 @@ sha-tool: sha-tool.o
 set-behavior: set-behavior.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS}
 
-cboot: cboot.o ../IDtoken.o ../SGX/ISOidentity/ISOenclave.o ISOidentity.o \
-	ContourPoint.o ExchangeEvent.o Actor.o Subject.o ${RDK_LIBRARY}   \
-	${NAAAIM_LIBRARY} ${HURD_LIBRARY}
-	${CC} ${LDFLAGS} -o $@ $< ../IDtoken.o ISOidentity.o ContourPoint.o \
+cboot: cboot.o ../SGX/ISOidentity/ISOenclave.o ISOidentity.o ContourPoint.o \
+	ExchangeEvent.o Actor.o Subject.o ${RDK_LIBRARY}  ${NAAAIM_LIBRARY} \
+	${HURD_LIBRARY}
+	${CC} ${LDFLAGS} -o $@ $< ISOidentity.o ContourPoint.o		    \
 		ExchangeEvent.o Actor.o Subject.o 			    \
 		../SGX/ISOidentity/ISOenclave.o ${RDKLIB} ${LIBS} ${SSL_CRYPTO}
 
-cboot-mgr: cboot-mgr.o ../IDtoken.o ../SGX/ISOidentity/ISOmanager.o \
+cboot-mgr: cboot-mgr.o ../SGX/ISOidentity/ISOmanager.o \
 	${RDK_LIBRARY} ${NAAAIM_LIBRARY} ${HURD_LIBRARY}
-	${CC} ${LDFLAGS} -o $@ $< ../IDtoken.o \
-		../SGX/ISOidentity/ISOmanager.o ${RDKLIB} ${LIBS} ${SSL_CRYPTO}
+	${CC} ${LDFLAGS} -o $@ $< ../SGX/ISOidentity/ISOmanager.o \
+		${RDKLIB} ${LIBS} ${SSL_CRYPTO}
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};

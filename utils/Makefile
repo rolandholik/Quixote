@@ -81,11 +81,10 @@ init: init.o Netconfig.o SoftwareTPM.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl -ltspi ${SSL_CRYPTO} -lssl;
 
 possum: possum.o Netconfig.o IPsec.o
-	${CC} ${LDFLAGS} -o $@ $^ ../IDtoken.o ${SSL_CRYPTO} ${LIBS} -ltspi \
-		-lfl;
+	${CC} ${LDFLAGS} -o $@ $^ ${SSL_CRYPTO} ${LIBS} -ltspi -lfl;
 
-gen-id-verifier: gen-id-verifier.o ../IDtoken.o
-	${CC} ${LDFLAGS} -o $@ $^ ${SSL_CRYPTO} ${LIBS} -ltspi;
+gen-id-verifier: gen-id-verifier.o
+	${CC} ${LDFLAGS} -o $@ $< ${SSL_CRYPTO} ${LIBS} -ltspi;
 
 software-status: software-status.o
 	${CC} ${LDFLAGS} -o $@ $^ ${SSL_CRYPTO} ${LIBS};
@@ -96,17 +95,17 @@ software-tpm: software-tpm.o SoftwareTPM.o
 tpm-cmd: tpm-cmd.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi ${SSL_CRYPTO};
 
-id-set: id-set.o ../IDtoken.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi ${SSL_CRYPTO};
+id-set: id-set.o
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS} -ltspi ${SSL_CRYPTO};
 
-idmgr: idmgr.o ../IDtoken.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi ${SSL_CRYPTO};
+idmgr: idmgr.o
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS} -ltspi ${SSL_CRYPTO};
 
 net-config: net-config.o Netconfig.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
-idtest: idtest.o ../IDtoken.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi ${SSL_CRYPTO};
+idtest: idtest.o
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS} -ltspi ${SSL_CRYPTO};
 
 device-supvr: device-supvr.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
@@ -138,7 +137,7 @@ Netconfig.o: Netconfig.h
 IPsec.o: IPsec.h
 MGMTsupvr.o: MGMTsupvr.h
 
-possum.o: Netconfig.h IPsec.h ../IDtoken.h
+possum.o: Netconfig.h IPsec.h
 mgmt-supvr.o: MGMTsupvr.h
 
 gen-id-verifier.o:
