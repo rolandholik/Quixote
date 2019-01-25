@@ -47,7 +47,7 @@ extern int main(int argc, char *argv[])
 
 	File output = NULL;
 
-	SHA256 sha256 = NULL;
+	Sha256 sha256 = NULL;
 
 
 	while ( (opt = getopt(argc, argv, "da:b:i:k:n:")) != EOF )
@@ -85,7 +85,7 @@ extern int main(int argc, char *argv[])
 	INIT(NAAAIM, IDtoken, id, goto done);
 	INIT(HurdLib, Buffer, key, goto done);
 	INIT(HurdLib, File, output, goto done);
-	INIT(NAAAIM, SHA256, sha256, goto done);
+	INIT(NAAAIM, Sha256, sha256, goto done);
 
 
 	/* Open output file and identity token file. */

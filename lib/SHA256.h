@@ -17,7 +17,7 @@
 
 
 /* Object type definitions. */
-typedef struct NAAAIM_SHA256 * SHA256;
+typedef struct NAAAIM_SHA256 * Sha256;
 
 typedef struct NAAAIM_SHA256_State * SHA256_State;
 
@@ -27,15 +27,15 @@ typedef struct NAAAIM_SHA256_State * SHA256_State;
 struct NAAAIM_SHA256
 {
 	/* External methods. */
-	_Bool (*add)(const SHA256, const Buffer);
-	_Bool (*compute)(const SHA256);
-	_Bool (*rehash)(const SHA256, unsigned int);
-	_Bool (*extend)(const SHA256, const Buffer);
-	void (*reset)(const SHA256);
-	unsigned char * (*get)(const SHA256);
-	Buffer (*get_Buffer)(const SHA256);
-	void (*print)(const SHA256);
-	void (*whack)(const SHA256);
+	_Bool (*add)(const Sha256, const Buffer);
+	_Bool (*compute)(const Sha256);
+	_Bool (*rehash)(const Sha256, unsigned int);
+	_Bool (*extend)(const Sha256, const Buffer);
+	void (*reset)(const Sha256);
+	unsigned char * (*get)(const Sha256);
+	Buffer (*get_Buffer)(const Sha256);
+	void (*print)(const Sha256);
+	void (*whack)(const Sha256);
 
 	/* Private state. */
 	SHA256_State state;
@@ -43,6 +43,6 @@ struct NAAAIM_SHA256
 
 
 /* SHA256 constructor call. */
-extern SHA256 NAAAIM_SHA256_Init(void);
+extern Sha256 NAAAIM_Sha256_Init(void);
 
 #endif

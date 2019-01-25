@@ -73,7 +73,7 @@ struct NAAAIM_ExchangeEvent_State
 	Subject subject;
 
 	/* Event identity/measurement. */
-	SHA256 identity;
+	Sha256 identity;
 };
 
 
@@ -679,7 +679,7 @@ extern ExchangeEvent NAAAIM_ExchangeEvent_Init(void)
 	INIT(HurdLib, String, this->state->event, goto fail);
 	INIT(NAAAIM, Actor, this->state->actor, goto fail);
 	INIT(NAAAIM, Subject, this->state->subject, goto fail);
-	INIT(NAAAIM, SHA256, this->state->identity, goto fail);
+	INIT(NAAAIM, Sha256, this->state->identity, goto fail);
 
 	/* Method initialization. */
 	this->parse	   = parse;

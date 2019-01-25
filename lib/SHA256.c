@@ -199,7 +199,7 @@ static _Bool _compute_digest(const SHA256_State const S)
  *		of the data addition.
  */
 
-static _Bool add(const SHA256 const this, const Buffer const bf)
+static _Bool add(const Sha256 const this, const Buffer const bf)
 
 {
 	auto _Bool retn = false;
@@ -259,7 +259,7 @@ static _Bool add(const SHA256 const this, const Buffer const bf)
  *		of the digest computation.
  */
 
-static _Bool compute(const SHA256 const this)
+static _Bool compute(const Sha256 const this)
 
 {
 	return _compute_digest(this->state);
@@ -283,7 +283,7 @@ static _Bool compute(const SHA256 const this)
  *		of the hashing sequence.
  */
 
-static _Bool rehash(const SHA256 const this, unsigned int cnt)
+static _Bool rehash(const Sha256 const this, unsigned int cnt)
 
 {
 	const SHA256_State const S = this->state;
@@ -357,7 +357,7 @@ static _Bool rehash(const SHA256 const this, unsigned int cnt)
  *		of the extension sequence.
  */
 
-static _Bool extend(const SHA256 const this, const Buffer const bufr)
+static _Bool extend(const Sha256 const this, const Buffer const bufr)
 
 {
 	const SHA256_State const S = this->state;
@@ -421,7 +421,7 @@ static _Bool extend(const SHA256 const this, const Buffer const bufr)
  *
  */
 
-static void reset(const SHA256 const this)
+static void reset(const Sha256 const this)
 
 {
 	auto const SHA256_State const S = this->state;
@@ -449,7 +449,7 @@ static void reset(const SHA256 const this)
  *		the results of the hash.
  */
 
-static unsigned char *get(const SHA256 const this)
+static unsigned char *get(const Sha256 const this)
 
 {
 	auto const SHA256_State const S = this->state;
@@ -483,7 +483,7 @@ static unsigned char *get(const SHA256 const this)
  *		the destructor for this object is called.
  */
 
-static Buffer get_Buffer(const SHA256 const this)
+static Buffer get_Buffer(const Sha256 const this)
 
 {
 	auto const SHA256_State const S = this->state;
@@ -507,7 +507,7 @@ static Buffer get_Buffer(const SHA256 const this)
  * \param this	A pointer to the SHA256 object which is to be printed.
  */
 
-static void print(const SHA256 const this)
+static void print(const Sha256 const this)
 
 {
 	if ( this->state->poisoned ) {
@@ -526,7 +526,7 @@ static void print(const SHA256 const this)
  * \param this	A pointer to the object which is to be destroyed.
  */
 
-static void whack(const SHA256 const this)
+static void whack(const Sha256 const this)
 
 {
 	auto const SHA256_State const S = this->state;
@@ -551,12 +551,12 @@ static void whack(const SHA256 const this)
  *		indicates an error was encountered in object generation.
  */
 
-extern SHA256 NAAAIM_SHA256_Init(void)
+extern Sha256 NAAAIM_Sha256_Init(void)
 
 {
 	auto Origin root;
 
-	auto SHA256 this = NULL;
+	auto Sha256 this = NULL;
 
 	auto struct HurdLib_Origin_Retn retn;
 

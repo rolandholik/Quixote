@@ -120,7 +120,7 @@ static _Bool create(CO(Identity, this), CO(OrgID, orgid), \
 
 	Buffer id = S->id;
 
-	SHA256 sha256 = NULL;
+	Sha256 sha256 = NULL;
 
 
 	/* Integrity checks. */
@@ -132,7 +132,7 @@ static _Bool create(CO(Identity, this), CO(OrgID, orgid), \
 		goto done;
 
 	/* Hash the identifier. */
-	INIT(NAAAIM, SHA256, sha256, goto done);
+	INIT(NAAAIM, Sha256, sha256, goto done);
 
 	if ( !id->add(id, (unsigned char *) identifier->get(identifier), \
 		      identifier->size(identifier)) )

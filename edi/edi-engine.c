@@ -146,7 +146,7 @@ static void update_process_table(void)
  */
 
 static _Bool setup_session(CO(Duct, client), CO(EDIpacket, edi), \
-			   CO(Buffer, bufr), CO(SHA256, hash))
+			   CO(Buffer, bufr), CO(Sha256, hash))
 
 {
 	_Bool retn = false;
@@ -206,7 +206,7 @@ static _Bool setup_session(CO(Duct, client), CO(EDIpacket, edi), \
  */
 
 static _Bool encrypt_edi(CO(String, service), CO(EDIpacket, edi), \
-			 CO(SHA256, hash))
+			 CO(Sha256, hash))
 
 {
 	_Bool retn = false;
@@ -325,7 +325,7 @@ static _Bool encrypt_edi(CO(String, service), CO(EDIpacket, edi), \
  */
 
 static _Bool decrypt_edi(CO(String, service), CO(EDIpacket, edi), \
-			 CO(SHA256, hash))
+			 CO(Sha256, hash))
 
 {
 	_Bool retn = false;
@@ -451,7 +451,7 @@ static void handle_connection(CO(Duct,duct))
 
 	INIT(HurdLib, Buffer, bufr, goto done);
 	INIT(NAAAIM, EDIpacket, edi, goto done);
-	INIT(NAAAIM, SHA256, hash, goto done);
+	INIT(NAAAIM, Sha256, hash, goto done);
 	if ( (svc = HurdLib_String_Init_cstr("service1")) == NULL )
 		goto done;
 

@@ -12,7 +12,7 @@ extern int main(int argc, char *argv[])
 {
 	auto Buffer hashin;
 
-	auto SHA256 sha256;
+	auto Sha256 sha256;
 
 
 	if ( (hashin = HurdLib_Buffer_Init()) == NULL ) {

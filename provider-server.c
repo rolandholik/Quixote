@@ -216,7 +216,7 @@ static int _authorize_identity(const DBduct const db, \
 
 	auto Buffer bf = NULL;
 
-	auto SHA256 sha256 = NULL;
+	auto Sha256 sha256 = NULL;
 
 
 	/* Compute the token key. */

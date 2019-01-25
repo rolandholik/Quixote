@@ -82,7 +82,7 @@ struct NAAAIM_Actor_State
 
 	/* Measured identity. */
 	_Bool measured;
-	SHA256 identity;
+	Sha256 identity;
 };
 
 
@@ -664,7 +664,7 @@ extern Actor NAAAIM_Actor_Init(void)
 	_init_state(this->state);
 
 	/* Initialize aggregate objects. */
-	INIT(NAAAIM, SHA256, this->state->identity, ERR(goto fail));
+	INIT(NAAAIM, Sha256, this->state->identity, ERR(goto fail));
 
 	/* Method initialization. */
 	this->set_identity_elements = set_identity_elements;

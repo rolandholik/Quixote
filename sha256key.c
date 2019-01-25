@@ -16,7 +16,7 @@ extern int main(int argc, char *argv[])
 
 	auto Buffer bufr;
 
-	auto SHA256 sha256;
+	auto Sha256 sha256;
 
 	if ( (sha256 = NAAAIM_SHA256_Init()) == NULL ) {
 		fputs("Failed SHA256 init.\n", stderr);

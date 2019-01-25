@@ -133,7 +133,7 @@ static int signature_mode(SGXmetadata metadata, char *output)
 
 	Buffer bufr = NULL;
 
-	SHA256 sha256 = NULL;
+	Sha256 sha256 = NULL;
 
 	File outfile = NULL;
 
@@ -201,7 +201,7 @@ static int signature_mode(SGXmetadata metadata, char *output)
 
 	/* Output the MRSIGNER value. */
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	INIT(NAAAIM, SHA256, sha256, ERR(goto done));
+	INIT(NAAAIM, Sha256, sha256, ERR(goto done));
 
 	if ( !bufr->add(bufr, (unsigned char *) sigstruct.modulus, \
 			sizeof(sigstruct.modulus)) )

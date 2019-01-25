@@ -48,7 +48,7 @@ extern int main(int argc, char *argv[])
 
 	Buffer bufr = NULL;
 
-	SHA256 sha256 = NULL;
+	Sha256 sha256 = NULL;
 
 
 	/* Parse and verify arguements. */
@@ -85,7 +85,7 @@ extern int main(int argc, char *argv[])
 
 	/* Initialize objects. */
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	INIT(NAAAIM, SHA256, sha256, ERR(goto done));
+	INIT(NAAAIM, Sha256, sha256, ERR(goto done));
 
 
 	/* Add the length and actor value. */

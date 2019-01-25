@@ -341,7 +341,7 @@ static _Bool _verify_endpoint(CO(SGXmessage, msg), CO(struct SGX_pek *, pek), \
 
 	Buffer b;
 
-	SHA256 sha256 = NULL;
+	Sha256 sha256 = NULL;
 
 
 	/*
@@ -392,7 +392,7 @@ static _Bool _verify_endpoint(CO(SGXmessage, msg), CO(struct SGX_pek *, pek), \
 			     Server->size(Server)) )
 		ERR(goto done);
 
-	INIT(NAAAIM, SHA256, sha256, ERR(goto done));
+	INIT(NAAAIM, Sha256, sha256, ERR(goto done));
 	sha256->add(sha256, signature);
 	if ( !sha256->compute(sha256) )
 		ERR(goto done);
@@ -656,7 +656,7 @@ static _Bool process_message2(CO(SGXmessage, msg), CO(String, response), \
 	Buffer b,
 	       message = NULL;
 
-	SHA256 sha256 = NULL;
+	Sha256 sha256 = NULL;
 
 
 	/* Decode and verify the message count. */
@@ -686,7 +686,7 @@ static _Bool process_message2(CO(SGXmessage, msg), CO(String, response), \
 	msg->dump(msg);
 
 	/* Verify the internal message. */
-	INIT(NAAAIM, SHA256, sha256, ERR(goto done));
+	INIT(NAAAIM, Sha256, sha256, ERR(goto done));
 
 	message->reset(message);
 	message->add(message, pek->n, sizeof(pek->n) + sizeof(pek->e));

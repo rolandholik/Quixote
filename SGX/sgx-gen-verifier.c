@@ -83,14 +83,14 @@ static _Bool write_identity(CO(Buffer, asn), CO(IDtoken, token), \
 
 	Buffer b;
 
-	SHA256 sha256;
+	Sha256 sha256;
 
 	String filename = NULL;
 
 	File output = NULL;
 
 
-	INIT(NAAAIM, SHA256, sha256, goto done);
+	INIT(NAAAIM, Sha256, sha256, goto done);
 	INIT(HurdLib, String, filename, goto done);
 
 	if ( (b = token->get_element(token, IDtoken_orgkey)) == NULL )

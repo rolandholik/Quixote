@@ -84,15 +84,15 @@ struct NAAAIM_PossumPipe_State
 	Duct duct;
 
 	/* Packet transmission nonce. */
-	SHA256 nonce;
+	Sha256 nonce;
 
 	/* Shared secrets. */
-	SHA256 shared1;
-	SHA256 shared2;
+	Sha256 shared1;
+	Sha256 shared2;
 
 	/* Sent and received data extension hashes. */
-	SHA256 sent;
-	SHA256 received;
+	Sha256 sent;
+	Sha256 received;
 
 	/* Remote software status. */
 	Buffer software;
@@ -188,7 +188,7 @@ static _Bool _setup_nonce(CO(PossumPipe_State, S))
 
 
 	/* Initialize the nonce generator. */
-	INIT(NAAAIM, SHA256, S->nonce, goto done);
+	INIT(NAAAIM, Sha256, S->nonce, goto done);
 	if ( !rb->generate(rb, 2 * ENCRYPTION_BLOCKSIZE) )
 		ERR(goto done);
 	S->nonce->add(S->nonce, rb->get_Buffer(rb));
@@ -1071,7 +1071,7 @@ static _Bool generate_shared_keys(CO(PossumPipe, this), CO(Buffer, nonce1),   \
 	Buffer xor = NULL,
 	       key = NULL;
 
-	SHA256 sha256 = NULL;
+	Sha256 sha256 = NULL;
 
 	SHA256_hmac hmac;
 
@@ -1383,7 +1383,7 @@ static _Bool receive_connection_start(CO(PossumPipe, this), CO(Buffer, bufr))
 
 	AES256_cbc cipher = NULL;
 
-	SHA256 sha256 = NULL;
+	Sha256 sha256 = NULL;
 
 	SHA256_hmac hmac = NULL;
 
@@ -1423,7 +1423,7 @@ static _Bool receive_connection_start(CO(PossumPipe, this), CO(Buffer, bufr))
 
 
 	/* Confirm the authenticator. */
-	INIT(NAAAIM, SHA256, sha256, goto done);
+	INIT(NAAAIM, Sha256, sha256, goto done);
 	sha256->add(sha256, key);
 	if ( !sha256->compute(sha256) )
 		ERR(goto done);
@@ -1668,7 +1668,7 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 	S->shared2->print(S->shared2);
 	fputc('\n', stderr);
 
-	INIT(NAAAIM, SHA256, S->sent, goto done);
+	INIT(NAAAIM, Sha256, S->sent, goto done);
 	S->sent->add(S->sent, S->shared1->get_Buffer(S->shared1));
 	S->sent->add(S->sent, S->shared2->get_Buffer(S->shared2));
 	if ( !S->sent->compute(S->sent) )
@@ -1676,7 +1676,7 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 	fputs("Send root:\n", stderr);
 	S->sent->print(S->sent);
 
-	INIT(NAAAIM, SHA256, S->received, goto done);
+	INIT(NAAAIM, Sha256, S->received, goto done);
 	S->received->add(S->received, S->shared2->get_Buffer(S->shared2));
 	S->received->add(S->received, S->shared1->get_Buffer(S->shared1));
 	if ( !S->received->compute(S->received) )
@@ -1747,7 +1747,7 @@ static _Bool send_connection_start(CO(PossumPipe, this), CO(Buffer, bufr))
 
 	RandomBuffer iv = NULL;
 
-	SHA256 sha256 = NULL;
+	Sha256 sha256 = NULL;
 
 	SHA256_hmac hmac = NULL;
 
@@ -1760,7 +1760,7 @@ static _Bool send_connection_start(CO(PossumPipe, this), CO(Buffer, bufr))
 		ERR(goto done);
 
 	/* Generate the connection authenticator. */
-	INIT(NAAAIM, SHA256, sha256, goto done);
+	INIT(NAAAIM, Sha256, sha256, goto done);
 	sha256->add(sha256, key);
 	if ( !sha256->compute(sha256) )
 		ERR(goto done);
@@ -1987,7 +1987,7 @@ static _Bool start_client_mode(CO(PossumPipe, this))
 	S->shared2->print(S->shared2);
 	fputc('\n', stderr);
 
-	INIT(NAAAIM, SHA256, S->sent, goto done);
+	INIT(NAAAIM, Sha256, S->sent, goto done);
 	S->sent->add(S->sent, S->shared2->get_Buffer(S->shared2));
 	S->sent->add(S->sent, S->shared1->get_Buffer(S->shared1));
 	if ( !S->sent->compute(S->sent) )
@@ -1995,7 +1995,7 @@ static _Bool start_client_mode(CO(PossumPipe, this))
 	fputs("Send root:\n", stderr);
 	S->sent->print(S->sent);
 
-	INIT(NAAAIM, SHA256, S->received, goto done);
+	INIT(NAAAIM, Sha256, S->received, goto done);
 	S->received->add(S->received, S->shared1->get_Buffer(S->shared1));
 	S->received->add(S->received, S->shared2->get_Buffer(S->shared2));
 	if ( !S->received->compute(S->received) )
@@ -2129,8 +2129,8 @@ extern PossumPipe NAAAIM_PossumPipe_Init(void)
 
 	/* Initialize aggregate objects. */
 	INIT(NAAAIM, Duct,   this->state->duct,	   goto fail);
-	INIT(NAAAIM, SHA256, this->state->shared1, goto fail);
-	INIT(NAAAIM, SHA256, this->state->shared2, goto fail);
+	INIT(NAAAIM, Sha256, this->state->shared1, goto fail);
+	INIT(NAAAIM, Sha256, this->state->shared2, goto fail);
 
 	/* Initialize object state. */
 	_init_state(this->state);

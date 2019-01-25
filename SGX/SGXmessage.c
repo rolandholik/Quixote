@@ -448,7 +448,7 @@ static _Bool encode_message2(CO(SGXmessage, this), CO(RandomBuffer, rnd), \
 	       tag    = NULL,
 	       encout = NULL;
 
-	SHA256 sha256 = NULL;
+	Sha256 sha256 = NULL;
 
 	SGXcmac cmac = NULL;
 
@@ -483,7 +483,7 @@ static _Bool encode_message2(CO(SGXmessage, this), CO(RandomBuffer, rnd), \
 
 	/* Hash the exponent and modulus of the PEK. */
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	INIT(NAAAIM, SHA256, sha256, ERR(goto done));
+	INIT(NAAAIM, Sha256, sha256, ERR(goto done));
 
 	bufr->add(bufr, pek->n, sizeof(pek->n));
 	sha256->add(sha256, bufr);

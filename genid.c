@@ -272,7 +272,7 @@ static _Bool generate_token(const Config const parser,	\
 
 	auto RandomBuffer random = NULL;
 
-	auto SHA256 sha256 = NULL;
+	auto Sha256 sha256 = NULL;
 
 	auto SHA256_hmac hmac = NULL;
 

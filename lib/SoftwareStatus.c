@@ -88,10 +88,10 @@ struct NAAAIM_SoftwareStatus_State
 	File file;
 
 	/* Hash of template hashes. */
-	SHA256 template_hash;
+	Sha256 template_hash;
 
 	/* Hash of file hashes. */
-	SHA256 file_hash;
+	Sha256 file_hash;
 };
 
 
@@ -440,11 +440,11 @@ extern SoftwareStatus NAAAIM_SoftwareStatus_Init(void)
 	this->state->root = root;
 
 	/* Initialize aggregate objects. */
-        if ( (this->state->template_hash = NAAAIM_SHA256_Init()) == NULL ) {
+        if ( (this->state->template_hash = NAAAIM_Sha256_Init()) == NULL ) {
                 root->whack(root, this, this->state);
                 return NULL;
         }
-	if ( (this->state->file_hash = NAAAIM_SHA256_Init()) == NULL ) {
+	if ( (this->state->file_hash = NAAAIM_Sha256_Init()) == NULL ) {
 		WHACK(this->state->template_hash);
 		root->whack(root, this, this->state);
 		return NULL;

@@ -407,7 +407,7 @@ static _Bool setup_ipsec(CO(Config, cfg), CO(char *, remote_ip),      \
 	String local_ip   = NULL,
 	       local_mask = NULL;
 
-	SHA256 sha256 = NULL;
+	Sha256 sha256 = NULL;
 
 	Netconfig netconfig = NULL;
 
@@ -449,7 +449,7 @@ static _Bool setup_ipsec(CO(Config, cfg), CO(char *, remote_ip),      \
 
 	/* Setup the authentication key. */
 	INIT(HurdLib, Buffer, mac_key, goto done);
-	INIT(NAAAIM, SHA256, sha256, goto done);
+	INIT(NAAAIM, Sha256, sha256, goto done);
 
 	sha256->add(sha256, shared_key);
 	sha256->compute(sha256);
@@ -972,7 +972,7 @@ static _Bool send_connection_start(CO(Duct, duct), CO(Buffer, bufr), \
 
 	RandomBuffer iv = NULL;
 
-	SHA256 sha256 = NULL;
+	Sha256 sha256 = NULL;
 
 	SHA256_hmac hmac = NULL;
 
@@ -985,7 +985,7 @@ static _Bool send_connection_start(CO(Duct, duct), CO(Buffer, bufr), \
 		goto done;
 
 	/* Generate the connection authenticator. */
-	INIT(NAAAIM, SHA256, sha256, goto done);
+	INIT(NAAAIM, Sha256, sha256, goto done);
 	sha256->add(sha256, key);
 	if ( !sha256->compute(sha256) )
 		goto done;
@@ -1057,7 +1057,7 @@ static _Bool receive_connection_start(CO(Duct, duct), CO(Buffer, bufr), \
 
 	AES256_cbc cipher = NULL;
 
-	SHA256 sha256 = NULL;
+	Sha256 sha256 = NULL;
 
 	SHA256_hmac hmac = NULL;
 
@@ -1097,7 +1097,7 @@ static _Bool receive_connection_start(CO(Duct, duct), CO(Buffer, bufr), \
 
 
 	/* Confirm the authenticator. */
-	INIT(NAAAIM, SHA256, sha256, goto done);
+	INIT(NAAAIM, Sha256, sha256, goto done);
 	sha256->add(sha256, key);
 	if ( !sha256->compute(sha256) )
 		goto done;

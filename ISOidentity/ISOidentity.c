@@ -209,11 +209,11 @@ static _Bool _update_measurement(CO(ISOidentity_State, S), \
 	Buffer b,
 	       bufr = NULL;
 
-	SHA256 sha256 = NULL;
+	Sha256 sha256 = NULL;
 
 
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	INIT(NAAAIM, SHA256, sha256, ERR(goto done));
+	INIT(NAAAIM, Sha256, sha256, ERR(goto done));
 
 	/* Project the update into a host specific domain. */
 	bufr->add(bufr, S->hostid, sizeof(S->hostid));

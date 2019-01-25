@@ -176,7 +176,7 @@ static _Bool LE_init_ecall0(char *enclave,
 
 	Buffer bufr = NULL;
 
-	SHA256 sha256 = NULL;
+	Sha256 sha256 = NULL;
 
 
 	/* Buffer object for utility support. */
@@ -199,7 +199,7 @@ static _Bool LE_init_ecall0(char *enclave,
 
 
 	/* Compute the hash of the signature modulus. */
-	INIT(NAAAIM, SHA256, sha256, ERR(goto done));
+	INIT(NAAAIM, Sha256, sha256, ERR(goto done));
 
 	if ( !bufr->add(bufr, (unsigned char *) sigstruct.modulus, \
 			sizeof(sigstruct.modulus)) )

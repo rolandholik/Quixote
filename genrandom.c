@@ -22,7 +22,7 @@ extern int main(int argc, char *argv[])
 
 	auto RandomBuffer random = NULL;
 
-	auto SHA256 sha256 = NULL;
+	auto Sha256 sha256 = NULL;
 
 
 	/* Get the organizational identifier and SSN. */
@@ -52,7 +52,7 @@ extern int main(int argc, char *argv[])
 	fputs("key:  ", stdout);
 	random->print(random);
 
-	if ( (sha256 = NAAAIM_SHA256_Init()) == NULL ) {
+	if ( (sha256 = NAAAIM_Sha256_Init()) == NULL ) {
 		fputs("Failed SHA256 initialization.\n", stderr);
 		random->whack(random);
 		return 1;

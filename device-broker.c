@@ -161,7 +161,7 @@ static _Bool authorize_identity(const IDtoken const token, \
 
 	auto Buffer bf;
 
-	auto SHA256 sha256;
+	auto Sha256 sha256;
 
 
 	if ( (bf = token->get_element(token, IDtoken_id)) == NULL ) {
@@ -169,7 +169,7 @@ static _Bool authorize_identity(const IDtoken const token, \
 		goto done;
 	}
 
-	if ( (sha256 = NAAAIM_SHA256_Init()) == NULL ) {
+	if ( (sha256 = NAAAIM_Sha256_Init()) == NULL ) {
 		fputs("Cannot initialize hash object.\n", stderr);
 		goto done;
 	}
@@ -238,7 +238,7 @@ static _Bool authenticate_identity(const IDtoken const token,  \
 
 	auto RSAkey rsa = NULL;
 
-	auto SHA256 sha256 = NULL;
+	auto Sha256 sha256 = NULL;
 
 
 	if ( (rsa = NAAAIM_RSAkey_Init()) == NULL )
@@ -257,7 +257,7 @@ static _Bool authenticate_identity(const IDtoken const token,  \
 		goto done;
 	}
 
-	if ( (sha256 = NAAAIM_SHA256_Init()) == NULL ) {
+	if ( (sha256 = NAAAIM_Sha256_Init()) == NULL ) {
 		fputs("SHA256 object creation failed.\n", stderr);
 		goto done;
 	}

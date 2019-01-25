@@ -77,7 +77,7 @@ struct NAAAIM_OTEDKS_State
 	uint8_t rounds;
 
 	/* The SHA256 digest to be used. */
-	SHA256 digest;
+	Sha256 digest;
 
 	/* The SHA256 based MAC generator. */
 	SHA256_hmac hmac;
@@ -144,7 +144,7 @@ static _Bool _init_aggregates(CO(OTEDKS_State, S))
 	if ( (S->hmac_key = HurdLib_Buffer_Init()) == NULL )
 		return false;
 
-	if ( (S->digest = NAAAIM_SHA256_Init()) == NULL )
+	if ( (S->digest = NAAAIM_Sha256_Init()) == NULL )
 		return false;
 
 	if ( (S->hmac = NAAAIM_SHA256_hmac_Init(S->hmac_key)) == NULL )

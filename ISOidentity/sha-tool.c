@@ -47,7 +47,7 @@ extern int main(int argc, char *argv[])
 
 	Buffer bufr = NULL;
 
-	SHA256 sha256 = NULL;
+	Sha256 sha256 = NULL;
 
 	File file = NULL;
 
@@ -95,7 +95,7 @@ extern int main(int argc, char *argv[])
 		INIT(HurdLib, Buffer, bufr, ERR(goto done));
 		bufr->add(bufr, (unsigned char *) string, strlen(string));
 
-		INIT(NAAAIM, SHA256, sha256, ERR(goto done));
+		INIT(NAAAIM, Sha256, sha256, ERR(goto done));
 		sha256->add(sha256, bufr);
 		if ( !sha256->compute(sha256) )
 			ERR(goto done);
@@ -111,7 +111,7 @@ extern int main(int argc, char *argv[])
 		if ( !file->slurp(file, bufr) )
 			ERR(goto done);
 
-		INIT(NAAAIM, SHA256, sha256, ERR(goto done));
+		INIT(NAAAIM, Sha256, sha256, ERR(goto done));
 		sha256->add(sha256, bufr);
 		if ( !sha256->compute(sha256) )
 			ERR(goto done);
@@ -121,7 +121,7 @@ extern int main(int argc, char *argv[])
 	/* Compute the value of a base and extension. */
 	if ( (base != NULL) && (extend != NULL) ) {
 		INIT(HurdLib, Buffer, bufr, ERR(goto done));
-		INIT(NAAAIM, SHA256, sha256, ERR(goto done));
+		INIT(NAAAIM, Sha256, sha256, ERR(goto done));
 
 		bufr->add_hexstring(bufr, base);
 		sha256->add(sha256, bufr);

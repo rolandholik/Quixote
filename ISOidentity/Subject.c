@@ -81,7 +81,7 @@ struct NAAAIM_Subject_State
 
 	/* Measured identity. */
 	_Bool measured;
-	SHA256 identity;
+	Sha256 identity;
 };
 
 
@@ -812,7 +812,7 @@ extern Subject NAAAIM_Subject_Init(void)
 	_init_state(this->state);
 
 	/* Initialize aggregate objects. */
-	INIT(NAAAIM, SHA256, this->state->identity, ERR(goto fail));
+	INIT(NAAAIM, Sha256, this->state->identity, ERR(goto fail));
 
 	/* Method initialization. */
 #if 0

@@ -368,7 +368,7 @@ static _Bool add_measurement(CO(char *, bufr))
 	Buffer bf,
 	       input = NULL;
 
-	SHA256 sha256 = NULL;
+	Sha256 sha256 = NULL;
 
 
 	/* Convert the ASCII measurement into a binary buffer. */
@@ -395,7 +395,7 @@ static _Bool add_measurement(CO(char *, bufr))
 
 
 	/* Update the internal measurement. */
-	INIT(NAAAIM, SHA256, sha256, ERR(goto done));
+	INIT(NAAAIM, Sha256, sha256, ERR(goto done));
 
 	sha256->add(sha256, input);
 	if ( !sha256->compute(sha256) )

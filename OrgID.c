@@ -49,7 +49,7 @@ struct NAAAIM_OrgID_State
 	_Bool poisoned;
 
 	/* Organizational identity. */
-	SHA256 identity;
+	Sha256 identity;
 };
 
 
@@ -277,7 +277,7 @@ extern OrgID NAAAIM_OrgID_Init(void)
 	this->state->root = root;
 
 	/* Initialize aggregate objects. */
-	if ( (this->state->identity = NAAAIM_SHA256_Init()) == NULL )
+	if ( (this->state->identity = NAAAIM_Sha256_Init()) == NULL )
 		return NULL;
 
 	/* Initialize object state. */

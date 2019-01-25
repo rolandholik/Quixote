@@ -463,7 +463,7 @@ static _Bool to_verifier(CO(IDtoken, this))
 
 	_Bool retn = false;
 
-	SHA256 mac = NULL;
+	Sha256 mac = NULL;
 
 
 	if ( S->poisoned )
@@ -471,7 +471,7 @@ static _Bool to_verifier(CO(IDtoken, this))
 	if ( S->ptid->size(S->ptid) != 256 )
 		goto done;
 
-	INIT(NAAAIM, SHA256, mac, goto done);
+	INIT(NAAAIM, Sha256, mac, goto done);
 	mac->add(mac, S->ptid);
 	if ( !mac->compute(mac) )
 		goto done;

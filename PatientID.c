@@ -50,7 +50,7 @@ struct NAAAIM_PatientID_State
 	_Bool poisoned;
 
 	/* Organizational identity. */
-	SHA256 identity;
+	Sha256 identity;
 };
 
 
@@ -259,7 +259,7 @@ extern PatientID NAAAIM_PatientID_Init(void)
 	this->state->root = root;
 
 	/* Initialize aggregate objects. */
-	if ( (this->state->identity = NAAAIM_SHA256_Init()) == NULL )
+	if ( (this->state->identity = NAAAIM_Sha256_Init()) == NULL )
 		return NULL;
 
 	/* Initialize object state. */

@@ -234,13 +234,13 @@ static _Bool compute_checksum(CO(PossumPacket_State, S),	      \
 
 	Buffer b;
 
-	SHA256 hmac_key;
+	Sha256 hmac_key;
 
 	SHA256_hmac hmac;
 
 
 	/* Verify the packet checksum. */
-	INIT(NAAAIM, SHA256, hmac_key, goto done);
+	INIT(NAAAIM, Sha256, hmac_key, goto done);
 	hmac_key->add(hmac_key, status);
 	hmac_key->add(hmac_key, S->otedks->get_key(S->otedks));
 	if ( !hmac_key->compute(hmac_key) )
@@ -816,7 +816,7 @@ static _Bool set_schedule(CO(PossumPacket, this), CO(IDtoken, token), \
 	Buffer idkey,
 	       idhash;
 
-	SHA256 hash = NULL;
+	Sha256 hash = NULL;
 
 
 	/* Verify arguements. */
@@ -833,7 +833,7 @@ static _Bool set_schedule(CO(PossumPacket, this), CO(IDtoken, token), \
 	 * the identity is not a hash value compute the hash of
 	 * the identity.
 	 */
-	INIT(NAAAIM, SHA256, hash, goto done);
+	INIT(NAAAIM, Sha256, hash, goto done);
 	if ( (idkey = token->get_element(token, IDtoken_key)) == NULL )
 		goto done;
 	if ( (idhash = token->get_element(token, IDtoken_id)) == NULL )
