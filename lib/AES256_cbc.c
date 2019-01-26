@@ -4,11 +4,12 @@
  */
 
 /**************************************************************************
- * (C)Copyright 2007, The Open Hurderos Foundation. All rights reserved.
+ * (C)Copyright IDfusion, LLC. All rights reserved.
  *
- * Please refer to the file named COPYING in the top of the source tree
- * for licensing information.
+ * Please refer to the file named Documentation/COPYRIGHT in the top of
+ * the source tree for copyright and licensing information.
  **************************************************************************/
+
 
 /* Include files. */
 #include <stdint.h>
@@ -17,6 +18,7 @@
 #include <openssl/evp.h>
 
 #include <Origin.h>
+#include <HurdLib.h>
 #include <Buffer.h>
 
 #include "NAAAIM.h"
@@ -31,6 +33,10 @@
 #if !defined(NAAAIM_AES256_cbc_OBJID)
 #error Object identifier not defined.
 #endif
+
+
+/* Object state extraction macro. */
+#define STATE(var) CO(AES256_cbc_State, var) = this->state
 
 
 /** AES256_CBC private state information. */
@@ -56,7 +62,7 @@ struct NAAAIM_AES256_cbc_State
 	int blocksize;
 
 	/* The encryption control structure. */
-	EVP_CIPHER_CTX context;
+	EVP_CIPHER_CTX *context;
 
 	/* The encryption key. */
 	Buffer key;
@@ -79,12 +85,14 @@ struct NAAAIM_AES256_cbc_State
  *        is to be initialized.
  */
 
-static void _init_state(const AES256_cbc_State const S) {
+static void _init_state(CO(AES256_cbc_State, S))
+
+{
 
 	S->libid = NAAAIM_LIBID;
 	S->objid = NAAAIM_AES256_cbc_OBJID;
 
-	EVP_CIPHER_CTX_init(&S->context);
+	S->context = EVP_CIPHER_CTX_new();
 
 	return;
 }
@@ -103,10 +111,10 @@ static void _init_state(const AES256_cbc_State const S) {
  *		the encrypted payload is returned.
  */
 
-static Buffer encrypt(const AES256_cbc const this, Buffer in)
+static Buffer encrypt(CO(AES256_cbc, this), CO(Buffer, in))
 
 {
-	const AES256_cbc_State const S = this->state;
+	STATE(S);
 
 	unsigned char *bp = in->get(in),
 			    encbuf[S->blocksize];
@@ -124,12 +132,12 @@ static Buffer encrypt(const AES256_cbc const this, Buffer in)
 	if ( size == 0 )
 		return NULL;
 
-	
+
 	rounds   = size / S->blocksize;
 	residual = size % S->blocksize;
 
 	for (lp= 0; lp < rounds; ++lp) {
-		if ( !EVP_EncryptUpdate(&S->context, encbuf, &encsize, bp, \
+		if ( !EVP_EncryptUpdate(S->context, encbuf, &encsize, bp, \
 					S->blocksize) )
 			return NULL;
 		if ( encsize > 0 )
@@ -138,14 +146,14 @@ static Buffer encrypt(const AES256_cbc const this, Buffer in)
 	}
 
 	if ( residual != 0 ) {
-		if ( !EVP_EncryptUpdate(&S->context, encbuf, &encsize, bp, \
+		if ( !EVP_EncryptUpdate(S->context, encbuf, &encsize, bp, \
 					residual) )
 			return NULL;
 		if ( encsize > 0 )
 			S->buffer->add(S->buffer, encbuf, encsize);
 	}
-		
-	if ( !EVP_EncryptFinal_ex(&S->context, encbuf, &encsize) )
+
+	if ( !EVP_EncryptFinal_ex(S->context, encbuf, &encsize) )
 		return NULL;
 	if ( encsize > 0 )
 		S->buffer->add(S->buffer, encbuf, encsize);
@@ -168,18 +176,17 @@ static Buffer encrypt(const AES256_cbc const this, Buffer in)
  *		the decrypted payload is returned.
  */
 
-static Buffer decrypt(const AES256_cbc const this, Buffer in)
+static Buffer decrypt(CO(AES256_cbc, this), CO(Buffer, in))
 
 {
-	const AES256_cbc_State const S = this->state;
+	STATE(S);
 
 	unsigned char *bp = in->get(in),
 		      decbuf[S->blocksize * 2];
 
 	int lp,
 	    decsize,
-	    rounds,
-	    residual;
+	    rounds;
 
 	size_t size = in->size(in);
 
@@ -190,13 +197,12 @@ static Buffer decrypt(const AES256_cbc const this, Buffer in)
 		return NULL;
 
 
-	rounds   = size / S->blocksize;
-	residual = size % S->blocksize;
+	rounds = size / S->blocksize;
 
 	for (lp= 0; lp < rounds; ++lp ) {
 		memcpy(decbuf, bp, S->blocksize);
 
-		if ( !EVP_DecryptUpdate(&S->context, decbuf, &decsize, bp, \
+		if ( !EVP_DecryptUpdate(S->context, decbuf, &decsize, bp, \
 					S->blocksize) )
 			return NULL;
 		if ( decsize > 0 )
@@ -204,7 +210,7 @@ static Buffer decrypt(const AES256_cbc const this, Buffer in)
 		bp += S->blocksize;
 	}
 
-	if ( !EVP_DecryptFinal_ex(&S->context, decbuf, &decsize) )
+	if ( !EVP_DecryptFinal_ex(S->context, decbuf, &decsize) )
 		return NULL;
 	if ( decsize > 0 )
 		S->buffer->add(S->buffer, decbuf, decsize);
@@ -225,26 +231,31 @@ static Buffer decrypt(const AES256_cbc const this, Buffer in)
  *		message.
  */
 
-static Buffer get_Buffer(const AES256_cbc const this)
+static Buffer get_Buffer(CO(AES256_cbc, this))
 
 {
-	return this->state->buffer;
+	STATE(S);
+
+
+	return S->buffer;
 }
 
 
 /**
  * External public method.
  *
-v * This method implements a destructor for a AES256_CBC object.
+ * This method implements a destructor for a AES256_CBC object.
  *
  * \param this	A pointer to the object which is to be destroyed.
  */
 
-static void whack(const AES256_cbc const this)
+static void whack(CO(AES256_cbc, this))
 
 {
-	const AES256_cbc_State const S = this->state;
+	STATE(S);
 
+
+	EVP_CIPHER_CTX_free(S->context);
 
 	if ( S->buffer != NULL )
 		S->buffer->whack(S->buffer);
@@ -253,7 +264,7 @@ static void whack(const AES256_cbc const this)
 	return;
 }
 
-	
+
 /**
  * External constructor call.
  *
@@ -332,12 +343,12 @@ extern AES256_cbc NAAAIM_AES256_cbc_Init_encrypt(const Buffer const key, \
 	S->key  = key;
 	S->mode = encrypt_mode;
 
-	if ( !EVP_EncryptInit_ex(&S->context, EVP_aes_256_cbc(), NULL, \
+	if ( !EVP_EncryptInit_ex(S->context, EVP_aes_256_cbc(), NULL, \
 				 key->get(key), iv->get(iv)) ) {
 		this->whack(this);
 		return NULL;
 	}
-	S->blocksize = EVP_CIPHER_CTX_block_size(&S->context);
+	S->blocksize = EVP_CIPHER_CTX_block_size(S->context);
 
 	return this;
 }
@@ -371,12 +382,12 @@ extern AES256_cbc NAAAIM_AES256_cbc_Init_decrypt(const Buffer const key, \
 	S->key  = key;
 	S->mode = decrypt_mode;
 
-	if ( !EVP_DecryptInit_ex(&S->context, EVP_aes_256_cbc(), NULL, \
+	if ( !EVP_DecryptInit_ex(S->context, EVP_aes_256_cbc(), NULL, \
 				 key->get(key), iv->get(iv)) ) {
 		this->whack(this);
 		return NULL;
 	}
-	S->blocksize = EVP_CIPHER_CTX_block_size(&S->context);
+	S->blocksize = EVP_CIPHER_CTX_block_size(S->context);
 
 	return this;
 }
