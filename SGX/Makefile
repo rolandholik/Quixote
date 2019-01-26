@@ -30,8 +30,7 @@ MUSL_INCLUDE = /usr/local/musl/include
 CDEBUG = -g -O2 -fomit-frame-pointer -march=core2
 CFLAGS = -Wall ${CDEBUG}
 
-LDFLAGS = ${STATIC} -g -Wl,--rpath-link /usr/local/musl/lib -L../lib \
-	-L../HurdLib
+LDFLAGS = ${STATIC} -g -L ../lib -L ../HurdLib
 
 # OpenSSL crypto library
 SSL_CRYPTO  = -L /usr/local/musl/lib -lcrypto
@@ -65,7 +64,7 @@ SGXSDK_INCLUDES = -I/opt/intel/sgxsdk/include				\
 COBJS = ${CSRC:.c=.o}
 AOBJS = ${ASRC:.s=.o}
 
-ELFLIB = -Wl,--rpath /usr/local/musl/lib -lelf
+ELFLIB = -lelf
 
 HURDLIB = -L../lib -lHurdLib
 INTEL_CRYPTO = -L/opt/intel/sgxsdk/lib64 -lsgx_tcrypto

@@ -68,8 +68,7 @@ gen-image: gen-image.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 load-image: load-image.o
-	${CC} ${LDFLAGS} -Wl,-rpath-link /usr/local/musl/lib -o $@ $^ ${LIBS} \
-		-ltpm_unseal ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltpm_unseal ${SSL_CRYPTO};
 
 boot: boot.o Netconfig.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};

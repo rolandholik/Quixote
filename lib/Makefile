@@ -31,8 +31,7 @@ CDEBUG = -g ${DMALLOC}
 
 CFLAGS = -Wall ${CDEBUG}
 
-# LDFLAGS = -s -L/usr/local/krb5/lib 
-LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib -L../HurdLib 
+LDFLAGS = -g -L ../HurdLib 
 
 
 #

@@ -58,9 +58,9 @@ CC = musl-gcc
 CFLAGS = -Wall -O2 -fomit-frame-pointer -march=core2 -I .. -I ../.. \
 	-I ../../HurdLib -I ../../ISOidentity -I ../../lib
 
-LDFLAGS = -g -Wl,--rpath-link /usr/local/musl/lib
+LDFLAGS = -g
 
-ELFLIB = -Wl,--rpath /usr/local/musl/lib -lelf
+ELFLIB = -lelf
 
 HURD_LIBRARY = ../../HurdLib/libHurdLib.a
 HURDLIB	     = -L ../../HurdLib -lHurdLib

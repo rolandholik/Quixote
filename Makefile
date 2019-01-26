@@ -46,8 +46,7 @@ CFLAGS = -Wall ${CDEBUG} -I./HurdLib # -pedantic-errors -ansi
 LIBS = HurdLib
 
 # LDFLAGS = -s -L/usr/local/krb5/lib 
-LDFLAGS = -g ${DMALLOC_LIBS} -Wl,-rpath-link /usr/local/musl/lib -L./HurdLib \
-	-L./lib
+LDFLAGS = -g ${DMALLOC_LIBS} -L ./HurdLib  -L ./lib
 
 
 #

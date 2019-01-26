@@ -64,9 +64,9 @@ ifdef ENCLAVE_DIR
 CFLAGS += -DENCLAVE_DIR=\"${ENCLAVE_DIR}\"
 endif
 
-LDFLAGS = ${STATIC} -g -Wl,--rpath-link /usr/local/musl/lib
+LDFLAGS = ${STATIC} -g
 
-ELFLIB = -Wl,-rpath /usr/local/musl/lib -lelf
+ELFLIB = -lelf
 
 HURD_LIBRARY = ../../../HurdLib/libHurdLib.a
 HURDLIB	     = -L ../../../HurdLib -lHurdLib
