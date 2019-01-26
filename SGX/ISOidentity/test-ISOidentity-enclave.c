@@ -272,7 +272,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Start management interface test. */
-	if ( !isoenclave->manager(isoenclave, id_bufr, ivy, spid) )
+	if ( !isoenclave->manager(isoenclave, id_bufr, 11990, spid) )
 		ERR(goto done);
 
 	retn = true;
