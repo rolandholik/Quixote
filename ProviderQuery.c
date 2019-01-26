@@ -255,7 +255,7 @@ static _Bool get_simple_query(const ProviderQuery const this, \
         if ( !d2i_simple_query(&query, &p, asn_size) )
                 goto done;	
 
-	if ( !ptid->add(ptid, ASN1_STRING_data(query->ptid), \
+	if ( !ptid->add(ptid, ASN1_STRING_get0_data(query->ptid), \
 			ASN1_STRING_length(query->ptid)) ) {
 		goto done;
 	}
@@ -428,14 +428,14 @@ static _Bool get_simple_query_sms(const ProviderQuery const this, \
                 goto done;
 	}
 
-	if ( !ptid->add(ptid, ASN1_STRING_data(query->ptid), \
+	if ( !ptid->add(ptid, ASN1_STRING_get0_data(query->ptid), \
 			ASN1_STRING_length(query->ptid)) ) {
 		err = "Unable to load patient identity.";
 		goto done;
 	}
 
 	if ( !address->add(address, \
-			   (char *) ASN1_STRING_data(query->address)) ) {
+			   (char *) ASN1_STRING_get0_data(query->address)) ) {
 		err = "Unable to load SMS address.";
 		goto done;
 	}
@@ -585,7 +585,7 @@ static _Bool decode(const ProviderQuery const this, const Buffer const bufr)
 
 	S->type = ASN1_ENUMERATED_get(query->type);
 
-	S->payload->add(S->payload, ASN1_STRING_data(query->payload), \
+	S->payload->add(S->payload, ASN1_STRING_get0_data(query->payload), \
 			 ASN1_STRING_length(query->payload));
 	if ( S->payload->poisoned(S->payload) ) {
 		err = "Failed to load patient identity.";

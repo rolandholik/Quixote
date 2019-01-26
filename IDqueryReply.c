@@ -279,7 +279,7 @@ static _Bool get_ip_reply(const IDqueryReply const this, \
                 goto done;
 
 	bufr->reset(bufr);
-	bufr->add(bufr, ASN1_STRING_data(reply->hostname), \
+	bufr->add(bufr, ASN1_STRING_get0_data(reply->hostname), \
 		  ASN1_STRING_length(reply->hostname));
 
 	*port = ASN1_INTEGER_get(reply->port);
@@ -409,7 +409,7 @@ static _Bool get_text_reply(const IDqueryReply const this, \
                 goto done;	
 	}
 
-	if ( !text->add(text, (char *) ASN1_STRING_data(reply->text)) ) {
+	if ( !text->add(text, (char *) ASN1_STRING_get0_data(reply->text)) ) {
 		fputs("text add error.\n", stderr);
 		goto done;
 	}
@@ -577,15 +577,15 @@ static _Bool get_sms_reply(const IDqueryReply const this, \
 	}
 
 	if ( !address->add(address, \
-			   (char *) ASN1_STRING_data(reply->address)) ) {
+			   (char *) ASN1_STRING_get0_data(reply->address)) ) {
 		fputs("text add error.\n", stderr);
 		goto done;
 	}
 
 	if ( S->type == IDQreply_sms_bimodal ) {
 		S->payload->reset(S->payload);
-		S->payload->add(S->payload,			   \
-				ASN1_STRING_data(reply->referral), \
+		S->payload->add(S->payload,				\
+				ASN1_STRING_get0_data(reply->referral), \
 				ASN1_STRING_length(reply->referral));
 		if ( S->payload->poisoned(S->payload) )
 			goto done;
@@ -731,7 +731,7 @@ static _Bool decode(const IDqueryReply const this, const Buffer const bufr)
 
 	S->type = ASN1_ENUMERATED_get(reply->type);
 
-	S->payload->add(S->payload, ASN1_STRING_data(reply->payload), \
+	S->payload->add(S->payload, ASN1_STRING_get0_data(reply->payload), \
 			 ASN1_STRING_length(reply->payload));
 	if ( S->payload->poisoned(S->payload) )
 		goto done;

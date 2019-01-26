@@ -291,7 +291,8 @@ static _Bool decode(const AuthenReply const this, const Buffer const bufr)
 	if ( magic != AUTHENREPLY_MAGIC )
 		goto done;
 
-	S->elements->add(S->elements, ASN1_STRING_data(payload->elements), \
+	S->elements->add(S->elements,				   \
+			 ASN1_STRING_get0_data(payload->elements), \
 			 ASN1_STRING_length(payload->elements));
 	if ( S->elements->poisoned(S->elements) )
 		goto done;

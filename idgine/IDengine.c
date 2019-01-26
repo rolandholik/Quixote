@@ -593,15 +593,15 @@ static _Bool _decode_ipc(struct IDengine_ipc * const ipc, CO(Buffer, bufr))
 	ipc->idtype = ASN1_ENUMERATED_get(idreq->idtype);
 
 	memset(ipc->name, '\0', sizeof(ipc->name));
-	memcpy(ipc->name, ASN1_STRING_data(idreq->name), \
+	memcpy(ipc->name, ASN1_STRING_get0_data(idreq->name), \
 	       ASN1_STRING_length(idreq->name));
 
 	memset(ipc->identifier, '\0', sizeof(ipc->identifier));
-	memcpy(ipc->identifier, ASN1_STRING_data(idreq->identifier), \
+	memcpy(ipc->identifier, ASN1_STRING_get0_data(idreq->identifier), \
 	       ASN1_STRING_length(idreq->identifier));
 
 	memset(ipc->identity, '\0', sizeof(ipc->identity));
-	memcpy(ipc->identity, ASN1_STRING_data(idreq->identity), \
+	memcpy(ipc->identity, ASN1_STRING_get0_data(idreq->identity), \
 	       ASN1_STRING_length(idreq->identity));
 
 	retn = true;

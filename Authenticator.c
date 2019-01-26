@@ -605,16 +605,17 @@ static _Bool decode(const Authenticator const this, const Buffer const bufr)
         if ( !d2i_authenticator_payload(&payload, &p, asn_size) )
                 goto done;	
 
-	S->orgkey->add(S->orgkey, ASN1_STRING_data(payload->orgkey), \
+	S->orgkey->add(S->orgkey, ASN1_STRING_get0_data(payload->orgkey), \
 		       ASN1_STRING_length(payload->orgkey));
-	S->orgid->add(S->orgid, ASN1_STRING_data(payload->orgid), \
+	S->orgid->add(S->orgid, ASN1_STRING_get0_data(payload->orgid), \
 		      ASN1_STRING_length(payload->orgid));
-	S->id->add(S->id, ASN1_STRING_data(payload->id), \
+	S->id->add(S->id, ASN1_STRING_get0_data(payload->id), \
 		   ASN1_STRING_length(payload->id));
-	S->key->add(S->key, ASN1_STRING_data(payload->key), \
+	S->key->add(S->key, ASN1_STRING_get0_data(payload->key), \
 		   ASN1_STRING_length(payload->key));
-	S->elements->add(S->elements, ASN1_STRING_data(payload->elements), \
-		   ASN1_STRING_length(payload->elements));
+	S->elements->add(S->elements,				   \
+			 ASN1_STRING_get0_data(payload->elements), \
+			 ASN1_STRING_length(payload->elements));
 
 	retn = true;
 
