@@ -759,15 +759,16 @@ static _Bool decode_packet1(CO(PossumPacket, this), CO(IDtoken, token),
 	S->protocol = ASN1_INTEGER_get(packet1->protocol);
 	S->spi	    = ASN1_INTEGER_get(packet1->spi);
 
-	S->replay_nonce->add(S->replay_nonce,			      \
-			     ASN1_STRING_data(packet1->replay_nonce), \
+	S->replay_nonce->add(S->replay_nonce,			      	   \
+			     ASN1_STRING_get0_data(packet1->replay_nonce), \
 			     ASN1_STRING_length(packet1->replay_nonce));
 	S->quote_nonce->add(S->quote_nonce,			     \
-			     ASN1_STRING_data(packet1->quote_nonce), \
+			     ASN1_STRING_get0_data(packet1->quote_nonce), \
 			     ASN1_STRING_length(packet1->quote_nonce));
-	S->public->add(S->public, ASN1_STRING_data(packet1->public), \
+	S->public->add(S->public, ASN1_STRING_get0_data(packet1->public), \
 		       ASN1_STRING_length(packet1->public));
-	S->hardware->add(S->hardware, ASN1_STRING_data(packet1->hardware), \
+	S->hardware->add(S->hardware,				   \
+			 ASN1_STRING_get0_data(packet1->hardware), \
 			 ASN1_STRING_length(packet1->hardware));
 
 	if ( S->magic == POSSUMPACKET_MAGIC1 )

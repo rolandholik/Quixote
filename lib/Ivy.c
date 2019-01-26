@@ -108,7 +108,7 @@ IMPLEMENT_ASN1_FUNCTIONS(asn1_ivy)
 		err
 
 #define ASN1_BUFFER_DECODE(b, e, err) \
-	if ( !b->add(b, ASN1_STRING_data(e), ASN1_STRING_length(e)) ) \
+	if ( !b->add(b, ASN1_STRING_get0_data(e), ASN1_STRING_length(e)) ) \
  		err
 
 

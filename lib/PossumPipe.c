@@ -805,7 +805,7 @@ static PossumPipe_type receive_packet(CO(PossumPipe, this), CO(Buffer, bufr))
 	remote_retn = ASN1_INTEGER_get(packet->type);
 
 	bufr->reset(bufr);
-	if ( !bufr->add(bufr, ASN1_STRING_data(packet->payload), \
+	if ( !bufr->add(bufr, ASN1_STRING_get0_data(packet->payload), \
 			ASN1_STRING_length(packet->payload)) )
 		ERR(goto done);
 
