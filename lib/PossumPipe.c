@@ -1470,7 +1470,7 @@ static _Bool start_host_mode(CO(PossumPipe, this))
 
 	_Bool retn = false;
 
-	uint32_t spi;
+	uint32_t spi = 0;
 
 	SoftwareStatus software_status = NULL;
 
@@ -1824,7 +1824,7 @@ static _Bool start_client_mode(CO(PossumPipe, this))
 
 	_Bool retn = false;
 
-	uint32_t spi;
+	uint32_t spi = 0;
 
 	Duct duct = S->duct;
 
