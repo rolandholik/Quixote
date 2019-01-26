@@ -33,7 +33,7 @@ CDEBUG = -g ${DMALLOC}
 CFLAGS = -Wall ${CDEBUG}
 
 # LDFLAGS = -s -L/usr/local/krb5/lib 
-LDFLAGS = -g -Wl,--rpath /usr/local/musl/lib -L../lib -L../HurdLib
+LDFLAGS = -g -L ../lib -L ../HurdLib -Wl,-rpath-link /usr/local/musl/lib
 
 
 #
@@ -123,7 +123,8 @@ mgmt-set-key: mgmt-set-key.o MGMTsupvr.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO} ${PCSC_LIBRARY};
 
 tpm2-cmd: tpm2-cmd.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltss ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltss \
+		/usr/local/musl/lib/libcrypto.so.1.0.0 ${SSL_CRYPTO};
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};
