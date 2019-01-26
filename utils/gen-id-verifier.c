@@ -43,10 +43,6 @@
 #include <TPMcmd.h>
 
 
-/* Macro for setting error location. */
-#define ERR(action) {err = __LINE__; action;}
-
-
 /**
  * Private function.
  *
