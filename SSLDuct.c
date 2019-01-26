@@ -1,18 +1,22 @@
 /** \file
- *
+ * This file contains the implementation of an object which provides
+ * SSL based communications.  The object implements both the client
+ * and server side of a secured communications context.
  */
 
 /**************************************************************************
- * (C)Copyright 2010, The Open Hurderos Foundation. All rights reserved.
+ * (C)Copyright IDfusion, LLC. All rights reserved.
  *
- * Please refer to the file named COPYING in the top of the source tree
- * for licensing information.
+ * Please refer to the file named Documentation/COPYRIGHT in the top of
+ * the source tree for copyright and licensing information.
  **************************************************************************/
+
 
 /* Include files. */
 #include <stdint.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <string.h>
 #include <unistd.h>
 #include <netdb.h>
 #include <sys/socket.h>
@@ -21,6 +25,7 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <openssl/bn.h>
+#include <openssl/dh.h>
 
 #include <Origin.h>
 #include <Buffer.h>
@@ -74,7 +79,7 @@ struct NAAAIM_SSLDuct_State
 	enum {not_defined, server, client} type;
 
 	/* SSL protocol type. */
-	SSL_METHOD *method;
+	const SSL_METHOD *method;
 
 	/* SSL context. */
 	SSL_CTX *context;
@@ -337,11 +342,12 @@ static _Bool init_server(const SSLDuct const this)
 
 
 	/* Initialize the SSL context. */
-	S->method = SSLv3_server_method();
+	S->method = TLS_server_method();
 	if ( (S->context = SSL_CTX_new(S->method)) == NULL ) {
 		S->poisoned = true;
 		goto done;
 	}
+
 
 	/* Set Diffie-Hellman key exchange parameters. */
 	if ( (dfh = DH_new()) == NULL ) {
@@ -349,16 +355,15 @@ static _Bool init_server(const SSLDuct const this)
 		goto done;
 	}
 
-	dfh->p = BN_bin2bn(dhp, sizeof(dhp), NULL);
-	dfh->g = BN_bin2bn(dhg, sizeof(dhg), NULL);
-	if ( (dfh->p == NULL) || (dfh->g == NULL) ) {
-		S->poisoned = true;
-		goto done;
-	}
+	if ( DH_set0_pqg(dfh, BN_bin2bn(dhp, sizeof(dhp), NULL), NULL, \
+			 BN_bin2bn(dhp, sizeof(dhg), NULL)) == 0 )
+		ERR(goto done);
+
 	if ( SSL_CTX_set_tmp_dh(S->context, dfh) != 1 ) {
 		S->poisoned = true;
 		goto done;
 	}
+
 
 	/* Set session identification for this context. */
 	S->context_id = 0xbeaf;
@@ -403,7 +408,7 @@ static _Bool init_client(const SSLDuct const this)
 
 
 	/* Initialize the SSL context. */
-	S->method = SSLv3_client_method();
+	S->method = TLS_client_method();
 	if ( (S->context = SSL_CTX_new(S->method)) == NULL ) {
 		S->poisoned = true;
 		goto done;
