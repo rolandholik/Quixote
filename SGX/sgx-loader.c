@@ -11,6 +11,7 @@
 
 #include "NAAAIM.h"
 #include "SGX.h"
+#include "SGXenclave.h"
 #include "SGXloader.h"
 
 
