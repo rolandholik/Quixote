@@ -4,24 +4,30 @@
  */
 
 /**************************************************************************
- * (C)Copyright 2007, The Open Hurderos Foundation. All rights reserved.
- * (C)Copyright 2015, IDfusion, LLC. All rights reserved.
+ * (C)Copyright IDfusion, LLC. All rights reserved.
  *
- * Please refer to the file named COPYING in the top of the source tree
- * for licensing information.
+ * Please refer to the file named Documentation/COPYRIGHT in the top of
+ * the source tree for copyright and licensing information.
  **************************************************************************/
+
 
 /* Include files. */
 #include <stdint.h>
 #include <stdbool.h>
 
+#include <openssl/sha.h>
 #include <openssl/evp.h>
 
 #include <Origin.h>
+#include <HurdLib.h>
 #include <Buffer.h>
 
 #include "NAAAIM.h"
 #include "SHA256.h"
+
+
+/* Object state extraction macro. */
+#define STATE(var) CO(SHA256_State, var) = this->state
 
 
 /* Verify library/object header file inclusions. */
@@ -59,7 +65,7 @@ struct NAAAIM_SHA256_State
 	const EVP_MD *digest;
 
 	/* The digest context. */
-	EVP_MD_CTX context;
+	EVP_MD_CTX *context;
 
 	/* The output of the hash. */
 	Buffer buffer;
@@ -76,7 +82,7 @@ struct NAAAIM_SHA256_State
  *        is to be initialized.
  */
 
-static void _init_state(const SHA256_State const S) {
+static void _init_state(CO(SHA256_State, S)) {
 
 	S->libid = NAAAIM_LIBID;
 	S->objid = NAAAIM_SHA256_OBJID;
@@ -103,26 +109,32 @@ static void _init_state(const SHA256_State const S) {
  *		to indicate success.
  */
 
-static _Bool _init_crypto(const SHA256_State const S )
+static _Bool _init_crypto(CO(SHA256_State, S))
 
  {
 	 static _Bool initialized = false;
 
+	 _Bool retn = false;
+
 
 	 /* Initialize all the available digests. */
 	 if ( !initialized ) {
-		 OpenSSL_add_all_digests();
+		 EVP_add_digest(EVP_sha256());
 		 initialized = true;
 	 }
 
 	 /* Describe the hash we are using. */
-	 if ( (S->digest = EVP_get_digestbyname("SHA256")) == NULL ) {
-		 S->poisoned = true;
-		 return false;
-	 }
+	 if ( (S->digest = EVP_sha256()) == NULL )
+		 ERR(goto done);
 
 	 /* Initialize a structure for digest manipulations. */
-	 EVP_MD_CTX_init(&S->context);
+	 S->context = EVP_MD_CTX_new();
+	 retn = true;
+
+
+ done:
+	 if ( !retn )
+		 S->poisoned = true;
 
 	 return true;
 }
@@ -148,38 +160,35 @@ static _Bool _init_crypto(const SHA256_State const S )
  *		failure of the hash computation.
  */
 
-static _Bool _compute_digest(const SHA256_State const S)
+static _Bool _compute_digest(CO(SHA256_State, S))
 
 {
-	auto _Bool retn = false;
+	_Bool retn = false;
 
-	auto unsigned char buffer[EVP_MD_size(S->digest)];
+	unsigned char buffer[EVP_MD_size(S->digest)];
 
-	auto unsigned int size;
+	unsigned int size;
 
 
 	if ( S->poisoned )
-		return false;
+		ERR(goto done);
 
-	if ( S->computed ) {
-		S->poisoned = true;
-		goto done;
-	}
+	if ( S->computed )
+		ERR(goto done);
 	S->computed = true;
 
-	if ( !EVP_DigestFinal_ex(&S->context, buffer, &size) ) {
-		S->poisoned = true;
-		goto done;
-	}
+	if ( !EVP_DigestFinal_ex(S->context, buffer, &size) )
+		ERR(goto done);
 
-	if ( !S->buffer->add(S->buffer, buffer, size) ){
-		S->poisoned = true;
-		goto done;
-	}
+	if ( !S->buffer->add(S->buffer, buffer, size) )
+		ERR(goto done);
 	retn = true;
 
 
  done:
+	if ( !retn )
+		S->poisoned = true;
+
 	return retn;
 }
 	
@@ -199,12 +208,12 @@ static _Bool _compute_digest(const SHA256_State const S)
  *		of the data addition.
  */
 
-static _Bool add(const Sha256 const this, const Buffer const bf)
+static _Bool add(CO(Sha256, this), CO(Buffer, bf))
 
 {
-	auto _Bool retn = false;
+	STATE(S);
 
-	auto const SHA256_State const S = this->state;
+	_Bool retn = false;
 
 
 	/*
@@ -212,36 +221,32 @@ static _Bool add(const Sha256 const this, const Buffer const bf)
 	 * input object.
 	 */
 	if ( S->poisoned )
-		goto done;
-	if ( bf->poisoned(bf) ) {
-		S->poisoned = true;
-		goto done;
-	}
+		ERR(goto done);
+	if ( bf->poisoned(bf) )
+		ERR(goto done);
 
 
 	/* Refuse to add to the hash if it has been computed. */
-	if ( S->computed ) {
-		S->poisoned = true;
-		goto done;
-	}
+	if ( S->computed )
+		ERR(goto done);
 
 	/* Initialize the digest if necessary. */
 	if ( !S->initialized ) {
-		if ( !EVP_DigestInit_ex(&S->context, S->digest, NULL) ) {
-			S->poisoned = true;
-			goto done;
-		}
+		if ( !EVP_DigestInit_ex(S->context, S->digest, NULL) )
+			ERR(goto done);
 		S->initialized = true;
 	}
 
 	/* Add the buffer contents. */
-	if ( !EVP_DigestUpdate(&S->context, bf->get(bf), bf->size(bf)) ) {
-		S->poisoned = true;
-		goto done;
-	}
+	if ( !EVP_DigestUpdate(S->context, bf->get(bf), bf->size(bf)) )
+		ERR(goto done);
 	retn = true;
 
+
  done:
+	if ( !retn )
+		S->poisoned = true;
+
 	return retn;
 }
 
@@ -259,7 +264,7 @@ static _Bool add(const Sha256 const this, const Buffer const bf)
  *		of the digest computation.
  */
 
-static _Bool compute(const Sha256 const this)
+static _Bool compute(CO(Sha256, this))
 
 {
 	return _compute_digest(this->state);
@@ -283,10 +288,10 @@ static _Bool compute(const Sha256 const this)
  *		of the hashing sequence.
  */
 
-static _Bool rehash(const Sha256 const this, unsigned int cnt)
+static _Bool rehash(CO(Sha256, this), const unsigned int cnt)
 
 {
-	const SHA256_State const S = this->state;
+	STATE(S);
 
 	_Bool retn = false;
 
@@ -298,31 +303,25 @@ static _Bool rehash(const Sha256 const this, unsigned int cnt)
 	Buffer b = S->buffer;
 
 
-	if ( S->poisoned ) {
-		fputs("poisoned\n", stderr);
-		goto done;
-	}
-	if ( cnt == 0 ) {
-		fputs("non-zero count\n", stderr);
-		goto done;
-	}
-	if ( !S->computed ) {
-		fputs("not computed\n", stderr);
-		goto done;
-	}
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( cnt == 0 )
+		ERR(goto done);
+	if ( !S->computed )
+		ERR(goto done);
 
 
 	for (lp= 0; lp < cnt; ++lp) {
-		if ( !EVP_DigestInit_ex(&S->context, S->digest, NULL) )
-			goto done;
-		if ( !EVP_DigestUpdate(&S->context, b->get(b), b->size(b)) )
-			goto done;
-		if ( !EVP_DigestFinal_ex(&S->context, buffer, &size) )
-			goto done;
+		if ( !EVP_DigestInit_ex(S->context, S->digest, NULL) )
+			ERR(goto done);
+		if ( !EVP_DigestUpdate(S->context, b->get(b), b->size(b)) )
+			ERR(goto done);
+		if ( !EVP_DigestFinal_ex(S->context, buffer, &size) )
+			ERR(goto done);
 
 		b->reset(b);
 		if ( !b->add(b, buffer, size) )
-			goto done;
+			ERR(goto done);
 	}
 	retn = true;
 
@@ -357,10 +356,10 @@ static _Bool rehash(const Sha256 const this, unsigned int cnt)
  *		of the extension sequence.
  */
 
-static _Bool extend(const Sha256 const this, const Buffer const bufr)
+static _Bool extend(CO(Sha256, this), CO(Buffer, bufr))
 
 {
-	const SHA256_State const S = this->state;
+	STATE(S);
 
 	_Bool retn = false;
 
@@ -370,24 +369,24 @@ static _Bool extend(const Sha256 const this, const Buffer const bufr)
 
 
 	if ( S->poisoned )
-		goto done;
+		ERR(goto done);
 	if ( !S->computed )
-		goto done;
+		ERR(goto done);
 	if ( (bufr == NULL) || bufr->poisoned(bufr) )
-		goto done;
+		ERR(goto done);
 
 
 	/* Hash the supplied material. */
-	if ( !EVP_DigestInit_ex(&S->context, S->digest, NULL) )
-		goto done;
-	if ( !EVP_DigestUpdate(&S->context, bufr->get(bufr), \
+	if ( !EVP_DigestInit_ex(S->context, S->digest, NULL) )
+		ERR(goto done);
+	if ( !EVP_DigestUpdate(S->context, bufr->get(bufr), \
 			       bufr->size(bufr)) )
-		goto done;
-	if ( !EVP_DigestFinal_ex(&S->context, buffer, &size) )
-		goto done;
+		ERR(goto done);
+	if ( !EVP_DigestFinal_ex(S->context, buffer, &size) )
+		ERR(goto done);
 
 	if ( !S->buffer->add(S->buffer, buffer, size) )
-		goto done;
+		ERR(goto done);
 
 
 	/* Hash the current buffer contents. */
@@ -397,7 +396,7 @@ static _Bool extend(const Sha256 const this, const Buffer const bufr)
 	add(this, S->buffer);
 	S->buffer->reset(S->buffer);
 	if ( !compute(this) )
-		goto done;
+		ERR(goto done);
 
 	retn = true;
 
@@ -421,10 +420,11 @@ static _Bool extend(const Sha256 const this, const Buffer const bufr)
  *
  */
 
-static void reset(const Sha256 const this)
+static void reset(CO(Sha256, this))
 
 {
-	auto const SHA256_State const S = this->state;
+	STATE(S);
+
 
 	S->computed    = false;
 	S->initialized = false;
@@ -449,10 +449,10 @@ static void reset(const Sha256 const this)
  *		the results of the hash.
  */
 
-static unsigned char *get(const Sha256 const this)
+static unsigned char *get(CO(Sha256, this))
 
 {
-	auto const SHA256_State const S = this->state;
+	STATE(S);
 
 
 	if ( S->poisoned )
@@ -483,10 +483,10 @@ static unsigned char *get(const Sha256 const this)
  *		the destructor for this object is called.
  */
 
-static Buffer get_Buffer(const Sha256 const this)
+static Buffer get_Buffer(CO(Sha256, this))
 
 {
-	auto const SHA256_State const S = this->state;
+	STATE(S);
 
 
 	if ( !S->computed ) {
@@ -507,14 +507,17 @@ static Buffer get_Buffer(const Sha256 const this)
  * \param this	A pointer to the SHA256 object which is to be printed.
  */
 
-static void print(const Sha256 const this)
+static void print(CO(Sha256, this))
 
 {
-	if ( this->state->poisoned ) {
+	STATE(S);
+
+	if ( S->poisoned ) {
 		fputs("* POISONED *\n", stderr);
 		return;
 	}
-	this->state->buffer->print(this->state->buffer);
+
+	S->buffer->print(this->state->buffer);
 }
 
 
@@ -526,13 +529,13 @@ static void print(const Sha256 const this)
  * \param this	A pointer to the object which is to be destroyed.
  */
 
-static void whack(const Sha256 const this)
+static void whack(CO(Sha256, this))
 
 {
-	auto const SHA256_State const S = this->state;
+	STATE(S);
 
 
-	EVP_MD_CTX_cleanup(&S->context);
+	EVP_MD_CTX_free(S->context);
 
 	if ( S->buffer != NULL )
 		S->buffer->whack(S->buffer);
@@ -554,11 +557,11 @@ static void whack(const Sha256 const this)
 extern Sha256 NAAAIM_Sha256_Init(void)
 
 {
-	auto Origin root;
+	Origin root;
 
-	auto Sha256 this = NULL;
+	Sha256 this = NULL;
 
-	auto struct HurdLib_Origin_Retn retn;
+	struct HurdLib_Origin_Retn retn;
 
 
 	/* Get the root object. */
