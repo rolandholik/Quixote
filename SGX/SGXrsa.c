@@ -139,8 +139,8 @@ static _Bool init(CO(SGXrsa, this), struct SGX_pek *pek)
 
 	if ( (key = RSA_new()) == NULL )
 		ERR(goto done);
-	key->e = exponent;
-	key->n = modulus;
+	if ( RSA_set0_key(key, modulus, exponent, NULL) == 0 )
+		ERR(goto done);
 
 
 	/* Initialize an envelope key and assign the RSA key to it. */

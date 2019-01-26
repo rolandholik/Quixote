@@ -356,8 +356,8 @@ static _Bool _verify_endpoint(CO(SGXmessage, msg), CO(struct SGX_pek *, pek), \
 
 	if ( (key = RSA_new()) == NULL )
 		ERR(goto done);
-	key->e = exponent;
-	key->n = modulus;
+	if ( RSA_set0_key(key, modulus, exponent, NULL) == 0 )
+		ERR(goto done);
 
 
 	/* Decrypt and extract the signature. */
