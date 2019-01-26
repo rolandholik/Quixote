@@ -4,11 +4,12 @@
  */
 
 /**************************************************************************
- * (C)Copyright 2007, The Open Hurderos Foundation. All rights reserved.
+ * (C)Copyright IDfusion, LLC. All rights reserved.
  *
- * Please refer to the file named COPYING in the top of the source tree
- * for licensing information.
+ * Please refer to the file named Documentation/COPYRIGHT in the top of
+ * the source tree for copyright and licensing information.
  **************************************************************************/
+
 
 /* Include files. */
 #include <stdint.h>
@@ -18,10 +19,15 @@
 #include <openssl/hmac.h>
 
 #include <Origin.h>
+#include <HurdLib.h>
 #include <Buffer.h>
 
 #include "NAAAIM.h"
 #include "SHA256_hmac.h"
+
+
+/* Object state extraction macro. */
+#define STATE(var) CO(SHA256_hmac_State, var) = this->state
 
 
 /* Verify library/object header file inclusions. */
@@ -59,7 +65,7 @@ struct NAAAIM_SHA256_hmac_State
 	const EVP_MD *digest;
 
 	/* The keyed digest context. */
-	HMAC_CTX context;
+	HMAC_CTX *context;
 
 	/* The Buffer object containing the authentication key. */
 	Buffer key;
@@ -79,7 +85,9 @@ struct NAAAIM_SHA256_hmac_State
  *        is to be initialized.
  */
 
-static void _init_state(const SHA256_hmac_State const S) {
+static void _init_state(CO(SHA256_hmac_State, S))
+
+{
 
 	S->libid = NAAAIM_LIBID;
 	S->objid = NAAAIM_SHA256_hmac_OBJID;
@@ -106,29 +114,35 @@ static void _init_state(const SHA256_hmac_State const S) {
  *		to indicate success.
  */
 
-static _Bool _init_crypto(const SHA256_hmac_State const S )
+static _Bool _init_crypto(CO(SHA256_hmac_State, S))
 
 {
-	 static _Bool initialized = false;
+	_Bool retn = false;
+
+	static _Bool initialized = false;
 
 
-	 /* Initialize all the available digests. */
-	 if ( !initialized ) {
-		 OpenSSL_add_all_digests();
-		 initialized = true;
-	 }
+	/* Initialize all the available digests. */
+	if ( !initialized ) {
+		EVP_add_digest(EVP_sha256());
+		initialized = true;
+	}
 
-	 /* Describe the hash we are using. */
-	 if ( (S->digest = EVP_get_digestbyname("SHA256")) == NULL ) {
-		 S->poisoned = true;
-		 return false;
-	 }
+	/* Describe the hash we are using. */
+	if ( (S->digest = EVP_sha256()) == NULL )
+		ERR(goto done);
+
+	/* Initialize structures for the hash and digest algorithms. */
+	if ( (S->context = HMAC_CTX_new()) == NULL )
+		ERR(goto done);
+	retn = true;
 
 
-	 /* Initialize structures for the hash and digest algorithms. */
-	 HMAC_CTX_init(&S->context);
+ done:
+	if ( !retn )
+		S->poisoned = true;
 
-	 return true;
+	return true;
 }
 
 
@@ -152,35 +166,34 @@ static _Bool _init_crypto(const SHA256_hmac_State const S )
  *		failure of the hash computation.
  */
 
-static _Bool _compute_digest(const SHA256_hmac_State const S)
+static _Bool _compute_digest(CO(SHA256_hmac_State, S))
 
 {
-	auto _Bool retn = false;
+	_Bool retn = false;
 
-	auto unsigned char buffer[EVP_MD_size(S->digest)];
+	unsigned char buffer[EVP_MD_size(S->digest)];
 
-	auto unsigned int size;
+	unsigned int size;
 
 
 	if ( S->poisoned )
 		return false;
 
-	if ( S->computed ) {
-		S->poisoned = true;
-		goto done;
-	}
+	if ( S->computed )
+		ERR(goto done);
 	S->computed = true;
 
-	HMAC_Final(&S->context, buffer, &size);
+	HMAC_Final(S->context, buffer, &size);
 
-	if ( !S->buffer->add(S->buffer, buffer, size) ) {
-		S->poisoned = true;
-		goto done;
-	}
+	if ( !S->buffer->add(S->buffer, buffer, size) )
+		ERR(goto done);
 	retn = true;
 
 
  done:
+	if ( !retn )
+		S->poisoned = true;
+
 	return retn;
 }
 
@@ -188,7 +201,7 @@ static _Bool _compute_digest(const SHA256_hmac_State const S)
 /**
  * This method implements adding the contents of a buffer of given size
  * to the MAC being constructed.
- * 
+ *
  * \param this	A pointer to the MAC object which is having content
  *		added to it.
  *
@@ -197,13 +210,13 @@ static _Bool _compute_digest(const SHA256_hmac_State const S)
  * \param size	The number of bytes in the buffer to add.
  */
 
-static _Bool add(const SHA256_hmac const this, \
-		 unsigned const char * const bf, size_t const size)
+static _Bool add(CO(SHA256_hmac, this), unsigned const char * const bf, \
+		 size_t const size)
 
 {
-	auto _Bool retn = false;
+	STATE(S);
 
-	auto const SHA256_hmac_State const S = this->state;
+	_Bool retn = false;
 
 
 	/*
@@ -220,20 +233,24 @@ static _Bool add(const SHA256_hmac const this, \
 
 	/* Initialize the digest if necessary. */
 	if ( !S->initialized ) {
-		HMAC_Init_ex(&S->context, S->key->get(S->key), \
+		HMAC_Init_ex(S->context, S->key->get(S->key), \
 			     S->key->size(S->key), S->digest, NULL);
 		S->initialized = true;
 	}
 
 	/* Add the buffer contents. */
-	HMAC_Update(&S->context, bf, size);
+	HMAC_Update(S->context, bf, size);
 	retn = true;
 
+
  done:
+	if ( !retn )
+		S->poisoned = true;
+
 	return retn;
 }
 
-	
+
 /**
  * This method implements adding the contents of a buffer to the current
  * MAC being constructed.
@@ -245,12 +262,12 @@ static _Bool add(const SHA256_hmac const this, \
  *		of the data addition.
  */
 
-static _Bool add_Buffer(const SHA256_hmac const this, const Buffer const bf)
+static _Bool add_Buffer(CO(SHA256_hmac, this), CO(Buffer, bf))
 
 {
-	auto _Bool retn = false;
+	STATE(S);
 
-	auto const SHA256_hmac_State const S = this->state;
+	_Bool retn = false;
 
 
 	/*
@@ -258,27 +275,28 @@ static _Bool add_Buffer(const SHA256_hmac const this, const Buffer const bf)
 	 * programming issue.  Also verify the incoming object does not
 	 * have a problem.
 	 */
-	if ( S->computed ) {
-		S->poisoned = true;
-		goto done;
-	}
-	if ( bf->poisoned(bf) ) {
-		S->poisoned = true;
-		goto done;
-	}
+	if ( S->computed )
+		ERR(goto done);
+	if ( bf->poisoned(bf) )
+		ERR(goto done);
+
 
 	/* Initialize the digest if necessary. */
 	if ( !S->initialized ) {
-		HMAC_Init_ex(&S->context, S->key->get(S->key), \
+		HMAC_Init_ex(S->context, S->key->get(S->key), \
 			     S->key->size(S->key), S->digest, NULL);
 		S->initialized = true;
 	}
 
 	/* Add the buffer contents. */
-	HMAC_Update(&S->context, bf->get(bf), bf->size(bf));
+	HMAC_Update(S->context, bf->get(bf), bf->size(bf));
 	retn = true;
 
+
  done:
+	if ( !retn )
+		S->poisoned = true;
+
 	return retn;
 }
 
@@ -294,7 +312,7 @@ static _Bool add_Buffer(const SHA256_hmac const this, const Buffer const bf)
  *		of the digest computation.
  */
 
-static _Bool compute(const SHA256_hmac const this)
+static _Bool compute(CO(SHA256_hmac, this))
 
 {
 	return _compute_digest(this->state);
@@ -305,7 +323,7 @@ static _Bool compute(const SHA256_hmac const this)
  * External public method.
  *
  * This method implements resetting the HMAC object in preparation for
- * computation of another MAC code.  
+ * computation of another MAC code.
  * of another element.  It flags the digest to be re-initialized and
  * clears the current digest Buffer.
  *
@@ -313,10 +331,10 @@ static _Bool compute(const SHA256_hmac const this)
  *
  */
 
-static void reset(const SHA256_hmac const this)
+static void reset(CO(SHA256_hmac, this))
 
 {
-	auto const SHA256_hmac_State const S = this->state;
+	STATE(S);
 
 	S->computed    = false;
 	S->initialized = false;
@@ -341,10 +359,10 @@ static void reset(const SHA256_hmac const this)
  *		the MAC code.
  */
 
-static unsigned char *get(const SHA256_hmac const this)
+static unsigned char *get(CO(SHA256_hmac, this))
 
 {
-	auto const SHA256_hmac_State const S = this->state;
+	STATE(S);
 
 
 	if ( !S->computed )
@@ -372,10 +390,10 @@ static unsigned char *get(const SHA256_hmac const this)
  *		the destructor for MAC object is called.
  */
 
-static Buffer get_Buffer(const SHA256_hmac const this)
+static Buffer get_Buffer(CO(SHA256_hmac, this))
 
 {
-	auto const SHA256_hmac_State const S = this->state;
+	STATE(S);
 
 
 	if ( !S->computed )
@@ -396,14 +414,17 @@ static Buffer get_Buffer(const SHA256_hmac const this)
  * \param this	A pointer to the MAC object which is to be printed.
  */
 
-static void print(const SHA256_hmac const this)
+static void print(CO(SHA256_hmac, this))
 
 {
-	if ( this->state->poisoned ) {
+	STATE(S);
+
+
+	if ( S->poisoned ) {
 		fputs("* POISONED *\n", stderr);
 		return;
 	}
-	this->state->buffer->print(this->state->buffer);
+	S->buffer->print(S->buffer);
 }
 
 
@@ -415,13 +436,13 @@ static void print(const SHA256_hmac const this)
  * \param this	A pointer to the object which is to be destroyed.
  */
 
-static void whack(const SHA256_hmac const this)
+static void whack(CO(SHA256_hmac, this))
 
 {
-	auto const SHA256_hmac_State const S = this->state;
+	STATE(S);
 
 
-	HMAC_CTX_cleanup(&S->context);
+	HMAC_CTX_free(S->context);
 
 	if ( S->buffer != NULL )
 		S->buffer->whack(S->buffer);
@@ -430,7 +451,7 @@ static void whack(const SHA256_hmac const this)
 	return;
 }
 
-	
+
 /**
  * External constructor call.
  *
@@ -448,11 +469,11 @@ static void whack(const SHA256_hmac const this)
 extern SHA256_hmac NAAAIM_SHA256_hmac_Init(const Buffer key)
 
 {
-	auto Origin root;
+	Origin root;
 
-	auto SHA256_hmac this = NULL;
+	SHA256_hmac this = NULL;
 
-	auto struct HurdLib_Origin_Retn retn;
+	struct HurdLib_Origin_Retn retn;
 
 
 	/* Get the root object. */
