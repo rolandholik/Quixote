@@ -208,8 +208,7 @@ static _Bool do_configuration(void)
 {
 	_Bool retn = false;
 
-	int fd,
-	    status;
+	int status;
 
 	pid_t pid;
 
