@@ -13,8 +13,6 @@ TOOLS = test-actor test-subject test-event generate-contours sha-tool	  \
 
 CC = musl-gcc
 
-MUSL_INCLUDE = /usr/local/musl/include
-
 CDEBUG = -g -O2 -fomit-frame-pointer -march=core2
 CFLAGS = -Wall ${CDEBUG}
 
@@ -53,8 +51,7 @@ NAAAIMLIB      = -L ../lib -lNAAAIM
 
 LIBS = ${NAAAIMLIB} ${HURDLIB}
 
-CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I/usr/local/musl/include \
-	-I ../SGX/ISOidentity -I ../SGX
+CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I ../SGX/ISOidentity -I ../SGX
 
 
 #

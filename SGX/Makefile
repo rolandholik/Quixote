@@ -25,8 +25,6 @@ export SGXKEY
 CC = musl-gcc
 AS = as
 
-MUSL_INCLUDE = /usr/local/musl/include
-
 CDEBUG = -g -O2 -fomit-frame-pointer -march=core2
 CFLAGS = -Wall ${CDEBUG}
 
@@ -71,7 +69,7 @@ INTEL_CRYPTO = -L/opt/intel/sgxsdk/lib64 -lsgx_tcrypto
 
 LIBS = ${RDKLIB} ${ELFLIB} ${HURDLIB}
 
-CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I/usr/local/musl/include
+CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib
 
 
 #
@@ -97,51 +95,50 @@ sgx-metadata: sgx-metadata.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO};
 
 sgx-metadata.o: sgx-metadata.c
-	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
+	$(CC) $(CFLAGS) -c $< -o $@;
 
 sgx-loader: sgx-loader.o ${LIBRARY}
 	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
 
 sgx-loader.o: sgx-loader.c
-	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
+	$(CC) $(CFLAGS) -c $< -o $@;
 
 sgx-load: sgx-load.o ${LIBRARY}
 	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
 
 sgx-load.o: sgx-load.c
-	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
+	$(CC) $(CFLAGS) -c $< -o $@;
 
 sgx-sigstruct: sgx-sigstruct.o ${LIBRARY}
 	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
 
 sgx-sigstruct.o: sgx-sigstruct.c
-	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
+	$(CC) $(CFLAGS) -c $< -o $@;
 
 sgx-gen-token: sgx-gen-token.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO};
 
 sgx-gen-token.o: sgx-gen-token.c LE_whitelist.h
-	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
+	$(CC) $(CFLAGS) -c $< -o $@;
 
 sgx-provision: sgx-provision.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO} \
 		${INTEL_CRYPTO};
 
 sgx-provision.o: sgx-provision.c
-	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
+	$(CC) $(CFLAGS) -c $< -o $@;
 
 sdk-compute-size: sdk-compute-size.o
 	${CC} ${LDFLAGS} -o $@ $<;
 
 sdk-compute-size.o: sdk-compute-size.c
-	${CC} ${CFLAGS} ${SGXSDK_INCLUDES} -I/usr/local/musl/include \
-		-c $< -o $@;
+	${CC} ${CFLAGS} ${SGXSDK_INCLUDES} -c $< -o $@;
 
 generate-array: generate-array.o
 	${CC} ${LDFLAGS} -o $@ $< ${HURDLIB};
 
 generate-array.o: generate-array.c
-	$(CC) $(CFLAGS) -I/usr/local/musl/include -c $< -o $@;
+	$(CC) $(CFLAGS) -c $< -o $@;
 
 sgx-gen-verifier: sgx-gen-verifier.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO};

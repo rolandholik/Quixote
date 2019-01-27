@@ -10,7 +10,6 @@ BINARIES = idgine gen-id idsvr fetch-id recip-svr fwd-id
 
 CC = musl-gcc
 
-MUSL_INCLUDE = /usr/local/musl/include
 
 #
 # Locations of SSL include files and libraries
@@ -41,8 +40,7 @@ COBJS = ${CSRC:.c=.o}
 
 LIBS = -lNAAAIM -lHurdLib
 
-CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I${SSL_INCLUDE} \
-	-I${MUSL_INCLUDE}/tss
+CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I${SSL_INCLUDE}
 
 
 #

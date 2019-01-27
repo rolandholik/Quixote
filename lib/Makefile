@@ -14,10 +14,9 @@ TESTS = Duct_test OTEDKS_test Curve25519_test IPC_test PossumPipe_test \
 
 CC = musl-gcc
 
-MUSL_INCLUDE = /usr/local/musl/include
-
 LIBNAME = NAAAIM
 LIBRARY = lib${LIBNAME}.a
+
 
 #
 # Locations of SSL include files and libraries
