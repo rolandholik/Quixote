@@ -19,6 +19,8 @@ TOOLS = sgx-check sgx-metadata sgx-loader sgx-load sgx-sigstruct	     \
 	sgx-gen-token test-ecall test-pcr idf-sgx-fandf	idf-sgx-fandf-unibin \
 	sgx-provision sdk-compute-size sgx-gen-verifier
 
+LE_WHITELIST = /opt/intel/sgxpsw/aesm/sgx_white_list_cert.bin
+
 SGXKEY = ${CURDIR}/Signing-key.pem
 export SGXKEY
 
@@ -173,8 +175,7 @@ sigstruct.h: generate-array
 		-n LE_sigstruct > $@ || rm $@;
 
 LE_whitelist.h: generate-array
-	./generate-array -i sgx_white_list_cert.bin -n LE_whitelist > $@ || \
-		rm $@;
+	./generate-array -i ${LE_WHITELIST} -n LE_whitelist > $@ || rm $@;
 
 
 #
