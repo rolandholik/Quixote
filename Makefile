@@ -43,8 +43,6 @@ CDEBUG = -g ${DMALLOC}
 CFLAGS = -Wall ${CDEBUG} -I./HurdLib # -pedantic-errors -ansi
 
 
-LIBS = HurdLib
-
 # LDFLAGS = -s -L/usr/local/krb5/lib 
 LDFLAGS = -g ${DMALLOC_LIBS} -L ./HurdLib  -L ./lib
 
@@ -69,12 +67,16 @@ CFLAGS := ${CFLAGS} -I./HurdLib -I${SSL_INCLUDE} -I./lib
 #
 # Target directives.
 #
-.PHONY: client lib ${SUBDIRS}
+.PHONY: HurdLib client lib ${SUBDIRS}
 
 
 # Targets
 # all: ${COBJS} genrandom genid query-client servers ${SUBDIRS}
-all: lib ${COBJS} genrandom query-client servers ${SUBDIRS}
+all: HurdLib lib ${COBJS} genrandom query-client servers ${SUBDIRS}
+
+HurdLib:
+	cd $@ && CC=${CC} ./configure;
+	make -C $@;
 
 servers: ${SERVERS} ${TOOLS}
 
@@ -158,6 +160,7 @@ tags:
 	/opt/emacs/bin/etags *.{h,c};
 
 clean:
+	${MAKE} -C HurdLib clean;
 	${MAKE} -C lib clean;
 	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i clean; done
 	rm -f *.o *~ TAGS;
