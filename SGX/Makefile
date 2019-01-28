@@ -19,10 +19,13 @@ TOOLS = sgx-check sgx-metadata sgx-loader sgx-load sgx-sigstruct	     \
 	sgx-gen-token test-ecall test-pcr idf-sgx-fandf	idf-sgx-fandf-unibin \
 	sgx-provision sdk-compute-size sgx-gen-verifier
 
+
+LE	     = /opt/intel/sgxpsw/aesm/libsgx_le.signed.so
 LE_WHITELIST = /opt/intel/sgxpsw/aesm/sgx_white_list_cert.bin
 
 SGXKEY = ${CURDIR}/Signing-key.pem
 export SGXKEY
+
 
 CC = musl-gcc
 AS = as
@@ -157,13 +160,13 @@ test-pcr: test-pcr.o
 idf-sgx-fandf: idf-sgx-fandf.o
 	${CC} -static ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO};
 
-idf-sgx-fandf.o: idf-sgx-fandf.c LE_whitelist.h
+idf-sgx-fandf.o: idf-sgx-fandf.c LE_whitelist.h LE.h
 	$(CC) $(CFLAGS) -c $< -o $@;
 
 idf-sgx-fandf-unibin: idf-sgx-fandf-unibin.o
 	${CC} -static ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO};
 
-idf-sgx-fandf-unibin.o: idf-sgx-fandf-unibin.c LE_whitelist.h
+idf-sgx-fandf-unibin.o: idf-sgx-fandf-unibin.c LE_whitelist.h LE.h
 	$(CC) $(CFLAGS) -c $< -o $@;
 
 SGXecdsa.o: SGXecdsa.c
@@ -182,6 +185,9 @@ sigstruct.h: generate-array
 
 LE_whitelist.h: generate-array
 	./generate-array -i ${LE_WHITELIST} -n LE_whitelist > $@ || rm $@;
+
+LE.h: generate-array
+	./generate-array -i ${LE} -n LE_image > $@ || rm $@;
 
 
 #

@@ -51,7 +51,7 @@
 
 
 /* Include the launch image. */
-#include "launch-enclave.c"
+#include "LE.h"
 
 
 /* Include the execution enclave. */
@@ -349,7 +349,7 @@ extern int main(int argc, char *argv[])
 	/* Create the launch token. */
 	INIT(NAAAIM, SGXenclave, le, ERR(goto done));
 
-	if ( !le->open_enclave_memory(le, sgx_device, LE_image, \
+	if ( !le->open_enclave_memory(le, sgx_device, (char *) LE_image, \
 				      sizeof(LE_image), false) )
 		ERR(goto done);
 	if ( !le->create_enclave(le) )
