@@ -67,16 +67,17 @@ CFLAGS := ${CFLAGS} -I./HurdLib -I${SSL_INCLUDE} -I./lib
 #
 # Target directives.
 #
-.PHONY: HurdLib client lib ${SUBDIRS}
+.PHONY: client lib ${SUBDIRS}
 
 
 # Targets
 # all: ${COBJS} genrandom genid query-client servers ${SUBDIRS}
-all: HurdLib lib ${COBJS} genrandom query-client servers ${SUBDIRS}
+all: HurdLib/libHurdLib.a lib ${COBJS} genrandom query-client servers \
+	${SUBDIRS}
 
-HurdLib:
-	cd $@ && CC=${CC} ./configure;
-	make -C $@;
+HurdLib/libHurdLib.a:
+	cd HurdLib && CC=${CC} ./configure;
+	make -C HurdLib;
 
 servers: ${SERVERS} ${TOOLS}
 
