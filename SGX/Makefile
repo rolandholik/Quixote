@@ -166,7 +166,7 @@ idf-sgx-fandf.o: idf-sgx-fandf.c LE_whitelist.h LE.h
 idf-sgx-fandf-unibin: idf-sgx-fandf-unibin.o
 	${CC} -static ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO};
 
-idf-sgx-fandf-unibin.o: idf-sgx-fandf-unibin.c LE_whitelist.h LE.h
+idf-sgx-fandf-unibin.o: idf-sgx-fandf-unibin.c LE_whitelist.h LE.h TE.h
 	$(CC) $(CFLAGS) -c $< -o $@;
 
 SGXecdsa.o: SGXecdsa.c
@@ -189,6 +189,9 @@ LE_whitelist.h: generate-array
 LE.h: generate-array
 	./generate-array -i ${LE} -n LE_image > $@ || rm $@;
 
+TE.h: generate-array
+	./generate-array -i TE.h -n TE_image > $@ || rm $@;
+
 
 #
 # Subdirectory targets.
@@ -206,7 +209,7 @@ ISOidentity:
 tags:
 	/opt/emacs/bin/etags *.{h,c};
 clean:
-	rm -f *.o *~ TAGS sigstruct.h LE_whitelist.h;
+	rm -f *.o *~ TAGS sigstruct.h LE_whitelist.h LE.h TE.h;
 	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i clean; done
 	rm -f ${LIBRARY};
 	rm -f generate-array ${TOOLS};

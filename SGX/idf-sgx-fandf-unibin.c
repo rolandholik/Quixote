@@ -55,7 +55,7 @@
 
 
 /* Include the execution enclave. */
-#include "test-enclave.c"
+#include "TE.h"
 
 
 /**
@@ -149,8 +149,8 @@ static _Bool LE_init_ecall0(char *enclave,
 
 	/* Get the attributes for an enclave to be signed. */
 	INIT(NAAAIM, SGXmetadata, init_enclave, ERR(goto done));
-	if ( !init_enclave->load_memory(init_enclave, test_enclave, \
-					sizeof(test_enclave)) )
+	if ( !init_enclave->load_memory(init_enclave, (char *) TE_image, \
+					sizeof(TE_image)) )
 		ERR(goto done);
 	if ( !init_enclave->compute_attributes(init_enclave, true) )
 		ERR(goto done);
@@ -368,9 +368,8 @@ extern int main(int argc, char *argv[])
 	INIT(NAAAIM, SGXenclave, enclave, ERR(goto done));
 
 	if ( !enclave->open_enclave_memory(enclave, sgx_device,	 \
-					   test_enclave,	 \
-					   sizeof(test_enclave), \
-					   true) )
+					   (char *) TE_image,	 \
+					   sizeof(TE_image), true) )
 		ERR(goto done);
 
 	if ( !enclave->create_enclave(enclave) )
