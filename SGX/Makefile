@@ -157,8 +157,14 @@ test-pcr: test-pcr.o
 idf-sgx-fandf: idf-sgx-fandf.o
 	${CC} -static ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO};
 
+idf-sgx-fandf.o: idf-sgx-fandf.c LE_whitelist.h
+	$(CC) $(CFLAGS) -c $< -o $@;
+
 idf-sgx-fandf-unibin: idf-sgx-fandf-unibin.o
 	${CC} -static ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO};
+
+idf-sgx-fandf-unibin.o: idf-sgx-fandf-unibin.c LE_whitelist.h
+	$(CC) $(CFLAGS) -c $< -o $@;
 
 SGXecdsa.o: SGXecdsa.c
 	$(CC) $(CFLAGS) -I /opt/intel/sgxsdk/include -c $< -o $@;
