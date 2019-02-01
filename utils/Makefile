@@ -122,8 +122,7 @@ mgmt-set-key: mgmt-set-key.o MGMTsupvr.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO} ${PCSC_LIBRARY};
 
 tpm2-cmd: tpm2-cmd.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltss \
-		/usr/local/musl/lib/libcrypto.so.1.0.0 ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -libmtss_nf ${SSL_CRYPTO};
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};

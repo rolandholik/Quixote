@@ -41,9 +41,9 @@
 #include <HurdLib.h>
 #include <Buffer.h>
 
-#include <tss2/tss.h>
-#include <tss2/tssproperties.h>
-#include <tss2/tssresponsecode.h>
+#include <ibmtss/tss.h>
+#include <ibmtss/tssproperties.h>
+#include <ibmtss/tssresponsecode.h>
 
 #include "NAAAIM.h"
 #include "TPM2cmd.h"
