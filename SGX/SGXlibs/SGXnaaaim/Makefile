@@ -16,8 +16,9 @@ POSSUMSRC = test-Possum-enclave.c test-Possum-interface.c RandomBuffer.c
 
 TOOLS = test-naaaim test-Duct test-Possum
 
-LIBNAME = SGXnaaaim
-LIBRARY = lib${LIBNAME}.a
+LIBNAME	   = SGXnaaaim
+LIBRARY	   = lib${LIBNAME}.a
+NAAAIMDIR  = ../../../lib
 
 ENCLAVE_CC = gcc64
 
@@ -183,11 +184,43 @@ clean:
 
 
 # Source dependencies.
-test-naaaim-enclave.o: test-naaaim-interface.h SHA256.h
+test-naaaim-enclave.o: test-naaaim-interface.h RandomBuffer.h	\
+	${NAAAIMDIR}/SHA256.h ${NAAAIMDIR}/Curve25519.h		\
+	${NAAAIMDIR}/SHA256_hmac.h ${NAAAIMDIR}/AES256_cbc.h	\
+	${NAAAIMDIR}/Base64.h
 test-naaaim-interface.o: test-naaaim-interface.h
 
-test-Possum-enclave.o: test-Possum-interface.h
+test-Duct-enclave.o: ${NAAAIMDIR}/Duct.h
+test-Duct-interface.o: test-Duct-interface.h
+
+test-Possum-enclave.o: test-Possum-interface.h RandomBuffer.h IDtoken.h	  \
+	PossumPipe.h ${NAAAIMDIR}/Ivy.h ${NAAAIMDIR}/SHA256.h ../../SGX.h \
+	../SGXfusion/SGXfusion.h
+
 test-Possum-interface.o: test-Possum-interface.h
 
-SHA256.o: SHA256.h
+SHA256.o: ${NAAAIMDIR}/SHA256.h
 RandomBuffer.o: RandomBuffer.h
+Curve25519.o: ${NAAAIMDIR}/Curve25519.h
+SHA256_hmac.o: ${NAAAIMDIR}/SHA256_hmac.h
+AES256_cbc.o: ${NAAAIMDIR}/AES256_cbc.h
+Duct.o: ${NAAAIMDIR}/Duct.h
+SGXquote.o: ../../SGXquote.h
+Base64.o: ${NAAAIMDIR}/Base64.h
+IDtoken.o: IDtoken.h
+PossumPacket.o: PossumPacket.h RandomBuffer.h IDtoken.h	 \
+	${NAAAIMDIR}/AES256_cbc.h ${NAAAIMDIR}/SHA256.h	 \
+	${NAAAIMDIR}/SHA256_hmac.h ${NAAAIMDIR}/OTEDKS.h \
+	${NAAAIMDIR}/Curve25519.h
+PossumPipe.o: PossumPipe.h IDtoken.h ${NAAAIMDIR}/SHA256.h		    \
+	${NAAAIMDIR}/SHA256_hmac.h ${NAAAIMDIR}/AES256_cbc.h RandomBuffer.h \
+	${NAAAIMDIR}/Duct.h ${NAAAIMDIR}/SoftwareStatus.h		    \
+	${NAAAIMDIR}/Curve25519.h PossumPacket.h ${NAAAIMDIR}/IDmgr.h	    \
+	${NAAAIMDIR}/Ivy.h
+SoftwareStatus.o: ${NAAAIMDIR}/SoftwareStatus.h ../../SGX.h	\
+	../SGXfusion/SGXfusion.h ${NAAAIMDIR}/SHA256.h
+SoftwareStatus.o: ${NAAAIMDIR}/SoftwareStatus.h ../../SGX.h	\
+	../SGXfusion/SGXfusion.h ${NAAAIMDIR}/SHA256.h
+OTEDKS.o: ${NAAAIMDIR}/OTEDKS.h ${NAAAIMDIR}/IDmgr.h ${NAAAIMDIR}/Ivy.h
+IDmgr.o: IDtoken.h ${NAAAIMDIR}/IDmgr.h
+Ivy.o: IDtoken.h ${NAAAIMDIR}/Ivy.h
