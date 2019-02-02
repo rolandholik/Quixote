@@ -1545,6 +1545,59 @@ static _Bool get_header(CO(SGXmessage, this), CO(Buffer, bufr))
 /**
  * External public method.
  *
+ * This method is an accessor method for returning the type of the
+ * response message that was received.  This is used to support
+ * the ability to determine if the provisioning service is returning
+ * an EPID that has been previously provisioned.  This infomation
+ * is used to determine whether or not the response from the
+ * provisioning request message 1 can be immediately given to
+ * the message three processing routine which will extract the EPID.
+ *
+ * \param this		A pointer to the message object whose
+ *			header is to be returned.
+ *
+ * \param type		A pointer to the variable that will be
+ *			loaded with the response type.
+ *
+ * \return		A boolean value is returned to indicate if
+ *			an error was encountered in the processing
+ *			of the response message.  A true value
+ *			indicates the location referenced by the
+ *			pointer contains a valid response type.  A
+ *			false value indicates an error was encountered
+ *			and the value in the variable is undefined.
+ */
+
+static _Bool get_response_type(CO(SGXmessage, this), uint8_t *type)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Verify object and caller status. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( S->state != RESPONSE )
+		ERR(goto done);
+
+
+	/* Load the variable location with the response type. */
+	*type = S->response.type;
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a diagnostic dump of the state of the
  * message object.
  *
@@ -1799,8 +1852,9 @@ extern SGXmessage NAAAIM_SGXmessage_Init(void)
 	this->get_message_number = get_message_number;
 	this->reload_messages = reload_messages;
 
-	this->get_xid	 = get_xid;
-	this->get_header = get_header;
+	this->get_xid		= get_xid;
+	this->get_header	= get_header;
+	this->get_response_type = get_response_type;
 
 	this->reset = reset;
 	this->dump  = dump;

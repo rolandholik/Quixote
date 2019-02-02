@@ -46,6 +46,7 @@ struct NAAAIM_SGXmessage
 
 	_Bool (*get_xid)(const SGXmessage, const Buffer);
 	_Bool (*get_header)(const SGXmessage, const Buffer);
+	_Bool (*get_response_type)(const SGXmessage, uint8_t *);
 
 	void (*reset)(const SGXmessage);
 	void (*dump)(const SGXmessage);

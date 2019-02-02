@@ -1046,7 +1046,9 @@ extern int main(int argc, char *argv[])
 	     *pce_token	    = NULL;
 
 	int opt,
-	    retn;
+	    retn = 0;
+
+	uint8_t type;
 
 	struct SGX_pek pek;
 
@@ -1064,6 +1066,7 @@ extern int main(int argc, char *argv[])
 		message1,
 		message2,
 		message3,
+		test_message,
 		dump_message
 	} mode = none;
 
@@ -1090,7 +1093,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "123DEvi:k:o:p:s:t:")) != EOF )
+	while ( (opt = getopt(argc, argv, "123DETvi:k:o:p:s:t:")) != EOF )
 		switch ( opt ) {
 			case '1':
 				mode = message1;
@@ -1106,6 +1109,9 @@ extern int main(int argc, char *argv[])
 				break;
 			case 'E':
 				mode = endpoint;
+				break;
+			case 'T':
+				mode = test_message;
 				break;
 			case 'v':
 				verbose = true;
@@ -1151,6 +1157,11 @@ extern int main(int argc, char *argv[])
 		return 1;
 	}
 
+	if ( (mode == test_message) && (input == NULL) ) {
+		usage("No input file for message testing.\n");
+		return 1;
+	}
+
 
 	/* Load input if needed. */
 	INIT(NAAAIM, SGXmessage, msg, ERR(goto done));
@@ -1167,6 +1178,20 @@ extern int main(int argc, char *argv[])
 		if ( !msg->decode(msg, response) )
 			ERR(goto done);
 		msg->dump(msg);
+	}
+
+
+	/*
+	 * Test an incoming message type to determine if it is a
+	 * terminal EPID generation message.
+	 */
+	if ( mode == test_message ) {
+		if ( !msg->decode(msg, response) )
+			ERR(goto done);
+		if ( !msg->get_response_type(msg, &type) )
+			ERR(goto done);
+		if ( type != 3 )
+			retn = 1;
 	}
 
 
@@ -1336,6 +1361,8 @@ extern int main(int argc, char *argv[])
 		if ( verbose )
 			fprintf(stdout, "\nExtracted EPID blob to: %s\n", \
 				msg_output);
+
+		retn = 0;
 	}
 
 

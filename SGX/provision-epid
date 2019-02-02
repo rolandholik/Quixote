@@ -1,29 +1,78 @@
 #! /bin/bash
 
 #
-# This file contains the implementation of a utility which ties the
-# four separate messages phases of the provisioning of an Enhanced
-# Privacy ID (EPID).  This functionality ultimately needs to be
-# integrated into a single binary in the sgx-provision utility but
-# this script currently can automate the process and make EPID
-# provisioning more straight forward.
+# This file contains the implementation of a utility which integrates
+# the multiple message handling phases into unified provisioning of
+# an Enhanced Privacy ID (EPID).
 #
-# This script currently does not handle the case of where the
-# provisioning servers will return the completed EPID as the message
-# 2 output
+# While this functionality may be ultimately integrated into the
+# sgx-provision utility this script demonstrates how the utility can
+# be used to debug the provisioning process.
 #
-# (C)Copyright 2018, IDfusion, LLC. All rights reserved.
+
+#
+# Copyright(c) 2018, IDfusion, LLC. All rights reserved.
+#
+# Please refer to the file named Documentation/COPYRIGHT in the top of
+# the source tree for copyright and licensing information.
 #
 
 
+# Variable to hold the provisioning authentication key.
+declare Key="";
+
+# Variable to hold the destination for sealed EPID output.
+declare Output="/var/lib/IDfusion/data/EPID.bin";
+
+
+#
+# Option processing.
+#
+while getopts "o:" Arg;
+do
+        case $Arg in
+		o)	Output="$OPTARG";;
+        esac;
+done;
+
+
+#
+# Request an endpoint identifier.
+#
 sgx-provision -E -v -o endpoint;
 
+
+#
+# Obtain the RSA provisioning key (PEK) and and request the first
+# provisioning message.  The message one handling outputs the
+# authentication key to standard output which the sed script
+# captures in a file for subsequent re-use.
+#
 sgx-provision -1 -v -i endpoint -o msg1 -k pek | tee msg1.output;
-sed -n '/SK:/ {n;p}' msg1.output > key.txt;
+Keyfile=`sed -n '/SK:/ {n;p}' msg1.output`;
 rm msg1.output;
 
-sgx-provision -2 -v -i msg1 -o msg2 -k pek -s `cat key.txt`;
-sgx-provision -3 -v -i msg2 -o EPID.bin -k pek -s `cat key.txt`;
 
-rm -f endpoint msg1 msg2 pek key.txt;
+#
+# If the platform has been previously provisioned the message one
+# response will contain the EPID private key.  Use the test mode of
+# the provisioning utility to determine if this is a final mesage
+# and route the message handling appropriately.
+#
+sgx-provision -T -v -i msg1;
+if [ $? -eq 0 ]; then
+	mv msg1 msg2;
+else
+	sgx-provision -2 -v -i msg1 -o msg2 -k pek -s $Keyfile;
+fi;
+
+
+#
+# Extract the EPID key from the final message.
+#
+sgx-provision -3 -v -i msg2 -o $Output -k pek -s $Keyfile;
+
+
+# Cleanup.
+rm -f endpoint msg1 msg2 pek;
 exit 0;
