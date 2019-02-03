@@ -24,14 +24,19 @@ declare Key="";
 # Variable to hold the destination for sealed EPID output.
 declare Output="/var/lib/IDfusion/data/EPID.bin";
 
+# Variable used to specify a request for verbose output.
+declare V="";
+
 
 #
 # Option processing.
 #
-while getopts "o:" Arg;
+while getopts "o:v" Arg;
 do
         case $Arg in
 		o)	Output="$OPTARG";;
+
+		v)	V="-v";;
         esac;
 done;
 
@@ -39,7 +44,7 @@ done;
 #
 # Request an endpoint identifier.
 #
-sgx-provision -E -v -o endpoint;
+sgx-provision -E $V -o endpoint;
 
 
 #
@@ -48,7 +53,12 @@ sgx-provision -E -v -o endpoint;
 # authentication key to standard output which the sed script
 # captures in a file for subsequent re-use.
 #
-sgx-provision -1 -v -i endpoint -o msg1 -k pek | tee msg1.output;
+if [ -z "$V" ]; then
+	sgx-provision -1 -i endpoint -o msg1 -k pek > msg1.output;
+else
+	sgx-provision -1 $V -i endpoint -o msg1 -k pek | tee msg1.output;
+fi;
+
 Keyfile=`sed -n '/SK:/ {n;p}' msg1.output`;
 rm msg1.output;
 
@@ -59,18 +69,18 @@ rm msg1.output;
 # the provisioning utility to determine if this is a final mesage
 # and route the message handling appropriately.
 #
-sgx-provision -T -v -i msg1;
+sgx-provision -T $V -i msg1;
 if [ $? -eq 0 ]; then
 	mv msg1 msg2;
 else
-	sgx-provision -2 -v -i msg1 -o msg2 -k pek -s $Keyfile;
+	sgx-provision -2 $V -i msg1 -o msg2 -k pek -s $Keyfile;
 fi;
 
 
 #
 # Extract the EPID key from the final message.
 #
-sgx-provision -3 -v -i msg2 -o $Output -k pek -s $Keyfile;
+sgx-provision -3 $V -i msg2 -o $Output -k pek -s $Keyfile;
 
 
 # Cleanup.

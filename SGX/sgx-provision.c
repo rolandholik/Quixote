@@ -99,6 +99,11 @@ static String Server = NULL;
  */
 static uint16_t Ttl = 0;
 
+/**
+ * Flag variable to request verbose output.
+ */
+static _Bool Verbose = false;
+
 
 /**
  * Internal public function.
@@ -177,7 +182,7 @@ static _Bool read_input(CO(char *, fname), CO(String, msg))
 		ERR(goto done);
 
 	if ( bufr->size == 0 ) {
-		fputs("No file input.\n", stdout);
+		fputs("No file input.\n", stderr);
 		ERR(goto done);
 	}
 
@@ -448,7 +453,8 @@ static _Bool process_message1(CO(SGXmessage, msg), CO(String, response), \
 		ERR(goto done);
 	if ( msg->message_count(msg) != 3 )
 		ERR(goto done);
-	msg->dump(msg);
+	if ( Verbose )
+		msg->dump(msg);
 
 
 	/* Extract the server TTL and URL. */
@@ -466,9 +472,11 @@ static _Bool process_message1(CO(SGXmessage, msg), CO(String, response), \
 	if ( !Server->add(Server, (char *) (bufr->get(bufr) + sizeof(Ttl))) )
 		ERR(goto done);
 
-	fputs("\nSERVER:\n\t", stdout);
-	Server->print(Server);
-	fprintf(stdout, "\tTTL: %u\n", Ttl);
+	if ( Verbose ) {
+		fputs("\nSERVER:\n\t", stdout);
+		Server->print(Server);
+		fprintf(stdout, "\tTTL: %u\n", Ttl);
+	}
 
 
 	/* Process the PEK message. */
@@ -478,7 +486,8 @@ static _Bool process_message1(CO(SGXmessage, msg), CO(String, response), \
 
 	if ( !_verify_pek(msg, bufr) )
 		ERR(goto done);
-	fputs("\nPEK verified.\n", stdout);
+	if ( Verbose )
+		fputs("\nPEK verified.\n", stdout);
 	memcpy(&lpek, bufr->get(bufr), sizeof(struct SGX_pek));
 
 
@@ -489,7 +498,8 @@ static _Bool process_message1(CO(SGXmessage, msg), CO(String, response), \
 	if ( !_verify_endpoint(msg, &lpek, bufr) )
 		ERR(goto done);
 
-	fputs("\nEndpoint verified:\n", stdout);
+	if ( Verbose )
+		fputs("\nEndpoint verified:\n", stdout);
 	*pek = lpek;
 	retn = true;
 
@@ -668,22 +678,26 @@ static _Bool process_message2(CO(SGXmessage, msg), CO(String, response), \
 		fputs("Message 2 SIGRL not supported.\n", stderr);
 		ERR(goto done);
 	}
-	msg->dump(msg);
+	if ( Verbose )
+		msg->dump(msg);
 
 
 	/* Decrypt the internal message. */
 	INIT(HurdLib, Buffer, message, ERR(goto done));
 	if ( !_decrypt_message2(msg, sk, message, nonce) )
 		ERR(goto done);
-	fputs("\nDecrypted internal message.\n", stdout);
+	if ( Verbose )
+		fputs("\nDecrypted internal message.\n", stdout);
 
 	if ( !msg->reload_messages(msg, message) )
 		ERR(goto done);
 	if ( (msg->message_count(msg) != 4) && (msg->message_count(msg) != 6) )
 		ERR(goto done);
 
-	fputc('\n', stdout);
-	msg->dump(msg);
+	if ( Verbose ) {
+		fputc('\n', stdout);
+		msg->dump(msg);
+	}
 
 	/* Verify the internal message. */
 	INIT(NAAAIM, Sha256, sha256, ERR(goto done));
@@ -701,7 +715,8 @@ static _Bool process_message2(CO(SGXmessage, msg), CO(String, response), \
 	if ( !message->equal(message, b) )
 		ERR(goto done);
 
-	fputs("\nVerified internal message.\n", stdout);
+	if ( Verbose )
+		fputs("\nVerified internal message.\n", stdout);
 	retn = true;
 
 
@@ -864,22 +879,26 @@ static _Bool process_message3(CO(SGXmessage, msg), CO(String, response), \
 		ERR(goto done);
 	if ( (msg->message_count(msg) != 3) )
 		ERR(goto done);
-	msg->dump(msg);
+	if ( Verbose )
+		msg->dump(msg);
 
 
 	/* Decrypt and verify the internal message. */
 	INIT(HurdLib, Buffer, message, ERR(goto done));
 	if ( !_decrypt_message3(msg, sk, message) )
 		ERR(goto done);
-	fputs("\nDecrypted internal message 3.\n", stdout);
+	if ( Verbose )
+		fputs("\nDecrypted internal message 3.\n", stdout);
 
 	if ( !msg->reload_messages(msg, message) )
 		ERR(goto done);
 	if ( msg->message_count(msg) != 5 )
 		ERR(goto done);
 
-	fputc('\n', stdout);
-	msg->dump(msg);
+	if ( Verbose ) {
+		fputc('\n', stdout);
+		msg->dump(msg);
+	}
 
 	retn = true;
 
@@ -1036,8 +1055,6 @@ static _Bool pek_file(CO(char *, file), _Bool mode, struct SGX_pek *pek)
 extern int main(int argc, char *argv[])
 
 {
-	_Bool verbose = false;
-
 	char *input	    = NULL,
 	     *msg_output    = NULL,
 	     *sk_value	    = NULL,
@@ -1114,7 +1131,7 @@ extern int main(int argc, char *argv[])
 				mode = test_message;
 				break;
 			case 'v':
-				verbose = true;
+				Verbose = true;
 				break;
 
 			case 'i':
@@ -1214,7 +1231,7 @@ extern int main(int argc, char *argv[])
 		memset(&pek_report, '\0', sizeof(struct SGX_report));
 		if ( !pve->get_message1(pve, &pek, &pce_tgt, &pek_report) )
 			ERR(goto done);
-		if ( verbose )
+		if ( Verbose )
 			fputs("\nPVE message one created.\n", stdout);
 		if ( pek_fname != NULL ) {
 			if ( !pek_file(pek_fname, 1, &pek) )
@@ -1223,7 +1240,7 @@ extern int main(int argc, char *argv[])
 
 		if ( !pce->get_info(pce, &pek, &pek_report) )
 			ERR(goto done);
-		if ( verbose )
+		if ( Verbose )
 			fputs("\npce information created.\n", stdout);
 
 
@@ -1246,7 +1263,7 @@ extern int main(int argc, char *argv[])
 					   &pek_report) )
 			ERR(goto done);
 
-		if ( verbose )
+		if ( Verbose )
 			msg->dump(msg);
 		generate_output(msg, msg_output);
 
@@ -1292,7 +1309,7 @@ extern int main(int argc, char *argv[])
 		if ( !pve->get_message3(pve, msg, &pek, &pce_tgt, epid_sig,
 					&platform_info, &msg3) )
 			ERR(goto done);
-		if ( verbose )
+		if ( Verbose )
 			fputs("\nGenerated message three.\n", stdout);
 
 
@@ -1302,7 +1319,8 @@ extern int main(int argc, char *argv[])
 					   &platform_info, report_sig) )
 			ERR(goto done);
 
-		fputs("\nReport signature generated.\n", stdout);
+		if ( Verbose )
+			fputs("\nReport signature generated.\n", stdout);
 
 
 		/*
@@ -1322,7 +1340,7 @@ extern int main(int argc, char *argv[])
 					   epid_sig, report_sig) )
 			ERR(goto done);
 
-		if ( verbose )
+		if ( Verbose )
 			msg->dump(msg);
 		generate_output(msg, msg_output);
 
@@ -1358,9 +1376,9 @@ extern int main(int argc, char *argv[])
 
 		if ( !epid->save(epid, msg_output) )
 			ERR(goto done);
-		if ( verbose )
-			fprintf(stdout, "\nExtracted EPID blob to: %s\n", \
-				msg_output);
+		if ( Verbose )
+			fputc('\n', stdout);
+		fprintf(stdout, "Provisioned EPID: %s\n", msg_output);
 
 		retn = 0;
 	}
@@ -1380,7 +1398,7 @@ extern int main(int argc, char *argv[])
 		if ( !pve->generate_endpoint_message(pve, msg) )
 			ERR(goto done);
 
-		if ( verbose )
+		if ( Verbose )
 			msg->dump(msg);
 		generate_output(msg, msg_output);
 
