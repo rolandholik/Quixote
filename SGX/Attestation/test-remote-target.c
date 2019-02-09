@@ -108,9 +108,9 @@ extern int main(int argc, char *argv[])
 {
 	_Bool debug = true;
 
-	char *epid_blob	     = NULL,
-	     *quote_token    = NULL,
-	     *pce_token	     = NULL,
+	char *epid_blob	     = "/var/lib/IDfusion/data/EPID.bin",
+	     *quote_token    = SGX_TOKEN_DIRECTORY"/libsgx_qe.token",
+	     *pce_token	     = SGX_TOKEN_DIRECTORY"/libsgx_pce.token",
 	     *spid_fname     = SPID_FILENAME,
 	     *source_token   = "target.token",
 	     *source_enclave = "LocalTarget.signed.so";
@@ -152,13 +152,16 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "Te:q:s:")) != EOF )
+	while ( (opt = getopt(argc, argv, "Te:p:q:s:")) != EOF )
 		switch ( opt ) {
 			case 'T':
 				mode = trusted;
 				break;
 			case 'e':
 				epid_blob = optarg;
+				break;
+			case 'p':
+				pce_token = optarg;
 				break;
 			case 'q':
 				quote_token = optarg;
@@ -268,7 +271,7 @@ extern int main(int argc, char *argv[])
 	}
 
 	fputs("\nGenerating quote with:\n", stdout);
-	fputs("\tSPID:  \n", stdout);
+	fputs("\tSPID:  ", stdout);
 	spid_key->print(spid_key);
 
 
