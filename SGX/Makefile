@@ -22,6 +22,7 @@ TOOLS = sgx-check sgx-metadata sgx-loader sgx-load sgx-sigstruct	     \
 
 LE	     = /opt/intel/sgxpsw/aesm/libsgx_le.signed.so
 LE_WHITELIST = /opt/intel/sgxpsw/aesm/sgx_white_list_cert.bin
+LE_SIGSTRUCT = /opt/intel/sgxpsw/aesm/le_prod_css.bin
 
 SGXKEY = ${CURDIR}/Signing-key.pem
 export SGXKEY
@@ -180,8 +181,7 @@ SGXaesgcm.o: SGXaesgcm.c
 
 
 sigstruct.h: generate-array
-	./generate-array -i /opt/intel/sgxpsw/aesm/le_prod_css.bin \
-		-n LE_sigstruct > $@ || rm $@;
+	./generate-array -i ${LE_SIGSTRUCT} -n LE_sigstruct > $@ || rm $@;
 
 LE_whitelist.h: generate-array
 	./generate-array -i ${LE_WHITELIST} -n LE_whitelist > $@ || rm $@;
