@@ -1,3 +1,10 @@
+/**************************************************************************
+ * (C)Copyright IDfusion, LLC. All rights reserved.
+ *
+ * Please refer to the file named Documentation/COPYRIGHT in the top of
+ * the source tree for copyright and licensing information.
+ **************************************************************************/
+
 #define ID "8ef2928e3eb9fd0ee1a2b9f1112a48983128d903521034a449c880d1a8e64ac0"
 
 #include <stdio.h>

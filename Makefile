@@ -1,8 +1,9 @@
-# ***************************************************************************
-# (C)Copyright 2003, The Open Hurderos Foundation. All rights reserved.
-#
-# Please see bottom of file for change information.
-# ***************************************************************************
+/**************************************************************************
+ * (C)Copyright IDfusion, LLC. All rights reserved.
+ *
+ * Please refer to the file named Documentation/COPYRIGHT in the top of
+ * the source tree for copyright and licensing information.
+ **************************************************************************/
 
 
 # Variable declarations.

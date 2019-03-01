@@ -1,3 +1,10 @@
+/**************************************************************************
+ * (C)Copyright IDfusion, LLC. All rights reserved.
+ *
+ * Please refer to the file named Documentation/COPYRIGHT in the top of
+ * the source tree for copyright and licensing information.
+ **************************************************************************/
+
 #define ORGID   "1234567890"
 #define ORGANON "b5da47c67077b6104c0c2d01397e70c764449970a1518c660b511d86b7410ac2"
 #define PTID	"000-00-0000"

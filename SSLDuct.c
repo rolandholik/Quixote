@@ -11,7 +11,6 @@
  * the source tree for copyright and licensing information.
  **************************************************************************/
 
-
 /* Include files. */
 #include <stdint.h>
 #include <stdio.h>
