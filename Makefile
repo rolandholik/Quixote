@@ -1,10 +1,9 @@
-/**************************************************************************
- * (C)Copyright IDfusion, LLC. All rights reserved.
- *
- * Please refer to the file named Documentation/COPYRIGHT in the top of
- * the source tree for copyright and licensing information.
- **************************************************************************/
-
+# **************************************************************************
+# * (C)Copyright IDfusion, LLC. All rights reserved.
+# *
+# * Please refer to the file named Documentation/COPYRIGHT in the top of
+# * the source tree for copyright and licensing information.
+# **************************************************************************/
 
 # Variable declarations.
 CSRC = 	OrgID.c PatientID.c Authenticator.c AuthenReply.c IDqueryReply.c \
