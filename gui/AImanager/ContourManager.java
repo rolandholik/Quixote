@@ -4,9 +4,12 @@
  * managing the contours of an ISOidentity model instance.
  */
 
-/*
- * (C)Copyright 2018, IDfusion, LLC. All rights reserved.
- */
+/**************************************************************************
+ * (C)Copyright IDfusion, LLC. All rights reserved.
+ *
+ * Please refer to the file named Documentation/COPYRIGHT in the top of
+ * the source tree for copyright and licensing information.
+ **************************************************************************/
 
 
 /* Package and import statements follow below. */

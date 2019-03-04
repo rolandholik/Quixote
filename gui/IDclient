@@ -1,5 +1,12 @@
 #! /bin/bash
 
+# **************************************************************************
+# * (C)Copyright IDfusion, LLC. All rights reserved.
+# *
+# * Please refer to the file named Documentation/COPYRIGHT in the top of
+# * the source tree for copyright and licensing information.
+# **************************************************************************/
+
 #
 # Wrapper script for execution of the idquery graphical identity
 # generation client.

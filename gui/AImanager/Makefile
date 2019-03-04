@@ -1,6 +1,9 @@
-# ***************************************************************************
-# (C)Copyright 2018, IDfusion, LLCLLC. All rights reserved.
-# ***************************************************************************
+# **************************************************************************
+# * (C)Copyright IDfusion, LLC. All rights reserved.
+# *
+# * Please refer to the file named Documentation/COPYRIGHT in the top of
+# * the source tree for copyright and licensing information.
+# **************************************************************************/
 
 #
 # Java source definitions.
