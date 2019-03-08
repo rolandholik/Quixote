@@ -3,12 +3,12 @@
  * management of an provisioned EPID blob.
  */
 
-/*
- * (C)Copyright 2018, IDfusion, LLC. All rights reserved.
+/**************************************************************************
+ * (C)Copyright IDfusion, LLC. All rights reserved.
  *
- * Please refer to the file named COPYING in the top of the source tree
- * for licensing information.
- */
+ * Please refer to the file named Documentation/COPYRIGHT in the top of
+ * the source tree for copyright and licensing information.
+ **************************************************************************/
 
 #ifndef NAAAIM_SGXepid_HEADER
 #define NAAAIM_SGXepid_HEADER

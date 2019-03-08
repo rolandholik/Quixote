@@ -1,3 +1,10 @@
+/**************************************************************************
+ * (C)Copyright IDfusion, LLC. All rights reserved.
+ *
+ * Please refer to the file named Documentation/COPYRIGHT in the top of
+ * the source tree for copyright and licensing information.
+ **************************************************************************/
+
 /* Number of enclave interfaces. */
 #define ECALL_NUMBER 1
 #define OCALL_NUMBER 1

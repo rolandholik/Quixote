@@ -3,12 +3,12 @@
  * management of provisioning enclaves.
  */
 
-/*
- * (C)Copyright 2017, IDfusion, LLC. All rights reserved.
+/**************************************************************************
+ * (C)Copyright IDfusion, LLC. All rights reserved.
  *
- * Please refer to the file named COPYING in the top of the source tree
- * for licensing information.
- */
+ * Please refer to the file named Documentation/COPYRIGHT in the top of
+ * the source tree for copyright and licensing information.
+ **************************************************************************/
 
 #ifndef NAAAIM_PVEenclave_HEADER
 #define NAAAIM_PVEenclave_HEADER

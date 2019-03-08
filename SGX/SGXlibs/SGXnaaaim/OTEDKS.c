@@ -15,11 +15,10 @@
 
 
 /**************************************************************************
- * (C)Copyright 2007, The Open Hurderos Foundation. All rights reserved.
- * (C)Copyright 2014, IDfusion, LLC. All rights resevered.
+ * (C)Copyright IDfusion, LLC. All rights reserved.
  *
- * Please refer to the file named COPYING in the top of the source tree
- * for licensing information.
+ * Please refer to the file named Documentation/COPYRIGHT in the top of
+ * the source tree for copyright and licensing information.
  **************************************************************************/
 
 /* Include files. */

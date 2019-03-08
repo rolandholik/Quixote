@@ -1,7 +1,9 @@
-# ***************************************************************************
-# (C)Copyright 2017, IDfusion, LLC. All rights reserved.
-# ***************************************************************************
-
+# **************************************************************************
+# * (C)Copyright IDfusion, LLC. All rights reserved.
+# *
+# * Please refer to the file named Documentation/COPYRIGHT in the top of
+# * the source tree for copyright and licensing information.
+# **************************************************************************/
 
 # Variable declarations.
 CSRC   = test-ISOidentity-enclave.c ISOenclave.c ISOmanager.c

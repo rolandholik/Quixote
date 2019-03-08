@@ -4,6 +4,13 @@
  * which the regular expression routines were abstracted.
  */
 
+/**************************************************************************
+ * (C)Copyright IDfusion, LLC. All rights reserved.
+ *
+ * Please refer to the file named Documentation/COPYRIGHT in the top of
+ * the source tree for copyright and licensing information.
+ **************************************************************************/
+
 #define WCTYPE_ALNUM  1
 #define WCTYPE_ALPHA  2
 #define WCTYPE_BLANK  3
