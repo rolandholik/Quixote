@@ -5,6 +5,13 @@
 # and mouse and starts a VGT based Windows virtual machine and
 # attaches the USB device to it.
 
+# **************************************************************************
+# * (C)Copyright IDfusion, LLC. All rights reserved.
+# *
+# * Please refer to the file named Documentation/COPYRIGHT in the top of
+# * the source tree for copyright and licensing information.
+# **************************************************************************/
+
 # set -xv
 PATH="$PATH:/usr/local/musl/sbin";
 export PATH;

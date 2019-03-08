@@ -6,6 +6,13 @@
 # Trusted Execution Technology environment.
 #
 
+# **************************************************************************
+# * (C)Copyright IDfusion, LLC. All rights reserved.
+# *
+# * Please refer to the file named Documentation/COPYRIGHT in the top of
+# * the source tree for copyright and licensing information.
+# **************************************************************************/
+
 # Location of boot configuration file.
 declare -r Boot_Menu="/boot/grub/menu.lst";
 

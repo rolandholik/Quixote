@@ -4,6 +4,13 @@
 # Script to wait for ttyUSB device and start PPP daemon.
 #
 
+# **************************************************************************
+# * (C)Copyright IDfusion, LLC. All rights reserved.
+# *
+# * Please refer to the file named Documentation/COPYRIGHT in the top of
+# * the source tree for copyright and licensing information.
+# **************************************************************************/
+
 declare -i Cnt=0;
 
 
