@@ -297,10 +297,17 @@ _Bool test_server(_Bool debug, unsigned int port, time_t current_time,	   \
 {
 	_Bool retn = false;
 
+	uint16_t vendor,
+		 svn;
+
+	uint64_t attributes;
+
 	PossumPipe pipe = NULL;
 
-	Buffer spid = NULL,
-	       bufr = NULL;
+	Buffer spid	   = NULL,
+	       bufr	   = NULL,
+	       signer	   = NULL,
+	       measurement = NULL;
 
 
 	/* Initialize the time. */
@@ -342,6 +349,24 @@ _Bool test_server(_Bool debug, unsigned int port, time_t current_time,	   \
 		goto done;
 	}
 
+	/* Display remote connection parameters. */
+	INIT(HurdLib, Buffer, signer, ERR(goto done));
+	INIT(HurdLib, Buffer, measurement, ERR(goto done));
+
+	if ( !pipe->get_connection(pipe, &attributes, signer, measurement, \
+				   &vendor, &svn) )
+		ERR(goto done);
+
+	fputs("\nHave connection.\n", stdout);
+	fputs("Signer:\n\t", stdout);
+	signer->print(signer);
+	fputs("Measurement:\n\t", stdout);
+	measurement->print(measurement);
+	fprintf(stdout, "Attributes:\n\t%lu\n", attributes);
+	fprintf(stdout, "Software:\n\t%u/%u\n", vendor, svn);
+
+
+	/* Run server mode test. */
 	Mode = server;
 	ping(pipe);
 
@@ -351,6 +376,8 @@ _Bool test_server(_Bool debug, unsigned int port, time_t current_time,	   \
 
 	WHACK(pipe);
 	WHACK(spid);
+	WHACK(signer);
+	WHACK(measurement);
 	WHACK(bufr);
 
 	return retn;
@@ -405,10 +432,17 @@ _Bool test_client(_Bool debug, char *hostname, int port, time_t current_time, \
 {
 	_Bool retn = false;
 
+	uint16_t vendor,
+		 svn;
+
+	uint64_t attributes;
+
 	PossumPipe pipe = NULL;
 
-	Buffer bufr = NULL,
-	       spid = NULL;
+	Buffer bufr	   = NULL,
+	       spid	   = NULL,
+	       signer	   = NULL,
+	       measurement = NULL;
 
 	Ivy ivy = NULL;
 
@@ -450,6 +484,25 @@ _Bool test_client(_Bool debug, char *hostname, int port, time_t current_time, \
 		goto done;
 	}
 
+
+	/* Display remote connection parameters. */
+	INIT(HurdLib, Buffer, signer, ERR(goto done));
+	INIT(HurdLib, Buffer, measurement, ERR(goto done));
+
+	if ( !pipe->get_connection(pipe, &attributes, signer, measurement, \
+				   &vendor, &svn) )
+		ERR(goto done);
+
+	fputs("\nHave connection.\n", stdout);
+	fputs("Signer:\n\t", stdout);
+	signer->print(signer);
+	fputs("Measurement:\n\t", stdout);
+	measurement->print(measurement);
+	fprintf(stdout, "Attributes:\n\t%lu\n", attributes);
+	fprintf(stdout, "Software:\n\t%u/%u\n", vendor, svn);
+
+
+	/* Run client mode test. */
 	Mode = client;
 	ping(pipe);
 
@@ -462,6 +515,8 @@ _Bool test_client(_Bool debug, char *hostname, int port, time_t current_time, \
 	WHACK(pipe);
 	WHACK(bufr);
 	WHACK(spid);
+	WHACK(signer);
+	WHACK(measurement);
 	WHACK(ivy);
 	WHACK(idt);
 

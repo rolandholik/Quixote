@@ -2390,6 +2390,83 @@ static _Bool start_client_mode(CO(PossumPipe, this), CO(Buffer, spid))
 /**
  * External public method.
  *
+ * This method implements a method for obtaining the status of the remote
+ * enclave that the object is connected to.
+ *
+ * \param this		The communications object whose connection endpoint
+ *			information is to be queried for.
+ *
+ * \param attributes	A pointer to a variable that will be loaded with
+ *			the attributes of the remote enclave.
+ *
+ * \param signer	The object that will be loaded with the signature
+ *			of the signer of the enclave.
+ *
+ * \param measurement	The object that will be loaded with the measurement
+ *			of the remote enclave.
+ *
+ * \param vendor	A pointer to the variable that will be loaded
+ *			with the vendor identity for the enclave.
+ *
+ * \param svn		A pointer to the variable that will be loaded
+ *			with the security version of the enclave.
+ *
+ * \return	A boolean value is used to indicate whether or not the
+ *		returned information is valid.  A false value indicates
+ *		that the information is valid while a true value indicates
+ *		the information is valid.
+ */
+
+static _Bool get_connection(CO(PossumPipe, this), uint64_t *attributes,	 \
+			    CO(Buffer, signer), CO(Buffer, measurement), \
+			    uint16_t *vendor, uint16_t * svn)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	struct SGX_quote *quote;
+
+	struct SGX_reportbody *bp;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( (signer == NULL) || signer->poisoned(signer) )
+		ERR(goto done);
+	if ( (measurement == NULL) || measurement->poisoned(measurement) )
+		ERR(goto done);
+
+
+	/* Generate pointer to report body. */
+	quote = S->remote->get_quoteinfo(S->remote);
+	bp = &quote->report_body;
+
+	/* Abstract attributes and version information. */
+	*attributes = bp->attributes.flags;
+	*vendor	    = bp->isvprodid;
+	*svn	    = bp->isvsvn;
+
+	/* Get signer and measurement values. */
+	if ( !measurement->add(measurement, bp->mr_enclave.m, \
+			       sizeof(bp->mr_enclave.m)) )
+		ERR(goto done);
+	if ( !signer->add(signer, bp->mrsigner, sizeof(bp->mrsigner)) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a method for displaying the current
  * attestation status of the remote connection.
  *
@@ -2556,6 +2633,7 @@ extern PossumPipe NAAAIM_PossumPipe_Init(void)
 	this->start_host_mode	= start_host_mode;
 	this->start_client_mode = start_client_mode;
 
+	this->get_connection	 = get_connection;
 	this->display_connection = display_connection;
 
 	this->debug = debug;

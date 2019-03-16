@@ -49,6 +49,8 @@ struct NAAAIM_PossumPipe
 	_Bool (*send_packet)(const PossumPipe, PossumPipe_type, const Buffer);
 	PossumPipe_type (*receive_packet)(const PossumPipe, const Buffer);
 
+	_Bool (*get_connection)(const PossumPipe, uint64_t *, const Buffer, \
+				const Buffer, uint16_t *, uint16_t *);
 	void (*display_connection)(const PossumPipe);
 
 	void (*debug)(const PossumPipe, _Bool debug);
