@@ -14,6 +14,8 @@
 #define PRIVATE_KEY "/opt/IDfusion/etc/ias-key.pem"
 #define PUBLIC_CERT "/opt/IDfusion/etc/ias-cert.pem"
 
+#define IAS_VERSION "3"
+
 
 /* Include files. */
 #include <stdint.h>
@@ -114,6 +116,7 @@ struct NAAAIM_SGXquote_State
 	QEenclave qe;
 
 	/* Information derived from an attestation report. */
+	String version;
 	String id;
 	String timestamp;
 
@@ -148,6 +151,7 @@ static void _init_state(CO(SGXquote_State, S)) {
 
 	S->qe	 = NULL;
 
+	S->version   = NULL;
 	S->id	     = NULL;
 	S->timestamp = NULL;
 	S->status    = SGXquote_status_UNDEFINED;
@@ -408,6 +412,89 @@ static _Bool generate_report(CO(SGXquote, this), CO(Buffer, quote), \
 /**
  * Internal private function.
  *
+ * This method parses the supplied input for conformance with the
+ * version of IAS services that the SGXquote object is designed to
+ * handle.  It is a subordinate helper function for the ->decode_report
+ * method.
+ *
+ * \param field	The object containing the field to be parsed.
+ *
+ * \param rgx	The object which is to be used to create the
+ *		regular expression.
+ *
+ * \param value	A pointer to the object that will be loaded with
+ *		the parsed field value.
+ *
+ * \return	A boolean value is used to indicate the success or
+ *		failure of the field extraction.  A false value is
+ *		used to indicate a failure occurred during the field
+ *		entry extraction.  A true value indicates the
+ *		field has been successfully extracted and the value
+ *		variable contains a legitimate value.
+ */
+
+static _Bool _get_version(CO(String, field), CO(String, rgx), \
+			  CO(String, value))
+
+{
+	_Bool retn       = false,
+	      have_regex = false;
+
+	char *fp,
+	     element[2];
+
+	size_t len;
+
+	regex_t regex;
+
+	regmatch_t regmatch[2];
+
+
+	/* Extract the field element. */
+	rgx->reset(rgx);
+	if ( !rgx->add(rgx, "[,{]\"version\":([^,}]*).*") )
+		ERR(goto done);
+	value->reset(value);
+
+
+	if ( regcomp(&regex, rgx->get(rgx), REG_EXTENDED) != 0 )
+		ERR(goto done);
+	have_regex = true;
+
+	if ( regexec(&regex, field->get(field), 2, regmatch, 0) != REG_OK )
+		ERR(goto done);
+
+	len = regmatch[1].rm_eo - regmatch[1].rm_so;
+	if ( len > field->size(field) )
+		ERR(goto done);
+
+
+	/* Copy the field element to the output object. */
+	memset(element, '\0', sizeof(element));
+	fp = field->get(field) + regmatch[1].rm_so;
+
+	while ( len-- ) {
+		element[0] = *fp;
+		value->add(value, element);
+		++fp;
+	}
+	if ( value->poisoned(value) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	if ( have_regex )
+		regfree(&regex);
+
+	return retn;
+}
+
+
+/**
+ * Internal private function.
+ *
  * This method parses the supplied input for a single JSON field.  It
  * is a subordinate helper function for the ->decode_report method.
  *
@@ -532,6 +619,13 @@ static _Bool decode_report(CO(SGXquote, this), CO(String, report))
 
 	/* Decode the mandatory information fields. */
 	INIT(HurdLib, String, fregex, ERR(goto done));
+
+	INIT(HurdLib, String, S->version, ERR(goto done));
+	if ( !_get_version(report, fregex, S->version) )
+		ERR(goto done);
+	if ( memcmp(IAS_VERSION, S->version->get(S->version), \
+		    S->version->size(S->version)) != 0 )
+		ERR(goto done);
 
 	INIT(HurdLib, String, S->id, ERR(goto done));
 	if ( !_get_field(report, fregex, "id", S->id) )
@@ -696,6 +790,9 @@ static void dump_report(CO(SGXquote, this))
 	fputs("ID:        ", stdout);
 	S->id->print(S->id);
 
+	fputs("Version:   ", stdout);
+	S->version->print(S->version);
+
 	fputs("Timestamp: ", stdout);
 	S->timestamp->print(S->timestamp);
 
@@ -824,6 +921,7 @@ static void whack(CO(SGXquote, this))
 
 	WHACK(S->qe);
 	WHACK(S->id);
+	WHACK(S->version);
 	WHACK(S->timestamp);
 
 	S->root->whack(S->root, this, S);
