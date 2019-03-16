@@ -65,6 +65,7 @@ static const char *Quote_status[] = {
 	"KEY_REVOKED",
 	"SIGRL_VERSION_MISMATCH",
 	"GROUP_OUT_OF_DATE",
+	"CONFIGURATION_NEEDED",
 	"UNDEFINED",
 	NULL
 };
@@ -336,7 +337,7 @@ static _Bool generate_report(CO(SGXquote, this), CO(Buffer, quote), \
 
 	_Bool retn = false;
 
-	char *url = "https://as.sgx.trustedservices.intel.com:443/attestation/sgx/v2/report";
+	char *url = "https://as.sgx.trustedservices.intel.com:443/attestation/sgx/v3/report";
 
 	Buffer http_in	= NULL,
 	       http_out = NULL;
@@ -566,8 +567,9 @@ static _Bool decode_report(CO(SGXquote, this), CO(String, report))
 
 
 	/* Decode the platform information report if available. */
-	if ( S->status == SGXquote_status_GROUP_OUT_OF_DATE ||
-	     S->status == SGXquote_status_GROUP_REVOKED ) {
+	if ( S->status == SGXquote_status_GROUP_OUT_OF_DATE || \
+	     S->status == SGXquote_status_GROUP_REVOKED ||     \
+	     S->status == SGXquote_status_CONFIGURATION_NEEDED ) {
 		field->reset(field);
 		if ( !_get_field(report, fregex, "platformInfoBlob", field) )
 			ERR(goto done);

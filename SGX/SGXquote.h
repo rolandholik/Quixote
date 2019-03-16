@@ -69,6 +69,7 @@ enum SGXquote_status {
 	SGXquote_status_KEY_REVOKD,
 	SGXquote_status_SIGRL_VERSION_MISMATCH,
 	SGXquote_status_GROUP_OUT_OF_DATE,
+	SGXquote_status_CONFIGURATION_NEEDED,
 	SGXquote_status_UNDEFINED
 };
 
