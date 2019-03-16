@@ -2,3 +2,5 @@ Version 0.8:
 	* Transition to new hardware based GPG signing key.
 
 	* Upgrade to Intel SDK 2.4 and SGX OpenSSL 1.1.0j.
+
+	* Implement uniform copyright standard.
