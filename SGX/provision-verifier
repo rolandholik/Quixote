@@ -1,0 +1,142 @@
+#! /bin/bash
+
+#
+# This file contains the implementation of a utility for generating and
+# installing identity verifiers for Host Specific Enclave Authentication.
+#
+
+# **************************************************************************
+# * (C)Copyright IDfusion, LLC. All rights reserved.
+# *
+# * Please refer to the file named Documentation/COPYRIGHT in the top of
+# * the source tree for copyright and licensing information.
+# **************************************************************************/
+
+
+# Utility name.
+declare -r Pgm="provision-verifier";
+
+# Mode the application is to run in.
+declare Mode="none";
+
+# Arguement used for option processing.
+declare Arg;
+
+# The name of the utility that will generate the platform identity.
+declare Program="";
+
+# The name of the enclave whose identity is being generated.
+declare Enclave="";
+
+# The name containing the identity verifier.
+declare Verifier="";
+
+# The name of the verifier symbolic link.
+declare Link="";
+
+
+#
+# Option processing.
+#
+while getopts "GIe:p:v:" Arg;
+do
+        case $Arg in
+		G)	Mode="generate";;
+		I)	Mode="install";;
+
+		e)	Enclave="$OPTARG";;
+		p)	Program="$OPTARG";;
+		v)	Verifier="$OPTARG";;
+        esac;
+done;
+
+if [ "$Mode" = "generate" -a -z "$Program" ]; then
+	echo "$Pgm: No measurement source specified.";
+	exit 1;
+fi;
+
+
+#
+# Handle no mode specification.
+#
+if [ "$Mode" = "none" ]; then
+	echo "$Pgm: HSEA identity verifier utility.";
+	echo -e "\t-G\tGenerate a host specific enclave identifier.";
+	echo -e "\t-I\tInstall a host specific enclave identifer.";
+	echo;
+	echo -e "\t-e\tEnclave that identifier is to be generated for.";
+	echo -e "\t-p\tProgram to generate the enclave identifier.";
+	echo;
+	echo -e "\t-i\tIdentifier to install.";
+
+	exit 0;
+fi;
+
+
+#
+# Handle installation mode.
+#
+if [ "$Mode" = "install" ]; then
+	if [ -z "$Verifier" ]; then
+		"$Pgm: No identify verifier specifed.";
+		exit 1;
+	fi;
+
+	Enclave=`echo $Verifier | sed -e 's/^.*_//'`;
+	Enclave=`echo $Enclave | cut -d. -f2`;
+
+	cp $Verifier "/opt/IDfusion/etc/verifiers/$Enclave";
+	if [ $? -ne 0 ]; then
+		echo "$Pgm: Error installing verifier.";
+		exit 1;
+	fi;
+	echo "Installed: $Verifier";
+	rm $Verifier;
+
+	Verifier="/opt/IDfusion/etc/verifiers/$Enclave/$Verifier";
+	Link=`echo $Verifier | sed -e 's/_.*//'`;
+	if [ ! -L "$Link" ]; then
+		ln -s "$Verifier" "$Link";
+		if [ $? -ne 0 ]; then
+			echo "$Pgm: Unable to establish verifier link.";
+			exit 1;
+		fi;
+		echo "Linked: $Link";
+	fi;
+
+	exit 0;
+fi;
+
+
+#
+# Set default enclave names for various utilities.
+#
+case "$Program" in
+	cboot-mgr)		Enclave="ISOmanager";;
+	cboot)			Enclave="ISOidentity";;
+	sgx-mbus-proxy)		Enclave="MBUSpipe";;
+	test-Possum)		Enclave="test-Possum";;
+	test-remote-target)	Enclave="LocalTarget";;
+esac;
+
+if [ -z "$Enclave" ]; then
+	echo "$Pgm: No enclave name available.";
+	exit 1;
+fi;
+
+
+#
+# Generate the identifier.
+#
+sgx-gen-verifier -t /opt/IDfusion/etc/host.idt -m `$Program -M` -f \
+	-l "`hostname`.$Enclave";
+if [ $? -ne 0 ]; then
+	echo "$Pgm: Error generating identity verifier.";
+	exit 1;
+fi;
+
+
+#
+# Exit.
+#
+exit 0;
