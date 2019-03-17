@@ -115,7 +115,7 @@ static _Bool write_identity(CO(Buffer, asn), CO(IDtoken, token), \
 	}
 	filename->add(filename, IVY_EXTENSION);
 	if ( label != NULL ) {
-		filename->add(filename, ".");
+		filename->add(filename, "_");
 		filename->add(filename, label);
 	}
 	if ( filename->poisoned(filename) )
@@ -277,9 +277,11 @@ extern int main(int argc, char *argv[])
 	/* Output the enclave verifier. */
 	ivy->print(ivy);
 	fputs("\nASN output:\n", stdout);
-	if ( out_file )
-		retn = write_identity(bufr, token, label_name);
-	else {
+	if ( out_file ) {
+		if ( !write_identity(bufr, token, label_name) )
+			ERR(goto done);
+		retn = 0;
+	} else {
 		bufr->print(bufr);
 		retn = 0;
 	}
