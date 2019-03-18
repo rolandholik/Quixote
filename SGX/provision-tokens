@@ -1,0 +1,41 @@
+#! /bin/bash
+
+#
+# This file contains the implementation of a utility that generates
+# launch tokens for all SRDE installed enclaves.
+#
+
+# **************************************************************************
+# * (C)Copyright IDfusion, LLC. All rights reserved.
+# *
+# * Please refer to the file named Documentation/COPYRIGHT in the top of
+# * the source tree for copyright and licensing information.
+# **************************************************************************/
+
+
+# Enclave installation directory.
+declare -r Enclave_Dir="/opt/IDfusion/lib/enclaves";
+
+# Token installation directory.
+declare -r Token_Dir="/var/lib/IDfusion/tokens";
+
+# Working variables.
+declare Token Enclave_Path Enclave;
+
+
+#
+# Loop through available enclaves and generate tokens.
+#
+for Enclave_Path in $Enclave_Dir/*
+do
+	Enclave=`basename "$Enclave_Path" .signed.so`;
+	Token="$Token_Dir/$Enclave.token";
+	sgx-gen-token -e "$Enclave_Path" -o $Token;
+	echo "Generated: $Token";
+done;
+
+
+#
+# Exit.
+#
+exit 0;
