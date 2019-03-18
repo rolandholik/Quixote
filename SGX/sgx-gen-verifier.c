@@ -151,7 +151,8 @@ static _Bool write_identity(CO(Buffer, asn), CO(IDtoken, token), \
 extern int main(int argc, char *argv[])
 
 {
-	_Bool out_file = false;
+	_Bool quiet    = false,
+	      out_file = false;
 
 	int opt,
 	    retn = 1;
@@ -185,10 +186,13 @@ extern int main(int argc, char *argv[])
 
 
 	/* Get the organizational identifier and SSN. */
-	while ( (opt = getopt(argc, argv, "fe:l:m:t:")) != EOF )
+	while ( (opt = getopt(argc, argv, "fqe:l:m:t:")) != EOF )
 		switch ( opt ) {
 			case 'f':
 				out_file = true;
+				break;
+			case 'q':
+				quiet = true;
 				break;
 
 			case 'e':
@@ -275,14 +279,17 @@ extern int main(int argc, char *argv[])
 
 
 	/* Output the enclave verifier. */
-	ivy->print(ivy);
-	fputs("\nASN output:\n", stdout);
+	if ( !quiet ) {
+		ivy->print(ivy);
+		fputs("\nASN output:\n", stdout);
+	}
 	if ( out_file ) {
 		if ( !write_identity(bufr, token, label_name) )
 			ERR(goto done);
 		retn = 0;
 	} else {
-		bufr->print(bufr);
+		if ( !quiet )
+			bufr->print(bufr);
 		retn = 0;
 	}
 
