@@ -165,6 +165,12 @@ struct {
 } Signals;
 
 /**
+ * SGX signal handler.
+ */
+void exception_handler(int, siginfo_t *, void *);
+
+
+/**
  * The following enumeration type specifies whether or not
  * the measurements are being managed internally or by an SGX enclave.
  */
@@ -289,27 +295,28 @@ static _Bool add_verifiers(CO(ISOenclave, enclave), CO(File, infile), \
  *			handler to execute.
  */
 
-void signal_handler(int signal)
+void signal_handler(int signal, siginfo_t *siginfo, void *private)
 
 {
 	switch ( signal ) {
 		case SIGINT:
 			Signals.stop = true;
-			break;
+			return;
 		case SIGTERM:
 			Signals.stop = true;
-			break;
+			return;
 		case SIGHUP:
 			Signals.stop = true;
-			break;
+			return;
 		case SIGQUIT:
 			Signals.stop = true;
-			break;
+			return;
 		case SIGCHLD:
 			Signals.sigchild = true;
-			break;
+			return;
 	}
 
+	exception_handler(signal, siginfo, private);
 	return;
 }
 
@@ -1390,6 +1397,14 @@ static void * measurement_mode(CO(char *, enclave_name), CO(char *, token))
 	Buffer bufr = NULL;
 
 
+	/* Install the SGX exception handler for this mode. */
+	if ( !sgx_configure_exception() ) {
+		fputs("SGX signal handler initialization failure.\n", stderr);
+		goto done;
+	}
+
+
+	/* Setup the ISOidentity enclave and invoke the measurement ECALL. */
 	INIT(NAAAIM, ISOenclave, Enclave, ERR(goto done));
 	if ( !Enclave->load_enclave(Enclave, enclave_name, token) ) {
 		fputs("Enclave measurement initialization failure.\n", stderr);
@@ -1635,8 +1650,8 @@ extern int main(int argc, char *argv[])
 	if ( sigemptyset(&signal_action.sa_mask) == -1 )
 		ERR(goto done);
 
-	signal_action.sa_flags = 0;
-	signal_action.sa_handler = signal_handler;
+	signal_action.sa_flags = SA_SIGINFO | SA_NODEFER | SA_RESTART;
+	signal_action.sa_sigaction = signal_handler;
 	if ( sigaction(SIGINT, &signal_action, NULL) == -1 )
 		goto done;
 	if ( sigaction(SIGTERM, &signal_action, NULL) == -1 )
@@ -1644,6 +1659,16 @@ extern int main(int argc, char *argv[])
 	if ( sigaction(SIGHUP, &signal_action, NULL) == -1 )
 		goto done;
 	if ( sigaction(SIGQUIT, &signal_action, NULL) == -1 )
+		goto done;
+	if ( sigaction(SIGSEGV, &signal_action, NULL) == -1 )
+		goto done;
+	if ( sigaction(SIGFPE, &signal_action, NULL) == -1 )
+		goto done;
+	if ( sigaction(SIGILL, &signal_action, NULL) == -1 )
+		goto done;
+	if ( sigaction(SIGBUS, &signal_action, NULL) == -1 )
+		goto done;
+	if ( sigaction(SIGTRAP, &signal_action, NULL) == -1 )
 		goto done;
 
 
