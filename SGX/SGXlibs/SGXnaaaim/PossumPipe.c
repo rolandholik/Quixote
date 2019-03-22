@@ -875,8 +875,14 @@ static PossumPipe_type receive_packet(CO(PossumPipe, this), CO(Buffer, bufr))
 		ERR(goto done);
 
 	/* Receive and decode the packet. */
-	if ( !S->duct->receive_Buffer(S->duct, bufr) )
-		ERR(goto done);
+	if ( !S->duct->receive_Buffer(S->duct, bufr) ) {
+		if ( !S->duct->eof(S->duct) )
+			ERR(goto done);
+		retn	    = true;
+		remote_retn = PossumPipe_eop;
+		goto done;
+
+	}
 	if ( bufr->size(bufr) == 0 ) {
 		retn	    = true;
 		remote_retn = PossumPipe_eop;

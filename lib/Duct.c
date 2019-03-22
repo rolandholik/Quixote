@@ -555,6 +555,8 @@ static _Bool receive_Buffer(CO(Duct, this), CO(Buffer, bf))
 
 	_Bool retn = false;
 
+	int rc;
+
 	uint32_t rsize;
 
 	size_t lp,
@@ -575,8 +577,13 @@ static _Bool receive_Buffer(CO(Duct, this), CO(Buffer, bf))
 	 * variable to be a negative value so it can be distinguished
 	 * from a standard error number.
 	 */
-	if ( read(S->fd, &rsize, sizeof(rsize)) != sizeof(rsize) )
-		ERR(S->error = errno; goto done);
+	if ( (rc = read(S->fd, &rsize, sizeof(rsize))) != sizeof(rsize) ) {
+		if ( rc < 0 )
+			ERR(S->error = errno; goto done);
+		retn   = true;
+		S->eof = true;
+		goto done;
+	}
 
 	rsize = ntohl(rsize);
 	if ( rsize == 0 ) {
