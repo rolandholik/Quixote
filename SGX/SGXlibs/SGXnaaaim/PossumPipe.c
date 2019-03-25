@@ -107,6 +107,9 @@ struct NAAAIM_PossumPipe_State
 	/* Object status. */
 	_Bool poisoned;
 
+	/* Object error status. */
+	PossumPipe_error_code error;
+
 	/* Object debug status. */
 	_Bool debug;
 
@@ -208,6 +211,7 @@ static void _init_state(CO(PossumPipe_State,S))
 	S->objid = NAAAIM_PossumPipe_OBJID;
 
 	S->poisoned = false;
+	S->error    = PossumPipe_error_internal;
 	S->debug    = false;
 
 	S->remote = NULL;
@@ -1347,9 +1351,17 @@ static _Bool receive_platform_quote(CO(PossumPipe, this), CO(Buffer, bufr), \
 	SHA256_hmac hmac = NULL;
 
 
-	if ( !S->duct->receive_Buffer(S->duct, bufr) )
+	if ( !S->duct->receive_Buffer(S->duct, bufr) ) {
+		if ( S->duct->eof(S->duct) ) {
+			S->error = PossumPipe_error_closed_pipe;
+			goto done;
+		}
 		ERR(goto done);
-
+	}
+	if ( bufr->size(bufr) == 0 ) {
+		S->error = PossumPipe_error_closed_pipe;
+		goto done;
+	}
 
 	INIT(HurdLib, Buffer, cksum, goto done);
 	payload = bufr->size(bufr) - 32;
@@ -1851,8 +1863,10 @@ static _Bool start_host_mode(CO(PossumPipe, this), CO(Buffer, spid))
 	/* Lookup the client identity. */
 	INIT(NAAAIM, IDtoken, token, goto done);
 	INIT(NAAAIM, Ivy, ivy, goto done);
-	if ( !find_client(netbufr, token, ivy) )
-		ERR(goto done);
+	if ( !find_client(netbufr, token, ivy) ) {
+		S->error = PossumPipe_error_no_identity;
+		goto done;
+	}
 
 	if ( (b = ivy->get_element(ivy, Ivy_software)) == NULL )
 		ERR(goto done);
@@ -1883,8 +1897,10 @@ static _Bool start_host_mode(CO(PossumPipe, this), CO(Buffer, spid))
 
 	/* Verify and decode packet. */
 	INIT(NAAAIM, PossumPacket, packet, goto done);
-	if ( !packet->decode_packet1(packet, token, S->software, netbufr) )
-		ERR(goto done);
+	if ( !packet->decode_packet1(packet, token, S->software, netbufr) ) {
+		S->error = PossumPipe_error_invalid_identity;
+		goto done;
+	}
 
 	if ( S->debug ) {
 		fprintf(stdout, "\n%s: Incoming client packet 1:\n", __func__);
@@ -1979,8 +1995,11 @@ static _Bool start_host_mode(CO(PossumPipe, this), CO(Buffer, spid))
 	if ( (b = packet->get_element(packet, PossumPacket_quote_nonce)) == \
 	     NULL )
 		ERR(goto done);
-	if ( !receive_platform_quote(this, netbufr, ivy, nonce) )
-		ERR(goto done);
+	if ( !receive_platform_quote(this, netbufr, ivy, nonce) ) {
+		if ( S->error == PossumPipe_error_internal )
+			ERR(goto done);
+		goto done;
+	}
 
 	/* Send platform verification quote. */
 	netbufr->reset(netbufr);
@@ -2261,8 +2280,13 @@ static _Bool start_client_mode(CO(PossumPipe, this), CO(Buffer, spid))
 	/* Wait for a packet to arrive. */
 	packet->reset(packet);
 	bufr->reset(bufr);
-	if ( !duct->receive_Buffer(duct, bufr) )
+	if ( !duct->receive_Buffer(duct, bufr) ) {
+		if ( duct->eof(duct) || (bufr->size(bufr) == 0) ) {
+			S->error = PossumPipe_error_closed_pipe;
+			goto done;
+		}
 		ERR(goto done);
+	}
 
 	if ( S->debug ) {
 		fprintf(stdout, "\n%s: Received host initialization " \
@@ -2273,8 +2297,10 @@ static _Bool start_client_mode(CO(PossumPipe, this), CO(Buffer, spid))
 	/* Find the host identity. */
 	INIT(NAAAIM, Ivy, ivy, goto done);
 	token->reset(token);
-	if ( !find_client(bufr, token, ivy) )
-		ERR(goto done);
+	if ( !find_client(bufr, token, ivy) ) {
+		S->error = PossumPipe_error_no_identity;
+		goto done;
+	}
 
 	/* Set the host configuration personality. */
 
@@ -2298,8 +2324,10 @@ static _Bool start_client_mode(CO(PossumPipe, this), CO(Buffer, spid))
 		S->software->print(S->software);
 	}
 
-	if ( !packet->decode_packet1(packet, token, S->software, bufr) )
-		ERR(goto done);
+	if ( !packet->decode_packet1(packet, token, S->software, bufr) ) {
+		S->error = PossumPipe_error_invalid_identity;
+		goto done;
+	}
 
 	if ( S->debug ) {
 		fprintf(stdout, "\n%s: Received host packet 1.\n", __func__);
@@ -2331,8 +2359,11 @@ static _Bool start_client_mode(CO(PossumPipe, this), CO(Buffer, spid))
 
 	/* Receive platform reference. */
 	bufr->reset(bufr);
-	if ( !receive_platform_quote(this, bufr, ivy, their_nonce) )
-		ERR(goto done);
+	if ( !receive_platform_quote(this, bufr, ivy, their_nonce) ) {
+		if ( S->error == PossumPipe_error_internal )
+			ERR(goto done);
+		goto done;
+	}
 
 	if ( S->debug ) {
 		fprintf(stdout, "\n%s: Verified server:\n", __func__);
@@ -2495,6 +2526,30 @@ static void display_connection(CO(PossumPipe, this))
 /**
  * External public method.
  *
+ * This method implements an accessor mode for returning the internal
+ * error state of the communications object.   This allows an enclave
+ * implementing a PossumPipe object to determine the failure mode of
+ * the communications object.
+ *
+ * \param this		The communications object whose status is to
+ *			be dumped.
+
+ * \return		A PossumPipe_error_code value is returned from
+ *			the current object state.
+ */
+
+static PossumPipe_error_code get_error(CO(PossumPipe, this))
+
+{
+	STATE(S);
+
+	return S->error;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a control method for setting the debug
  * status of a PossumPipe instance.
  *
@@ -2539,15 +2594,19 @@ static void reset(CO(PossumPipe, this))
 
 
 	/* Clear the security state information. */
-	S->nonce->reset(S->nonce);
+	if ( S->nonce != NULL )
+		S->nonce->reset(S->nonce);
 
 	S->shared1->reset(S->shared1);
 	S->shared2->reset(S->shared2);
 
-	S->sent->reset(S->sent);
-	S->received->reset(S->received);
+	if ( S->sent != NULL )
+		S->sent->reset(S->sent);
+	if ( S->received != NULL )
+		S->received->reset(S->received);
 
-	S->software->reset(S->software);
+	if ( S->software != NULL )
+		S->software->reset(S->software);
 
 	/* Close the underlying communications object. */
 	S->duct->reset(S->duct);
@@ -2571,7 +2630,7 @@ static void whack(CO(PossumPipe, this))
 
 
 	S->duct->whack(S->duct);
-	S->remote->whack(S->remote);
+	WHACK(S->remote);
 
 	WHACK(S->nonce);
 
@@ -2581,7 +2640,7 @@ static void whack(CO(PossumPipe, this))
 	WHACK(S->sent);
 	WHACK(S->received);
 
-	S->software->whack(S->software);
+	WHACK(S->software);
 
 	S->root->whack(S->root, this, S);
 	return;
@@ -2641,6 +2700,8 @@ extern PossumPipe NAAAIM_PossumPipe_Init(void)
 
 	this->get_connection	 = get_connection;
 	this->display_connection = display_connection;
+
+	this->get_error = get_error;
 
 	this->debug = debug;
 	this->reset = reset;

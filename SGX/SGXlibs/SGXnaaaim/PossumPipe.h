@@ -21,6 +21,16 @@ typedef struct NAAAIM_PossumPipe * PossumPipe;
 typedef struct NAAAIM_PossumPipe_State * PossumPipe_State;
 
 /**
+ * Enumerated definitions for internal error states.
+ */
+typedef enum {
+	PossumPipe_error_internal=1,
+	PossumPipe_error_closed_pipe,
+	PossumPipe_error_no_identity,
+	PossumPipe_error_invalid_identity
+} PossumPipe_error_code;
+
+/**
  * Enumerated definitions for packet types.
  */
 typedef enum {
@@ -52,6 +62,8 @@ struct NAAAIM_PossumPipe
 	_Bool (*get_connection)(const PossumPipe, uint64_t *, const Buffer, \
 				const Buffer, uint16_t *, uint16_t *);
 	void (*display_connection)(const PossumPipe);
+
+	PossumPipe_error_code (*get_error)(const PossumPipe);
 
 	void (*debug)(const PossumPipe, _Bool debug);
 	void (*reset)(const PossumPipe);
