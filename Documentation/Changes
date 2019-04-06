@@ -4,3 +4,9 @@ Version 0.8:
 	* Upgrade to Intel SDK 2.4 and SGX OpenSSL 1.1.0j.
 
 	* Implement uniform copyright standard.
+
+	* Convert to version 3 of IAS API.
+
+	* Improve enclave PossumPipe and Duct error handling.
+
+	* Improvements to identity verifier generation and provisioning.
