@@ -25,6 +25,9 @@
  * the source tree for copyright and licensing information.
  **************************************************************************/
 
+/* Definitions local to this file. */
+#define PGM "sgx-check"
+
 
 #include <stdio.h>
 #include <stdint.h>
@@ -33,6 +36,63 @@
 #include <stdbool.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+
+
+/**
+ * Internal function.
+ *
+ * This function is used to read and print out the value of the SGX
+ * identity modulus signature on a platform with unlocked launch control
+ * registers.
+ *
+ * \param fd	The file descriptor that is to be used to do I/O to
+ *		the MSR registers.
+ *
+ * \return	No return value is defined.
+ */
+
+static void print_launch_registers(int fd)
+
+{
+	unsigned int lp,
+		     index = 0,
+		     reg   = 0x8c;
+
+	uint8_t *bp;
+
+	uint64_t msr;
+
+
+	fputs("\t\t", stdout);
+	while ( index < 4 ) {
+		if ( lseek(fd, reg, SEEK_SET) == -1 ) {
+			fprintf(stderr, "Error seeking to LC register: %x\n", \
+				reg);
+			return;
+		}
+		if ( read(fd, &msr, sizeof(msr)) != sizeof(msr) ) {
+			fprintf(stderr, "Error reading LC register; %x\n", \
+				reg);
+			return;
+		}
+
+		bp = (uint8_t *) &msr;
+		for (lp= 0; lp < sizeof(msr); ++lp)
+			fprintf(stdout, "%02x ", *bp++);
+
+		++index;
+		if ( (index == 1) || (index == 3) )
+			fputs(": ", stdout);
+		if ( index == 2 )
+			fputs("\n\t\t", stdout);
+
+		++reg;
+	}
+
+
+	fputc('\n', stdout);
+	return;
+}
 
 
 /**
@@ -95,9 +155,9 @@ static void output_leaf0(uint32_t eax, uint32_t ebx, uint32_t ecx, \
 		(eax == 0) ? "yes" : "no");
 
 	fputc('\n', stdout);
-	fputs("\tEBX:\n", stdout);
+	fputs("\tEBX:\n\t\tMISCSELECT bits: ", stdout);
 	if ( ebx == 0 )
-		fputs("\t\tMISCSELECT bits: No bits set.\n", stdout);
+		fputs("No bits set.\n", stdout);
 	else
 		dump_bits(ebx);
 
@@ -107,7 +167,7 @@ static void output_leaf0(uint32_t eax, uint32_t ebx, uint32_t ecx, \
 		fputs("\t\tReserved: No bits set.\n", stdout);
 	else
 		dump_bits(ecx);
-	
+
 
 	fputc('\n', stdout);
 	fputs("\tEDX:\n", stdout);
@@ -252,7 +312,7 @@ static _Bool output_leaf2(uint32_t leaf)
 		 ebx,
 		 ecx,
 		 edx;
-	
+
 
 	__asm("movl %4, %%eax\n\t"
 	      "movl %5, %%ecx\n\t"
@@ -289,7 +349,7 @@ static _Bool output_leaf2(uint32_t leaf)
 }
 
 
-/** 
+/**
  * External function.
  *
  * This is the main entry point for the program.  This program does
@@ -305,24 +365,27 @@ extern int main(int argc, char *argv[])
 	uint32_t lp;
 
 	uint32_t eax_output,
-		 ebx_output;
+		 ebx_output,
+		 ecx_output;
 
 	uint64_t msr_output = 0;
 
 	int fd = -1;
 
 
-        fputs("sgx-check: SGX platform capability tester.\n", stdout);
+	fprintf(stdout, "%s: SGX platform capability tester.\n", PGM);
+	fprintf(stdout, "%s: Copyright(C) IDfusion, LLC.\n", PGM);
 
 
 	/* Check CPUID leaf 7 for processor support. */
-	__asm("movl %2, %%eax\n\t"
+	__asm("movl %3, %%eax\n\t"
 	      "xorl %%ecx, %%ecx\n\t"
 	      "cpuid\n\t"
 	      "movl %%eax, %0\n\t"
 	      "movl %%ebx, %1\n\t"
+	      "movl %%ecx, %2\n\t"
 	      /* Output. */
-	      : "=r" (eax_output), "=r" (ebx_output)
+	      : "=r" (eax_output), "=r" (ebx_output), "=r" (ecx_output)
 	      /* Input. */
 	      : "r" (7)
 	      /* Clobbers. */
@@ -337,6 +400,11 @@ extern int main(int argc, char *argv[])
 		fputs("no\n", stdout);
 		goto done;
 	}
+	fputs("\tSGX launch control: ", stdout);
+	if ( ecx_output & (1 << 30) )
+		fputs("yes\n", stdout);
+	else
+		fputs("no\n", stdout);
 
 
 	/* Read feature control register to check for BIOS support. */
@@ -364,8 +432,12 @@ extern int main(int argc, char *argv[])
 	if ( !(msr_output & (1ULL << 18)) )
 		goto done;
 
-	fprintf(stdout, "\tSGX unlocked identity modulus: %s\n", \
-		(msr_output & (1ULL << 17)) ? "yes" : "no");
+	fputs("\tSGX unlocked identity modulus: ", stdout);
+	if ( msr_output & (1ULL << 17) ) {
+		fputs("yes\n", stdout);
+		print_launch_registers(fd);
+	} else
+		fputs("no\n", stdout);
 
 
 	/* Output SGX configuration information. */

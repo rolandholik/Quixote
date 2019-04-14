@@ -10,3 +10,5 @@ Version 0.8:
 	* Improve enclave PossumPipe and Duct error handling.
 
 	* Improvements to identity verifier generation and provisioning.
+
+	* Update SGX capability tester to output launch registers.
