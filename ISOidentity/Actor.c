@@ -32,6 +32,10 @@
 #include "SHA256.h"
 #include "Actor.h"
 
+#if !defined(REG_OK)
+#define REG_OK REG_NOERROR
+#endif
+
 
 /* Object state extraction macro. */
 #define STATE(var) CO(Actor_State, var) = this->state

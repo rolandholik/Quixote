@@ -21,7 +21,13 @@ CFLAGS = -Wall ${CDEBUG}
 LDFLAGS = ${STATIC} -g
 
 # OpenSSL crypto library
-SSL_CRYPTO  = -L /usr/local/musl/lib -lcrypto
+ifeq (${CC}, musl-gcc)
+SSL_INCLUDE = /usr/local/musl/include
+SSL_CRYPTO = -L /usr/local/musl/lib -lcrypto
+else
+SSL_INCLUDE = /usr/local/IDfusion/include
+SSL_CRYPTO = -L /usr/local/IDfusion/lib -lcrypto -ldl -lpthread
+endif
 
 
 #

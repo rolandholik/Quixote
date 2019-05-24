@@ -32,6 +32,10 @@
 #include "Actor.h"
 #include "Subject.h"
 
+#if !defined(REG_OK)
+#define REG_OK REG_NOERROR
+#endif
+
 
 /* Object state extraction macro. */
 #define STATE(var) CO(ExchangeEvent_State, var) = this->state

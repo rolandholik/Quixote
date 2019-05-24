@@ -12,3 +12,5 @@ Version 0.8:
 	* Improvements to identity verifier generation and provisioning.
 
 	* Update SGX capability tester to output launch registers.
+
+	* Support compilation under GCC.

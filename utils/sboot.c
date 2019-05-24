@@ -54,6 +54,10 @@
 #include "Netconfig.h"
 #include "SoftwareTPM.h"
 
+#if !defined(MS_MOVE)
+#define MS_MOVE        8192
+#endif
+
 
 /* Variable static to this file. */
 static _Bool Debug = false;

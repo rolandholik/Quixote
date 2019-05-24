@@ -34,13 +34,28 @@ export SGXKEY
 CC = musl-gcc
 AS = as
 
+ifeq (${CC}, musl-gcc)
+CINCLUDE = -I/usr/local/musl/include
+else
+CINCLUDE = -I/usr/local/IDfusion/include
+endif
+
 CDEBUG = -g -O2 -fomit-frame-pointer -march=core2
-CFLAGS = -Wall ${CDEBUG}
+CFLAGS = -Wall ${CDEBUG} ${CINCLUDE}
 
 LDFLAGS = ${STATIC} -g -L ../lib -L ../HurdLib
+ifneq (${CC}, musl-gcc)
+LDFLAGS += -L /usr/local/IDfusion/lib
+endif
 
 # OpenSSL crypto library
-SSL_CRYPTO  = -L /usr/local/musl/lib -lcrypto
+ifeq (${CC}, musl-gcc)
+SSL_INCLUDE = /usr/local/musl/include
+SSL_CRYPTO = -L /usr/local/musl/lib -lcrypto
+else
+SSL_INCLUDE = /usr/local/IDfusion/include
+SSL_CRYPTO = -L /usr/local/IDfusion/lib -lcrypto -ldl -lpthread
+endif
 
 # NAAAIM library definition
 NAAAIM_LIB = -L../lib -lNAAAIM
