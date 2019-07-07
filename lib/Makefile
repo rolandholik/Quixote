@@ -24,8 +24,14 @@ LIBRARY = lib${LIBNAME}.a
 #
 # Locations of SSL include files and libraries
 #
-SSL_INCLUDE = /usr/local/musl/ssl/include
-SSL_CRYPTO = -L /usr/local/musl/ssl/lib -lcrypto
+
+ifeq (${CC}, musl-gcc)
+SSL_INCLUDE = /usr/local/musl/include
+SSL_CRYPTO = -L /usr/local/musl/lib -lcrypto
+else
+SSL_INCLUDE = /usr/local/IDfusion/include
+SSL_CRYPTO = -L /usr/local/IDfusion/lib -lcrypto
+endif
 
 
 CDEBUG = -O2 -fomit-frame-pointer -march=core2

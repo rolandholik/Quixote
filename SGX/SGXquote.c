@@ -40,6 +40,10 @@
 #include "PCEenclave.h"
 #include "SGXquote.h"
 
+#if !defined(REG_OK)
+#define REG_OK REG_NOERROR
+#endif
+
 
 /* Object state extraction macro. */
 #define STATE(var) CO(SGXquote_State, var) = this->state

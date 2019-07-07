@@ -59,6 +59,9 @@ endif
 
 
 LDFLAGS = ${STATIC} -g -L ../../../lib
+ifneq (${CC}, musl-gcc)
+LDFLAGS += -L /usr/local/IDfusion/lib
+endif
 
 ELFLIB	= -lelf
 

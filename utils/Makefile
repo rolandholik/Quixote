@@ -18,13 +18,24 @@ TOOLS = gen-image load-image boot sboot init possum gen-id-verifier	\
 
 CC = musl-gcc
 
+ifeq (${CC}, musl-gcc)
 MUSL_INCLUDE = /usr/local/musl/include
+else
+MUSL_INCLUDE = /usr/local/IDfusion/include
+endif
 
 #
 # Locations of SSL include files and libraries
 #
-SSL_INCLUDE = /usr/local/musl/ssl/include
-SSL_CRYPTO  = -L /usr/local/musl/lib -lcrypto
+ifeq (${CC}, musl-gcc)
+SSL_INCLUDE = /usr/local/musl/include
+SSL_CRYPTO = -L /usr/local/musl/lib -lcrypto
+SSL_LIBRARY = -L /usr/local/musl/lib -lssl -lcrypto
+else
+SSL_INCLUDE = /usr/local/IDfusion/include
+SSL_CRYPTO = -L /usr/local/IDfusion/lib -lcrypto -ldl -lpthread
+SSL_LIBRARY = -L /usr/local/IDfusion/lib -lssl ${SSL_CRYPTO}
+endif
 
 # Location of smartcard library.
 PCSC_LIBRARY = -L/usr/local/lib -lpcsclite
@@ -36,7 +47,10 @@ CDEBUG = -g ${DMALLOC}
 CFLAGS = -Wall ${CDEBUG}
 
 # LDFLAGS = -s -L/usr/local/krb5/lib 
-LDFLAGS = -g -L ../lib -L ../HurdLib -Wl,-rpath-link /usr/local/musl/lib
+LDFLAGS = -g -L ../lib -L ../HurdLib
+ifneq (${CC}, musl-gcc)
+LDFLAGS += -lpthread -lrt
+endif
 
 
 #
@@ -71,7 +85,7 @@ gen-image: gen-image.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 load-image: load-image.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltpm_unseal ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltpm_unseal -ltspi ${SSL_CRYPTO};
 
 boot: boot.o Netconfig.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};

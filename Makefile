@@ -27,9 +27,15 @@ CC = musl-gcc
 #
 # Locations of SSL include files and libraries
 #
+ifeq (${CC}, musl-gcc)
 SSL_INCLUDE = /usr/local/musl/include
-SSL_CRYPTO  = -L /usr/local/musl/lib -lcrypto
-SSL_LIBRARY = -L /usr/local/musl/lib -l ssl -l crypto
+SSL_CRYPTO = -L /usr/local/musl/lib -lcrypto
+SSL_LIBRARY = -L /usr/local/musl/lib -lssl -lcrypto
+else
+SSL_INCLUDE = /usr/local/IDfusion/include
+SSL_CRYPTO = -L /usr/local/IDfusion/lib -lcrypto -ldl -lpthread
+SSL_LIBRARY = -L /usr/local/IDfusion/lib -lssl ${SSL_CRYPTO}
+endif
 
 #
 # Locations for the Postgresql files and libraries.

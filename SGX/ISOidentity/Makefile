@@ -73,7 +73,13 @@ NAAAIMLIB      = -L ../../lib -lNAAAIM
 RDK_LIBRARY = ../libSGXrdk.a
 RDKLIB	    = -L ../ -lSGXrdk
 
+ifeq (${CC}, musl-gcc)
+SSL_INCLUDE = /usr/local/musl/include
 SSL_CRYPTO = -L /usr/local/musl/lib -lcrypto
+else
+SSL_INCLUDE = /usr/local/IDfusion/include
+SSL_CRYPTO = -L /usr/local/IDfusion/lib -lcrypto -ldl -lpthread
+endif
 
 LIBRARY_DEPENDS = ${HURD_LIBRARY} ${NAAAIM_LIBRARY} ${RDK_LIBRARY}
 LIBS		= ${RDKLIB} ${ELFLIB} ${NAAAIMLIB} ${HURDLIB}
