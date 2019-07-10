@@ -18,6 +18,7 @@
 #include <openssl/asn1t.h>
 
 #include <Origin.h>
+#include <HurdLib.h>
 #include <Buffer.h>
 
 #include "NAAAIM.h"

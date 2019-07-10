@@ -47,6 +47,7 @@
 #include <sys/wait.h>
 #include <arpa/inet.h>
 
+#include <HurdLib.h>
 #include <Config.h>
 #include <Buffer.h>
 

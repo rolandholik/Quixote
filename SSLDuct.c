@@ -27,6 +27,7 @@
 #include <openssl/dh.h>
 
 #include <Origin.h>
+#include <HurdLib.h>
 #include <Buffer.h>
 #include <String.h>
 

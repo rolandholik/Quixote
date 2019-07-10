@@ -22,6 +22,7 @@
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
 
+#include <HurdLib.h>
 #include <String.h>
 
 #include "NAAAIM.h"

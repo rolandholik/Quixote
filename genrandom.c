@@ -11,6 +11,8 @@
 
 #include <openssl/rand.h>
 
+#include <HurdLib.h>
+
 #include "NAAAIM.h"
 #include "Buffer.h"
 #include "RandomBuffer.h"

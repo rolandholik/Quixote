@@ -26,6 +26,8 @@
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
 
+#include <HurdLib.h>
+
 #include "NAAAIM.h"
 #include "IDqueryReply.h"
 #include "RandomBuffer.h"

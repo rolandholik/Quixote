@@ -39,6 +39,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
+#include <HurdLib.h>
 #include <Config.h>
 #include <Buffer.h>
 
