@@ -14,6 +14,11 @@ LIBSRC = fusion-shim.c regcomp.c regexec.c regerror.c tre-mem.c reg-support.c \
 ASRC   = enclu_ereport.s enclu_egetkey.s
 
 TOOLS = test-fusion
+ifneq (${CC}, musl-gcc)
+TOOLS += test-fusion-c++
+endif
+
+C++TOOLS = test-fusion-c++
 
 LIBNAME = SGXfusion
 LIBRARY = lib${LIBNAME}.a
@@ -126,13 +131,19 @@ test-fusion: test-fusion.o ${RDK_LIBRARY} ${HURD_LIBRARY}
 test-fusion.o: test-fusion.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
+test-fusion-c++: test-fusion-c++.o ${RDK_LIBRARY} ${HURD_LIBRARY}
+	${CXX} ${LDFLAGS} -o $@ $< ${RDKLIB} ${ELFLIB} ${HURDLIB};
+
+test-fusion-c++.o: test-fusion-c++.cpp
+	${CXX} ${CFLAGS} -c $< -o $@;
+
 ${LIBRARY}: ${LIBOBJS}
 	ar r ${LIBRARY} $^;
 	ranlib ${LIBRARY};
 
 clean:
 	rm -f *.o *~ ldscript;
-	rm -f ${TOOLS};
+	rm -f ${TOOLS} ${C++TOOLS};
 	rm -f ${LIBRARY};
 	rm -f test-fusion.so test-fusion.signed.so;
 
