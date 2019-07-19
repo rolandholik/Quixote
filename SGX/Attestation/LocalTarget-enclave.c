@@ -10,12 +10,12 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <SGX.h>
-#include <SGXfusion.h>
-
 #include <HurdLib.h>
 #include <Buffer.h>
 #include <String.h>
+
+#include <SGX.h>
+#include <SGXfusion.h>
 
 #include <NAAAIM.h>
 #include <RandomBuffer.h>

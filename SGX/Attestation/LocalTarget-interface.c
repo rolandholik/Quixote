@@ -14,6 +14,8 @@
 #include <sgx_trts.h>
 #include <sgx_edger8r.h>
 
+#include <HurdLib.h>
+
 #include "../SGX.h"
 #include "LocalTarget-interface.h"
 

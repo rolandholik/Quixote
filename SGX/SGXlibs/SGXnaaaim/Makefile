@@ -17,8 +17,6 @@ ASRC   = rdrand.s
 DUCTSRC	  = test-Duct-enclave.c test-Duct-interface.c
 POSSUMSRC = test-Possum-enclave.c test-Possum-interface.c RandomBuffer.c
 
-TOOLS = test-naaaim test-Duct test-Possum
-
 LIBNAME	   = SGXnaaaim
 LIBRARY	   = lib${LIBNAME}.a
 NAAAIMDIR  = ../../../lib
@@ -61,6 +59,12 @@ ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles  \
 
 
 CC = musl-gcc
+
+TOOLS = test-naaaim test-Duct test-Possum
+C++TOOLS = test-naaaim-c++
+ifneq (${CC}, musl-gcc)
+TOOLS += ${C++TOOLS}
+endif
 
 CFLAGS = -Wall -O2 -fomit-frame-pointer -march=core2 -I ../.. -I ../../.. \
 	-I ../../../HurdLib 
@@ -170,6 +174,12 @@ test-naaaim: test-naaaim.o ${LIBRARY_DEPENDS}
 
 test-naaaim.o: test-naaaim.c
 	${CC} ${CFLAGS} -c $< -o $@;
+
+test-naaaim-c++: test-naaaim-c++.o ${RDK_LIBRARY} ${HURD_LIBRARY}
+	${CXX} ${LDFLAGS} -o $@ $< ${RDKLIB} ${ELFLIB} ${HURDLIB};
+
+test-naaaim-c++.o: test-naaaim-c++.cpp
+	${CXX} ${CFLAGS} -c $< -o $@;
 
 test-Duct: test-Duct.o ${LIBRARY_DEPDNDS}
 	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
