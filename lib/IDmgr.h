@@ -52,6 +52,5 @@ struct NAAAIM_IDmgr
 
 
 /* IDmgr constructor call. */
-extern IDmgr NAAAIM_IDmgr_Init(void);
-
+extern HCLINK IDmgr NAAAIM_IDmgr_Init(void);
 #endif

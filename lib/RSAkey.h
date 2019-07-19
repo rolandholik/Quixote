@@ -53,6 +53,5 @@ struct NAAAIM_RSAkey
 
 
 /* RSAkey constructor call. */
-extern RSAkey NAAAIM_RSAkey_Init(void);
-
+extern HCLINK RSAkey NAAAIM_RSAkey_Init(void);
 #endif

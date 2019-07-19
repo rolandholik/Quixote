@@ -43,5 +43,5 @@ struct NAAAIM_ISOmanager
 
 
 /* Exchange event constructor call. */
-extern ISOmanager NAAAIM_ISOmanager_Init(void);
+extern HCLINK ISOmanager NAAAIM_ISOmanager_Init(void);
 #endif

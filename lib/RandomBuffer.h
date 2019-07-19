@@ -35,6 +35,5 @@ struct NAAAIM_RandomBuffer
 
 
 /* RandomBuffer constructor call. */
-extern RandomBuffer NAAAIM_RandomBuffer_Init(void);
-
+extern HCLINK RandomBuffer NAAAIM_RandomBuffer_Init(void);
 #endif

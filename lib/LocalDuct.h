@@ -49,6 +49,5 @@ struct NAAAIM_LocalDuct
 
 
 /* LocalDuct constructor call. */
-extern LocalDuct NAAAIM_LocalDuct_Init(void);
-
+extern HCLINK LocalDuct NAAAIM_LocalDuct_Init(void);
 #endif

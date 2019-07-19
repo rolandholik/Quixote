@@ -45,6 +45,5 @@ struct NAAAIM_Actor
 
 
 /* Actor constructor call. */
-extern Actor NAAAIM_Actor_Init(void);
-
+extern HCLINK Actor NAAAIM_Actor_Init(void);
 #endif

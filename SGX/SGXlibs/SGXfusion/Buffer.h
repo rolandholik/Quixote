@@ -47,6 +47,5 @@ struct HurdLib_Buffer
 
 
 /* Buffer constructor call. */
-extern Buffer HurdLib_Buffer_Init(void);
-
+extern HCLINK Buffer HurdLib_Buffer_Init(void);
 #endif

@@ -47,5 +47,5 @@ struct NAAAIM_Subject
 
 
 /* Actor constructor call. */
-extern Subject NAAAIM_Subject_Init(void);
+extern HCLINK Subject NAAAIM_Subject_Init(void);
 #endif

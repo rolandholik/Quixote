@@ -39,6 +39,5 @@ struct NAAAIM_Curve25519
 
 
 /* Curve25519 constructor call. */
-extern Curve25519 NAAAIM_Curve25519_Init(void);
-
+extern HCLINK Curve25519 NAAAIM_Curve25519_Init(void);
 #endif

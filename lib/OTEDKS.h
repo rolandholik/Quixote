@@ -45,6 +45,5 @@ struct NAAAIM_OTEDKS
 
 
 /* OTEDKS constructor call. */
-extern OTEDKS NAAAIM_OTEDKS_Init(time_t);
-
+extern HCLINK OTEDKS NAAAIM_OTEDKS_Init(time_t);
 #endif

@@ -51,6 +51,10 @@ struct HurdLib_Origin
 
 
 /* Origin constructor call. */
+#if __cpluscplus
+extern "C" Origin HurdLib_Origin_Init(void);
+#else
 extern Origin HurdLib_Origin_Init(void);
+#endif
 
 #endif

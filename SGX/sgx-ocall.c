@@ -17,6 +17,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include <HurdLib.h>
+
 #include "SGX.h"
 #include "SGXenclave.h"
 

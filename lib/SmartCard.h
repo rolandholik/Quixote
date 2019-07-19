@@ -38,6 +38,5 @@ struct NAAAIM_SmartCard
 
 
 /* SmartCard constructor call. */
-extern SmartCard NAAAIM_SmartCard_Init(void);
-
+extern HCLINK SmartCard NAAAIM_SmartCard_Init(void);
 #endif

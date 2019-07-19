@@ -14,6 +14,13 @@
 #ifndef HurdLib_HEADER
 #define HurdLib_HEADER
 
+/* Macro for defining C-linkage for object initialization. */
+#if __cpluscplus
+#define HCLINK "C"
+#else
+#define HCLINK
+#endif
+
 /*
  * Include definitions for shim code.
  */

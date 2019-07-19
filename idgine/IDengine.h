@@ -59,6 +59,5 @@ struct NAAAIM_IDengine
 
 
 /* IDenginer constructor call. */
-extern IDengine NAAAIM_IDengine_Init(void);
-
+extern HCLINK IDengine NAAAIM_IDengine_Init(void);
 #endif

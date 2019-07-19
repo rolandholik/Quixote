@@ -36,6 +36,5 @@ struct NAAAIM_PatientID
 
 
 /* PatientId constructor call. */
-extern PatientID NAAAIM_PatientID_Init(void);
-
+extern HCLINK PatientID NAAAIM_PatientID_Init(void);
 #endif

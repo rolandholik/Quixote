@@ -40,6 +40,5 @@ struct NAAAIM_IPsec
 
 
 /* IPsec constructor call. */
-extern IPsec NAAAIM_IPsec_Init(void);
-
+extern HCLINK IPsec NAAAIM_IPsec_Init(void);
 #endif

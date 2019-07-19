@@ -46,6 +46,5 @@ struct NAAAIM_DBduct
 
 
 /* DBduct constructor call. */
-extern DBduct NAAAIM_DBduct_Init(void);
-
+extern HCLINK DBduct NAAAIM_DBduct_Init(void);
 #endif

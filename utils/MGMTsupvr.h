@@ -45,6 +45,5 @@ struct NAAAIM_MGMTsupvr
 
 
 /* MGMTsupvr constructor call. */
-extern MGMTsupvr NAAAIM_MGMTsupvr_Init(void);
-
+extern HCLINK MGMTsupvr NAAAIM_MGMTsupvr_Init(void);
 #endif

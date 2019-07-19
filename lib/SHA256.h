@@ -43,6 +43,5 @@ struct NAAAIM_SHA256
 
 
 /* SHA256 constructor call. */
-extern Sha256 NAAAIM_Sha256_Init(void);
-
+extern HCLINK Sha256 NAAAIM_Sha256_Init(void);
 #endif

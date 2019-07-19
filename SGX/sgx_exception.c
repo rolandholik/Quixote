@@ -35,6 +35,8 @@
 #include <ucontext.h>
 #include <sys/ucontext.h>
 
+#include <HurdLib.h>
+
 #include <NAAAIM.h>
 
 #include "SGX.h"

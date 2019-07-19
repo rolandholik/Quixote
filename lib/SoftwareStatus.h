@@ -41,6 +41,5 @@ struct NAAAIM_SoftwareStatus
 
 
 /* SoftwareStatus constructor call. */
-extern SoftwareStatus NAAAIM_SoftwareStatus_Init(void);
-
+extern HCLINK SoftwareStatus NAAAIM_SoftwareStatus_Init(void);
 #endif

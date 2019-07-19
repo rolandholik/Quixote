@@ -37,6 +37,5 @@ struct NAAAIM_OrgID
 
 
 /* OrgID constructor call. */
-extern OrgID NAAAIM_OrgID_Init(void);
-
+extern HCLINK OrgID NAAAIM_OrgID_Init(void);
 #endif

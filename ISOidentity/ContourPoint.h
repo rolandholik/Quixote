@@ -42,5 +42,5 @@ struct NAAAIM_ContourPoint
 
 
 /* Exchange event constructor call. */
-extern ContourPoint NAAAIM_ContourPoint_Init(void);
+extern HCLINK ContourPoint NAAAIM_ContourPoint_Init(void);
 #endif

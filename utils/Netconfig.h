@@ -40,6 +40,5 @@ struct NAAAIM_Netconfig
 
 
 /* Netconfig constructor call. */
-extern Netconfig NAAAIM_Netconfig_Init(void);
-
+extern HCLINK Netconfig NAAAIM_Netconfig_Init(void);
 #endif

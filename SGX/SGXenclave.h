@@ -64,6 +64,5 @@ struct NAAAIM_SGXenclave
 
 
 /* Sgxmetadata constructor call. */
-extern SGXenclave NAAAIM_SGXenclave_Init(void);
-
+extern HCLINK SGXenclave NAAAIM_SGXenclave_Init(void);
 #endif

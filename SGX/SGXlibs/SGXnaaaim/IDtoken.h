@@ -52,6 +52,5 @@ struct NAAAIM_IDtoken
 
 
 /* IDtoken constructor call. */
-extern IDtoken NAAAIM_IDtoken_Init(void);
-
+extern HCLINK IDtoken NAAAIM_IDtoken_Init(void);
 #endif

@@ -57,5 +57,5 @@ struct NAAAIM_EDIpacket
 
 
 /* PossumPacket constructor call. */
-extern EDIpacket NAAAIM_EDIpacket_Init(void);
+extern HCLINK EDIpacket NAAAIM_EDIpacket_Init(void);
 #endif

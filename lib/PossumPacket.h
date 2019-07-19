@@ -68,5 +68,5 @@ struct NAAAIM_PossumPacket
 
 
 /* PossumPacket constructor call. */
-extern PossumPacket NAAAIM_PossumPacket_Init(void);
+extern HCLINK PossumPacket NAAAIM_PossumPacket_Init(void);
 #endif

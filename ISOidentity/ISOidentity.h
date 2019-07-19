@@ -65,5 +65,5 @@ struct NAAAIM_ISOidentity
 
 
 /* Exchange event constructor call. */
-extern ISOidentity NAAAIM_ISOidentity_Init(void);
+extern HCLINK ISOidentity NAAAIM_ISOidentity_Init(void);
 #endif

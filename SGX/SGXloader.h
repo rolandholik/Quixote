@@ -49,6 +49,5 @@ struct NAAAIM_SGXloader
 
 
 /* SGXMetadata constructor call. */
-extern SGXloader NAAAIM_SGXloader_Init(void);
-
+extern HCLINK SGXloader NAAAIM_SGXloader_Init(void);
 #endif

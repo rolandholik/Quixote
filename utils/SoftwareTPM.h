@@ -35,6 +35,5 @@ struct NAAAIM_SoftwareTPM
 
 
 /* SoftwareTPM constructor call. */
-extern SoftwareTPM NAAAIM_SoftwareTPM_Init(void);
-
+extern HCLINK SoftwareTPM NAAAIM_SoftwareTPM_Init(void);
 #endif

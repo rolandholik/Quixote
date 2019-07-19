@@ -61,6 +61,5 @@ struct NAAAIM_IDqueryReply
 
 
 /* IDqueryReply constructor call. */
-extern IDqueryReply NAAAIM_IDqueryReply_Init(void);
-
+extern HCLINK IDqueryReply NAAAIM_IDqueryReply_Init(void);
 #endif

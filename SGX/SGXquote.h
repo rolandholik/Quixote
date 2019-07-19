@@ -108,6 +108,5 @@ struct NAAAIM_SGXquote
 extern SGXquote NAAAIM_SGXquote_Init(void);
 
 /* Definition for entry point for SGXquote SGX manager. */
-extern int SGXquote_sgxmgr(struct SGXquote_ocall *ocp);
-
+extern HCLINK int SGXquote_sgxmgr(struct SGXquote_ocall *ocp);
 #endif

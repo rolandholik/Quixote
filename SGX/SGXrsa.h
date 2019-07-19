@@ -41,5 +41,5 @@ struct NAAAIM_SGXrsa
 
 
 /* Sgxmetadata constructor call. */
-extern SGXrsa NAAAIM_SGXrsa_Init(void);
+extern HCLINK SGXrsa NAAAIM_SGXrsa_Init(void);
 #endif

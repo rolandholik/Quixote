@@ -45,6 +45,5 @@ struct NAAAIM_SHA256_hmac
 
 
 /* SHA256_hmac constructor call. */
-extern SHA256_hmac NAAAIM_SHA256_hmac_Init(const Buffer);
-
+extern HCLINK SHA256_hmac NAAAIM_SHA256_hmac_Init(const Buffer);
 #endif

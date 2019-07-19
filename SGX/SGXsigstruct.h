@@ -40,6 +40,5 @@ struct NAAAIM_SGXsigstruct
 
 
 /* SGXMetadata constructor call. */
-extern SGXsigstruct NAAAIM_SGXsigstruct_Init(void);
-
+extern HCLINK SGXsigstruct NAAAIM_SGXsigstruct_Init(void);
 #endif

@@ -44,6 +44,5 @@ struct NAAAIM_AuthenReply
 
 
 /* AuthenReply constructor call. */
-extern AuthenReply NAAAIM_AuthenReply_Init(void);
-
+extern HCLINK AuthenReply NAAAIM_AuthenReply_Init(void);
 #endif

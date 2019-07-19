@@ -99,9 +99,8 @@ struct NAAAIM_Duct
 
 
 /* Duct constructor call. */
-extern Duct NAAAIM_Duct_Init(void);
+extern HCLINK Duct NAAAIM_Duct_Init(void);
 
 /* Definition for entry point for Duct SGX manager. */
 extern int Duct_sgxmgr(struct Duct_ocall *ocp);
-
 #endif

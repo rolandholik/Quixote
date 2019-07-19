@@ -37,6 +37,5 @@ struct NAAAIM_HTTP
 
 
 /* HTTP constructor call. */
-extern HTTP NAAAIM_HTTP_Init(void);
-
+extern HCLINK HTTP NAAAIM_HTTP_Init(void);
 #endif

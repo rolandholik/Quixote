@@ -50,6 +50,5 @@ struct NAAAIM_Ivy
 
 
 /* Ivy constructor call. */
-extern Ivy NAAAIM_Ivy_Init(void);
-
+extern HCLINK Ivy NAAAIM_Ivy_Init(void);
 #endif

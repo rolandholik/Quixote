@@ -44,6 +44,5 @@ struct SSL_Duct
 
 
 /* Duct constructor call. */
-extern SSLduct SSLduct_Init(void);
-
+extern HCLINK SSLduct SSLduct_Init(void);
 #endif

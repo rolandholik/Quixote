@@ -39,5 +39,5 @@ struct NAAAIM_SGXecdsa
 
 
 /* Sgxmetadata constructor call. */
-extern SGXecdsa NAAAIM_SGXecdsa_Init(void);
+extern HCLINK SGXecdsa NAAAIM_SGXecdsa_Init(void);
 #endif

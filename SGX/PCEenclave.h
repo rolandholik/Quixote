@@ -48,5 +48,5 @@ struct NAAAIM_PCEenclave
 
 
 /* Sgxmetadata constructor call. */
-extern PCEenclave NAAAIM_PCEenclave_Init(void);
+extern HCLINK PCEenclave NAAAIM_PCEenclave_Init(void);
 #endif

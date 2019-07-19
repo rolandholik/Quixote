@@ -57,6 +57,5 @@ struct NAAAIM_PossumPipe
 
 
 /* PossumPipe constructor call. */
-extern PossumPipe NAAAIM_PossumPipe_Init(void);
-
+extern HCLINK PossumPipe NAAAIM_PossumPipe_Init(void);
 #endif

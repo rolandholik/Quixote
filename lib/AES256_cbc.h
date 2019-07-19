@@ -38,7 +38,9 @@ struct NAAAIM_AES256_cbc
 
 
 /* AES256_CBC constructor call. */
-extern AES256_cbc NAAAIM_AES256_cbc_Init(void);
-extern AES256_cbc NAAAIM_AES256_cbc_Init_encrypt(const Buffer, const Buffer);
-extern AES256_cbc NAAAIM_AES256_cbc_Init_decrypt(const Buffer, const Buffer);
+extern HCLINK AES256_cbc NAAAIM_AES256_cbc_Init(void);
+extern HCLINK AES256_cbc NAAAIM_AES256_cbc_Init_encrypt(const Buffer, \
+							const Buffer);
+extern HCLINK AES256_cbc NAAAIM_AES256_cbc_Init_decrypt(const Buffer, \
+							const Buffer);
 #endif

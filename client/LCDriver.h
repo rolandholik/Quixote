@@ -48,6 +48,5 @@ struct NAAAIM_LCDriver
 
 
 /* LCDriver constructor call. */
-extern LCDriver NAAAIM_LCDriver_Init(void);
-
+extern HCLINK LCDriver NAAAIM_LCDriver_Init(void);
 #endif

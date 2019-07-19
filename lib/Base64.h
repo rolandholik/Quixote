@@ -37,6 +37,5 @@ struct NAAAIM_Base64
 
 
 /* Base64 constructor call. */
-extern Base64 NAAAIM_Base64_Init(void);
-
+extern HCLINK Base64 NAAAIM_Base64_Init(void);
 #endif

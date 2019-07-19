@@ -39,6 +39,5 @@ struct NAAAIM_Identity
 
 
 /* Identity constructor call. */
-extern Identity NAAAIM_Identity_Init(void);
-
+extern HCLINK Identity NAAAIM_Identity_Init(void);
 #endif

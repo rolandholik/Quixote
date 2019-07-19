@@ -45,5 +45,5 @@ struct NAAAIM_ExchangeEvent
 
 
 /* Exchange event constructor call. */
-extern ExchangeEvent NAAAIM_ExchangeEvent_Init(void);
+extern HCLINK ExchangeEvent NAAAIM_ExchangeEvent_Init(void);
 #endif

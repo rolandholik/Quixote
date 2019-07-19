@@ -43,7 +43,6 @@ struct HurdLib_String
 
 
 /* String constructor calls. */
-extern String HurdLib_String_Init(void);
-extern String HurdLib_String_Init_cstr(const char *);
-
+extern HCLINK String HurdLib_String_Init(void);
+extern HCLINK String HurdLib_String_Init_cstr(const char *);
 #endif

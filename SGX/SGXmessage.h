@@ -59,6 +59,5 @@ struct NAAAIM_SGXmessage
 
 
 /* Sgxmetadata constructor call. */
-extern SGXmessage NAAAIM_SGXmessage_Init(void);
-
+extern HCLINK SGXmessage NAAAIM_SGXmessage_Init(void);
 #endif

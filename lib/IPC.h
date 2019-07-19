@@ -42,6 +42,5 @@ struct NAAAIM_IPC
 
 
 /* IPC constructor call. */
-extern IPC NAAAIM_IPC_Init(void);
-
+extern HCLINK IPC NAAAIM_IPC_Init(void);
 #endif

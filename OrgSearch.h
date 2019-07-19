@@ -45,6 +45,5 @@ struct NAAAIM_OrgSearch
 
 
 /* OrgSearch constructor call. */
-extern OrgSearch NAAAIM_OrgSearch_Init(void);
-
+extern HCLINK OrgSearch NAAAIM_OrgSearch_Init(void);
 #endif

@@ -44,6 +44,5 @@ struct NAAAIM_SSLDuct
 
 
 /* SSLDuct constructor call. */
-extern SSLDuct NAAAIM_SSLDuct_Init(void);
-
+extern HCLINK SSLDuct NAAAIM_SSLDuct_Init(void);
 #endif

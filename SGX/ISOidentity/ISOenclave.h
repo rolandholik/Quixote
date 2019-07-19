@@ -92,5 +92,5 @@ struct NAAAIM_ISOenclave
 
 
 /* Exchange event constructor call. */
-extern ISOenclave NAAAIM_ISOenclave_Init(void);
+extern HCLINK ISOenclave NAAAIM_ISOenclave_Init(void);
 #endif

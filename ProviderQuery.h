@@ -61,6 +61,5 @@ struct NAAAIM_ProviderQuery
 
 
 /* ProviderQuery constructor call. */
-extern ProviderQuery NAAAIM_ProviderQuery_Init(void);
-
+extern HCLINK ProviderQuery NAAAIM_ProviderQuery_Init(void);
 #endif

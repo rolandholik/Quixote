@@ -42,6 +42,5 @@ struct NAAAIM_Authenticator
 
 
 /* Authenticator constructor call. */
-extern Authenticator NAAAIM_Authenticator_Init(void);
-
+extern HCLINK Authenticator NAAAIM_Authenticator_Init(void);
 #endif

@@ -74,6 +74,5 @@ struct NAAAIM_TPM2cmd
 
 
 /* TPM2cmd constructor call. */
-extern TPM2cmd NAAAIM_TPM2cmd_Init(void);
-
+extern HCLINK TPM2cmd NAAAIM_TPM2cmd_Init(void);
 #endif
