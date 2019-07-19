@@ -13,13 +13,6 @@ LIBSRC = fusion-shim.c regcomp.c regexec.c regerror.c tre-mem.c reg-support.c \
 	inet.c Origin.c Fibsequence.c Buffer.c String.c
 ASRC   = enclu_ereport.s enclu_egetkey.s
 
-TOOLS = test-fusion
-ifneq (${CC}, musl-gcc)
-TOOLS += test-fusion-c++
-endif
-
-C++TOOLS = test-fusion-c++
-
 LIBNAME = SGXfusion
 LIBRARY = lib${LIBNAME}.a
 
@@ -55,6 +48,11 @@ ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles  \
 
 
 CC = musl-gcc
+
+TOOLS = test-fusion
+ifneq (${CC}, musl-gcc)
+TOOLS += test-fusion-c++
+endif
 
 CFLAGS = -Wall -O2 -fomit-frame-pointer -march=core2 -I ../.. -I ../../.. \
 	-I ../../../HurdLib
@@ -143,7 +141,7 @@ ${LIBRARY}: ${LIBOBJS}
 
 clean:
 	rm -f *.o *~ ldscript;
-	rm -f ${TOOLS} ${C++TOOLS};
+	rm -f ${TOOLS};
 	rm -f ${LIBRARY};
 	rm -f test-fusion.so test-fusion.signed.so;
 
