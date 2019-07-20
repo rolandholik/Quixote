@@ -14,3 +14,5 @@ Version 0.8:
 	* Update SGX capability tester to output launch registers.
 
 	* Support compilation under GCC.
+
+	* Support library usage in C++ based projects.
