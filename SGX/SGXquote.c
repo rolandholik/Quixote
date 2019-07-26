@@ -384,6 +384,7 @@ static _Bool generate_report(CO(SGXquote, this), CO(Buffer, quote), \
 	http->add_arg(http, "--secure-protocol=TLSv1_2");
 	http->add_arg(http, "--private-key="PRIVATE_KEY);
 	http->add_arg(http, "--certificate="PUBLIC_CERT);
+	http->add_arg(http, "--header=Content-Type: application/json");
 	http->add_arg(http, "-oias.log");
 
 	if ( !http_in->add(http_in, (unsigned char *) report->get(report), \
