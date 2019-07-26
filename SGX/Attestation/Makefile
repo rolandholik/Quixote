@@ -7,11 +7,15 @@
 
 
 # Variable declarations.
+INSTPATH       = ${DESTDIR}/opt/IDfusion
+INSTALLENCLAVE = LocalTarget.signed.so
+
 CSRC   = test-local-enclave.c test-remote-enclave.c
 ENCSRC1 = LocalTarget-enclave.c LocalTarget-interface.c
 ENCSRC2 = LocalSource-enclave.c LocalSource-interface.c
 
-TOOLS = test-local-target test-remote-target
+TOOLS	   = test-local-target test-remote-target
+INSTALLBIN = test-remote-target
 
 ENCLAVE_CC = gcc64
 
@@ -148,6 +152,11 @@ test-remote-target: test-remote-target.o ${LIBRARY_DEPENDS}
 test-remote-target.o: test-remote-target.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
+install-bin:
+	[ -d ${INSTPATH}/bin ] || mkdir -p ${INSTPATH}/bin;
+	install -s ${INSTALLBIN} ${INSTPATH}/bin;
+	[ -d ${INSTPATH}/lib/enclaves ] || mkdir -p ${INSTPATH}/lib/enclaves;
+	install ${INSTALLENCLAVE} ${INSTPATH}/lib/enclaves;
 
 clean:
 	rm -f *.o *~ ldscript;

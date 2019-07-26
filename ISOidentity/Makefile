@@ -6,12 +6,16 @@
 # **************************************************************************/
 
 # Variable declarations.
+INSTPATH       = ${DESTDIR}/opt/IDfusion
+
 CSRC = Actor.c Subject.c ExchangeEvent.c ISOidentity.c ContourPoint.c \
 	cboot.c cboot-mgr.c compute-aggregate.c
 
 TOOLS = test-actor test-subject test-event generate-contours sha-tool	  \
 	compute-measurement set-behavior cboot cboot-mgr test-ISOidentity \
 	compute-aggregate bad-actor
+INSTALLBIN  = generate-contours sha-tool cboot-mgr
+INSTALLSBIN = set-behavior cboot
 
 CC = musl-gcc
 
@@ -117,6 +121,15 @@ cboot-mgr: cboot-mgr.o ../SGX/ISOidentity/ISOmanager.o \
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};
+
+install-bin:
+	[ -d ${INSTPATH}/bin ] || mkdir -p ${INSTPATH}/bin;
+	install -s ${INSTALLBIN} ${INSTPATH}/bin;
+	[ -d ${INSTPATH}/sbin ] || mkdir -p ${INSTPATH}/sbin;
+	install -s ${INSTALLSBIN} ${INSTPATH}/sbin;
+	[ -e /distrib/SRDE/opt/IDfusion/sbin/runc ] && \
+		install /distrib/SRDE/opt/IDfusion/sbin/runc ${INSTPATH}/sbin;
+
 clean:
 	rm -f *.o *~ TAGS;
 	rm -f ${TOOLS};

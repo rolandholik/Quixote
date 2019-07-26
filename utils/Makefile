@@ -143,6 +143,10 @@ tpm2-cmd: tpm2-cmd.o
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};
+
+install-bin:
+	@echo "Nothing to install.";
+
 clean:
 	rm -f *.o *~ TAGS;
 	rm -f ${TOOLS};

@@ -23,6 +23,9 @@ edi-receiver: edi-receiver.o EDIpacket.o
 send-edi: send-edi.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
+install-bin:
+	@echo "Nothing to install.";
+
 # Source file specific rules.
 edi-engine.o: edi-engine.c edi.h
 	${CC} ${CFLAGS} -I../utils -I.. -c $< -o $@;

@@ -7,6 +7,11 @@
 
 
 # Variable declarations.
+INSTPATH      = ${DESTDIR}/opt/IDfusion
+INSTALLBIN    = sgx-check sgx-gen-token sgx-gen-verifier sgx-load \
+	sgx-metadata  sgx-provision
+INSTALLSCRIPT = provision-epid provision-tokens provision-verifier
+
 SUBDIRS = SGXlibs Attestation ISOidentity
 
 CSRC = SGXmetadata.c SGXloader.c SGXenclave.c SGXsigstruct.c PVEenclave.c   \
@@ -210,7 +215,6 @@ LE.h: generate-array
 TE.h: generate-array
 	./generate-array -i TE.h -n TE_image > $@ || rm $@;
 
-
 #
 # Subdirectory targets.
 #
@@ -223,6 +227,21 @@ Attestation:
 ISOidentity:
 	${MAKE} -C $@;
 
+install-bin:
+	[ -d ${INSTPATH}/etc ] || mkdir -p ${INSTPATH}/etc;
+	touch ${INSTPATH}/etc/host.idt ${INSTPATH}/etc/ias-cert.pem \
+		${INSTPATH}/etc/ias-key.pem ${INSTPATH}/etc/spid.txt;
+	[ -d ${INSTPATH}/etc/verifiers ] || mkdir -p ${INSTPATH}/etc/verifiers;
+	[ -d ${INSTPATH}/etc/verifiers/ISOidentity ] || \
+		mkdir -p ${INSTPATH}/etc/verifiers/ISOidentity;
+	[ -d ${INSTPATH}/etc/verifiers/ISOmanager ] || \
+		mkdir ${INSTPATH}/etc/verifiers/ISOmanager;
+	[ -d ${INSTPATH}/lib ] || mkdir -p ${INSTPATH}/lib;
+	[ -d ${INSTPATH}/lib ] || mkdir -p ${INSTPATH}/lib/enclaves;
+	[ -d ${INSTPATH}/bin ] || mkdir -p ${INSTPATH}/bin;
+	install -s ${INSTALLBIN} ${INSTPATH}/bin;
+	install ${INSTALLSCRIPT} ${INSTPATH}/bin;
+	set -e; for dir in ${SUBDIRS}; do ${MAKE} -C $$dir $@; done;
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};

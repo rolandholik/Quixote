@@ -79,6 +79,9 @@ recip-svr: recip-svr.o IDengine.o Identity.o
 fwd-id: fwd-id.o IDengine.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
+install-bin:
+	@echo "Nothing to install.";
+
 clean:
 	rm -f *.o *~ TAGS;
 	rm -f ${BINARIES};

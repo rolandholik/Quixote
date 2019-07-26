@@ -163,6 +163,9 @@ SGX:
 ISOidentity:
 	${MAKE} -C $@;
 
+install-bin:
+	set -e; for dir in ${SUBDIRS}; do ${MAKE} -C $$dir $@; done;
+
 tags:
 	/opt/emacs/bin/etags *.{h,c};
 

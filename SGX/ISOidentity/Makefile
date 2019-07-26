@@ -6,6 +6,9 @@
 # **************************************************************************/
 
 # Variable declarations.
+INSTPATH       = ${DESTDIR}/opt/IDfusion
+INSTALLENCLAVE = ISOidentity.signed.so ISOmanager.signed.so
+
 CSRC   = test-ISOidentity-enclave.c ISOenclave.c ISOmanager.c
 ENCSRC = ISOidentity-enclave.c ISOidentity-interface.c ISOidentity-manager.c \
 	ContourPoint.c Actor.c Subject.c ExchangeEvent.c ISOidentity.c
@@ -152,6 +155,9 @@ ISOenclave.o: ISOenclave.c
 ISOmanager.o: ISOmanager.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
+install-bin:
+	[ -d ${INSTPATH}/lib/enclaves ] || mkdir -p ${INSTPATH}/lib/enclaves;
+	install ${INSTALLENCLAVE} ${INSTPATH}/lib/enclaves;
 
 clean:
 	rm -f *.o *~ ldscript;

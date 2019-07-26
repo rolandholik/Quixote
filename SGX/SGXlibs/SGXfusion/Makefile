@@ -7,6 +7,9 @@
 
 
 # Variable declarations.
+INSTPATH       = ${DESTDIR}/opt/IDfusion
+INSTALLENCLAVE = test-fusion.signed.so
+
 CSRC   = test-fusion.c
 ENCSRC = test-fusion-enclave.c test-fusion-interface.c
 LIBSRC = fusion-shim.c regcomp.c regexec.c regerror.c tre-mem.c reg-support.c \
@@ -50,6 +53,8 @@ ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles  \
 CC = musl-gcc
 
 TOOLS = test-fusion
+INSTALLBIN = ${TOOLS}
+
 ifneq (${CC}, musl-gcc)
 TOOLS += test-fusion-c++
 endif
@@ -138,6 +143,12 @@ test-fusion-c++.o: test-fusion-c++.cpp
 ${LIBRARY}: ${LIBOBJS}
 	ar r ${LIBRARY} $^;
 	ranlib ${LIBRARY};
+
+install-bin:
+	[ -d ${INSTPATH}/bin ] || mkdir -p ${INSTPATH}/bin;
+	install -s ${INSTALLBIN} ${INSTPATH}/bin;
+	[ -d ${INSTPATH}/lib/enclaves ] || mkdir -p ${INSTPATH}/lib/enclaves;
+	install ${INSTALLENCLAVE} ${INSTPATH}/lib/enclaves;
 
 clean:
 	rm -f *.o *~ ldscript;

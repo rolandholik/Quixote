@@ -7,6 +7,10 @@
 
 
 # Variable declarations.
+INSTPATH       = ${DESTDIR}/opt/IDfusion
+INSTALLENCLAVE = test-naaaim.signed.so test-Duct.signed.so \
+	test-Possum.signed.so
+
 CSRC   = test-naaaim.c
 ENCSRC = test-naaaim-enclave.c test-naaaim-interface.c
 LIBSRC = SHA256.c RandomBuffer.c Curve25519.c SHA256_hmac.c AES256_cbc.c \
@@ -61,6 +65,8 @@ ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles  \
 CC = musl-gcc
 
 TOOLS = test-naaaim test-Duct test-Possum
+INSTALLBIN = ${TOOLS}
+
 C++TOOLS = test-naaaim-c++
 ifneq (${CC}, musl-gcc)
 TOOLS += ${C++TOOLS}
@@ -196,6 +202,12 @@ test-Possum.o: test-Possum.c
 ${LIBRARY}: ${LIBOBJS}
 	ar r ${LIBRARY} $^;
 	ranlib ${LIBRARY};
+
+install-bin:
+	[ -d ${INSTPATH}/bin ] || mkdir -p ${INSTPATH}/bin;
+	install -s ${INSTALLBIN} ${INSTPATH}/bin;
+	[ -d ${INSTPATH}/lib/enclaves ] || mkdir -p ${INSTPATH}/lib/enclaves;
+	install ${INSTALLENCLAVE} ${INSTPATH}/lib/enclaves;
 
 clean:
 	rm -f *.o *~ ldscript;
