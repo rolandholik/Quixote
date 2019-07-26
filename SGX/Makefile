@@ -236,6 +236,9 @@ install-bin:
 		mkdir -p ${INSTPATH}/etc/verifiers/ISOidentity;
 	[ -d ${INSTPATH}/etc/verifiers/ISOmanager ] || \
 		mkdir ${INSTPATH}/etc/verifiers/ISOmanager;
+	[ -e /distrib/SRDE/opt/IDfusion/etc/ca-bundle.pem ] &&		    \
+		install -m 644 /distrib/SRDE/opt/IDfusion/etc/ca-bundle.pem \
+			${INSTPATH}/etc;
 	[ -d ${INSTPATH}/lib ] || mkdir -p ${INSTPATH}/lib;
 	[ -d ${INSTPATH}/lib ] || mkdir -p ${INSTPATH}/lib/enclaves;
 	[ -d ${INSTPATH}/bin ] || mkdir -p ${INSTPATH}/bin;

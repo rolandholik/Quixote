@@ -11,6 +11,7 @@
  **************************************************************************/
 
 /* Local defines. */
+#define CA_BUNDLE   "/opt/IDfusion/etc/ca-bundle.pem"
 #define PRIVATE_KEY "/opt/IDfusion/etc/ias-key.pem"
 #define PUBLIC_CERT "/opt/IDfusion/etc/ias-cert.pem"
 
@@ -380,8 +381,8 @@ static _Bool generate_report(CO(SGXquote, this), CO(Buffer, quote), \
 
 	http->add_arg(http, "-v");
 	http->add_arg(http, "-S");
-	http->add_arg(http, "--no-check-certificate");
 	http->add_arg(http, "--secure-protocol=TLSv1_2");
+	http->add_arg(http, "--ca-certificate="CA_BUNDLE);
 	http->add_arg(http, "--private-key="PRIVATE_KEY);
 	http->add_arg(http, "--certificate="PUBLIC_CERT);
 	http->add_arg(http, "--header=Content-Type: application/json");
