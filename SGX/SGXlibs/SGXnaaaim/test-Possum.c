@@ -127,7 +127,7 @@ extern int main(int argc, char *argv[])
 	char *id_token	   = NULL,
 	     *verifier	   = NULL,
 	     *spid_fname   = SPID_FILENAME,
-	     *token	   = "test-Possum.token",
+	     *token	   = SGX_TOKEN_DIRECTORY"/test-Possum.token",
 	     *hostname	   = "localhost",
 	     *enclave_name = ENCLAVE_NAME;
 

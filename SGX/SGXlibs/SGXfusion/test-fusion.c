@@ -118,7 +118,7 @@ extern int main(int argc, char *argv[])
 	_Bool debug	    = false,
 	      debug_enclave = true;
 
-	char *token	   = NULL,
+	char *token	   = SGX_TOKEN_DIRECTORY"/test-fusion.token",
 	     *sgx_device   = "/dev/isgx",
 	     *enclave_name = ENCLAVE_NAME;
 
