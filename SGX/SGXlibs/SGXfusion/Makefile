@@ -16,7 +16,7 @@ LIBSRC = fusion-shim.c regcomp.c regexec.c regerror.c tre-mem.c reg-support.c \
 	inet.c Origin.c Fibsequence.c Buffer.c String.c
 ASRC   = enclu_ereport.s enclu_egetkey.s
 
-LIBNAME = SGXfusion
+LIBNAME = SRDEfusion
 LIBRARY = lib${LIBNAME}.a
 
 ENCLAVE_CC = gcc64

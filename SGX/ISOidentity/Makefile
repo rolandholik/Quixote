@@ -45,7 +45,7 @@ ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles  \
 	-L . -L ${SGX_LIBRARY_PATH} -L ${SSL_LIBRARY_PATH}		     \
 	-L ../SGXlibs/SGXfusion	-L ../SGXlibs/SGXnaaaim			     \
 	-Wl,--whole-archive						     \
-	-l${SGX_TRTS_LIB} -lSGXfusion					     \
+	-l${SGX_TRTS_LIB} -lSRDEfusion					     \
 	-Wl,--no-whole-archive						     \
 	-Wl,--start-group						     \
 	-lsgx_tstdc -l${SGX_CRYPTO_LIB} -l${SGX_SERVICE_LIBRARY} -lSGXnaaaim \
