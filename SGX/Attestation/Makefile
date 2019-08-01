@@ -73,8 +73,8 @@ HURDLIB	     = -L ../../HurdLib -lHurdLib
 NAAAIM_LIBRARY = ../../lib/libNAAAIM.a
 NAAAIMLIB      = -L ../../lib -lNAAAIM
 
-RDK_LIBRARY = ../libSGXrdk.a
-RDKLIB	    = -L ../ -lSGXrdk
+RDK_LIBRARY = ../libSRDEruntime.a
+RDKLIB	    = -L ../ -lSRDEruntime
 
 ifeq (${CC}, musl-gcc)
 SSL_INCLUDE = /usr/local/musl/include

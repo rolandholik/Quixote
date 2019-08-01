@@ -76,8 +76,8 @@ ELFLIB	= -lelf
 HURD_LIBRARY = ../../../HurdLib
 HURDLIB	     = -L ../../../HurdLib -lHurdLib
 
-RDK_LIBRARY = ../../libSGXrdk.a
-RDKLIB	    = -L ../../ -lSGXrdk
+RDK_LIBRARY = ../../libSRDEruntime.a
+RDKLIB	    = -L ../../ -lSRDEruntime
 
 
 #

@@ -21,7 +21,7 @@ CSRC = SGXmetadata.c SGXloader.c SGXenclave.c SGXsigstruct.c PVEenclave.c   \
 
 ASRC = boot-sgx.s
 
-LIBRARY = libSGXrdk.a
+LIBRARY = libSRDEruntime.a
 
 TOOLS = sgx-check sgx-metadata sgx-loader sgx-load sgx-sigstruct	     \
 	sgx-gen-token test-ecall test-pcr idf-sgx-fandf	idf-sgx-fandf-unibin \
@@ -66,7 +66,7 @@ endif
 NAAAIM_LIB = -L../lib -lNAAAIM
 
 # SGXrdk library definition.
-RDKLIB = -L . -lSGXrdk
+RDKLIB = -L . -lSRDEruntime
 
 # Sources for SGX include files, used by sdk-compute-size utility.
 SGXSDK = /u/usr/src/SGX/linux-sgx
