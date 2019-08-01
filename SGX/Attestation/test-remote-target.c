@@ -12,9 +12,11 @@
 
 
 /* Local defines. */
-#define PGM "test-remote-target"
+#define PGM	"test-remote-target"
+#define ENCLAVE "LocalTarget.signed.so"
 
 
+/* Include files. */
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -112,8 +114,8 @@ extern int main(int argc, char *argv[])
 	     *quote_token    = SGX_TOKEN_DIRECTORY"/libsgx_qe.token",
 	     *pce_token	     = SGX_TOKEN_DIRECTORY"/libsgx_pce.token",
 	     *spid_fname     = SPID_FILENAME,
-	     *source_token   = "target.token",
-	     *source_enclave = "LocalTarget.signed.so";
+	     *source_token   = SGX_TOKEN_DIRECTORY"/LocalTarget.token",
+	     *source_enclave = ENCLAVE_NAME;
 
 	int rc,
 	    opt,
@@ -152,7 +154,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "Te:p:q:s:")) != EOF )
+	while ( (opt = getopt(argc, argv, "Te:p:q:s:t:")) != EOF )
 		switch ( opt ) {
 			case 'T':
 				mode = trusted;
@@ -168,6 +170,9 @@ extern int main(int argc, char *argv[])
 				break;
 			case 's':
 				spid_fname = optarg;
+				break;
+			case 't':
+				source_token = optarg;
 				break;
 		}
 
