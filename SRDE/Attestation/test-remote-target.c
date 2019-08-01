@@ -38,7 +38,7 @@
 #include <Base64.h>
 #include <HTTP.h>
 
-#include "SGX.h"
+#include "SRDE.h"
 #include "SRDEenclave.h"
 #include "SGXquote.h"
 #include "SGXepid.h"

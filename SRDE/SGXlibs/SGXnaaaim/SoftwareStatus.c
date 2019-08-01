@@ -53,7 +53,7 @@
 #include <Buffer.h>
 #include <String.h>
 
-#include <SGX.h>
+#include <SRDE.h>
 #include <SGXfusion.h>
 
 #include "NAAAIM.h"

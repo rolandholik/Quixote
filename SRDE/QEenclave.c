@@ -40,7 +40,7 @@
 
 #include "NAAAIM.h"
 #include "RandomBuffer.h"
-#include "SGX.h"
+#include "SRDE.h"
 #include "SRDEenclave.h"
 #include "SGXepid.h"
 #include "QEenclave.h"

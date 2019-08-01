@@ -20,7 +20,7 @@
 #include <Ivy.h>
 #include <PossumPipe.h>
 
-#include <SGX.h>
+#include <SRDE.h>
 #include <SGXfusion.h>
 
 #include <cboot.h>

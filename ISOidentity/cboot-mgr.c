@@ -51,7 +51,7 @@
 #include <IDtoken.h>
 #include <ISOmanager.h>
 
-#include <SGX.h>
+#include <SRDE.h>
 #include <SGXquote.h>
 
 #include "cboot.h"

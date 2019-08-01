@@ -37,7 +37,7 @@
 #include "NAAAIM.h"
 #include "SHA256.h"
 #include "RandomBuffer.h"
-#include "SGX.h"
+#include "SRDE.h"
 #include "SRDEenclave.h"
 #include "PCEenclave.h"
 #include "SGXmessage.h"

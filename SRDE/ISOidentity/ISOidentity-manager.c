@@ -29,7 +29,7 @@
 #include <IDtoken.h>
 #include <Ivy.h>
 
-#include <SGX.h>
+#include <SRDE.h>
 #include <SGXfusion.h>
 
 #include <cboot.h>

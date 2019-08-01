@@ -36,7 +36,7 @@
 #include "NAAAIM.h"
 #include "Base64.h"
 #include "HTTP.h"
-#include "SGX.h"
+#include "SRDE.h"
 #include "QEenclave.h"
 #include "PCEenclave.h"
 #include "SGXquote.h"

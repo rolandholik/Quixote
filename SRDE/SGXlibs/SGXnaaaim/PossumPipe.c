@@ -59,7 +59,7 @@
 #if 0
 #include "TPMcmd.h"
 #else
-#include <SGX.h>
+#include <SRDE.h>
 #include <SGXfusion.h>
 #include <SGXquote.h>
 #endif

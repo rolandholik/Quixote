@@ -38,7 +38,7 @@
 #include <PossumPipe.h>
 #include <IDtoken.h>
 
-#include <SGX.h>
+#include <SRDE.h>
 #include <SRDEenclave.h>
 #include <SGXquote.h>
 

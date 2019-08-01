@@ -227,8 +227,8 @@ test-naaaim-interface.o: test-naaaim-interface.h
 test-Duct-enclave.o: ${NAAAIMDIR}/Duct.h
 test-Duct-interface.o: test-Duct-interface.h
 
-test-Possum-enclave.o: test-Possum-interface.h RandomBuffer.h IDtoken.h	  \
-	PossumPipe.h ${NAAAIMDIR}/Ivy.h ${NAAAIMDIR}/SHA256.h ../../SGX.h \
+test-Possum-enclave.o: test-Possum-interface.h RandomBuffer.h IDtoken.h	   \
+	PossumPipe.h ${NAAAIMDIR}/Ivy.h ${NAAAIMDIR}/SHA256.h ../../SRDE.h \
 	../SGXfusion/SGXfusion.h
 
 test-Possum-interface.o: test-Possum-interface.h
@@ -251,9 +251,9 @@ PossumPipe.o: PossumPipe.h IDtoken.h ${NAAAIMDIR}/SHA256.h		    \
 	${NAAAIMDIR}/Duct.h ${NAAAIMDIR}/SoftwareStatus.h		    \
 	${NAAAIMDIR}/Curve25519.h PossumPacket.h ${NAAAIMDIR}/IDmgr.h	    \
 	${NAAAIMDIR}/Ivy.h
-SoftwareStatus.o: ${NAAAIMDIR}/SoftwareStatus.h ../../SGX.h	\
+SoftwareStatus.o: ${NAAAIMDIR}/SoftwareStatus.h ../../SRDE.h	\
 	../SGXfusion/SGXfusion.h ${NAAAIMDIR}/SHA256.h
-SoftwareStatus.o: ${NAAAIMDIR}/SoftwareStatus.h ../../SGX.h	\
+SoftwareStatus.o: ${NAAAIMDIR}/SoftwareStatus.h ../../SRDE.h	\
 	../SGXfusion/SGXfusion.h ${NAAAIMDIR}/SHA256.h
 OTEDKS.o: ${NAAAIMDIR}/OTEDKS.h ${NAAAIMDIR}/IDmgr.h ${NAAAIMDIR}/Ivy.h
 IDmgr.o: IDtoken.h ${NAAAIMDIR}/IDmgr.h

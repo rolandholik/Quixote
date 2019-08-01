@@ -34,7 +34,7 @@
 #include <NAAAIM.h>
 #include <Duct.h>
 
-#include "../SRDE/SGX.h"
+#include "../SRDE/SRDE.h"
 #include "../SRDE/SRDEenclave.h"
 #include <SGXquote.h>
 

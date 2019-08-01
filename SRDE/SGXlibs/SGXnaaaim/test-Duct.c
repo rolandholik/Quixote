@@ -34,7 +34,7 @@
 
 #include <NAAAIM.h>
 #include <Duct.h>
-#include <SGX.h>
+#include <SRDE.h>
 #include <SRDEenclave.h>
 
 #include "test-Duct-interface.h"

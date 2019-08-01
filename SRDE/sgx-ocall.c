@@ -19,7 +19,7 @@
 
 #include <HurdLib.h>
 
-#include "SGX.h"
+#include "SRDE.h"
 #include "SRDEenclave.h"
 
 

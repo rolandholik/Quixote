@@ -78,7 +78,7 @@
 #include <SHA256.h>
 #include <IDtoken.h>
 
-#include <SGX.h>
+#include <SRDE.h>
 #include <ISOenclave.h>
 
 #include "ContourPoint.h"

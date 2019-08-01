@@ -35,7 +35,7 @@
 #include <File.h>
 
 #include <NAAAIM.h>
-#include <SGX.h>
+#include <SRDE.h>
 #include <SRDEenclave.h>
 
 

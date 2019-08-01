@@ -32,7 +32,7 @@
 #include <String.h>
 
 #include "NAAAIM.h"
-#include "SGX.h"
+#include "SRDE.h"
 #include "SGXquote.h"
 #include "Base64.h"
 

@@ -37,7 +37,7 @@
 #include <Buffer.h>
 
 #include "NAAAIM.h"
-#include "SGX.h"
+#include "SRDE.h"
 #include "SRDEenclave.h"
 #include "SGXmetadata.h"
 

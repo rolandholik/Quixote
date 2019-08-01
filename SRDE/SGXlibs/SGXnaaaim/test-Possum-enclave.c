@@ -33,7 +33,7 @@
 #include <Ivy.h>
 #include <SHA256.h>
 
-#include <SGX.h>
+#include <SRDE.h>
 #include <SGXfusion.h>
 
 #include "PossumPipe.h"

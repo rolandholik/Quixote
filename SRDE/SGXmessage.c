@@ -52,7 +52,7 @@
 #include "SHA256.h"
 
 #include "intel-messages.h"
-#include "SGX.h"
+#include "SRDE.h"
 #include "PCEenclave.h"
 #include "SGXmessage.h"
 #include "SGXcmac.h"

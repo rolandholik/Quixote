@@ -256,15 +256,15 @@ clean:
 
 
 # Source dependencies.
-sgx-metadata.o: SGX.h SRDEenclave.h SGXsigstruct.h SGXmetadata.h
+sgx-metadata.o: SRDE.h SRDEenclave.h SGXsigstruct.h SGXmetadata.h
 sgx-load.o: SRDEenclave.h
 sgx-provision.o: PVEenclave.h
 
-SGXmetadata.o: SGX.h SGXmetadata.h
-SGXloader.o: SGX.h SGXloader.h
-SRDEenclave.o: SGX.h SRDEenclave.h SGXmetadata.h SGXloader.h
-SGXsigstruct.o: SGX.h SGXsigstruct.h sigstruct.h
-PVEenclave.o: SGX.h SRDEenclave.h PVEenclave.h
+SGXmetadata.o: SRDE.h SGXmetadata.h
+SGXloader.o: SRDE.h SGXloader.h
+SRDEenclave.o: SRDE.h SRDEenclave.h SGXmetadata.h SGXloader.h
+SGXsigstruct.o: SRDE.h SGXsigstruct.h sigstruct.h
+PVEenclave.o: SRDE.h SRDEenclave.h PVEenclave.h
 SGXmessage.o: SGXmessage.h
-QEenclave.o: SGX.h SRDEenclave.h QEenclave.h
-SGXquote.o: SGX.h QEenclave.h PCEenclave.h SGXquote.h
+QEenclave.o: SRDE.h SRDEenclave.h QEenclave.h
+SGXquote.o: SRDE.h QEenclave.h PCEenclave.h SGXquote.h

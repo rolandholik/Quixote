@@ -24,7 +24,7 @@
 
 #include <NAAAIM.h>
 
-#include "SGX.h"
+#include "SRDE.h"
 #include "SGXsigstruct.h"
 
 

@@ -43,7 +43,7 @@
 #include <SoftwareStatus.h>
 #include <Ivy.h>
 
-#include "SGX.h"
+#include "SRDE.h"
 #include "SRDEenclave.h"
 #include "SGXmetadata.h"
 

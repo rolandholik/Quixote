@@ -16,7 +16,7 @@
 #include <NAAAIM.h>
 #include <Curve25519.h>
 
-#include <SGX.h>
+#include <SRDE.h>
 #include <SGXfusion.h>
 
 #include "LocalSource-interface.h"

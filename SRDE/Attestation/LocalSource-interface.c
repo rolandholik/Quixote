@@ -20,7 +20,7 @@
 
 #include <HurdLib.h>
 
-#include "../SGX.h"
+#include "../SRDE.h"
 #include "LocalSource-interface.h"
 
 

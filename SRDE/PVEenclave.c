@@ -42,7 +42,7 @@
 
 #include "NAAAIM.h"
 #include "RandomBuffer.h"
-#include "SGX.h"
+#include "SRDE.h"
 #include "SRDEenclave.h"
 #include "PCEenclave.h"
 #include "SGXmessage.h"
@@ -135,7 +135,7 @@ struct msg2_blob_input {
 
 /**
  * Structure used to define platform software version.  Needs to
- * be lifted into SGX.h.
+ * be lifted into SRDE.h.
  */
 struct psvn {
 	uint8_t cpu_svn[16];

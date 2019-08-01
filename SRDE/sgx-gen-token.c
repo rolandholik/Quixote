@@ -33,7 +33,7 @@
 
 #include "NAAAIM.h"
 #include "SHA256.h"
-#include "SGX.h"
+#include "SRDE.h"
 #include "SRDEenclave.h"
 #include "SGXmetadata.h"
 

@@ -36,7 +36,7 @@
 #include <RandomBuffer.h>
 #include <HTTP.h>
 
-#include "SGX.h"
+#include "SRDE.h"
 #include "PCEenclave.h"
 #include "SGXmessage.h"
 #include "SGXepid.h"
