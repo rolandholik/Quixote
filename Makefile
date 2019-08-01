@@ -13,7 +13,7 @@ CSRC = 	OrgID.c PatientID.c Authenticator.c AuthenReply.c IDqueryReply.c \
 # 	provider-server
 SERVERS = root-referral device-broker user-broker
 
-SUBDIRS = idgine utils edi SGX ISOidentity # client
+SUBDIRS = idgine utils edi SRDE ISOidentity # client
 
 # CC = gcc
 CC = musl-gcc

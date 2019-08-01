@@ -34,8 +34,8 @@
 #include <NAAAIM.h>
 #include <Duct.h>
 
-#include "../SGX/SGX.h"
-#include "../SGX/SGXenclave.h"
+#include "../SRDE/SGX.h"
+#include "../SRDE/SGXenclave.h"
 #include <SGXquote.h>
 
 #include <ContourPoint.h>

@@ -55,15 +55,16 @@ ELFLIB = -lelf
 HURD_LIBRARY = ../HurdLib/libHurdLib.a
 HURDLIB	     = -L ../HurdLib -lHurdLib
 
-RDK_LIBRARY = ../SGX/libSGXrdk.a
-RDKLIB	    = -L ../SGX -lSGXrdk ${ELFLIB}
+RDK_LIBRARY = ../SRDE/libSGXrdk.a
+RDKLIB	    = -L ../SRDE -lSGXrdk ${ELFLIB}
 
 NAAAIM_LIBRARY = ../lib/libNAAAIM.a
 NAAAIMLIB      = -L ../lib -lNAAAIM
 
 LIBS = ${NAAAIMLIB} ${HURDLIB}
 
-CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I ../SGX/ISOidentity -I ../SGX
+CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I ../SRDE/ISOidentity \
+	-I ../SRDE
 
 
 #
@@ -107,16 +108,17 @@ sha-tool: sha-tool.o
 set-behavior: set-behavior.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS}
 
-cboot: cboot.o ../SGX/ISOidentity/ISOenclave.o ISOidentity.o ContourPoint.o \
-	ExchangeEvent.o Actor.o Subject.o ${RDK_LIBRARY}  ${NAAAIM_LIBRARY} \
+cboot: cboot.o ../SRDE/ISOidentity/ISOenclave.o ISOidentity.o ContourPoint.o \
+	ExchangeEvent.o Actor.o Subject.o ${RDK_LIBRARY} ${NAAAIM_LIBRARY}   \
 	${HURD_LIBRARY}
-	${CC} ${LDFLAGS} -o $@ $< ISOidentity.o ContourPoint.o		    \
-		ExchangeEvent.o Actor.o Subject.o 			    \
-		../SGX/ISOidentity/ISOenclave.o ${RDKLIB} ${LIBS} ${SSL_CRYPTO}
+	${CC} ${LDFLAGS} -o $@ $< ISOidentity.o ContourPoint.o		     \
+		ExchangeEvent.o Actor.o Subject.o 			     \
+		../SRDE/ISOidentity/ISOenclave.o ${RDKLIB} ${LIBS}	     \
+		${SSL_CRYPTO}
 
-cboot-mgr: cboot-mgr.o ../SGX/ISOidentity/ISOmanager.o \
+cboot-mgr: cboot-mgr.o ../SRDE/ISOidentity/ISOmanager.o \
 	${RDK_LIBRARY} ${NAAAIM_LIBRARY} ${HURD_LIBRARY}
-	${CC} ${LDFLAGS} -o $@ $< ../SGX/ISOidentity/ISOmanager.o \
+	${CC} ${LDFLAGS} -o $@ $< ../SRDE/ISOidentity/ISOmanager.o \
 		${RDKLIB} ${LIBS} ${SSL_CRYPTO}
 
 tags:
