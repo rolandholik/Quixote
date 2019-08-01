@@ -157,7 +157,7 @@ lib:
 utils:
 	${MAKE} -C $@;
 
-SGX:
+SRDE:
 	${MAKE} -C $@;
 
 ISOidentity:
