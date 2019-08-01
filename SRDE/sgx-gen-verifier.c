@@ -44,7 +44,7 @@
 #include <Ivy.h>
 
 #include "SGX.h"
-#include "SGXenclave.h"
+#include "SRDEenclave.h"
 #include "SGXmetadata.h"
 
 

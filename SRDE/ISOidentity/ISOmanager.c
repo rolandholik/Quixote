@@ -34,7 +34,7 @@
 #include <Duct.h>
 
 #include "../SRDE/SGX.h"
-#include "../SRDE/SGXenclave.h"
+#include "../SRDE/SRDEenclave.h"
 #include <SGXquote.h>
 
 #include <ContourPoint.h>
@@ -167,7 +167,7 @@ struct NAAAIM_ISOmanager_State
 	int enclave_error;
 
 	/* SGX enclave object. */
-	SGXenclave enclave;
+	SRDEenclave enclave;
 };
 
 
@@ -236,7 +236,7 @@ static _Bool load_enclave(CO(ISOmanager, this), CO(char *, enclave), \
 
 
 	/* Load and initialize the enclave. */
-	INIT(NAAAIM, SGXenclave, S->enclave, ERR(goto done));
+	INIT(NAAAIM, SRDEenclave, S->enclave, ERR(goto done));
 
 	if ( !S->enclave->setup(S->enclave, enclave, token, true) )
 		ERR(goto done);

@@ -39,20 +39,20 @@
 
 #include "NAAAIM.h"
 #include "SGX.h"
-#include "SGXenclave.h"
+#include "SRDEenclave.h"
 #include "SGXloader.h"
 #include "SGXsigstruct.h"
 
 
 /* Object state extraction macro. */
-#define STATE(var) CO(SGXenclave_State, var) = this->state
+#define STATE(var) CO(SRDEenclave_State, var) = this->state
 
 /* Verify library/object header file inclusions. */
 #if !defined(NAAAIM_LIBID)
 #error Library identifier not defined.
 #endif
 
-#if !defined(NAAAIM_SGXenclave_OBJID)
+#if !defined(NAAAIM_SRDEenclave_OBJID)
 #error Object identifier not defined.
 #endif
 
@@ -61,8 +61,8 @@
 extern int boot_sgx(struct SGX_tcs *, long fn, const void *, void *, void *);
 
 
-/** SGXenclave private state information. */
-struct NAAAIM_SGXenclave_State
+/** SRDEenclave private state information. */
+struct NAAAIM_SRDEenclave_State
 {
 	/* The root object. */
 	Origin root;
@@ -139,17 +139,17 @@ int sgx_ocall(unsigned int ocall_slot, void *ocall_table, void *ocall_data, \
 /**
  * Internal private method.
  *
- * This method is responsible for initializing the NAAAIM_SGXenclave_State
+ * This method is responsible for initializing the NAAAIM_SRDEenclave_State
  * structure which holds state information for each instantiated object.
  *
  * \param S A pointer to the object containing the state information which
  *        is to be initialized.
  */
 
-static void _init_state(CO(SGXenclave_State, S)) {
+static void _init_state(CO(SRDEenclave_State, S)) {
 
 	S->libid = NAAAIM_LIBID;
-	S->objid = NAAAIM_SGXenclave_OBJID;
+	S->objid = NAAAIM_SRDEenclave_OBJID;
 
 
 	S->poisoned = false;
@@ -203,8 +203,8 @@ static void _init_state(CO(SGXenclave_State, S)) {
  *		called.
  */
 
-static _Bool setup(CO(SGXenclave, this), CO(char *, name), CO(char *, token), \
-		  const _Bool debug)
+static _Bool setup(CO(SRDEenclave, this), CO(char *, name), \
+		   CO(char *, token), const _Bool debug)
 
 {
 	_Bool retn = false;
@@ -283,7 +283,7 @@ static _Bool setup(CO(SGXenclave, this), CO(char *, name), CO(char *, token), \
  *		enclave is ready for creation.
  */
 
-static _Bool open_enclave(CO(SGXenclave, this), CO(char *, device), \
+static _Bool open_enclave(CO(SRDEenclave, this), CO(char *, device), \
 			  CO(char *, enclave), _Bool debug)
 
 {
@@ -341,8 +341,8 @@ static _Bool open_enclave(CO(SGXenclave, this), CO(char *, device), \
  *		enclave is ready for creation.
  */
 
-static _Bool open_enclave_memory(CO(SGXenclave, this), CO(char *, device),  \
-				 const char * enclave, size_t enclave_size, \
+static _Bool open_enclave_memory(CO(SRDEenclave, this), CO(char *, device),  \
+				 const char * enclave, size_t enclave_size,  \
 				 _Bool debug)
 
 {
@@ -388,7 +388,7 @@ static _Bool open_enclave_memory(CO(SGXenclave, this), CO(char *, device),  \
  *		enclave was successfully created.
  */
 
-static _Bool create_enclave(CO(SGXenclave, this))
+static _Bool create_enclave(CO(SRDEenclave, this))
 
 {
 	STATE(S);
@@ -447,7 +447,7 @@ static _Bool create_enclave(CO(SGXenclave, this))
  *		enclave was successfully loaded.
  */
 
-static _Bool load_enclave(CO(SGXenclave, this))
+static _Bool load_enclave(CO(SRDEenclave, this))
 
 {
 	STATE(S);
@@ -557,7 +557,7 @@ static uint64_t _cpu_info(void)
  *		enclave was initialized.
  */
 
-static _Bool _init_enclave(CO(SGXenclave, this), int *rc)
+static _Bool _init_enclave(CO(SRDEenclave, this), int *rc)
 
 {
 	STATE(S);
@@ -607,7 +607,7 @@ static _Bool _init_enclave(CO(SGXenclave, this), int *rc)
  *			loaded.
  */
 
-static _Bool init_enclave(CO(SGXenclave, this), struct SGX_einittoken *token)
+static _Bool init_enclave(CO(SRDEenclave, this), struct SGX_einittoken *token)
 
 {
 	STATE(S);
@@ -689,7 +689,7 @@ static _Bool init_enclave(CO(SGXenclave, this), struct SGX_einittoken *token)
  *			successfully loaded.
  */
 
-static _Bool init_launch_enclave(CO(SGXenclave, this))
+static _Bool init_launch_enclave(CO(SRDEenclave, this))
 
 {
 	STATE(S);
@@ -783,7 +783,7 @@ static _Bool init_launch_enclave(CO(SGXenclave, this))
  *		enclave was successfully loaded.
  */
 
-static _Bool add_page(CO(SGXenclave, this), CO(uint8_t *, page), \
+static _Bool add_page(CO(SRDEenclave, this), CO(uint8_t *, page), \
 		      struct SGX_secinfo *secinfo, const uint8_t flags)
 
 {
@@ -842,7 +842,7 @@ static _Bool add_page(CO(SGXenclave, this), CO(uint8_t *, page), \
  *		hole was successfully punched.
  */
 
-static _Bool add_hole(CO(SGXenclave, this))
+static _Bool add_hole(CO(SRDEenclave, this))
 
 {
 	STATE(S);
@@ -874,7 +874,7 @@ static _Bool add_hole(CO(SGXenclave, this))
  *		multipled by the page size of the enclave.
  */
 
-static unsigned long int get_address(CO(SGXenclave, this))
+static unsigned long int get_address(CO(SRDEenclave, this))
 
 {
 	STATE(S);
@@ -910,7 +910,7 @@ static unsigned long int get_address(CO(SGXenclave, this))
  *		thread was successfully added.
  */
 
-static _Bool add_thread(CO(SGXenclave, this))
+static _Bool add_thread(CO(SRDEenclave, this))
 
 {
 	STATE(S);
@@ -959,7 +959,7 @@ static _Bool add_thread(CO(SGXenclave, this))
  *		structure contains a valid thread definition.
  */
 
-static _Bool get_thread(CO(SGXenclave, this), unsigned long int *tcs)
+static _Bool get_thread(CO(SRDEenclave, this), unsigned long int *tcs)
 
 {
 	STATE(S);
@@ -1153,7 +1153,7 @@ static void _restore_fp_state(uint8_t *save_area)
  *		the execution was successful.
  */
 
-static _Bool boot_slot(CO(SGXenclave, this), int slot, CO(void *, ocall), \
+static _Bool boot_slot(CO(SRDEenclave, this), int slot, CO(void *, ocall), \
 		       void *ecall, int *retc)
 
 {
@@ -1224,7 +1224,7 @@ static _Bool boot_slot(CO(SGXenclave, this), int slot, CO(void *, ocall), \
  *		OCALL code which is requested.
  */
 
-static int boot_ocall(CO(SGXenclave, this), int slot, CO(void *, ocall), \
+static int boot_ocall(CO(SRDEenclave, this), int slot, CO(void *, ocall), \
 		      CO(void *, interface))
 
 {
@@ -1261,7 +1261,7 @@ static int boot_ocall(CO(SGXenclave, this), int slot, CO(void *, ocall), \
  *		the enclave.
  */
 
-static void get_target_info(CO(SGXenclave, this), struct SGX_targetinfo *tgt)
+static void get_target_info(CO(SRDEenclave, this), struct SGX_targetinfo *tgt)
 
 {
 	STATE(S);
@@ -1295,7 +1295,8 @@ static void get_target_info(CO(SGXenclave, this), struct SGX_targetinfo *tgt)
  *		caller.
  */
 
-static _Bool get_attributes(CO(SGXenclave, this), sgx_attributes_t *attributes)
+static _Bool get_attributes(CO(SRDEenclave, this), \
+			    sgx_attributes_t *attributes)
 
 {
 	STATE(S);
@@ -1338,7 +1339,7 @@ static _Bool get_attributes(CO(SGXenclave, this), sgx_attributes_t *attributes)
  * \return	No return value is defined.
  */
 
-static void get_secs(CO(SGXenclave, this), struct SGX_secs *secs)
+static void get_secs(CO(SRDEenclave, this), struct SGX_secs *secs)
 
 {
 	STATE(S);
@@ -1365,7 +1366,7 @@ static void get_secs(CO(SGXenclave, this), struct SGX_secs *secs)
  * \return	No return value is defined.
  */
 
-static void get_psvn(CO(SGXenclave, this), struct SGX_psvn *psvn)
+static void get_psvn(CO(SRDEenclave, this), struct SGX_psvn *psvn)
 
 {
 	STATE(S);
@@ -1391,7 +1392,7 @@ static void get_psvn(CO(SGXenclave, this), struct SGX_psvn *psvn)
  * \return	No return value is defined.
  */
 
-static void debug(CO(SGXenclave, this), const _Bool debug)
+static void debug(CO(SRDEenclave, this), const _Bool debug)
 
 {
 	STATE(S);
@@ -1405,12 +1406,12 @@ static void debug(CO(SGXenclave, this), const _Bool debug)
 /**
  * External public method.
  *
- * This method implements a destructor for an SGXenclave object.
+ * This method implements a destructor for an SRDEenclave object.
  *
  * \param this	A pointer to the object which is to be destroyed.
  */
 
-static void whack(CO(SGXenclave, this))
+static void whack(CO(SRDEenclave, this))
 
 {
 	STATE(S);
@@ -1433,18 +1434,18 @@ static void whack(CO(SGXenclave, this))
 /**
  * External constructor call.
  *
- * This function implements a constructor call for a SGXenclave object.
+ * This function implements a constructor call for a SRDEenclave object.
  *
- * \return	A pointer to the initialized SGXenclave.  A null value
+ * \return	A pointer to the initialized SRDEenclave.  A null value
  *		indicates an error was encountered in object generation.
  */
 
-extern SGXenclave NAAAIM_SGXenclave_Init(void)
+extern SRDEenclave NAAAIM_SRDEenclave_Init(void)
 
 {
 	auto Origin root;
 
-	auto SGXenclave this = NULL;
+	auto SRDEenclave this = NULL;
 
 	auto struct HurdLib_Origin_Retn retn;
 
@@ -1453,9 +1454,9 @@ extern SGXenclave NAAAIM_SGXenclave_Init(void)
 	root = HurdLib_Origin_Init();
 
 	/* Allocate the object and internal state. */
-	retn.object_size  = sizeof(struct NAAAIM_SGXenclave);
-	retn.state_size   = sizeof(struct NAAAIM_SGXenclave_State);
-	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_SGXenclave_OBJID, &retn) )
+	retn.object_size  = sizeof(struct NAAAIM_SRDEenclave);
+	retn.state_size   = sizeof(struct NAAAIM_SRDEenclave_State);
+	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_SRDEenclave_OBJID, &retn) )
 		return NULL;
 	this	    	  = retn.object;
 	this->state 	  = retn.state;

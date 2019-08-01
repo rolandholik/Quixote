@@ -39,7 +39,7 @@
 #include <IDtoken.h>
 
 #include <SGX.h>
-#include <SGXenclave.h>
+#include <SRDEenclave.h>
 #include <SGXquote.h>
 
 #include "test-Possum-interface.h"
@@ -151,7 +151,7 @@ extern int main(int argc, char *argv[])
 	File infile    = NULL,
 	     spid_file = NULL;
 
-	SGXenclave enclave = NULL;
+	SRDEenclave enclave = NULL;
 
 	struct Possum_ecall0 ecall0;
 
@@ -209,7 +209,7 @@ extern int main(int argc, char *argv[])
 
 	/* Handle request for measurement. */
 	if ( Mode == measure ) {
-		INIT(NAAAIM, SGXenclave, enclave, ERR(goto done));
+		INIT(NAAAIM, SRDEenclave, enclave, ERR(goto done));
 		if ( !enclave->setup(enclave, enclave_name, token, \
 				     debug_enclave) )
 			ERR(goto done);
@@ -299,7 +299,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Load the enclave. */
-	INIT(NAAAIM, SGXenclave, enclave, ERR(goto done));
+	INIT(NAAAIM, SRDEenclave, enclave, ERR(goto done));
 	if ( !enclave->setup(enclave, enclave_name, token, debug_enclave) )
 		ERR(goto done);
 

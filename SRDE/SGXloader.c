@@ -35,7 +35,7 @@
 
 #include "NAAAIM.h"
 #include "SGX.h"
-#include "SGXenclave.h"
+#include "SRDEenclave.h"
 #include "SGXmetadata.h"
 #include "SGXloader.h"
 
@@ -662,7 +662,7 @@ static inline uint64_t r2p(uint64_t addr) {
  *		indicates the addition has failed.
  */
 
-static _Bool _finish_segment(CO(SGXenclave, enclave), \
+static _Bool _finish_segment(CO(SRDEenclave, enclave), \
 			     CO(struct segment *, segment))
 
 {
@@ -711,7 +711,7 @@ static _Bool _finish_segment(CO(SGXenclave, enclave), \
  *		indicates the build has failed.
  */
 
-static _Bool _build_segment(CO(SGXenclave, enclave),	   \
+static _Bool _build_segment(CO(SRDEenclave, enclave),	   \
 			    CO(struct segment *, segment), \
 			    const uint64_t offset,	   \
 			    const uint64_t compatibility, const _Bool debug)
@@ -885,7 +885,7 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
   *		enclave was successfully loaded.
   */
 
- static _Bool load_segments(CO(SGXloader, this), CO(SGXenclave, enclave))
+ static _Bool load_segments(CO(SGXloader, this), CO(SRDEenclave, enclave))
 
  {
 	 STATE(S);
@@ -1020,7 +1020,7 @@ static _Bool _build_segment(CO(SGXenclave, enclave),	   \
  *		the layouts were loaded.
  */
 
-static _Bool load_layouts(CO(SGXloader, this), CO(SGXenclave, enclave))
+static _Bool load_layouts(CO(SGXloader, this), CO(SRDEenclave, enclave))
 
 {
 	STATE(S);

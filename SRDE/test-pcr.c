@@ -30,7 +30,7 @@
 
 #include "NAAAIM.h"
 #include "SGX.h"
-#include "SGXenclave.h"
+#include "SRDEenclave.h"
 
 
 /* Define the OCALL interface for the 'print string' call. */
@@ -60,7 +60,7 @@ static struct ecall1_table {
 } ecall1_table;
 
 
-static _Bool enclave_loop(CO(SGXenclave, enclave))
+static _Bool enclave_loop(CO(SRDEenclave, enclave))
 
 {
 	_Bool retn = false;
@@ -148,7 +148,7 @@ extern int main(int argc, char *argv[])
 
 	struct SGX_einittoken *einit;
 
-	SGXenclave enclave = NULL;
+	SRDEenclave enclave = NULL;
 
 	Buffer bufr = NULL;
 
@@ -203,7 +203,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Load an initialize the enclave. */
-	INIT(NAAAIM, SGXenclave, enclave, ERR(goto done));
+	INIT(NAAAIM, SRDEenclave, enclave, ERR(goto done));
 
 	if ( !enclave->open_enclave(enclave, sgx_device, enclave_name, debug) )
 		ERR(goto done);

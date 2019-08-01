@@ -34,7 +34,7 @@
 
 #include "NAAAIM.h"
 #include "SGX.h"
-#include "SGXenclave.h"
+#include "SRDEenclave.h"
 
 
 /**
@@ -89,7 +89,7 @@ extern int main(int argc, char *argv[])
 
 	struct SGX_einittoken *einit = NULL;
 
-	SGXenclave enclave = NULL;
+	SRDEenclave enclave = NULL;
 
 	Buffer bufr = NULL;
 
@@ -140,7 +140,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Load and initialize the enclave. */
-	INIT(NAAAIM, SGXenclave, enclave, ERR(goto done));
+	INIT(NAAAIM, SRDEenclave, enclave, ERR(goto done));
 
 	if ( debug ) {
 		fprintf(stdout, "Loading enclave: %s\n\n", enclave_name);

@@ -37,7 +37,7 @@ struct NAAAIM_SGXmetadata
 	_Bool (*get_attributes)(const SGXmetadata, sgx_attributes_t *);
 	_Bool (*get_version)(const SGXmetadata, uint32_t *, uint32_t *);
 
-	_Bool (*load_layouts)(const SGXmetadata, const SGXenclave);
+	_Bool (*load_layouts)(const SGXmetadata, const SRDEenclave);
 
 	void (*debug)(const SGXmetadata, const _Bool);
 	void (*dump)(const SGXmetadata);

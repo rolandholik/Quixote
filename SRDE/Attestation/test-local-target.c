@@ -26,7 +26,7 @@
 #include <NAAAIM.h>
 
 #include "SGX.h"
-#include "SGXenclave.h"
+#include "SRDEenclave.h"
 
 #include "LocalSource-interface.h"
 #include "LocalTarget-interface.h"
@@ -80,8 +80,8 @@ static const struct OCALL_api ocall_table = {
  *		the enclave has been loaded and initialized.
  */
 
-static _Bool open_enclave(CO(SGXenclave, enclave), CO(char *, device), \
-			  CO(char *, name), CO(char *, token), 	       \
+static _Bool open_enclave(CO(SRDEenclave, enclave), CO(char *, device), \
+			  CO(char *, name), CO(char *, token),		\
 			  const _Bool debug)
 
 {
@@ -153,8 +153,8 @@ extern int main(int argc, char *argv[])
 
 	struct LocalTarget_ecall0_interface target_ecall0;
 
-	SGXenclave source = NULL,
-		   target = NULL;
+	SRDEenclave source = NULL,
+		    target = NULL;
 
 	Buffer bufr = NULL;
 
@@ -189,12 +189,12 @@ extern int main(int argc, char *argv[])
 
 
 	/* Load and initialize the source and target enclaves. */
-	INIT(NAAAIM, SGXenclave, source, ERR(goto done));
+	INIT(NAAAIM, SRDEenclave, source, ERR(goto done));
 	if ( !open_enclave(source, sgx_device, source_enclave, source_token, \
 			   debug) )
 		ERR(goto done);
 
-	INIT(NAAAIM, SGXenclave, target, ERR(goto done));
+	INIT(NAAAIM, SRDEenclave, target, ERR(goto done));
 	if ( !open_enclave(target, sgx_device, target_enclave, target_token, \
 			   debug) )
 		ERR(goto done);

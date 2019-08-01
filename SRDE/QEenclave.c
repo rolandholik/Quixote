@@ -41,7 +41,7 @@
 #include "NAAAIM.h"
 #include "RandomBuffer.h"
 #include "SGX.h"
-#include "SGXenclave.h"
+#include "SRDEenclave.h"
 #include "SGXepid.h"
 #include "QEenclave.h"
 
@@ -89,7 +89,7 @@ struct NAAAIM_QEenclave_State
 	_Bool poisoned;
 
 	/* The enclave object. */
-	SGXenclave enclave;
+	SRDEenclave enclave;
 
 	/* The buffer containing the EPID. */
 	SGXepid epid;
@@ -166,7 +166,7 @@ static _Bool open(CO(QEenclave, this), CO(char *, token))
 
 
 	/* Load and initialize the enclave. */
-	INIT(NAAAIM, SGXenclave, S->enclave, ERR(goto done));
+	INIT(NAAAIM, SRDEenclave, S->enclave, ERR(goto done));
 
 	if ( !S->enclave->open_enclave(S->enclave, DEVICE, ENCLAVE, false) )
 		ERR(goto done);

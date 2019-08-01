@@ -36,7 +36,7 @@
 
 #include <NAAAIM.h>
 #include <SGX.h>
-#include <SGXenclave.h>
+#include <SRDEenclave.h>
 
 
 /* Define the OCALL interface for the 'print string' call. */
@@ -130,7 +130,7 @@ extern int main(int argc, char *argv[])
 
 	struct SGX_einittoken *einit = NULL;
 
-	SGXenclave enclave = NULL;
+	SRDEenclave enclave = NULL;
 
 	Buffer bufr = NULL;
 
@@ -177,7 +177,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Load an initialize the enclave. */
-	INIT(NAAAIM, SGXenclave, enclave, ERR(goto done));
+	INIT(NAAAIM, SRDEenclave, enclave, ERR(goto done));
 	if ( debug )
 		enclave->debug(enclave, true);
 

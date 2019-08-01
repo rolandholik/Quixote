@@ -33,7 +33,7 @@
 #include <SHA256.h>
 
 #include "SGX.h"
-#include "SGXenclave.h"
+#include "SRDEenclave.h"
 #include "SGXsigstruct.h"
 #include "SGXmetadata.h"
 

@@ -14,9 +14,9 @@ INSTALLSCRIPT = provision-epid provision-tokens provision-verifier
 
 SUBDIRS = SGXlibs Attestation ISOidentity
 
-CSRC = SGXmetadata.c SGXloader.c SGXenclave.c SGXsigstruct.c PVEenclave.c   \
-	SGXmessage.c SGXecdsa.c PCEenclave.c SGXcmac.c SGXaesgcm.c SGXrsa.c \
-	QEenclave.c SGXepid.c SGXquote.c SGXquote_sgxmgr.c sgx_exception.c  \
+CSRC = SGXmetadata.c SGXloader.c SRDEenclave.c SGXsigstruct.c PVEenclave.c   \
+	SGXmessage.c SGXecdsa.c PCEenclave.c SGXcmac.c SGXaesgcm.c SGXrsa.c  \
+	QEenclave.c SGXepid.c SGXquote.c SGXquote_sgxmgr.c sgx_exception.c   \
 	sgx-ocall.c
 
 ASRC = boot-sgx.s
@@ -256,15 +256,15 @@ clean:
 
 
 # Source dependencies.
-sgx-metadata.o: SGX.h SGXenclave.h SGXsigstruct.h SGXmetadata.h
-sgx-load.o: SGXenclave.h
+sgx-metadata.o: SGX.h SRDEenclave.h SGXsigstruct.h SGXmetadata.h
+sgx-load.o: SRDEenclave.h
 sgx-provision.o: PVEenclave.h
 
 SGXmetadata.o: SGX.h SGXmetadata.h
 SGXloader.o: SGX.h SGXloader.h
-SGXenclave.o: SGX.h SGXenclave.h SGXmetadata.h SGXloader.h
+SRDEenclave.o: SGX.h SRDEenclave.h SGXmetadata.h SGXloader.h
 SGXsigstruct.o: SGX.h SGXsigstruct.h sigstruct.h
-PVEenclave.o: SGX.h SGXenclave.h PVEenclave.h
+PVEenclave.o: SGX.h SRDEenclave.h PVEenclave.h
 SGXmessage.o: SGXmessage.h
-QEenclave.o: SGX.h SGXenclave.h QEenclave.h
+QEenclave.o: SGX.h SRDEenclave.h QEenclave.h
 SGXquote.o: SGX.h QEenclave.h PCEenclave.h SGXquote.h

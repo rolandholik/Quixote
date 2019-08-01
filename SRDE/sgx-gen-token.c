@@ -34,7 +34,7 @@
 #include "NAAAIM.h"
 #include "SHA256.h"
 #include "SGX.h"
-#include "SGXenclave.h"
+#include "SRDEenclave.h"
 #include "SGXmetadata.h"
 
 
@@ -186,7 +186,7 @@ void thread_manager(void)
 }
 
 
-static _Bool load_white_list(SGXenclave enclave)
+static _Bool load_white_list(SRDEenclave enclave)
 
 {
 	_Bool retn = false;
@@ -213,7 +213,7 @@ static _Bool load_white_list(SGXenclave enclave)
 }
 
 
-static _Bool generate_token(SGXenclave enclave, char *init_enclave, \
+static _Bool generate_token(SRDEenclave enclave, char *init_enclave, \
 			    struct SGX_einittoken *token, _Bool debug_enclave)
 
 {
@@ -306,7 +306,7 @@ extern int main(int argc, char *argv[])
 
 	struct SGX_einittoken token;
 
-	SGXenclave enclave = NULL;
+	SRDEenclave enclave = NULL;
 
 	Buffer bufr = NULL;
 
@@ -350,7 +350,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Setup the Launch Enclave (LE) to generate an EINITTOKEN. */
-	INIT(NAAAIM, SGXenclave, enclave, ERR(goto done));
+	INIT(NAAAIM, SRDEenclave, enclave, ERR(goto done));
 
 	if ( debug )
 		fputs("Setting up launch enclave.\n", stdout);

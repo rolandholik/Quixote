@@ -20,7 +20,7 @@
 #include <HurdLib.h>
 
 #include "SGX.h"
-#include "SGXenclave.h"
+#include "SRDEenclave.h"
 
 
 /**
@@ -49,7 +49,7 @@
  *		OCALL.
  */
 
-int sgx_ocall(int slot, void *ocall_api, void *interface, SGXenclave enclave)
+int sgx_ocall(int slot, void *ocall_api, void *interface, SRDEenclave enclave)
 
 {
 	return enclave->boot_ocall(enclave, slot, ocall_api, interface);

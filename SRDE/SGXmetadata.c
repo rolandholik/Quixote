@@ -38,7 +38,7 @@
 
 #include "NAAAIM.h"
 #include "SGX.h"
-#include "SGXenclave.h"
+#include "SRDEenclave.h"
 #include "SGXmetadata.h"
 
 
@@ -1058,7 +1058,7 @@ static struct layout_description * _find_layout(CO(SGXmetadata_State, S), \
 
 static _Bool _load_layout(CO(SGXmetadata_State, S),		\
 			  CO(struct _layout_entry_t *, layout), \
-			  CO(SGXenclave, enclave))
+			  CO(SRDEenclave, enclave))
 
 {
 	_Bool retn = false;
@@ -1225,7 +1225,7 @@ static _Bool _load_layout(CO(SGXmetadata_State, S),		\
  */
 
 static _Bool _load_group(CO(SGXmetadata_State, S), CO(layout_t *, layout), \
-			 const uint64_t group, CO(SGXenclave, enclave))
+			 const uint64_t group, CO(SRDEenclave, enclave))
 
 {
 	_Bool retn = false;
@@ -1271,7 +1271,7 @@ static _Bool _load_group(CO(SGXmetadata_State, S), CO(layout_t *, layout), \
  *		indicates the enclave was successfully loaded.
  */
 
-static _Bool load_layouts(CO(SGXmetadata, this), CO(SGXenclave, enclave))
+static _Bool load_layouts(CO(SGXmetadata, this), CO(SRDEenclave, enclave))
 
 {
 	STATE(S);

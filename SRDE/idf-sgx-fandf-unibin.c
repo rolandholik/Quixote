@@ -39,7 +39,7 @@
 #include "NAAAIM.h"
 #include "SHA256.h"
 #include "SGX.h"
-#include "SGXenclave.h"
+#include "SRDEenclave.h"
 #include "SGXmetadata.h"
 
 
@@ -194,7 +194,7 @@ static _Bool LE_init_ecall0(char *enclave,
 }
 
 
-static _Bool load_white_list(SGXenclave enclave)
+static _Bool load_white_list(SRDEenclave enclave)
 
 {
 	_Bool retn = false;
@@ -221,7 +221,7 @@ static _Bool load_white_list(SGXenclave enclave)
 }
 
 
-static _Bool generate_token(SGXenclave enclave, char *init_enclave, \
+static _Bool generate_token(SRDEenclave enclave, char *init_enclave, \
 			    struct SGX_einittoken *token)
 
 {
@@ -257,7 +257,7 @@ static _Bool generate_token(SGXenclave enclave, char *init_enclave, \
 }
 
 
-static _Bool enclave_loop(CO(SGXenclave, enclave))
+static _Bool enclave_loop(CO(SRDEenclave, enclave))
 
 {
 	_Bool retn = false;
@@ -332,8 +332,8 @@ extern int main(int argc, char *argv[])
 
 	struct SGX_einittoken token;
 
-	SGXenclave le	   = NULL,
-		   enclave = NULL;
+	SRDEenclave le	    = NULL,
+		    enclave = NULL;
 
 
 	/* Output logo. */
@@ -348,7 +348,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Create the launch token. */
-	INIT(NAAAIM, SGXenclave, le, ERR(goto done));
+	INIT(NAAAIM, SRDEenclave, le, ERR(goto done));
 
 	if ( !le->open_enclave_memory(le, sgx_device, (char *) LE_image, \
 				      sizeof(LE_image), false) )
@@ -366,7 +366,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Load and initialize the execution enclave. */
-	INIT(NAAAIM, SGXenclave, enclave, ERR(goto done));
+	INIT(NAAAIM, SRDEenclave, enclave, ERR(goto done));
 
 	if ( !enclave->open_enclave_memory(enclave, sgx_device,	 \
 					   (char *) TE_image,	 \

@@ -36,7 +36,7 @@
 #include <NAAAIM.h>
 #include <IDtoken.h>
 #include <SGX.h>
-#include <SGXenclave.h>
+#include <SRDEenclave.h>
 #include <ExchangeEvent.h>
 
 #include "ISOidentity-interface.h"

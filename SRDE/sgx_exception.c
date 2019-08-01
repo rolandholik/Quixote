@@ -40,7 +40,7 @@
 #include <NAAAIM.h>
 
 #include "SGX.h"
-#include "SGXenclave.h"
+#include "SRDEenclave.h"
 
 
 /**
@@ -106,7 +106,7 @@ void exception_handler(int signal, siginfo_t *siginfo, void *private)
 
 	ucontext_t *sigcontext;
 
-	SGXenclave enclave = NULL;
+	SRDEenclave enclave = NULL;
 
 
 	/* Display untrapped faults and abort. */
@@ -152,7 +152,7 @@ void exception_handler(int signal, siginfo_t *siginfo, void *private)
 	if ( (rip == exit_handler_address) && (rax == SE_ERESUME) ) {
 		tcs	= (void *) *(uint64_t *) (rbp - 6*8);
 		ocall   = (void *) *(uint64_t *) (rbp - 7*8);
-		enclave = *((SGXenclave *) (rbp - 8*8));
+		enclave = *((SRDEenclave *) (rbp - 8*8));
 
 		retc = boot_sgx(tcs, ECMD_EXCEPT, ocall, NULL, enclave);
 		if ( retc != 0 ) {

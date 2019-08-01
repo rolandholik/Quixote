@@ -39,7 +39,7 @@
 #include <HTTP.h>
 
 #include "SGX.h"
-#include "SGXenclave.h"
+#include "SRDEenclave.h"
 #include "SGXquote.h"
 #include "SGXepid.h"
 
@@ -148,7 +148,7 @@ extern int main(int argc, char *argv[])
 
 	SGXquote quoter = NULL;
 
-	SGXenclave source = NULL;
+	SRDEenclave source = NULL;
 
 	HTTP http = NULL;
 
@@ -202,7 +202,7 @@ extern int main(int argc, char *argv[])
 	if ( mode == trusted ) {
 		fputs("\nTesting enclave mode attestation.\n", stdout);
 
-		INIT(NAAAIM, SGXenclave, source, ERR(goto done));
+		INIT(NAAAIM, SRDEenclave, source, ERR(goto done));
 		if ( !source->setup(source, source_enclave, source_token, \
 				    debug) )
 			ERR(goto done);
@@ -248,7 +248,7 @@ extern int main(int argc, char *argv[])
 	 * Load the source enclave which the quote will be generated
 	 * for.  The report will be directed to the quoting enclave.
 	 */
-	INIT(NAAAIM, SGXenclave, source, ERR(goto done));
+	INIT(NAAAIM, SRDEenclave, source, ERR(goto done));
 	if ( !source->setup(source, source_enclave, source_token, debug) )
 		ERR(goto done);
 
