@@ -26,5 +26,8 @@ SGXnaaaim:
 install-bin:
 	set -e; for dir in ${SUBDIRS}; do ${MAKE} -C $$dir $@; done;
 
+install-dev:
+	set -e; for dir in ${SUBDIRS}; do ${MAKE} -C $$dir $@; done;
+
 clean:
 	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i clean; done

@@ -9,6 +9,8 @@
 # Variable declarations.
 INSTPATH       = ${DESTDIR}/opt/IDfusion
 INSTALLENCLAVE = test-fusion.signed.so
+INSTINCLUDE    = Buffer.h Fibsequence.h HurdLib.h Origin.h SGXfusion.h	   \
+	String.h alltypes.h features.h fusion-shim.h reg-support.h regex.h \
 
 CSRC   = test-fusion.c
 ENCSRC = test-fusion-enclave.c test-fusion-interface.c
@@ -149,6 +151,14 @@ install-bin:
 	install -s ${INSTALLBIN} ${INSTPATH}/bin;
 	[ -d ${INSTPATH}/lib/enclaves ] || mkdir -p ${INSTPATH}/lib/enclaves;
 	install ${INSTALLENCLAVE} ${INSTPATH}/lib/enclaves;
+
+install-dev:
+	[ -d ${INSTPATH}/include ] || mkdir -p ${INSTPATH}/include;
+	[ -d ${INSTPATH}/include/SRDEfusion ] || \
+		mkdir -p ${INSTPATH}/include/SRDEfusion;
+	install -m 644 ${INSTINCLUDE} ${INSTPATH}/include/SRDEfusion;
+	[ -d ${INSTPATH}/lib ] || mkdir -p ${INSTPATH}/lib;
+	install -m 644 ${LIBRARY} ${INSTPATH}/lib;
 
 clean:
 	rm -f *.o *~ ldscript;

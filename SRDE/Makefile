@@ -11,6 +11,9 @@ INSTPATH      = ${DESTDIR}/opt/IDfusion
 INSTALLBIN    = sgx-check sgx-gen-token sgx-gen-verifier sgx-load \
 	sgx-metadata  sgx-provision
 INSTALLSCRIPT = provision-epid provision-tokens provision-verifier
+INSTINCLUDE   = PCEenclave.h PVEenclave.h QEenclave.h SGXaesgcm.h SGXcmac.h \
+	SGXecdsa.h SGXepid.h SGXloader.h SGXmessage.h SGXmetadata.h	    \
+	SGXquote.h SGXrsa.h SGXsigstruct.h SRDE.h SRDEenclave.h
 
 SUBDIRS = SGXlibs Attestation ISOidentity
 
@@ -244,7 +247,16 @@ install-bin:
 	[ -d ${INSTPATH}/bin ] || mkdir -p ${INSTPATH}/bin;
 	install -s ${INSTALLBIN} ${INSTPATH}/bin;
 	install ${INSTALLSCRIPT} ${INSTPATH}/bin;
-	set -e; for dir in ${SUBDIRS}; do ${MAKE} -C $$dir $@; done;
+	${MAKE} -C SGXlibs $@;
+
+install-dev:
+	[ -d ${INSTPATH}/include ] || mkdir -p ${INSTPATH}/include;
+	[ -d ${INSTPATH}/include/SRDEruntime ] || \
+		mkdir -p ${INSTPATH}/include/SRDEruntime;
+	install -m 644 ${INSTINCLUDE} ${INSTPATH}/include/SRDEruntime;
+	[ -d ${INSTPATH}/lib ] || mkdir -p ${INSTPATH}/lib;
+	install -m 644 ${LIBRARY} ${INSTPATH}/lib;
+	make -C SGXlibs install-dev;
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};

@@ -6,6 +6,12 @@
 # **************************************************************************/
 
 # Variable declarations.
+INSTPATH = ${DESTDIR}/opt/IDfusion
+HURDINC = HurdLib/Buffer.h HurdLib/Config.h HurdLib/Fibsequence.h \
+	HurdLib/File.h HurdLib/HurdLib.h HurdLib/Options.h	  \
+	HurdLib/Origin.h HurdLib/String.h
+HURDLIB = HurdLib/libHurdLib.a
+
 CSRC = 	OrgID.c PatientID.c Authenticator.c AuthenReply.c IDqueryReply.c \
 	ProviderQuery.c SSLDuct.c
 
@@ -13,7 +19,8 @@ CSRC = 	OrgID.c PatientID.c Authenticator.c AuthenReply.c IDqueryReply.c \
 # 	provider-server
 SERVERS = root-referral device-broker user-broker
 
-SUBDIRS = idgine utils edi SRDE ISOidentity # client
+SUBDIRS	    = idgine utils edi SRDE ISOidentity # client
+DEV_SUBDIRS = lib SRDE
 
 # CC = gcc
 CC = musl-gcc
@@ -165,6 +172,15 @@ ISOidentity:
 
 install-bin:
 	set -e; for dir in ${SUBDIRS}; do ${MAKE} -C $$dir $@; done;
+
+install-dev:
+	[ -d ${INSTPATH}/include ] || mkdir -p ${INSTPATH}/include;
+	[ -d ${INSTPATH}/include/HurdLib ] || \
+		mkdir -p ${INSTPATH}/include/HurdLib;
+	install -m 644 ${HURDINC} ${INSTPATH}/include/HurdLib;
+	[ -d ${INSTPATH}/lib ] || mkdir -p ${INSTPATH}/lib;
+	install -m 644 ${HURDLIB} ${INSTPATH}/lib;
+	set -e; for dir in ${DEV_SUBDIRS}; do ${MAKE} -C $$dir $@; done;
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};

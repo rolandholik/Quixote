@@ -10,6 +10,7 @@
 INSTPATH       = ${DESTDIR}/opt/IDfusion
 INSTALLENCLAVE = test-naaaim.signed.so test-Duct.signed.so \
 	test-Possum.signed.so
+INSTINCLUDE    = IDtoken.h NAAAIM.h PossumPacket.h PossumPipe.h RandomBuffer.h
 
 CSRC   = test-naaaim.c
 ENCSRC = test-naaaim-enclave.c test-naaaim-interface.c
@@ -208,6 +209,14 @@ install-bin:
 	install -s ${INSTALLBIN} ${INSTPATH}/bin;
 	[ -d ${INSTPATH}/lib/enclaves ] || mkdir -p ${INSTPATH}/lib/enclaves;
 	install ${INSTALLENCLAVE} ${INSTPATH}/lib/enclaves;
+
+install-dev:
+	[ -d ${INSTPATH}/include ] || mkdir -p ${INSTPATH}/include;
+	[ -d ${INSTPATH}/include/SRDEnaaaim ] || \
+		mkdir -p ${INSTPATH}/include/SRDEnaaaim;
+	install -m 644 ${INSTINCLUDE} ${INSTPATH}/include/SRDEnaaaim;
+	[ -d ${INSTPATH}/lib ] || mkdir -p ${INSTPATH}/lib;
+	install -m 644 ${LIBRARY} ${INSTPATH}/lib;
 
 clean:
 	rm -f *.o *~ ldscript;
