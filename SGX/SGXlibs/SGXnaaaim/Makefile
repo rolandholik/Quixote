@@ -21,7 +21,7 @@ ASRC   = rdrand.s
 DUCTSRC	  = test-Duct-enclave.c test-Duct-interface.c
 POSSUMSRC = test-Possum-enclave.c test-Possum-interface.c RandomBuffer.c
 
-LIBNAME	   = SGXnaaaim
+LIBNAME	   = SRDEnaaaim
 LIBRARY	   = lib${LIBNAME}.a
 NAAAIMDIR  = ../../../lib
 
@@ -45,20 +45,20 @@ SGX_TRTS_LIB	    = sgx_trts
 SGX_CRYPTO_LIB	    = sgx_tcrypto
 SGX_SERVICE_LIBRARY = sgx_tservice
 
-ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles  \
-	-Wl,--whole-archive -lsgx_tsgxssl -Wl,--no-whole-archive	     \
-	-L${SGX_LIBRARY_PATH} -L${SSL_LIBRARY_PATH} -L . -L ../SGXfusion     \
-	-Wl,--whole-archive						     \
-	-l${SGX_TRTS_LIB} -lSRDEfusion					     \
-	-Wl,--no-whole-archive						     \
-	-Wl,--start-group						     \
-	-lsgx_tstdc -l${SGX_CRYPTO_LIB} -l${SGX_SERVICE_LIBRARY} -lSGXnaaaim \
-	-lsgx_tsgxssl_crypto						     \
-	-lsgx_tcxx							     \
-	-Wl,--end-group							     \
-	-Wl,-Bstatic -Wl,-Bsymbolic -Wl,--no-undefined			     \
-	-Wl,-pie,-eenclave_entry -Wl,--export-dynamic			     \
-	-Wl,--defsym,__ImageBase=0					     \
+ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles   \
+	-Wl,--whole-archive -lsgx_tsgxssl -Wl,--no-whole-archive	      \
+	-L${SGX_LIBRARY_PATH} -L${SSL_LIBRARY_PATH} -L . -L ../SGXfusion      \
+	-Wl,--whole-archive						      \
+	-l${SGX_TRTS_LIB} -lSRDEfusion					      \
+	-Wl,--no-whole-archive						      \
+	-Wl,--start-group						      \
+	-lsgx_tstdc -l${SGX_CRYPTO_LIB} -l${SGX_SERVICE_LIBRARY} -lSRDEnaaaim \
+	-lsgx_tsgxssl_crypto						      \
+	-lsgx_tcxx							      \
+	-Wl,--end-group							      \
+	-Wl,-Bstatic -Wl,-Bsymbolic -Wl,--no-undefined			      \
+	-Wl,-pie,-eenclave_entry -Wl,--export-dynamic			      \
+	-Wl,--defsym,__ImageBase=0					      \
 	-Wl,--version-script=ldscript
 
 
