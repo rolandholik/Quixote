@@ -55,8 +55,8 @@ ELFLIB = -lelf
 HURD_LIBRARY = ../HurdLib/libHurdLib.a
 HURDLIB	     = -L ../HurdLib -lHurdLib
 
-RDK_LIBRARY = ../SRDE/libSGXrdk.a
-RDKLIB	    = -L ../SRDE -lSGXrdk ${ELFLIB}
+RDK_LIBRARY = ../SRDE/libSRDEruntime.a
+RDKLIB	    = -L ../SRDE -lSRDEruntime ${ELFLIB}
 
 NAAAIM_LIBRARY = ../lib/libNAAAIM.a
 NAAAIMLIB      = -L ../lib -lNAAAIM
