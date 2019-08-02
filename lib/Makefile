@@ -8,10 +8,11 @@
 
 # Variable declarations.
 INSTPATH = ${DESTDIR}/opt/IDfusion
-INSTINCLUDE = AES256_cbc.h Base64.h Curve25519.h Duct.h Duct_sgxmgr.h \
-	HTTP.h IDmgr.h IDtoken.h IPC.h Ivy.h LocalDuct.h OTEDKS.h     \
-	PossumPacket.h PossumPipe.h RSAkey.h RandomBuffer.h SHA256.h  \
-	SHA256_hmac.h SmartCard.h SoftwareStatus.h TPM2cmd.h TPMcmd.h
+INSTINCLUDE = ../NAAAIM.h AES256_cbc.h Base64.h Curve25519.h Duct.h	\
+	Duct_sgxmgr.h HTTP.h IDmgr.h IDtoken.h IPC.h Ivy.h LocalDuct.h	\
+	OTEDKS.h PossumPacket.h PossumPipe.h RSAkey.h RandomBuffer.h	\
+	SHA256.h  SHA256_hmac.h SmartCard.h SoftwareStatus.h TPM2cmd.h	\
+	TPMcmd.h
 
 CSRC = Duct.c OTEDKS.c Curve25519.c IPC.c SoftwareStatus.c Ivy.c IDmgr.c    \
 	TPMcmd.c TPM2cmd.c PossumPacket.c PossumPipe.c RSAkey.c SmartCard.c \
