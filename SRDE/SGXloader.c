@@ -831,8 +831,6 @@ static _Bool _build_segment(CO(SRDEenclave, enclave),	   \
 		}
 
 		size = r2p(size);
-		if ( segment->phdr.p_memsz < loaded )
-			size -= 4096;
 		if ( compatibility & NULL_PADDING_NEEDED )
 			size += 4096;
 
