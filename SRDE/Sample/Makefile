@@ -1,0 +1,44 @@
+# **************************************************************************
+# * (C)Copyright IDfusion, LLC. All rights reserved.
+# *
+# * Please refer to the file named Documentation/COPYRIGHT in the top of
+# * the source tree for copyright and licensing information.
+# **************************************************************************/
+
+
+# Variable declarations.
+INSTPATH   = ${DESTDIR}/opt/IDfusion
+TESTPATH = ${INSTPATH}/share/unit-tests
+
+FD = ../SGXlibs/SGXfusion
+FUSION_SOURCES = ${FD}/test-fusion.c ${FD}/test-fusion-enclave.c	\
+	${FD}/test-fusion-interface.c ${FD}/test-fusion-interface.h	\
+	${FD}/test-fusion-enclave.xml
+
+export INSTALLDIR
+
+#
+# Target directives.
+#
+.PHONY: ${SUBDIRS}
+
+all: fusion-source
+
+fusion-source: ${FUSION_SOURCES}
+	cp ${FUSION_SOURCES} .;
+
+test:
+	make -f Makefile.sample
+
+install-dev:
+	[ -d ${TESTPATH} ] || mkdir -p ${TESTPATH} ];
+	cp ${FUSION_SOURCES} ${TESTPATH};
+	cp Makefile.sample ${TESTPATH}/Makefile;
+
+clean:
+	rm -f test-fusion.c test-fusion-enclave.c test-fusion-interface.{c,h};
+	rm -f test-fusion-enclave.xml
+	make -f Makefile.sample clean;
+
+clobber: clean
+	make -f Makefile.sample clobber;

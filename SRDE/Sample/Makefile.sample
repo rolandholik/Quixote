@@ -1,0 +1,136 @@
+# **************************************************************************
+# * (C)Copyright IDfusion, LLC. All rights reserved.
+# *
+# * Please refer to the file named Documentation/COPYRIGHT in the top of
+# * the source tree for copyright and licensing information.
+# **************************************************************************/
+
+
+# Variable declarations.
+CSRC   = test-fusion.c
+ENCSRC = test-fusion-enclave.c test-fusion-interface.c
+
+CINCLUDE = ${DESTDIR}/opt/IDfusion/include
+
+LIBDIR	= ${DESTDIR}/opt/IDfusion/lib
+LIBNAME = SRDEfusion
+
+SDK		 = /opt/intel/sgxsdk
+SDK_LIBRARY_PATH = ${SDK}/lib64
+SDK_INCLUDE	 = ${SDK}/include
+
+
+OPENSSL = /usr/local/ssl/bin/openssl
+SIGNER	= ${SDK}/bin/sgx_sign
+SIGNKEY = signing-key.pem
+
+ENCLAVE_CC = gcc
+ENCLAVE_INCLUDE = -I ${CINCLUDE}/SRDEfusion -I ${SDK_INCLUDE} \
+	-I ${SDK_INCLUDE}/tlibc -I ${SDK_INCLUDE}/stlport
+ENCLAVE_CFLAGS = -Wall -nostdinc -fvisibility=hidden -fpie -fstack-protector \
+	-fno-builtin ${ENCLAVE_INCLUDE}
+
+CC = gcc
+C_INCLUDE = -I ${CINCLUDE}/HurdLib -I ${CINCLUDE}/SRDEruntime \
+	-I ${CINCLUDE}/NAAAIM
+CFLAGS = -Wall -O2 -fomit-frame-pointer -march=core2 ${C_INCLUDE}
+
+LDFLAGS = ${STATIC} -g -L ${LIBDIR}
+ifneq (${CC}, musl-gcc)
+LDFLAGS += -L /usr/local/IDfusion/lib
+endif
+
+ELFLIB	       = elf
+HURDLIB	       = HurdLib
+SRDEFUSIONLIB  = SRDEfusion
+SRDERUNLIB     = SRDEruntime
+
+SDK_TRTS_LIB	    = sgx_trts
+SDK_CRYPTO_LIB	    = sgx_tcrypto
+SDK_SERVICE_LIBRARY = sgx_tservice
+
+ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles  \
+	-L${SDK_LIBRARY_PATH} -L${LIBDIR}				     \
+	-Wl,--whole-archive						     \
+	-l${SDK_TRTS_LIB} -l${SRDEFUSIONLIB}				     \
+	-Wl,--no-whole-archive						     \
+	-Wl,--start-group						     \
+	-lsgx_tstdc -l${SDK_CRYPTO_LIB} -l${SDK_SERVICE_LIBRARY}	     \
+	-Wl,--end-group							     \
+	-Wl,-Bstatic -Wl,-Bsymbolic -Wl,--no-undefined			     \
+	-Wl,-pie,-eenclave_entry -Wl,--export-dynamic			     \
+	-Wl,--defsym,__ImageBase=0					     \
+	-Wl,--version-script=ldscript
+
+
+#
+# Compilation directives.
+#
+%.o: %.c
+	${ENCLAVE_CC} ${ENCLAVE_CFLAGS} -c $< -o $@;
+
+
+#
+# Automatic definition of classes and objects.
+#
+COBJS	= ${CSRC:.c=.o}
+ENCOBJS = ${ENCSRC:.c=.o}
+
+
+#
+# Target directives.
+#
+.PHONY: all enclave LDscript
+
+all: ${SIGNKEY} enclave test-fusion
+
+test: all
+	sgx-gen-token -e test-fusion.signed.so -o test-fusion.token;
+	echo "Test-fusion unit test complete." | \
+		./test-fusion -t test-fusion.token;
+
+enclave: ldscript test-fusion.signed.so
+
+test-fusion.signed.so: test-fusion.so
+	${SIGNER} sign -key ${SIGNKEY} -enclave $< -out $@ \
+		-config test-fusion-enclave.xml;
+
+test-fusion.so: ${ENCOBJS}
+	${ENCLAVE_CC} -o $@ $^ ${ENCLAVE_LDFLAGS};
+
+ldscript:
+	echo "{"			>  ldscript;
+	echo "global:"			>> ldscript;
+	echo "g_global_data_sim;"	>> ldscript;
+	echo "g_global_data;"		>> ldscript;
+	echo "enclave_entry;"		>> ldscript;
+	echo "local:"			>> ldscript;
+	echo "*;"			>> ldscript;
+	echo "};"			>> ldscript;
+
+${SIGNKEY}:
+	${OPENSSL} genrsa -3 -out ${SIGNKEY} 3072;
+
+test-fusion: test-fusion.o
+	${CC} ${LDFLAGS} -o $@ $< -l${SRDERUNLIB} -l${ELFLIB} -l${HURDLIB};
+
+test-fusion.o: test-fusion.c
+	${CC} ${CFLAGS} -c $< -o $@;
+
+test-fusion-c++: test-fusion-c++.o
+	${CXX} ${LDFLAGS} -o $@ $< -l${SRDERUNLIB} -l${ELFLIB} -l${HURDLIB};
+
+test-fusion-c++.o: test-fusion-c++.cpp
+	${CXX} ${CFLAGS} -c $< -o $@;
+clean:
+	rm -f *.o *~ ldscript;
+	rm -f test-fusion;
+	rm -f test-fusion.so test-fusion.signed.so;
+
+clobber: clean
+	rm -f ${SIGNKEY} test-fusion.token;
+
+
+# Source dependencies.
+test-fusion-enclave.o: test-fusion-interface.h
+test-fusion-interface.o: test-fusion-interface.h

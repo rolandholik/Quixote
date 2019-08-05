@@ -15,7 +15,8 @@ INSTINCLUDE   = PCEenclave.h PVEenclave.h QEenclave.h SGXaesgcm.h SGXcmac.h \
 	SGXecdsa.h SGXepid.h SGXloader.h SGXmessage.h SGXmetadata.h	    \
 	SGXquote.h SGXrsa.h SGXsigstruct.h SRDE.h SRDEenclave.h
 
-SUBDIRS = SGXlibs Attestation ISOidentity
+SUBDIRS	    = SGXlibs Attestation ISOidentity Sample
+DEV_SUBDIRS = SGXlibs Sample
 
 CSRC = SGXmetadata.c SGXloader.c SRDEenclave.c SGXsigstruct.c PVEenclave.c   \
 	SGXmessage.c SGXecdsa.c PCEenclave.c SGXcmac.c SGXaesgcm.c SGXrsa.c  \
@@ -230,6 +231,9 @@ Attestation:
 ISOidentity:
 	${MAKE} -C $@;
 
+Sample:
+	${MAKE} -C $@;
+
 install-bin:
 	[ -d ${INSTPATH}/etc ] || mkdir -p ${INSTPATH}/etc;
 	touch ${INSTPATH}/etc/host.idt ${INSTPATH}/etc/ias-cert.pem \
@@ -256,7 +260,7 @@ install-dev:
 	install -m 644 ${INSTINCLUDE} ${INSTPATH}/include/SRDEruntime;
 	[ -d ${INSTPATH}/lib ] || mkdir -p ${INSTPATH}/lib;
 	install -m 644 ${LIBRARY} ${INSTPATH}/lib;
-	make -C SGXlibs install-dev;
+	set -e; for dir in ${DEV_SUBDIRS}; do ${MAKE} -C $$dir $@; done;
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};
