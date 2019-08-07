@@ -7,13 +7,18 @@
 
 
 # Variable declarations.
-INSTPATH   = ${DESTDIR}/opt/IDfusion
+INSTPATH = ${DESTDIR}/opt/IDfusion
 TESTPATH = ${INSTPATH}/share/unit-tests
 
 FD = ../SGXlibs/SGXfusion
 FUSION_SOURCES = ${FD}/test-fusion.c ${FD}/test-fusion-enclave.c	\
 	${FD}/test-fusion-interface.c ${FD}/test-fusion-interface.h	\
 	${FD}/test-fusion-enclave.xml
+
+ND = ../SGXlibs/SGXnaaaim
+NAAAIM_SOURCES = ${ND}/test-naaaim.c ${ND}/test-naaaim-enclave.c	\
+	${ND}/test-naaaim-interface.c ${ND}/test-naaaim-interface.h	\
+	${ND}/test-naaaim-enclave.xml
 
 export INSTALLDIR
 
@@ -22,10 +27,13 @@ export INSTALLDIR
 #
 .PHONY: ${SUBDIRS}
 
-all: fusion-source
+all: fusion-source naaaim-source
 
 fusion-source: ${FUSION_SOURCES}
 	cp ${FUSION_SOURCES} .;
+
+naaaim-source: ${NAAAIM_SOURCES}
+	cp ${NAAAIM_SOURCES} .;
 
 test:
 	make -f Makefile.sample
@@ -33,11 +41,14 @@ test:
 install-dev:
 	[ -d ${TESTPATH} ] || mkdir -p ${TESTPATH} ];
 	cp ${FUSION_SOURCES} ${TESTPATH};
+	cp ${NAAAIM_SOURCES} ${TESTPATH};
 	cp Makefile.sample ${TESTPATH}/Makefile;
 
 clean:
 	rm -f test-fusion.c test-fusion-enclave.c test-fusion-interface.{c,h};
 	rm -f test-fusion-enclave.xml
+	rm -f test-naaaim.c test-naaaim-enclave.c test-naaaim-interface.{c,h};
+	rm -f test-naaaim-enclave.xml
 	make -f Makefile.sample clean;
 
 clobber: clean
