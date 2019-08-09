@@ -30,7 +30,7 @@ CFLAGS = -Wall ${CDEBUG}
 
 LDFLAGS = -g -L ../lib -L ../HurdLib
 ifneq (${CC}, musl-gcc)
-LDFLAGS += -lrt
+LDFLAGS += -lrt -Wl,-rpath=/usr/local/IDfusion/lib
 endif
 
 

@@ -81,7 +81,8 @@ SSL_INCLUDE = /usr/local/musl/include
 SSL_CRYPTO = -L /usr/local/musl/lib -lcrypto
 else
 SSL_INCLUDE = /usr/local/IDfusion/include
-SSL_CRYPTO = -L /usr/local/IDfusion/lib -lcrypto -ldl -lpthread
+SSL_CRYPTO = -Wl,-rpath=/usr/local/IDfusion/lib -L /usr/local/IDfusion/lib \
+	-lcrypto -ldl -lpthread
 endif
 
 LIBRARY_DEPENDS = ${HURD_LIBRARY} ${NAAAIM_LIBRARY} ${RDK_LIBRARY}

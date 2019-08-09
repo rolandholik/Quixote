@@ -54,7 +54,7 @@ CFLAGS = -Wall ${CDEBUG} ${CINCLUDE}
 
 LDFLAGS = ${STATIC} -g -L ../lib -L ../HurdLib
 ifneq (${CC}, musl-gcc)
-LDFLAGS += -L /usr/local/IDfusion/lib
+LDFLAGS += -Wl,-rpath=/usr/local/IDfusion/lib -L /usr/local/IDfusion/lib
 endif
 
 # OpenSSL crypto library

@@ -62,7 +62,7 @@ CFLAGS = -Wall -O2 -fomit-frame-pointer -march=core2 -I .. -I ../.. \
 
 LDFLAGS = -g
 ifneq (${CC}, musl-gcc)
-LDFLAGS += -L /usr/local/IDfusion/lib
+LDFLAGS += -Wl,-rpath=/usr/local/IDfusion/lib -L /usr/local/IDfusion/lib
 endif
 
 ELFLIB = -lelf

@@ -49,7 +49,7 @@ CFLAGS = -Wall ${CDEBUG}
 # LDFLAGS = -s -L/usr/local/krb5/lib 
 LDFLAGS = -g -L ../lib -L ../HurdLib
 ifneq (${CC}, musl-gcc)
-LDFLAGS += -lpthread -lrt
+LDFLAGS += -lpthread -lrt -Wl,-rpath=/usr/local/IDfusion/lib
 endif
 
 

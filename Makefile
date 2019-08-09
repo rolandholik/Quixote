@@ -41,7 +41,8 @@ SSL_LIBRARY = -L /usr/local/musl/lib -lssl -lcrypto
 else
 SSL_INCLUDE = /usr/local/IDfusion/include
 SSL_CRYPTO = -L /usr/local/IDfusion/lib -lcrypto -ldl -lpthread
-SSL_LIBRARY = -L /usr/local/IDfusion/lib -lssl ${SSL_CRYPTO}
+SSL_LIBRARY = -Wl,-rpath=/usr/local/IDfusion/lib -L /usr/local/IDfusion/lib \
+	-lssl ${SSL_CRYPTO}
 endif
 
 #
