@@ -57,7 +57,7 @@
 #include "SGXmessage.h"
 #include "SGXcmac.h"
 #include "SGXaesgcm.h"
-#include "SGXrsa.h"
+#include "SRDErsa.h"
 
 
 /* Object state extraction macro. */
@@ -454,7 +454,7 @@ static _Bool encode_message2(CO(SGXmessage, this), CO(RandomBuffer, rnd), \
 
 	SGXaesgcm aesgcm = NULL;
 
-	SGXrsa rsa = NULL;
+	SRDErsa rsa = NULL;
 
 
 	/* Verify object status. */
@@ -500,7 +500,7 @@ static _Bool encode_message2(CO(SGXmessage, this), CO(RandomBuffer, rnd), \
 		ERR(goto done);
 
 	/* Encrypt the sub-message and encode it in the current message. */
-	INIT(NAAAIM, SGXrsa, rsa, ERR(goto done));
+	INIT(NAAAIM, SRDErsa, rsa, ERR(goto done));
 	INIT(HurdLib, Buffer, encout, ERR(goto done));
 
 	if ( !rsa->init(rsa, pek) )

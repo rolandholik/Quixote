@@ -12,34 +12,34 @@
  * the source tree for copyright and licensing information.
  **************************************************************************/
 
-#ifndef NAAAIM_SGXrsa_HEADER
-#define NAAAIM_SGXrsa_HEADER
+#ifndef NAAAIM_SRDErsa_HEADER
+#define NAAAIM_SRDErsa_HEADER
 
 
 /* Object type definitions. */
-typedef struct NAAAIM_SGXrsa * SGXrsa;
+typedef struct NAAAIM_SRDErsa * SRDErsa;
 
-typedef struct NAAAIM_SGXrsa_State * SGXrsa_State;
+typedef struct NAAAIM_SRDErsa_State * SRDErsa_State;
 
 /**
- * External SGXrsa object representation.
+ * External SRDErsa object representation.
  */
-struct NAAAIM_SGXrsa
+struct NAAAIM_SRDErsa
 {
 	/* External methods. */
-	_Bool (*init)(const SGXrsa, struct SGX_pek *);
+	_Bool (*init)(const SRDErsa, struct SGX_pek *);
 
-	_Bool (*encrypt)(const SGXrsa, const Buffer, const Buffer);
+	_Bool (*encrypt)(const SRDErsa, const Buffer, const Buffer);
 
-	void (*dump)(const SGXrsa);
-	void (*whack)(const SGXrsa);
+	void (*dump)(const SRDErsa);
+	void (*whack)(const SRDErsa);
 
 
 	/* Private state. */
-	SGXrsa_State state;
+	SRDErsa_State state;
 };
 
 
-/* Sgxmetadata constructor call. */
-extern HCLINK SGXrsa NAAAIM_SGXrsa_Init(void);
+/* SRDErsa constructor call. */
+extern HCLINK SRDErsa NAAAIM_SRDErsa_Init(void);
 #endif
