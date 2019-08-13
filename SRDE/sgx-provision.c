@@ -39,7 +39,7 @@
 #include "SRDE.h"
 #include "PCEenclave.h"
 #include "SGXmessage.h"
-#include "SGXepid.h"
+#include "SRDEepid.h"
 #include "PVEenclave.h"
 #include "SGXecdsa.h"
 #include "intel-messages.h"
@@ -1102,7 +1102,7 @@ extern int main(int argc, char *argv[])
 
 	SGXmessage msg = NULL;
 
-	SGXepid epid = NULL;
+	SRDEepid epid = NULL;
 
 	RandomBuffer rbufr = NULL;
 
@@ -1367,7 +1367,7 @@ extern int main(int argc, char *argv[])
 			ERR(goto done);
 
 		/* Generate EPID blob using PVE enclave. */
-		INIT(NAAAIM, SGXepid, epid, ERR(goto done));
+		INIT(NAAAIM, SRDEepid, epid, ERR(goto done));
 		INIT(NAAAIM, PVEenclave, pve, ERR(goto done));
 		if ( !pve->open(pve, pve_token) )
 			ERR(goto done);

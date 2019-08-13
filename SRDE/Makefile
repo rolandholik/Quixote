@@ -12,7 +12,7 @@ INSTALLBIN    = sgx-check sgx-gen-token sgx-gen-verifier sgx-load \
 	sgx-metadata  sgx-provision
 INSTALLSCRIPT = provision-epid provision-tokens provision-verifier
 INSTINCLUDE   = PCEenclave.h PVEenclave.h QEenclave.h SGXaesgcm.h SGXcmac.h \
-	SGXecdsa.h SGXepid.h SGXloader.h SGXmessage.h SGXmetadata.h	    \
+	SGXecdsa.h SRDEepid.h SGXloader.h SGXmessage.h SGXmetadata.h	    \
 	SGXquote.h SRDErsa.h SGXsigstruct.h SRDE.h SRDEenclave.h
 
 SUBDIRS	    = SGXlibs Attestation ISOidentity Sample
@@ -20,7 +20,7 @@ DEV_SUBDIRS = SGXlibs Sample
 
 CSRC = SGXmetadata.c SGXloader.c SRDEenclave.c SGXsigstruct.c PVEenclave.c   \
 	SGXmessage.c SGXecdsa.c PCEenclave.c SGXcmac.c SGXaesgcm.c SRDErsa.c \
-	QEenclave.c SGXepid.c SGXquote.c SGXquote_sgxmgr.c sgx_exception.c   \
+	QEenclave.c SRDEepid.c SGXquote.c SGXquote_sgxmgr.c sgx_exception.c  \
 	sgx-ocall.c
 
 ASRC = boot-sgx.s

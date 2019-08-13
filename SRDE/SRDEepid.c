@@ -38,18 +38,18 @@
 #include "NAAAIM.h"
 
 #include "SRDE.h"
-#include "SGXepid.h"
+#include "SRDEepid.h"
 
 
 /* Object state extraction macro. */
-#define STATE(var) CO(SGXepid_State, var) = this->state
+#define STATE(var) CO(SRDEepid_State, var) = this->state
 
 /* Verify library/object header file inclusions. */
 #if !defined(NAAAIM_LIBID)
 #error Library identifier not defined.
 #endif
 
-#if !defined(NAAAIM_SGXepid_OBJID)
+#if !defined(NAAAIM_SRDEepid_OBJID)
 #error Object identifier not defined.
 #endif
 
@@ -120,8 +120,8 @@ struct epid_plaintext {
 };
 
 
-/** SGXepid private state information. */
-struct NAAAIM_SGXepid_State
+/** SRDEepid private state information. */
+struct NAAAIM_SRDEepid_State
 {
 	/* The root object. */
 	Origin root;
@@ -150,19 +150,19 @@ struct NAAAIM_SGXepid_State
 /**
  * Internal private method.
  *
- * This method is responsible for initializing the NAAAIM_SGXepid_State
+ * This method is responsible for initializing the NAAAIM_SRDEepid_State
  * structure which holds state information for each instantiated object.
  *
  * \param S	A pointer to the object containing the state information
  *		which is to be initialized.
  */
 
-static void _init_state(CO(SGXepid_State, S))
+static void _init_state(CO(SRDEepid_State, S))
 
 {
 
 	S->libid = NAAAIM_LIBID;
-	S->objid = NAAAIM_SGXepid_OBJID;
+	S->objid = NAAAIM_SRDEepid_OBJID;
 
 	S->poisoned = false;
 
@@ -189,7 +189,7 @@ static void _init_state(CO(SGXepid_State, S))
  * \return	No return value is specified.
  */
 
-static void _set_group_info(CO(SGXepid_State, S))
+static void _set_group_info(CO(SRDEepid_State, S))
 
 {
 	uint32_t plaintext_offset;
@@ -228,7 +228,7 @@ static void _set_group_info(CO(SGXepid_State, S))
  *		a valid EPID.
  */
 
-static _Bool load(CO(SGXepid, this), CO(char *, file))
+static _Bool load(CO(SRDEepid, this), CO(char *, file))
 
 {
 	STATE(S);
@@ -307,7 +307,7 @@ static _Bool load(CO(SGXepid, this), CO(char *, file))
  *		properly saved.
  */
 
-static _Bool save(CO(SGXepid, this), CO(char *, file))
+static _Bool save(CO(SRDEepid, this), CO(char *, file))
 
 {
 	STATE(S);
@@ -372,7 +372,7 @@ static _Bool save(CO(SGXepid, this), CO(char *, file))
  *		EPID was successfully added.
  */
 
-static _Bool add_epid(CO(SGXepid, this), CO(Buffer, epid))
+static _Bool add_epid(CO(SRDEepid, this), CO(Buffer, epid))
 
 {
 	STATE(S);
@@ -422,7 +422,7 @@ static _Bool add_epid(CO(SGXepid, this), CO(Buffer, epid))
  * \return	No return value is defined.
  */
 
-static void add_platform_info(CO(SGXepid, this), \
+static void add_platform_info(CO(SRDEepid, this), \
 			      struct SGX_platform_info *info)
 
 {
@@ -449,7 +449,7 @@ static void add_platform_info(CO(SGXepid, this), \
  *		null pointer is returned.
  */
 
-static Buffer get_epid(CO(SGXepid, this))
+static Buffer get_epid(CO(SRDEepid, this))
 
 {
 	STATE(S);
@@ -474,7 +474,7 @@ static Buffer get_epid(CO(SGXepid, this))
  * \return	No return value is defined.
  */
 
-static void dump(CO(SGXepid, this))
+static void dump(CO(SRDEepid, this))
 
 {
 	STATE(S);
@@ -535,12 +535,12 @@ static void dump(CO(SGXepid, this))
 /**
  * External public method.
  *
- * This method implements a destructor for the SGXepid object.
+ * This method implements a destructor for the SRDEepid object.
  *
  * \param this	A pointer to the object which is to be destroyed.
  */
 
-static void whack(CO(SGXepid, this))
+static void whack(CO(SRDEepid, this))
 
 {
 	STATE(S);
@@ -556,18 +556,18 @@ static void whack(CO(SGXepid, this))
 /**
  * External constructor call.
  *
- * This function implements a constructor call for a SGXepid object.
+ * This function implements a constructor call for a SRDEepid object.
  *
- * \return	A pointer to the initialized SGXepid.  A null value
+ * \return	A pointer to the initialized SRDEepid.  A null value
  *		indicates an error was encountered in object generation.
  */
 
-extern SGXepid NAAAIM_SGXepid_Init(void)
+extern SRDEepid NAAAIM_SRDEepid_Init(void)
 
 {
 	Origin root;
 
-	SGXepid this = NULL;
+	SRDEepid this = NULL;
 
 	struct HurdLib_Origin_Retn retn;
 
@@ -576,9 +576,9 @@ extern SGXepid NAAAIM_SGXepid_Init(void)
 	root = HurdLib_Origin_Init();
 
 	/* Allocate the object and internal state. */
-	retn.object_size  = sizeof(struct NAAAIM_SGXepid);
-	retn.state_size   = sizeof(struct NAAAIM_SGXepid_State);
-	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_SGXepid_OBJID, &retn) )
+	retn.object_size  = sizeof(struct NAAAIM_SRDEepid);
+	retn.state_size   = sizeof(struct NAAAIM_SRDEepid_State);
+	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_SRDEepid_OBJID, &retn) )
 		return NULL;
 	this	    	  = retn.object;
 	this->state 	  = retn.state;

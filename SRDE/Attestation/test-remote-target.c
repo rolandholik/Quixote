@@ -41,7 +41,7 @@
 #include "SRDE.h"
 #include "SRDEenclave.h"
 #include "SGXquote.h"
-#include "SGXepid.h"
+#include "SRDEepid.h"
 
 #include "LocalTarget-interface.h"
 

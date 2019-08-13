@@ -42,7 +42,7 @@
 #include "RandomBuffer.h"
 #include "SRDE.h"
 #include "SRDEenclave.h"
-#include "SGXepid.h"
+#include "SRDEepid.h"
 #include "QEenclave.h"
 
 
@@ -92,7 +92,7 @@ struct NAAAIM_QEenclave_State
 	SRDEenclave enclave;
 
 	/* The buffer containing the EPID. */
-	SGXepid epid;
+	SRDEepid epid;
 };
 
 
@@ -270,7 +270,7 @@ static _Bool load_epid(CO(QEenclave, this), CO(char *, epid_name))
 	 * Allocate the EPID buffer if this is the first call, otherwise
 	 * reset it.
 	 */
-	INIT(NAAAIM, SGXepid, S->epid, ERR(goto done));
+	INIT(NAAAIM, SRDEepid, S->epid, ERR(goto done));
 	if ( !S->epid->load(S->epid, epid_name) )
 		ERR(goto done);
 	b = S->epid->get_epid(S->epid);

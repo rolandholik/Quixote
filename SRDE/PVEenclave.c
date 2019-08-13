@@ -46,7 +46,7 @@
 #include "SRDEenclave.h"
 #include "PCEenclave.h"
 #include "SGXmessage.h"
-#include "SGXepid.h"
+#include "SRDEepid.h"
 #include "PVEenclave.h"
 #include "intel-messages.h"
 
@@ -431,7 +431,7 @@ static _Bool get_message3(CO(PVEenclave, this), CO(SGXmessage, msg),	      \
 	Buffer b,
 	       bufr = NULL;
 
-	SGXepid epid = NULL;
+	SRDEepid epid = NULL;
 
 
 	/* Populate the input structure. */
@@ -502,7 +502,7 @@ static _Bool get_message3(CO(PVEenclave, this), CO(SGXmessage, msg),	      \
 		fputs("\tPlatform pi:\t", stdout);
 		bufr->print(bufr);
 
-		INIT(NAAAIM, SGXepid, epid, ERR(goto done));
+		INIT(NAAAIM, SRDEepid, epid, ERR(goto done));
 		if ( !epid->load(epid, NULL) )
 			ERR(goto done);
 
@@ -598,7 +598,7 @@ static _Bool get_message3(CO(PVEenclave, this), CO(SGXmessage, msg),	      \
  */
 
 static _Bool get_epid(CO(PVEenclave, this), CO(SGXmessage, msg), \
-		      CO(SGXepid, epid_blob))
+		      CO(SRDEepid, epid_blob))
 
 {
 	STATE(S);
