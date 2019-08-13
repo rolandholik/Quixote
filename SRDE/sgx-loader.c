@@ -20,7 +20,7 @@
 #include "NAAAIM.h"
 #include "SRDE.h"
 #include "SRDEenclave.h"
-#include "SGXloader.h"
+#include "SRDEloader.h"
 
 
 extern int main(int argc, char *argv[])
@@ -30,7 +30,7 @@ extern int main(int argc, char *argv[])
 
 	_Bool debug = false;
 
-	SGXloader loader = NULL;
+	SRDEloader loader = NULL;
 
 
 	if (argc != 3) {
@@ -41,7 +41,7 @@ extern int main(int argc, char *argv[])
 	if ( strcmp(argv[2], "1") == 0 )
 		debug = true;
 
-	INIT(NAAAIM, SGXloader, loader, ERR(goto done));
+	INIT(NAAAIM, SRDEloader, loader, ERR(goto done));
 
 	if ( !loader->load(loader, argv[1], debug) ) {
 		fputs("Taking error exit.\n", stderr);

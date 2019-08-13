@@ -37,18 +37,18 @@
 #include "SRDE.h"
 #include "SRDEenclave.h"
 #include "SGXmetadata.h"
-#include "SGXloader.h"
+#include "SRDEloader.h"
 
 
 /* Object state extraction macro. */
-#define STATE(var) CO(SGXloader_State, var) = this->state
+#define STATE(var) CO(SRDEloader_State, var) = this->state
 
 /* Verify library/object header file inclusions. */
 #if !defined(NAAAIM_LIBID)
 #error Library identifier not defined.
 #endif
 
-#if !defined(NAAAIM_SGXloader_OBJID)
+#if !defined(NAAAIM_SRDEloader_OBJID)
 #error Object identifier not defined.
 #endif
 
@@ -66,8 +66,8 @@ struct segment {
 };
 
 
-/** SGXloader private state information. */
-struct NAAAIM_SGXloader_State
+/** SRDEloader private state information. */
+struct NAAAIM_SRDEloader_State
 {
 	/* The root object. */
 	Origin root;
@@ -111,17 +111,17 @@ struct NAAAIM_SGXloader_State
 /**
  * Internal private method.
  *
- * This method is responsible for initializing the NAAAIM_SGXloader_State
+ * This method is responsible for initializing the NAAAIM_SRDEloader_State
  * structure which holds state information for each instantiated object.
  *
  * \param S A pointer to the object containing the state information which
  *        is to be initialized.
  */
 
-static void _init_state(CO(SGXloader_State, S)) {
+static void _init_state(CO(SRDEloader_State, S)) {
 
 	S->libid = NAAAIM_LIBID;
-	S->objid = NAAAIM_SGXloader_OBJID;
+	S->objid = NAAAIM_SRDEloader_OBJID;
 
 	S->poisoned = false;
 	S->debug    = false;
@@ -155,7 +155,7 @@ static void _init_state(CO(SGXloader_State, S)) {
  *		Elf64_Dyn structure is returned.
  */
 
-static Elf64_Dyn *_get_tag(CO(SGXloader_State, S), Elf64_Sxword tag)
+static Elf64_Dyn *_get_tag(CO(SRDEloader_State, S), Elf64_Sxword tag)
 
 {
 	Elf64_Dyn *dptr = S->dynptr;
@@ -190,7 +190,7 @@ static Elf64_Dyn *_get_tag(CO(SGXloader_State, S), Elf64_Sxword tag)
  *		segment was saved.
  */
 
-static _Bool _pt_load_segment(CO(SGXloader_State, S), CO(Elf64_Phdr *, phdr))
+static _Bool _pt_load_segment(CO(SRDEloader_State, S), CO(Elf64_Phdr *, phdr))
 
 {
 	_Bool retn = false;
@@ -257,7 +257,7 @@ static _Bool _pt_load_segment(CO(SGXloader_State, S), CO(Elf64_Phdr *, phdr))
  *		no such relocations were present.
  */
 
-static _Bool _build_relocation_map(CO(SGXloader_State, S))
+static _Bool _build_relocation_map(CO(SRDEloader_State, S))
 
 {
 	_Bool retn = false;
@@ -301,7 +301,7 @@ static _Bool _build_relocation_map(CO(SGXloader_State, S))
  *		if the object contains valid metadata.
  */
 
-static _Bool load(CO(SGXloader, this), CO(char *, enclave), const _Bool debug)
+static _Bool load(CO(SRDEloader, this), CO(char *, enclave), const _Bool debug)
 
 {
 	STATE(S);
@@ -417,7 +417,7 @@ static _Bool load(CO(SGXloader, this), CO(char *, enclave), const _Bool debug)
  *		if the object contains valid metadata.
  */
 
-static _Bool load_secs(CO(SGXloader, this), CO(char *, enclave), \
+static _Bool load_secs(CO(SRDEloader, this), CO(char *, enclave), \
 		       struct SGX_secs *secs, const _Bool debug)
 
 {
@@ -476,7 +476,7 @@ static _Bool load_secs(CO(SGXloader, this), CO(char *, enclave), \
  *		if the object contains valid metadata.
  */
 
-static _Bool load_memory(CO(SGXloader, this), const char * enclave, \
+static _Bool load_memory(CO(SRDEloader, this), const char * enclave, \
 			 const size_t enclave_size, const _Bool debug)
 
 {
@@ -588,8 +588,8 @@ static _Bool load_memory(CO(SGXloader, this), const char * enclave, \
  *		if the object contains valid metadata.
  */
 
-static _Bool load_secs_memory(CO(SGXloader, this), const char * enclave,  \
-			      size_t enclave_size, struct SGX_secs *secs, \
+static _Bool load_secs_memory(CO(SRDEloader, this), const char * enclave,  \
+			      size_t enclave_size, struct SGX_secs *secs,  \
 			      const _Bool debug)
 
 {
@@ -881,7 +881,7 @@ static _Bool _build_segment(CO(SRDEenclave, enclave),	   \
   *		enclave was successfully loaded.
   */
 
- static _Bool load_segments(CO(SGXloader, this), CO(SRDEenclave, enclave))
+ static _Bool load_segments(CO(SRDEloader, this), CO(SRDEenclave, enclave))
 
  {
 	 STATE(S);
@@ -1016,7 +1016,7 @@ static _Bool _build_segment(CO(SRDEenclave, enclave),	   \
  *		the layouts were loaded.
  */
 
-static _Bool load_layouts(CO(SGXloader, this), CO(SRDEenclave, enclave))
+static _Bool load_layouts(CO(SRDEloader, this), CO(SRDEenclave, enclave))
 
 {
 	STATE(S);
@@ -1054,7 +1054,7 @@ static _Bool load_layouts(CO(SGXloader, this), CO(SRDEenclave, enclave))
  *		if the caller is returning a valid signature structure.
  */
 
-static _Bool get_sigstruct(CO(SGXloader, this), \
+static _Bool get_sigstruct(CO(SRDEloader, this), \
 			   struct SGX_sigstruct *sigstruct)
 
 {
@@ -1099,7 +1099,7 @@ static _Bool get_sigstruct(CO(SGXloader, this), \
  *		caller.
  */
 
-static _Bool get_attributes(CO(SGXloader, this), sgx_attributes_t *attributes)
+static _Bool get_attributes(CO(SRDEloader, this), sgx_attributes_t *attributes)
 
 {
 	STATE(S);
@@ -1138,7 +1138,7 @@ static _Bool get_attributes(CO(SGXloader, this), sgx_attributes_t *attributes)
  * \return	No return value is defined.
  */
 
-static void debug(CO(SGXloader, this), const _Bool debug)
+static void debug(CO(SRDEloader, this), const _Bool debug)
 
 {
 	STATE(S);
@@ -1160,7 +1160,7 @@ static void debug(CO(SGXloader, this), const _Bool debug)
  * \return	No return value is defined.
  */
 
-static void dump(CO(SGXloader, this))
+static void dump(CO(SRDEloader, this))
 
 {
 	STATE(S);
@@ -1208,12 +1208,12 @@ static void dump(CO(SGXloader, this))
 /**
  * External public method.
  *
- * This method implements a destructor for an SGXloader object.
+ * This method implements a destructor for an SRDEloader object.
  *
  * \param this	A pointer to the object which is to be destroyed.
  */
 
-static void whack(CO(SGXloader, this))
+static void whack(CO(SRDEloader, this))
 
 {
 	STATE(S);
@@ -1250,18 +1250,18 @@ static void whack(CO(SGXloader, this))
 /**
  * External constructor call.
  *
- * This function implements a constructor call for a SGXloader object.
+ * This function implements a constructor call for a SRDEloader object.
  *
- * \return	A pointer to the initialized SGXloader.  A null value
+ * \return	A pointer to the initialized SRDEloader.  A null value
  *		indicates an error was encountered in object generation.
  */
 
-extern SGXloader NAAAIM_SGXloader_Init(void)
+extern SRDEloader NAAAIM_SRDEloader_Init(void)
 
 {
 	auto Origin root;
 
-	auto SGXloader this = NULL;
+	auto SRDEloader this = NULL;
 
 	auto struct HurdLib_Origin_Retn retn;
 
@@ -1270,9 +1270,9 @@ extern SGXloader NAAAIM_SGXloader_Init(void)
 	root = HurdLib_Origin_Init();
 
 	/* Allocate the object and internal state. */
-	retn.object_size  = sizeof(struct NAAAIM_SGXloader);
-	retn.state_size   = sizeof(struct NAAAIM_SGXloader_State);
-	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_SGXloader_OBJID, &retn) )
+	retn.object_size  = sizeof(struct NAAAIM_SRDEloader);
+	retn.state_size   = sizeof(struct NAAAIM_SRDEloader_State);
+	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_SRDEloader_OBJID, &retn) )
 		return NULL;
 	this	    	  = retn.object;
 	this->state 	  = retn.state;

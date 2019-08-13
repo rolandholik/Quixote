@@ -147,9 +147,9 @@ ContourPoint.o: ContourPoint.h
 ExchangeEvent.o: ExchangeEvent.h
 ISOidentity.o: ISOidentity.h
 # SGXmetadata.o: SGX.h SGXmetadata.h
-# SGXloader.o: SGX.h SGXloader.h
-# SGXenclave.o: SGX.h SGXenclave.h SGXmetadata.h SGXloader.h
-# SGXsigstruct.o: SGX.h SGXsigstruct.h
+# SRDEloader.o: SRDE.h SRDEloader.h
+# SGXenclave.o: SRDE.h SRDEenclave.h SGXmetadata.h SRDEloader.h
+# SGXsigstruct.o: SRDE.h SGXsigstruct.h
 
 cboot.o: cboot.h
 

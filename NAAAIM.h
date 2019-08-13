@@ -74,7 +74,7 @@
 #define NAAAIM_MGMTsupvr_OBJID		38
 
 #define NAAAIM_SGXmetadata_OBJID	39
-#define NAAAIM_SGXloader_OBJID		40
+#define NAAAIM_SRDEloader_OBJID		40
 #define NAAAIM_SRDEenclave_OBJID	41
 #define NAAAIM_SGXsigstruct_OBJID	42
 #define NAAAIM_SRDEepid_OBJID		43

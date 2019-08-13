@@ -40,7 +40,7 @@
 #include "NAAAIM.h"
 #include "SRDE.h"
 #include "SRDEenclave.h"
-#include "SGXloader.h"
+#include "SRDEloader.h"
 #include "SGXsigstruct.h"
 
 
@@ -83,7 +83,7 @@ struct NAAAIM_SRDEenclave_State
 	int fd;
 
 	/* The enclave loader object. */
-	SGXloader loader;
+	SRDEloader loader;
 
 	/* The SGX Enclave Control Structure. */
 	struct SGX_secs secs;
@@ -297,7 +297,7 @@ static _Bool open_enclave(CO(SRDEenclave, this), CO(char *, device), \
 		ERR(goto done);
 
 	/* Load the SGX metadata and shared object file. */
-	INIT(NAAAIM, SGXloader, S->loader, ERR(goto done));
+	INIT(NAAAIM, SRDEloader, S->loader, ERR(goto done));
 	if ( S->debug )
 		S->loader->debug(S->loader, true);
 	if ( !S->loader->load_secs(S->loader, enclave, &S->secs, debug) )
@@ -356,7 +356,7 @@ static _Bool open_enclave_memory(CO(SRDEenclave, this), CO(char *, device),  \
 		ERR(goto done);
 
 	/* Load the SGX metadata and shared object file. */
-	INIT(NAAAIM, SGXloader, S->loader, ERR(goto done));
+	INIT(NAAAIM, SRDEloader, S->loader, ERR(goto done));
 	if ( S->debug )
 		S->loader->debug(S->loader, true);
 	if ( !S->loader->load_secs_memory(S->loader, enclave, enclave_size, \
@@ -896,7 +896,7 @@ static unsigned long int get_address(CO(SRDEenclave, this))
  * when the layout metadata is built during the signing process.
  *
  * There is one Task Control Structure (TCS) defined for each exection
- * thread.  The SGXloader object calls back into this method to
+ * thread.  The SRDEloader object calls back into this method to
  * designate that the next page added will be a TCS definition page.
  * This function captures the virtual address of this incoming page
  * as a TCS definition page.  This virtual address is used in the
