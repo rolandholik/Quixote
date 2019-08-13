@@ -40,7 +40,7 @@
 #include "SHA256.h"
 #include "SRDE.h"
 #include "SRDEenclave.h"
-#include "SGXmetadata.h"
+#include "SRDEmetadata.h"
 
 
 /**
@@ -137,7 +137,7 @@ static _Bool LE_init_ecall0(char *enclave,
 
 	struct SGX_sigstruct sigstruct;
 
-	SGXmetadata init_enclave = NULL;
+	SRDEmetadata init_enclave = NULL;
 
 	Buffer bufr = NULL;
 
@@ -149,7 +149,7 @@ static _Bool LE_init_ecall0(char *enclave,
 
 
 	/* Get the attributes for an enclave to be signed. */
-	INIT(NAAAIM, SGXmetadata, init_enclave, ERR(goto done));
+	INIT(NAAAIM, SRDEmetadata, init_enclave, ERR(goto done));
 	if ( !init_enclave->load_memory(init_enclave, (char *) TE_image, \
 					sizeof(TE_image)) )
 		ERR(goto done);

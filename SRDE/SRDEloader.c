@@ -36,7 +36,7 @@
 #include "NAAAIM.h"
 #include "SRDE.h"
 #include "SRDEenclave.h"
-#include "SGXmetadata.h"
+#include "SRDEmetadata.h"
 #include "SRDEloader.h"
 
 
@@ -95,7 +95,7 @@ struct NAAAIM_SRDEloader_State
 	Elf *elf;
 
 	/* SGX metadata. */
-	SGXmetadata metadata;
+	SRDEmetadata metadata;
 
 	/* The array of segments. */
 	Buffer segments;
@@ -325,7 +325,7 @@ static _Bool load(CO(SRDEloader, this), CO(char *, enclave), const _Bool debug)
 
 
 	/* Load the SGA metadata. */
-	INIT(NAAAIM, SGXmetadata, S->metadata, ERR(goto done));
+	INIT(NAAAIM, SRDEmetadata, S->metadata, ERR(goto done));
 	if ( S->debug )
 		S->metadata->debug(S->metadata, true);
 	if ( !S->metadata->load(S->metadata, enclave) )
@@ -498,8 +498,8 @@ static _Bool load_memory(CO(SRDEloader, this), const char * enclave, \
 		goto done;
 
 
-	/* Load the SGA metadata. */
-	INIT(NAAAIM, SGXmetadata, S->metadata, ERR(goto done));
+	/* Load the enclave metadata. */
+	INIT(NAAAIM, SRDEmetadata, S->metadata, ERR(goto done));
 	if ( S->debug )
 		S->metadata->debug(S->metadata, true);
 	if ( !S->metadata->load_memory(S->metadata, (char *) enclave, \

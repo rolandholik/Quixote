@@ -6,7 +6,7 @@
  * The SIGSTRUCT is a data structure which implements the information
  * used to verify the ownership, integrity and measurement status of
  * an enclave.  This structure is a component of the SGX metadata
- * which is handled by the SGXmetadata object.
+ * which is handled by the SRDEmetadata object.
  */
 
 /**************************************************************************

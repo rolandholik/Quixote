@@ -146,9 +146,9 @@ Actor.o: Actor.h
 ContourPoint.o: ContourPoint.h
 ExchangeEvent.o: ExchangeEvent.h
 ISOidentity.o: ISOidentity.h
-# SGXmetadata.o: SGX.h SGXmetadata.h
+# SRDEmetadata.o: SGX.h SRDEmetadata.h
 # SRDEloader.o: SRDE.h SRDEloader.h
-# SGXenclave.o: SRDE.h SRDEenclave.h SGXmetadata.h SRDEloader.h
+# SGXenclave.o: SRDE.h SRDEenclave.h SRDEmetadata.h SRDEloader.h
 # SGXsigstruct.o: SRDE.h SGXsigstruct.h
 
 cboot.o: cboot.h

@@ -45,7 +45,7 @@
 
 #include "SRDE.h"
 #include "SRDEenclave.h"
-#include "SGXmetadata.h"
+#include "SRDEmetadata.h"
 
 
 /**
@@ -182,7 +182,7 @@ extern int main(int argc, char *argv[])
 
 	RandomBuffer rbufr = NULL;
 
-	SGXmetadata metadata = NULL;
+	SRDEmetadata metadata = NULL;
 
 
 	/* Get the organizational identifier and SSN. */
@@ -239,7 +239,7 @@ extern int main(int argc, char *argv[])
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 
 	if ( enclave_name != NULL ) {
-		INIT(NAAAIM, SGXmetadata, metadata, ERR(goto done));
+		INIT(NAAAIM, SRDEmetadata, metadata, ERR(goto done));
 		if ( !metadata->load(metadata, enclave_name) ) {
 			fprintf(stderr, "Unable to load %s metadata.\n", \
 				enclave_name);

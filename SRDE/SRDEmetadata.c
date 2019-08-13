@@ -39,18 +39,18 @@
 #include "NAAAIM.h"
 #include "SRDE.h"
 #include "SRDEenclave.h"
-#include "SGXmetadata.h"
+#include "SRDEmetadata.h"
 
 
 /* Object state extraction macro. */
-#define STATE(var) CO(SGXmetadata_State, var) = this->state
+#define STATE(var) CO(SRDEmetadata_State, var) = this->state
 
 /* Verify library/object header file inclusions. */
 #if !defined(NAAAIM_LIBID)
 #error Library identifier not defined.
 #endif
 
-#if !defined(NAAAIM_SGXmetadata_OBJID)
+#if !defined(NAAAIM_SRDEmetadata_OBJID)
 #error Object identifier not defined.
 #endif
 
@@ -142,8 +142,8 @@ struct layout_description v2_layouts[] = {
 };
 
 
-/** SGXmetadata private state information. */
-struct NAAAIM_SGXmetadata_State
+/** SRDEmetadata private state information. */
+struct NAAAIM_SRDEmetadata_State
 {
 	/* The root object. */
 	Origin root;
@@ -185,17 +185,17 @@ struct NAAAIM_SGXmetadata_State
 /**
  * Internal private method.
  *
- * This method is responsible for initializing the NAAAIM_SGXmetadata_State
+ * This method is responsible for initializing the NAAAIM_SRDEmetadata_State
  * structure which holds state information for each instantiated object.
  *
  * \param S A pointer to the object containing the state information which
  *        is to be initialized.
  */
 
-static void _init_state(CO(SGXmetadata_State, S)) {
+static void _init_state(CO(SRDEmetadata_State, S)) {
 
 	S->libid = NAAAIM_LIBID;
-	S->objid = NAAAIM_SGXmetadata_OBJID;
+	S->objid = NAAAIM_SRDEmetadata_OBJID;
 
 	S->poisoned = false;
 	S->debug    = false;
@@ -235,7 +235,7 @@ static void _init_state(CO(SGXmetadata_State, S)) {
  *		indicates that valid metadata was not located.
  */
 
-static _Bool _load_metadata(CO(SGXmetadata, this), CO(uint8_t, *metaptr))
+static _Bool _load_metadata(CO(SRDEmetadata, this), CO(uint8_t, *metaptr))
 
 {
 	STATE(S);
@@ -302,7 +302,7 @@ static _Bool _load_metadata(CO(SGXmetadata, this), CO(uint8_t, *metaptr))
  *		if the object contains valid metadata.
  */
 
-static _Bool load(CO(SGXmetadata, this), CO(char *, enclave))
+static _Bool load(CO(SRDEmetadata, this), CO(char *, enclave))
 
 {
 	STATE(S);
@@ -447,7 +447,7 @@ static _Bool load(CO(SGXmetadata, this), CO(char *, enclave))
  *		if the object contains valid metadata.
  */
 
-static _Bool load_memory(CO(SGXmetadata, this), char * enclave, \
+static _Bool load_memory(CO(SRDEmetadata, this), char * enclave, \
 			 const size_t enclave_size)
 
 {
@@ -586,7 +586,7 @@ static _Bool load_memory(CO(SGXmetadata, this), char * enclave, \
  * \return	No return value is defined.
  */
 
-static void patch_enclave(CO(SGXmetadata, this), uint8_t *image)
+static void patch_enclave(CO(SRDEmetadata, this), uint8_t *image)
 
 {
 	STATE(S);
@@ -635,7 +635,7 @@ static void patch_enclave(CO(SGXmetadata, this), uint8_t *image)
  *			issue with the attribute set.
  */
 
-static _Bool compute_attributes(CO(SGXmetadata, this), const _Bool debug)
+static _Bool compute_attributes(CO(SRDEmetadata, this), const _Bool debug)
 
 {
 	STATE(S);
@@ -816,7 +816,7 @@ done:
  *			issue with the attribute set.
  */
 
-static _Bool get_secs(CO(SGXmetadata, this), struct SGX_secs *secs)
+static _Bool get_secs(CO(SRDEmetadata, this), struct SGX_secs *secs)
 
 {
 	STATE(S);
@@ -867,7 +867,7 @@ static _Bool get_secs(CO(SGXmetadata, this), struct SGX_secs *secs)
  *			is returned if the object is poisoned.
  */
 
-static _Bool get_sigstruct(CO(SGXmetadata, this), \
+static _Bool get_sigstruct(CO(SRDEmetadata, this), \
 			   struct SGX_sigstruct *sigstruct)
 
 {
@@ -909,7 +909,7 @@ static _Bool get_sigstruct(CO(SGXmetadata, this), \
  *			is returned if the object is poisoned.
  */
 
-static _Bool get_attributes(CO(SGXmetadata, this), \
+static _Bool get_attributes(CO(SRDEmetadata, this), \
 			    sgx_attributes_t *attributes)
 
 {
@@ -958,7 +958,7 @@ static _Bool get_attributes(CO(SGXmetadata, this), \
  *			not be guaranteed to have any valid values.
  */
 
-static _Bool get_version(CO(SGXmetadata, this), uint32_t *major, \
+static _Bool get_version(CO(SRDEmetadata, this), uint32_t *major, \
 			 uint32_t *minor)
 
 {
@@ -1004,7 +1004,7 @@ static _Bool get_version(CO(SGXmetadata, this), uint32_t *major, \
  *			location of the layout description fails.
  */
 
-static struct layout_description * _find_layout(CO(SGXmetadata_State, S), \
+static struct layout_description * _find_layout(CO(SRDEmetadata_State, S), \
 						const uint16_t id)
 
 {
@@ -1056,7 +1056,7 @@ static struct layout_description * _find_layout(CO(SGXmetadata_State, S), \
  *			the loading of the layout fails.
  */
 
-static _Bool _load_layout(CO(SGXmetadata_State, S),		\
+static _Bool _load_layout(CO(SRDEmetadata_State, S),		\
 			  CO(struct _layout_entry_t *, layout), \
 			  CO(SRDEenclave, enclave))
 
@@ -1224,7 +1224,7 @@ static _Bool _load_layout(CO(SGXmetadata_State, S),		\
  *			the loading of the group fails.
  */
 
-static _Bool _load_group(CO(SGXmetadata_State, S), CO(layout_t *, layout), \
+static _Bool _load_group(CO(SRDEmetadata_State, S), CO(layout_t *, layout), \
 			 const uint64_t group, CO(SRDEenclave, enclave))
 
 {
@@ -1271,7 +1271,7 @@ static _Bool _load_group(CO(SGXmetadata_State, S), CO(layout_t *, layout), \
  *		indicates the enclave was successfully loaded.
  */
 
-static _Bool load_layouts(CO(SGXmetadata, this), CO(SRDEenclave, enclave))
+static _Bool load_layouts(CO(SRDEmetadata, this), CO(SRDEenclave, enclave))
 
 {
 	STATE(S);
@@ -1327,7 +1327,7 @@ static _Bool load_layouts(CO(SGXmetadata, this), CO(SRDEenclave, enclave))
  * \return	No return value is defined.
  */
 
-static void debug(CO(SGXmetadata, this), const _Bool debug)
+static void debug(CO(SRDEmetadata, this), const _Bool debug)
 
 {
 	STATE(S);
@@ -1386,7 +1386,7 @@ static void _print_buffer(CO(char *, prefix), CO(uint8_t *, bufr), size_t cnt)
  *		if the object contains valid metadata.
  */
 
-static void dump(CO(SGXmetadata, this))
+static void dump(CO(SRDEmetadata, this))
 
 {
 	STATE(S);
@@ -1533,12 +1533,12 @@ static void dump(CO(SGXmetadata, this))
 /**
  * External public method.
  *
- * This method implements a destructor for a SGXmetadata object.
+ * This method implements a destructor for a SRDEmetadata object.
  *
  * \param this	A pointer to the object which is to be destroyed.
  */
 
-static void whack(CO(SGXmetadata, this))
+static void whack(CO(SRDEmetadata, this))
 
 {
 	STATE(S);
@@ -1560,18 +1560,18 @@ static void whack(CO(SGXmetadata, this))
 /**
  * External constructor call.
  *
- * This function implements a constructor call for a SGXmetadata object.
+ * This function implements a constructor call for a SRDEmetadata object.
  *
- * \return	A pointer to the initialized SGXmetadata.  A null value
+ * \return	A pointer to the initialized SRDEmetadata.  A null value
  *		indicates an error was encountered in object generation.
  */
 
-extern SGXmetadata NAAAIM_SGXmetadata_Init(void)
+extern SRDEmetadata NAAAIM_SRDEmetadata_Init(void)
 
 {
 	auto Origin root;
 
-	auto SGXmetadata this = NULL;
+	auto SRDEmetadata this = NULL;
 
 	auto struct HurdLib_Origin_Retn retn;
 
@@ -1580,9 +1580,10 @@ extern SGXmetadata NAAAIM_SGXmetadata_Init(void)
 	root = HurdLib_Origin_Init();
 
 	/* Allocate the object and internal state. */
-	retn.object_size  = sizeof(struct NAAAIM_SGXmetadata);
-	retn.state_size   = sizeof(struct NAAAIM_SGXmetadata_State);
-	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_SGXmetadata_OBJID, &retn) )
+	retn.object_size  = sizeof(struct NAAAIM_SRDEmetadata);
+	retn.state_size   = sizeof(struct NAAAIM_SRDEmetadata_State);
+	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_SRDEmetadata_OBJID, \
+			 &retn) )
 		return NULL;
 	this	    	  = retn.object;
 	this->state 	  = retn.state;

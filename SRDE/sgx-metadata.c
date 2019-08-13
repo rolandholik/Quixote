@@ -35,7 +35,7 @@
 #include "SRDE.h"
 #include "SRDEenclave.h"
 #include "SGXsigstruct.h"
-#include "SGXmetadata.h"
+#include "SRDEmetadata.h"
 
 
 /**
@@ -123,7 +123,7 @@ static void _print_buffer(CO(char *, prefix), CO(uint8_t *, bufr), size_t cnt)
  *			is returned.
  */
 
-static int signature_mode(SGXmetadata metadata, char *output)
+static int signature_mode(SRDEmetadata metadata, char *output)
 
 {
 	int retn = 1;
@@ -241,7 +241,7 @@ int main(int argc, char *argv[])
 		signature
 	} mode = dump;
 
-	SGXmetadata metadata = NULL;
+	SRDEmetadata metadata = NULL;
 
 
 	/* Parse and verify arguements. */
@@ -269,7 +269,7 @@ int main(int argc, char *argv[])
 		goto done;
 	}
 
-	INIT(NAAAIM, SGXmetadata, metadata, ERR(goto done));
+	INIT(NAAAIM, SRDEmetadata, metadata, ERR(goto done));
 	if ( !metadata->load(metadata, enclave_name) ) {
 		fprintf(stderr, "Unable to load metadata for enclave %s.\n", \
 			enclave_name);
