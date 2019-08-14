@@ -41,7 +41,7 @@
 #include "SRDE.h"
 #include "SRDEenclave.h"
 #include "SRDEloader.h"
-#include "SGXsigstruct.h"
+#include "SRDEsigstruct.h"
 
 
 /* Object state extraction macro. */
@@ -704,7 +704,7 @@ static _Bool init_launch_enclave(CO(SRDEenclave, this))
 
 	struct SGX_init_param init_param;
 
-	SGXsigstruct LEsigstruct = NULL;
+	SRDEsigstruct LEsigstruct = NULL;
 
 
 	/* Verify object. */
@@ -716,7 +716,7 @@ static _Bool init_launch_enclave(CO(SRDEenclave, this))
 	 * Use the binary SIGSTRUCT provided by Intel to support
 	 * loading of the Launch Enclave.
 	 */
-	INIT(NAAAIM, SGXsigstruct, LEsigstruct, ERR(goto done));
+	INIT(NAAAIM, SRDEsigstruct, LEsigstruct, ERR(goto done));
 	if ( !LEsigstruct->get_LE(LEsigstruct, &sigstruct) )
 		ERR(goto done);
 

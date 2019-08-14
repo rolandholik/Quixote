@@ -10,35 +10,35 @@
  * the source tree for copyright and licensing information.
  **************************************************************************/
 
-#ifndef NAAAIM_SGXsigstruct_HEADER
-#define NAAAIM_SGXsigstruct_HEADER
+#ifndef NAAAIM_SRDEsigstruct_HEADER
+#define NAAAIM_SRDEsigstruct_HEADER
 
 
 /* Object type definitions. */
-typedef struct NAAAIM_SGXsigstruct * SGXsigstruct;
+typedef struct NAAAIM_SRDEsigstruct * SRDEsigstruct;
 
-typedef struct NAAAIM_SGXsigstruct_State * SGXsigstruct_State;
+typedef struct NAAAIM_SRDEsigstruct_State * SRDEsigstruct_State;
 
 /**
  * External SGXMetadata object representation.
  */
-struct NAAAIM_SGXsigstruct
+struct NAAAIM_SRDEsigstruct
 {
 	/* External methods. */
-	_Bool (*load)(const SGXsigstruct, const char *);
+	_Bool (*load)(const SRDEsigstruct, const char *);
 
-	_Bool (*get)(const SGXsigstruct, struct SGX_sigstruct *);
-	_Bool (*get_LE)(const SGXsigstruct, struct SGX_sigstruct *);
+	_Bool (*get)(const SRDEsigstruct, struct SGX_sigstruct *);
+	_Bool (*get_LE)(const SRDEsigstruct, struct SGX_sigstruct *);
 
-	_Bool (*generate)(const SGXsigstruct);
-	void (*dump)(const SGXsigstruct);
-	void (*whack)(const SGXsigstruct);
+	_Bool (*generate)(const SRDEsigstruct);
+	void (*dump)(const SRDEsigstruct);
+	void (*whack)(const SRDEsigstruct);
 
 	/* Private state. */
-	SGXsigstruct_State state;
+	SRDEsigstruct_State state;
 };
 
 
 /* SGXMetadata constructor call. */
-extern HCLINK SGXsigstruct NAAAIM_SGXsigstruct_Init(void);
+extern HCLINK SRDEsigstruct NAAAIM_SRDEsigstruct_Init(void);
 #endif

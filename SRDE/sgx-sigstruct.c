@@ -25,7 +25,7 @@
 #include <NAAAIM.h>
 
 #include "SRDE.h"
-#include "SGXsigstruct.h"
+#include "SRDEsigstruct.h"
 
 
 int main(int argc, char *argv[])
@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
 {
 	int retn = 1;
 
-	SGXsigstruct sigstruct = NULL;
+	SRDEsigstruct sigstruct = NULL;
 
 
 	if (argc != 3) {
@@ -43,7 +43,7 @@ int main(int argc, char *argv[])
 		goto done;
 	}
 
-	INIT(NAAAIM, SGXsigstruct, sigstruct, ERR(goto done));
+	INIT(NAAAIM, SRDEsigstruct, sigstruct, ERR(goto done));
 	if ( !sigstruct->load(sigstruct, argv[1]) )
 		ERR(goto done);
 

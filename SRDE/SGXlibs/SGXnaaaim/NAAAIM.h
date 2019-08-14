@@ -75,7 +75,7 @@
 #define NAAAIM_SRDEmetadata_OBJID	37
 #define NAAAIM_SRDEloader_OBJID		38
 #define NAAAIM_SRDEenclave_OBJID	39
-#define NAAAIM_SGXsigstruct_OBJID	40
+#define NAAAIM_SRDEsigstruct_OBJID	40
 
 #define NAAAIM_Actor_OBJID		41
 #define NAAAIM_Subject_OBJID		42

@@ -37,18 +37,18 @@
 
 #include "NAAAIM.h"
 #include "SRDE.h"
-#include "SGXsigstruct.h"
+#include "SRDEsigstruct.h"
 
 
 /* Object state extraction macro. */
-#define STATE(var) CO(SGXsigstruct_State, var) = this->state
+#define STATE(var) CO(SRDEsigstruct_State, var) = this->state
 
 /* Verify library/object header file inclusions. */
 #if !defined(NAAAIM_LIBID)
 #error Library identifier not defined.
 #endif
 
-#if !defined(NAAAIM_SGXsigstruct_OBJID)
+#if !defined(NAAAIM_SRDEsigstruct_OBJID)
 #error Object identifier not defined.
 #endif
 
@@ -63,8 +63,8 @@
 #include "sigstruct.h"
 
 
-/** SGXsigstruct private state information. */
-struct NAAAIM_SGXsigstruct_State
+/** SRDEsigstruct private state information. */
+struct NAAAIM_SRDEsigstruct_State
 {
 	/* The root object. */
 	Origin root;
@@ -86,17 +86,17 @@ struct NAAAIM_SGXsigstruct_State
 /**
  * Internal private method.
  *
- * This method is responsible for initializing the NAAAIM_SGXsigstruct_State
+ * This method is responsible for initializing the NAAAIM_SRDEsigstruct_State
  * structure which holds state information for each instantiated object.
  *
  * \param S	A pointer to the object containing the state information which
  *		is to be initialized.
  */
 
-static void _init_state(CO(SGXsigstruct_State, S)) {
+static void _init_state(CO(SRDEsigstruct_State, S)) {
 
 	S->libid = NAAAIM_LIBID;
-	S->objid = NAAAIM_SGXsigstruct_OBJID;
+	S->objid = NAAAIM_SRDEsigstruct_OBJID;
 
 	S->poisoned = false;
 
@@ -128,7 +128,7 @@ static void _init_state(CO(SGXsigstruct_State, S)) {
  *		structure.
  */
 
-static _Bool load(CO(SGXsigstruct, this), CO(char *, fname))
+static _Bool load(CO(SRDEsigstruct, this), CO(char *, fname))
 
 {
 	STATE(S);
@@ -185,7 +185,7 @@ static _Bool load(CO(SGXsigstruct, this), CO(char *, fname))
  *		the structure.
  */
 
-static _Bool get(CO(SGXsigstruct, this), struct SGX_sigstruct *sigstruct)
+static _Bool get(CO(SRDEsigstruct, this), struct SGX_sigstruct *sigstruct)
 
 {
 	STATE(S);
@@ -228,7 +228,7 @@ static _Bool get(CO(SGXsigstruct, this), struct SGX_sigstruct *sigstruct)
  *		the structure.
  */
 
-static _Bool get_LE(CO(SGXsigstruct, this), struct SGX_sigstruct *sigstruct)
+static _Bool get_LE(CO(SRDEsigstruct, this), struct SGX_sigstruct *sigstruct)
 
 {
 	STATE(S);
@@ -270,7 +270,7 @@ static _Bool get_LE(CO(SGXsigstruct, this), struct SGX_sigstruct *sigstruct)
  *		valid structure was presented on the output.
  */
 
-static _Bool generate(CO(SGXsigstruct, this))
+static _Bool generate(CO(SRDEsigstruct, this))
 
 {
 	STATE(S);
@@ -359,7 +359,7 @@ static void _print_buffer(CO(char *, prefix), CO(uint8_t *, bufr), size_t cnt)
  * \return	No return value is defined.
  */
 
-static void dump(CO(SGXsigstruct, this))
+static void dump(CO(SRDEsigstruct, this))
 
 {
 	STATE(S);
@@ -412,12 +412,12 @@ static void dump(CO(SGXsigstruct, this))
 /**
  * External public method.
  *
- * This method implements a destructor for a SGXsigstruct object.
+ * This method implements a destructor for a SRDEsigstruct object.
  *
  * \param this	A pointer to the object which is to be destroyed.
  */
 
-static void whack(CO(SGXsigstruct, this))
+static void whack(CO(SRDEsigstruct, this))
 
 {
 	STATE(S);
@@ -430,18 +430,18 @@ static void whack(CO(SGXsigstruct, this))
 /**
  * External constructor call.
  *
- * This function implements a constructor call for a SGXsigstruct object.
+ * This function implements a constructor call for a SRDEsigstruct object.
  *
- * \return	A pointer to the initialized SGXsigstruct.  A null value
+ * \return	A pointer to the initialized SRDEsigstruct.  A null value
  *		indicates an error was encountered in object generation.
  */
 
-extern SGXsigstruct NAAAIM_SGXsigstruct_Init(void)
+extern SRDEsigstruct NAAAIM_SRDEsigstruct_Init(void)
 
 {
 	auto Origin root;
 
-	auto SGXsigstruct this = NULL;
+	auto SRDEsigstruct this = NULL;
 
 	auto struct HurdLib_Origin_Retn retn;
 
@@ -450,9 +450,9 @@ extern SGXsigstruct NAAAIM_SGXsigstruct_Init(void)
 	root = HurdLib_Origin_Init();
 
 	/* Allocate the object and internal state. */
-	retn.object_size  = sizeof(struct NAAAIM_SGXsigstruct);
-	retn.state_size   = sizeof(struct NAAAIM_SGXsigstruct_State);
-	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_SGXsigstruct_OBJID, \
+	retn.object_size  = sizeof(struct NAAAIM_SRDEsigstruct);
+	retn.state_size   = sizeof(struct NAAAIM_SRDEsigstruct_State);
+	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_SRDEsigstruct_OBJID, \
 			 &retn) )
 		return NULL;
 	this	    	  = retn.object;

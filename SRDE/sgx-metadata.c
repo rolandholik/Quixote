@@ -34,7 +34,7 @@
 
 #include "SRDE.h"
 #include "SRDEenclave.h"
-#include "SGXsigstruct.h"
+#include "SRDEsigstruct.h"
 #include "SRDEmetadata.h"
 
 

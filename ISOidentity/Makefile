@@ -149,7 +149,7 @@ ISOidentity.o: ISOidentity.h
 # SRDEmetadata.o: SGX.h SRDEmetadata.h
 # SRDEloader.o: SRDE.h SRDEloader.h
 # SGXenclave.o: SRDE.h SRDEenclave.h SRDEmetadata.h SRDEloader.h
-# SGXsigstruct.o: SRDE.h SGXsigstruct.h
+# SRDEsigstruct.o: SRDE.h SRDEsigstruct.h
 
 cboot.o: cboot.h
 
