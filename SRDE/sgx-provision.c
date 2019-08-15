@@ -38,7 +38,7 @@
 
 #include "SRDE.h"
 #include "PCEenclave.h"
-#include "SGXmessage.h"
+#include "SRDEmessage.h"
 #include "SRDEepid.h"
 #include "PVEenclave.h"
 #include "SGXecdsa.h"
@@ -226,7 +226,7 @@ static _Bool read_input(CO(char *, fname), CO(String, msg))
  *			value indicates the signature was verified.
  */
 
-static _Bool _verify_pek(CO(SGXmessage, msg), CO(Buffer, pekbufr))
+static _Bool _verify_pek(CO(SRDEmessage, msg), CO(Buffer, pekbufr))
 
 {
 	_Bool retn = false;
@@ -325,8 +325,8 @@ static _Bool _verify_pek(CO(SGXmessage, msg), CO(Buffer, pekbufr))
  *		the endpoint attributes are valid.
  */
 
-static _Bool _verify_endpoint(CO(SGXmessage, msg), CO(struct SGX_pek *, pek), \
-			      CO(Buffer, signature))
+static _Bool _verify_endpoint(CO(SRDEmessage, msg), \
+			      CO(struct SGX_pek *, pek), CO(Buffer, signature))
 
 {
 	_Bool retn = false;
@@ -437,7 +437,7 @@ static _Bool _verify_endpoint(CO(SGXmessage, msg), CO(struct SGX_pek *, pek), \
  *			processed and verified.
  */
 
-static _Bool process_message1(CO(SGXmessage, msg), CO(String, response), \
+static _Bool process_message1(CO(SRDEmessage, msg), CO(String, response), \
 			      struct SGX_pek *pek)
 
 {
@@ -538,7 +538,7 @@ static _Bool process_message1(CO(SGXmessage, msg), CO(String, response), \
  *		the output object carries a valid message.
  */
 
-static _Bool _decrypt_message2(CO(SGXmessage, msg), CO(Buffer, sk), \
+static _Bool _decrypt_message2(CO(SRDEmessage, msg), CO(Buffer, sk), \
 			       CO(Buffer, msg2), CO(Buffer, nonce))
 
 {
@@ -656,8 +656,8 @@ static _Bool _decrypt_message2(CO(SGXmessage, msg), CO(Buffer, sk), \
  *			processed and verified.
  */
 
-static _Bool process_message2(CO(SGXmessage, msg), CO(String, response), \
-			      CO(Buffer, sk), struct SGX_pek *pek,	 \
+static _Bool process_message2(CO(SRDEmessage, msg), CO(String, response), \
+			      CO(Buffer, sk), struct SGX_pek *pek,	  \
 			      CO(Buffer, nonce))
 
 {
@@ -751,7 +751,7 @@ static _Bool process_message2(CO(SGXmessage, msg), CO(String, response), \
  *		the output object carries a valid message.
  */
 
-static _Bool _decrypt_message3(CO(SGXmessage, msg), CO(Buffer, sk), \
+static _Bool _decrypt_message3(CO(SRDEmessage, msg), CO(Buffer, sk), \
 			       CO(Buffer, msg3))
 
 {
@@ -865,7 +865,7 @@ static _Bool _decrypt_message3(CO(SGXmessage, msg), CO(Buffer, sk), \
  *			processed and verified.
  */
 
-static _Bool process_message3(CO(SGXmessage, msg), CO(String, response), \
+static _Bool process_message3(CO(SRDEmessage, msg), CO(String, response), \
 			      CO(Buffer, sk))
 
 {
@@ -924,7 +924,7 @@ static _Bool process_message3(CO(SGXmessage, msg), CO(String, response), \
  * \return		No return value is specified.
  */
 
-static void generate_output(CO(SGXmessage, msg), CO(char *, outfile))
+static void generate_output(CO(SRDEmessage, msg), CO(char *, outfile))
 
 {
 	char *url = "http://ps.sgx.trustedservices.intel.com:80/";
@@ -1100,7 +1100,7 @@ extern int main(int argc, char *argv[])
 
 	PCEenclave pce = NULL;
 
-	SGXmessage msg = NULL;
+	SRDEmessage msg = NULL;
 
 	SRDEepid epid = NULL;
 
@@ -1181,7 +1181,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Load input if needed. */
-	INIT(NAAAIM, SGXmessage, msg, ERR(goto done));
+	INIT(NAAAIM, SRDEmessage, msg, ERR(goto done));
 
 	INIT(HurdLib, String, response, ERR(goto done));
 	if ( input != NULL ) {

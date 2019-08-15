@@ -54,21 +54,21 @@
 #include "intel-messages.h"
 #include "SRDE.h"
 #include "PCEenclave.h"
-#include "SGXmessage.h"
+#include "SRDEmessage.h"
 #include "SGXcmac.h"
 #include "SGXaesgcm.h"
 #include "SRDErsa.h"
 
 
 /* Object state extraction macro. */
-#define STATE(var) CO(SGXmessage_State, var) = this->state
+#define STATE(var) CO(SRDEmessage_State, var) = this->state
 
 /* Verify library/object header file inclusions. */
 #if !defined(NAAAIM_LIBID)
 #error Library identifier not defined.
 #endif
 
-#if !defined(NAAAIM_SGXmessage_OBJID)
+#if !defined(NAAAIM_SRDEmessage_OBJID)
 #error Object identifier not defined.
 #endif
 
@@ -153,8 +153,8 @@ struct provision_response_header {
 } __attribute__((packed));
 
 
-/** SGXmessage private state information. */
-struct NAAAIM_SGXmessage_State
+/** SRDEmessage private state information. */
+struct NAAAIM_SRDEmessage_State
 {
 	/* The root object. */
 	Origin root;
@@ -190,17 +190,17 @@ struct NAAAIM_SGXmessage_State
 /**
  * Internal private method.
  *
- * This method is responsible for initializing the NAAAIM_SGXmessage_State
+ * This method is responsible for initializing the NAAAIM_SRDEmessage_State
  * structure which holds state information for each instantiated object.
  *
  * \param S A pointer to the object containing the state information which
  *        is to be initialized.
  */
 
-static void _init_state(CO(SGXmessage_State, S)) {
+static void _init_state(CO(SRDEmessage_State, S)) {
 
 	S->libid = NAAAIM_LIBID;
-	S->objid = NAAAIM_SGXmessage_OBJID;
+	S->objid = NAAAIM_SRDEmessage_OBJID;
 
 	S->poisoned = false;
 	S->state    = INIT;
@@ -235,7 +235,7 @@ static void _init_state(CO(SGXmessage_State, S)) {
  * \return	No return value is defined.
  */
 
-static void init_request(CO(SGXmessage, this), const uint8_t protocol, \
+static void init_request(CO(SRDEmessage, this), const uint8_t protocol, \
 			 const uint8_t type, const uint8_t version,	\
 			 CO(uint8_t *, xid))
 
@@ -289,8 +289,8 @@ static void init_request(CO(SGXmessage, this), const uint8_t protocol, \
  *			message.
  */
 
-static _Bool _encode_message(CO(SGXmessage_State, S), const uint8_t type, \
-			     const uint8_t version, CO(Buffer, payload),  \
+static _Bool _encode_message(CO(SRDEmessage_State, S), const uint8_t type, \
+			     const uint8_t version, CO(Buffer, payload),   \
 			     CO(Buffer, msg))
 
 {
@@ -356,7 +356,7 @@ static _Bool _encode_message(CO(SGXmessage_State, S), const uint8_t type, \
  *			the message was successfully encoded.
  */
 
-static _Bool encode_es_request(CO(SGXmessage, this), const uint8_t type, \
+static _Bool encode_es_request(CO(SRDEmessage, this), const uint8_t type, \
 			       const uint8_t selector)
 
 {
@@ -420,8 +420,8 @@ static _Bool encode_es_request(CO(SGXmessage, this), const uint8_t type, \
  *			the message was successfully encoded.
  */
 
-static _Bool encode_message2(CO(SGXmessage, this), CO(RandomBuffer, rnd), \
-			     CO(PCEenclave, pce), struct SGX_pek *pek,	  \
+static _Bool encode_message2(CO(SRDEmessage, this), CO(RandomBuffer, rnd), \
+			     CO(PCEenclave, pce), struct SGX_pek *pek,	   \
 			     struct SGX_report *pek_report)
 
 {
@@ -666,7 +666,7 @@ static _Bool encode_message2(CO(SGXmessage, this), CO(RandomBuffer, rnd), \
  *			the message was successfully encoded.
  */
 
-static _Bool encode_message3(CO(SGXmessage, this), CO(Buffer, nonce),	 \
+static _Bool encode_message3(CO(SRDEmessage, this), CO(Buffer, nonce),	 \
 			     CO(Buffer, ek2), struct SGX_message3 *msg3, \
 			     CO(Buffer, epid_sig), CO(Buffer, report_sig))
 
@@ -870,7 +870,7 @@ static _Bool encode_message3(CO(SGXmessage, this), CO(Buffer, nonce),	 \
  *			the message was successfully encoded.
  */
 
-static _Bool encode(CO(SGXmessage, this), CO(String, msg))
+static _Bool encode(CO(SRDEmessage, this), CO(String, msg))
 
 {
 	STATE(S);
@@ -965,7 +965,7 @@ static _Bool encode(CO(SGXmessage, this), CO(String, msg))
  *			unpacked.
  */
 
-static _Bool _unpack_messages(CO(SGXmessage_State, S))
+static _Bool _unpack_messages(CO(SRDEmessage_State, S))
 
 {
 	_Bool retn = false;
@@ -1036,7 +1036,7 @@ static _Bool _unpack_messages(CO(SGXmessage_State, S))
  *			the message was successfully decoded.
  */
 
-static _Bool decode(CO(SGXmessage, this), CO(String, msg))
+static _Bool decode(CO(SRDEmessage, this), CO(String, msg))
 
 {
 	STATE(S);
@@ -1144,7 +1144,7 @@ static _Bool decode(CO(SGXmessage, this), CO(String, msg))
  *			is returned.
  */
 
-static size_t message_count(CO(SGXmessage, this))
+static size_t message_count(CO(SRDEmessage, this))
 
 {
 	STATE(S);
@@ -1184,7 +1184,7 @@ static size_t message_count(CO(SGXmessage, this))
  *			loaded into the supplied object.
  */
 
-static _Bool get_message(CO(SGXmessage, this), const uint8_t requested, \
+static _Bool get_message(CO(SRDEmessage, this), const uint8_t requested, \
 			 uint8_t version, CO(Buffer, msg))
 
 {
@@ -1286,7 +1286,7 @@ static _Bool get_message(CO(SGXmessage, this), const uint8_t requested, \
  *			loaded into the supplied object.
  */
 
-static _Bool get_message_number(CO(SGXmessage, this),			  \
+static _Bool get_message_number(CO(SRDEmessage, this),			  \
 				const uint8_t requested, uint8_t version, \
 				CO(Buffer, msg), uint8_t locn)
 
@@ -1381,7 +1381,7 @@ static _Bool get_message_number(CO(SGXmessage, this),			  \
  *			a new message list has been loaded.
  */
 
-static _Bool reload_messages(CO(SGXmessage, this), CO(Buffer, messages))
+static _Bool reload_messages(CO(SRDEmessage, this), CO(Buffer, messages))
 
 {
 	STATE(S);
@@ -1445,7 +1445,7 @@ static _Bool reload_messages(CO(SGXmessage, this), CO(Buffer, messages))
  *			loaded into the supplied object.
  */
 
-static _Bool get_xid(CO(SGXmessage, this), CO(Buffer, bufr))
+static _Bool get_xid(CO(SRDEmessage, this), CO(Buffer, bufr))
 
 {
 	STATE(S);
@@ -1506,7 +1506,7 @@ static _Bool get_xid(CO(SGXmessage, this), CO(Buffer, bufr))
  *			loaded into the supplied object.
  */
 
-static _Bool get_header(CO(SGXmessage, this), CO(Buffer, bufr))
+static _Bool get_header(CO(SRDEmessage, this), CO(Buffer, bufr))
 
 {
 	STATE(S);
@@ -1568,7 +1568,7 @@ static _Bool get_header(CO(SGXmessage, this), CO(Buffer, bufr))
  *			and the value in the variable is undefined.
  */
 
-static _Bool get_response_type(CO(SGXmessage, this), uint8_t *type)
+static _Bool get_response_type(CO(SRDEmessage, this), uint8_t *type)
 
 {
 	STATE(S);
@@ -1605,7 +1605,7 @@ static _Bool get_response_type(CO(SGXmessage, this), uint8_t *type)
  *		displayed.
  */
 
-static void dump(CO(SGXmessage, this))
+static void dump(CO(SRDEmessage, this))
 
 {
 	STATE(S);
@@ -1752,7 +1752,7 @@ static void dump(CO(SGXmessage, this))
  * \return	No return value is defined.
  */
 
-static void reset(CO(SGXmessage, this))
+static void reset(CO(SRDEmessage, this))
 
 {
 	STATE(S);
@@ -1779,12 +1779,12 @@ static void reset(CO(SGXmessage, this))
 /**
  * External public method.
  *
- * This method implements a destructor for the SGXmessage object.
+ * This method implements a destructor for the SRDEmessage object.
  *
  * \param this	A pointer to the object which is to be destroyed.
  */
 
-static void whack(CO(SGXmessage, this))
+static void whack(CO(SRDEmessage, this))
 
 {
 	STATE(S);
@@ -1804,18 +1804,18 @@ static void whack(CO(SGXmessage, this))
 /**
  * External constructor call.
  *
- * This function implements a constructor call for a SGXmessage object.
+ * This function implements a constructor call for a SRDEmessage object.
  *
- * \return	A pointer to the initialized SGXmessage.  A null value
+ * \return	A pointer to the initialized SRDEmessage.  A null value
  *		indicates an error was encountered in object generation.
  */
 
-extern SGXmessage NAAAIM_SGXmessage_Init(void)
+extern SRDEmessage NAAAIM_SRDEmessage_Init(void)
 
 {
 	Origin root;
 
-	SGXmessage this = NULL;
+	SRDEmessage this = NULL;
 
 	struct HurdLib_Origin_Retn retn;
 
@@ -1824,9 +1824,9 @@ extern SGXmessage NAAAIM_SGXmessage_Init(void)
 	root = HurdLib_Origin_Init();
 
 	/* Allocate the object and internal state. */
-	retn.object_size  = sizeof(struct NAAAIM_SGXmessage);
-	retn.state_size   = sizeof(struct NAAAIM_SGXmessage_State);
-	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_SGXmessage_OBJID, &retn) )
+	retn.object_size  = sizeof(struct NAAAIM_SRDEmessage);
+	retn.state_size   = sizeof(struct NAAAIM_SRDEmessage_State);
+	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_SRDEmessage_OBJID, &retn) )
 		return NULL;
 	this	    	  = retn.object;
 	this->state 	  = retn.state;

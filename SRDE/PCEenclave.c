@@ -40,7 +40,7 @@
 #include "SRDE.h"
 #include "SRDEenclave.h"
 #include "PCEenclave.h"
-#include "SGXmessage.h"
+#include "SRDEmessage.h"
 
 
 /* Name and location of launch token. */

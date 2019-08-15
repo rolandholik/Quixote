@@ -45,7 +45,7 @@
 #include "SRDE.h"
 #include "SRDEenclave.h"
 #include "PCEenclave.h"
-#include "SGXmessage.h"
+#include "SRDEmessage.h"
 #include "SRDEepid.h"
 #include "PVEenclave.h"
 #include "intel-messages.h"
@@ -400,7 +400,7 @@ static _Bool get_message1(CO(PVEenclave, this), struct SGX_pek *pek, \
  *		message has been successfully generated.
  */
 
-static _Bool get_message3(CO(PVEenclave, this), CO(SGXmessage, msg),	      \
+static _Bool get_message3(CO(PVEenclave, this), CO(SRDEmessage, msg),	      \
 			  struct SGX_pek *pek, struct SGX_targetinfo *tgt,    \
 			  CO(Buffer, epid_sig), struct SGX_platform_info *pi, \
 			  struct SGX_message3 *message3)
@@ -597,7 +597,7 @@ static _Bool get_message3(CO(PVEenclave, this), CO(SGXmessage, msg),	      \
  *		message has been successfully generated.
  */
 
-static _Bool get_epid(CO(PVEenclave, this), CO(SGXmessage, msg), \
+static _Bool get_epid(CO(PVEenclave, this), CO(SRDEmessage, msg), \
 		      CO(SRDEepid, epid_blob))
 
 {
@@ -711,7 +711,7 @@ static _Bool get_epid(CO(PVEenclave, this), CO(SGXmessage, msg), \
  */
 
 static _Bool generate_endpoint_message(CO(PVEenclave, this), \
-				       CO(SGXmessage, msg))
+				       CO(SRDEmessage, msg))
 
 {
 	STATE(S);

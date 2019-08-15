@@ -29,14 +29,15 @@ struct NAAAIM_PVEenclave
 
 	_Bool (*get_message1)(const PVEenclave, struct SGX_pek *pek, \
 			   struct SGX_targetinfo *tgt, struct SGX_report *rpt);
-	_Bool (*get_message3)(const PVEenclave, const SGXmessage,	 \
+	_Bool (*get_message3)(const PVEenclave, const SRDEmessage,	 \
 			      struct SGX_pek *, struct SGX_targetinfo *, \
 			      const Buffer, struct SGX_platform_info *,	 \
 			      struct SGX_message3 *);
-	_Bool (*get_epid)(const PVEenclave, const SGXmessage, const SRDEepid);
+	_Bool (*get_epid)(const PVEenclave, const SRDEmessage, const SRDEepid);
 
 	_Bool (*get_endpoint)(const PVEenclave);
-	_Bool (*generate_endpoint_message)(const PVEenclave, const SGXmessage);
+	_Bool (*generate_endpoint_message)(const PVEenclave, \
+					   const SRDEmessage);
 
 	void (*whack)(const PVEenclave);
 

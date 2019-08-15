@@ -1,7 +1,7 @@
 /** \file
  * This file contains definitions for messages which are processed by
  * the Intel servers.  The enumerated values are used to query the
- * SGXmessage object for messages which match a specified type.
+ * SRDEmessage object for messages which match a specified type.
  *
  * The contents of this file are taken from the following file in
  * the Intel Linux SDK:
