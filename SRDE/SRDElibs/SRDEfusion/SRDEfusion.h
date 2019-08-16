@@ -1,6 +1,6 @@
 /** \file
  * This file contains header definitions for the non-object code
- * implemented in the SGXfusion enclave library.
+ * implemented in the SRDEfusion enclave library.
  */
 
 /**************************************************************************

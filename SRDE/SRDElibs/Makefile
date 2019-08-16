@@ -7,7 +7,7 @@
 
 
 # Variable declarations.
-SUBDIRS = SGXfusion SGXnaaaim
+SUBDIRS = SRDEfusion SGXnaaaim
 
 
 #
@@ -17,7 +17,7 @@ SUBDIRS = SGXfusion SGXnaaaim
 
 all: ${SUBDIRS}
 
-SGXfusion:
+SRDEfusion:
 	${MAKE} -C $@;
 
 SGXnaaaim:

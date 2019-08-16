@@ -34,7 +34,7 @@
 #include <SHA256.h>
 
 #include <SRDE.h>
-#include <SGXfusion.h>
+#include <SRDEfusion.h>
 
 #include "PossumPipe.h"
 

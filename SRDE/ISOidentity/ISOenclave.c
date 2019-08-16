@@ -115,7 +115,7 @@ int ocall2_handler(struct ocall2_interface *pms)
 
 
 /* Interface and handler for fgets function simulation. */
-struct SGXfusion_fgets_interface {
+struct SRDEfusion_fgets_interface {
 	_Bool retn;
 
 	int stream;
@@ -123,7 +123,7 @@ struct SGXfusion_fgets_interface {
 	char bufr[];
 };
 
-int fgets_handler(struct SGXfusion_fgets_interface *oc)
+int fgets_handler(struct SRDEfusion_fgets_interface *oc)
 
 {
 	FILE *instream = NULL;

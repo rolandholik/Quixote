@@ -15,7 +15,7 @@
 #include <String.h>
 
 #include <SRDE.h>
-#include <SGXfusion.h>
+#include <SRDEfusion.h>
 
 #include <NAAAIM.h>
 #include <RandomBuffer.h>

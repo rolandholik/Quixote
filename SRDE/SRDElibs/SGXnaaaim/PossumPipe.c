@@ -60,7 +60,7 @@
 #include "TPMcmd.h"
 #else
 #include <SRDE.h>
-#include <SGXfusion.h>
+#include <SRDEfusion.h>
 #include <SRDEquote.h>
 #endif
 #include "PossumPipe.h"

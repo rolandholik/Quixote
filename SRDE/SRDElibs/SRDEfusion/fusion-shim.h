@@ -24,11 +24,11 @@ time_t time(time_t *);
 
 
 /* Prototype for the OCALL used to implement the *printf functions. */
-struct SGXfusion_ocall0_interface {
+struct SRDEfusion_ocall0_interface {
 	char *bufr;
 };
 
-struct SGXfusion_fgets_interface {
+struct SRDEfusion_fgets_interface {
 	_Bool retn;
 
 	int stream;

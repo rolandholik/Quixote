@@ -1,6 +1,6 @@
 /** \file
  * This file contains a test harness for exercising the functionality
- * of the SGXfusion library.
+ * of the SRDEfusion library.
  */
 
 /**************************************************************************

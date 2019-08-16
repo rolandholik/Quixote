@@ -30,7 +30,7 @@
 #include <Ivy.h>
 
 #include <SRDE.h>
-#include <SGXfusion.h>
+#include <SRDEfusion.h>
 
 #include <cboot.h>
 

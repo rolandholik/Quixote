@@ -102,10 +102,10 @@ char *fgets(char *bufr, int bufr_size, int stream)
 
 	int status = SGX_ERROR_INVALID_PARAMETER;
 
-	size_t arena_size = sizeof(struct SGXfusion_fgets_interface) + \
+	size_t arena_size = sizeof(struct SRDEfusion_fgets_interface) + \
 		bufr_size;
 
-	struct SGXfusion_fgets_interface *op = NULL;
+	struct SRDEfusion_fgets_interface *op = NULL;
 
 
 	/* Verify arguements and set size of arena. */
@@ -156,9 +156,9 @@ sgx_status_t ocall_print_string(const char* str)
 
 	size_t _len_str = str ? strlen(str) + 1 : 0;
 
-	struct SGXfusion_ocall0_interface *ms = NULL;
+	struct SRDEfusion_ocall0_interface *ms = NULL;
 
-	size_t ocalloc_size = sizeof(struct SGXfusion_ocall0_interface);
+	size_t ocalloc_size = sizeof(struct SRDEfusion_ocall0_interface);
 
 	void *__tmp = NULL;
 
@@ -171,9 +171,9 @@ sgx_status_t ocall_print_string(const char* str)
 		sgx_ocfree();
 		return SGX_ERROR_UNEXPECTED;
 	}
-	ms = (struct SGXfusion_ocall0_interface *) __tmp;
+	ms = (struct SRDEfusion_ocall0_interface *) __tmp;
 	__tmp = (void *) ((size_t)__tmp + \
-			  sizeof(struct SGXfusion_ocall0_interface));
+			  sizeof(struct SRDEfusion_ocall0_interface));
 
 	if (str != NULL && sgx_is_within_enclave(str, _len_str)) {
 		ms->bufr = (char*) __tmp;

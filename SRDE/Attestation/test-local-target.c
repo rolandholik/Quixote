@@ -33,11 +33,11 @@
 
 
 /** OCALL interface definition. */
-struct SGXfusion_ocall0_interface {
+struct SRDEfusion_ocall0_interface {
 	char* str;
-} SGXfusion_ocall0;
+} SRDEfusion_ocall0;
 
-int ocall0_handler(struct SGXfusion_ocall0_interface *interface)
+int ocall0_handler(struct SRDEfusion_ocall0_interface *interface)
 
 {
 	fprintf(stdout, "%s", interface->str);

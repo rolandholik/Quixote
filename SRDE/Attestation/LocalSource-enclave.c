@@ -17,7 +17,7 @@
 #include <Curve25519.h>
 
 #include <SRDE.h>
-#include <SGXfusion.h>
+#include <SRDEfusion.h>
 
 #include "LocalSource-interface.h"
 

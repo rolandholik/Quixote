@@ -33,7 +33,7 @@ include ${SGXDIR}/Make.sgx
 
 SGX_SSL	= /opt/intel/sgxssl
 SGX_INCLUDE = -I . -I ${SGX_SDK}/include -I ${SGX_SDK}/include/tlibc \
-	-I ${SGX_SDK}/include/stlport -I ../SGXfusion -I ../../../lib \
+	-I ${SGX_SDK}/include/stlport -I ../SRDEfusion -I ../../../lib \
 	-I ../.. -I ${SGX_SSL}/include
 
 ENCLAVE_CFLAGS = -Wall -nostdinc -fvisibility=hidden -fpie -fstack-protector \
@@ -48,7 +48,7 @@ SGX_SERVICE_LIBRARY = sgx_tservice
 
 ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles   \
 	-Wl,--whole-archive -lsgx_tsgxssl -Wl,--no-whole-archive	      \
-	-L${SGX_LIBRARY_PATH} -L${SSL_LIBRARY_PATH} -L . -L ../SGXfusion      \
+	-L${SGX_LIBRARY_PATH} -L${SSL_LIBRARY_PATH} -L . -L ../SRDEfusion     \
 	-Wl,--whole-archive						      \
 	-l${SGX_TRTS_LIB} -lSRDEfusion					      \
 	-Wl,--no-whole-archive						      \
@@ -238,7 +238,7 @@ test-Duct-interface.o: test-Duct-interface.h
 
 test-Possum-enclave.o: test-Possum-interface.h RandomBuffer.h IDtoken.h	   \
 	PossumPipe.h ${NAAAIMDIR}/Ivy.h ${NAAAIMDIR}/SHA256.h ../../SRDE.h \
-	../SGXfusion/SGXfusion.h
+	../SRDEfusion/SRDEfusion.h
 
 test-Possum-interface.o: test-Possum-interface.h
 
@@ -261,9 +261,9 @@ PossumPipe.o: PossumPipe.h IDtoken.h ${NAAAIMDIR}/SHA256.h		    \
 	${NAAAIMDIR}/Curve25519.h PossumPacket.h ${NAAAIMDIR}/IDmgr.h	    \
 	${NAAAIMDIR}/Ivy.h
 SoftwareStatus.o: ${NAAAIMDIR}/SoftwareStatus.h ../../SRDE.h	\
-	../SGXfusion/SGXfusion.h ${NAAAIMDIR}/SHA256.h
+	../SRDEfusion/SRDEfusion.h ${NAAAIMDIR}/SHA256.h
 SoftwareStatus.o: ${NAAAIMDIR}/SoftwareStatus.h ../../SRDE.h	\
-	../SGXfusion/SGXfusion.h ${NAAAIMDIR}/SHA256.h
+	../SRDEfusion/SRDEfusion.h ${NAAAIMDIR}/SHA256.h
 OTEDKS.o: ${NAAAIMDIR}/OTEDKS.h ${NAAAIMDIR}/IDmgr.h ${NAAAIMDIR}/Ivy.h
 IDmgr.o: IDtoken.h ${NAAAIMDIR}/IDmgr.h
 Ivy.o: IDtoken.h ${NAAAIMDIR}/Ivy.h

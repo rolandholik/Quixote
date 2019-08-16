@@ -10,7 +10,7 @@
 INSTPATH = ${DESTDIR}/opt/IDfusion
 TESTPATH = ${INSTPATH}/share/unit-tests
 
-FD = ../SRDElibs/SGXfusion
+FD = ../SRDElibs/SRDEfusion
 FUSION_SOURCES = ${FD}/test-fusion.c ${FD}/test-fusion-enclave.c	\
 	${FD}/test-fusion-interface.c ${FD}/test-fusion-interface.h	\
 	${FD}/test-fusion-enclave.xml

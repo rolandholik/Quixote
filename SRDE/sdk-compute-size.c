@@ -13,7 +13,7 @@
  * difficult to compute the correct sizes and configurations of the
  * structures.  This utility is designed to use the SGXSDK include
  * files to compute the sizes of various structures to create
- * equivalent sized structures in the SGXfusion runtime.
+ * equivalent sized structures in the SRDEfusion runtime.
  */
 
 /**************************************************************************

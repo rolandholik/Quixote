@@ -1,6 +1,6 @@
 /** \file
  * This file contains a test harness for exercising the functionality
- * of the SGXfusion library.
+ * of the SRDEfusion library.
  */
 
 /**************************************************************************
@@ -53,7 +53,7 @@ int ocall1_handler(struct ocall1_interface *interface)
 
 
 /* Interface and handler for fgets function simulation. */
-struct SGXfusion_fgets_interface {
+struct SRDEfusion_fgets_interface {
 	_Bool retn;
 
 	int stream;
@@ -61,7 +61,7 @@ struct SGXfusion_fgets_interface {
 	char bufr[];
 };
 
-int fgets_handler(struct SGXfusion_fgets_interface *oc)
+int fgets_handler(struct SRDEfusion_fgets_interface *oc)
 
 {
 	FILE *instream = NULL;
