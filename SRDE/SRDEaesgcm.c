@@ -46,24 +46,24 @@
 #include <Buffer.h>
 
 #include "NAAAIM.h"
-#include "SGXaesgcm.h"
+#include "SRDEaesgcm.h"
 
 
 /* Object state extraction macro. */
-#define STATE(var) CO(SGXaesgcm_State, var) = this->state
+#define STATE(var) CO(SRDEaesgcm_State, var) = this->state
 
 /* Verify library/object header file inclusions. */
 #if !defined(NAAAIM_LIBID)
 #error Library identifier not defined.
 #endif
 
-#if !defined(NAAAIM_SGXaesgcm_OBJID)
+#if !defined(NAAAIM_SRDEaesgcm_OBJID)
 #error Object identifier not defined.
 #endif
 
 
-/** SGXaesgcm private state information. */
-struct NAAAIM_SGXaesgcm_State
+/** SRDEaesgcm private state information. */
+struct NAAAIM_SRDEaesgcm_State
 {
 	/* The root object. */
 	Origin root;
@@ -205,18 +205,18 @@ int consttime_memequal(const void *b1, const void *b2, size_t len)
 /**
  * Internal private method.
  *
- * This method is responsible for initializing the NAAAIM_SGXaesgcm_State
+ * This method is responsible for initializing the NAAAIM_SRDEaesgcm_State
  * structure which holds state information for each instantiated object.
  *
  * \param S A pointer to the object containing the state information which
  *        is to be initialized.
  */
 
-static void _init_state(CO(SGXaesgcm_State, S))
+static void _init_state(CO(SRDEaesgcm_State, S))
 
 {
 	S->libid = NAAAIM_LIBID;
-	S->objid = NAAAIM_SGXaesgcm_OBJID;
+	S->objid = NAAAIM_SRDEaesgcm_OBJID;
 
 
 	S->poisoned = false;
@@ -249,8 +249,8 @@ static void _init_state(CO(SGXaesgcm_State, S))
  *		indicates the output object has valid encrypted data.
  */
 
-static _Bool encrypt(CO(SGXaesgcm, this), CO(Buffer, key), CO(Buffer, iv), \
-		     CO(Buffer, payload), CO(Buffer, output),		   \
+static _Bool encrypt(CO(SRDEaesgcm, this), CO(Buffer, key), CO(Buffer, iv), \
+		     CO(Buffer, payload), CO(Buffer, output),		    \
 		     CO(Buffer, extra), CO(Buffer, mactag))
 
 {
@@ -345,8 +345,8 @@ static _Bool encrypt(CO(SGXaesgcm, this), CO(Buffer, key), CO(Buffer, iv), \
  *		indicates the output object has valid decrypted data.
  */
 
-static _Bool decrypt(CO(SGXaesgcm, this), CO(Buffer, key), CO(Buffer, iv), \
-		     CO(Buffer, payload), CO(Buffer, output),		   \
+static _Bool decrypt(CO(SRDEaesgcm, this), CO(Buffer, key), CO(Buffer, iv), \
+		     CO(Buffer, payload), CO(Buffer, output),		    \
 		     CO(Buffer, extra), CO(Buffer, mactag))
 
 {
@@ -421,12 +421,12 @@ static _Bool decrypt(CO(SGXaesgcm, this), CO(Buffer, key), CO(Buffer, iv), \
 /**
  * External public method.
  *
- * This method implements a destructor for the SGXaesgcm object.
+ * This method implements a destructor for the SRDEaesgcm object.
  *
  * \param this	A pointer to the object which is to be destroyed.
  */
 
-static void whack(CO(SGXaesgcm, this))
+static void whack(CO(SRDEaesgcm, this))
 
 {
 	STATE(S);
@@ -440,18 +440,18 @@ static void whack(CO(SGXaesgcm, this))
 /**
  * External constructor call.
  *
- * This function implements a constructor call for a SGXaesgcm object.
+ * This function implements a constructor call for a SRDEaesgcm object.
  *
- * \return	A pointer to the initialized SGXaesgcm.  A null value
+ * \return	A pointer to the initialized SRDEaesgcm.  A null value
  *		indicates an error was encountered in object generation.
  */
 
-extern SGXaesgcm NAAAIM_SGXaesgcm_Init(void)
+extern SRDEaesgcm NAAAIM_SRDEaesgcm_Init(void)
 
 {
 	Origin root;
 
-	SGXaesgcm this = NULL;
+	SRDEaesgcm this = NULL;
 
 	struct HurdLib_Origin_Retn retn;
 
@@ -460,9 +460,9 @@ extern SGXaesgcm NAAAIM_SGXaesgcm_Init(void)
 	root = HurdLib_Origin_Init();
 
 	/* Allocate the object and internal state. */
-	retn.object_size  = sizeof(struct NAAAIM_SGXaesgcm);
-	retn.state_size   = sizeof(struct NAAAIM_SGXaesgcm_State);
-	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_SGXaesgcm_OBJID, &retn) )
+	retn.object_size  = sizeof(struct NAAAIM_SRDEaesgcm);
+	retn.state_size   = sizeof(struct NAAAIM_SRDEaesgcm_State);
+	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_SRDEaesgcm_OBJID, &retn) )
 		return NULL;
 	this	    	  = retn.object;
 	this->state 	  = retn.state;

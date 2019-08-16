@@ -56,7 +56,7 @@
 #include "PCEenclave.h"
 #include "SRDEmessage.h"
 #include "SGXcmac.h"
-#include "SGXaesgcm.h"
+#include "SRDEaesgcm.h"
 #include "SRDErsa.h"
 
 
@@ -452,7 +452,7 @@ static _Bool encode_message2(CO(SRDEmessage, this), CO(RandomBuffer, rnd), \
 
 	SGXcmac cmac = NULL;
 
-	SGXaesgcm aesgcm = NULL;
+	SRDEaesgcm aesgcm = NULL;
 
 	SRDErsa rsa = NULL;
 
@@ -587,7 +587,7 @@ static _Bool encode_message2(CO(SRDEmessage, this), CO(RandomBuffer, rnd), \
 	if ( !aaad->add(aaad, (unsigned char *) &reqhdr, sizeof(reqhdr)) )
 		ERR(goto done);
 
-	INIT(NAAAIM, SGXaesgcm, aesgcm, ERR(goto done));
+	INIT(NAAAIM, SRDEaesgcm, aesgcm, ERR(goto done));
 	tag->reset(tag);
 	encout->reset(encout);
 	if ( !aesgcm->encrypt(aesgcm, bufr, b, submsg, encout, aaad, tag) )
@@ -690,7 +690,7 @@ static _Bool encode_message3(CO(SRDEmessage, this), CO(Buffer, nonce),	 \
 
 	RandomBuffer rnd = NULL;
 
-	SGXaesgcm aesgcm = NULL;
+	SRDEaesgcm aesgcm = NULL;
 
 
 	/* Verify object status and arguements. */
@@ -785,7 +785,7 @@ static _Bool encode_message3(CO(SRDEmessage, this), CO(Buffer, nonce),	 \
 
 	INIT(HurdLib, Buffer, encout, ERR(goto done));
 	INIT(HurdLib, Buffer, tag, ERR(goto done));
-	INIT(NAAAIM, SGXaesgcm, aesgcm, ERR(goto done));
+	INIT(NAAAIM, SRDEaesgcm, aesgcm, ERR(goto done));
 	if ( !aesgcm->encrypt(aesgcm, ek2, iv, submsg, encout, aaad, tag) )
 		ERR(goto done);
 

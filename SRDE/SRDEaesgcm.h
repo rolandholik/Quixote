@@ -13,36 +13,36 @@
  * the source tree for copyright and licensing information.
  **************************************************************************/
 
-#ifndef NAAAIM_SGXaesgcm_HEADER
-#define NAAAIM_SGXaesgcm_HEADER
+#ifndef NAAAIM_SRDEaesgcm_HEADER
+#define NAAAIM_SRDEaesgcm_HEADER
 
 
 /* Object type definitions. */
-typedef struct NAAAIM_SGXaesgcm * SGXaesgcm;
+typedef struct NAAAIM_SRDEaesgcm * SRDEaesgcm;
 
-typedef struct NAAAIM_SGXaesgcm_State * SGXaesgcm_State;
+typedef struct NAAAIM_SRDEaesgcm_State * SRDEaesgcm_State;
 
 /**
- * External SGXaesgcm object representation.
+ * External SRDEaesgcm object representation.
  */
-struct NAAAIM_SGXaesgcm
+struct NAAAIM_SRDEaesgcm
 {
 	/* External methods. */
-	_Bool (*encrypt)(const SGXaesgcm, const Buffer, const Buffer, \
-			 const Buffer, const Buffer, const Buffer,    \
+	_Bool (*encrypt)(const SRDEaesgcm, const Buffer, const Buffer, \
+			 const Buffer, const Buffer, const Buffer,     \
 			 const Buffer);
-	_Bool (*decrypt)(const SGXaesgcm, const Buffer, const Buffer, \
-			 const Buffer, const Buffer, const Buffer,    \
+	_Bool (*decrypt)(const SRDEaesgcm, const Buffer, const Buffer, \
+			 const Buffer, const Buffer, const Buffer,     \
 			 const Buffer);
 
-	void (*whack)(const SGXaesgcm);
+	void (*whack)(const SRDEaesgcm);
 
 
 	/* Private state. */
-	SGXaesgcm_State state;
+	SRDEaesgcm_State state;
 };
 
 
 /* Sgxmetadata constructor call. */
-extern HCLINK SGXaesgcm NAAAIM_SGXaesgcm_Init(void);
+extern HCLINK SRDEaesgcm NAAAIM_SRDEaesgcm_Init(void);
 #endif

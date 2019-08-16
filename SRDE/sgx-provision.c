@@ -44,7 +44,7 @@
 #include "SGXecdsa.h"
 #include "intel-messages.h"
 
-#include "SGXaesgcm.h"
+#include "SRDEaesgcm.h"
 #include "SGXcmac.h"
 
 
@@ -553,7 +553,7 @@ static _Bool _decrypt_message2(CO(SRDEmessage, msg), CO(Buffer, sk), \
 
 	SGXcmac cmac = NULL;
 
-	SGXaesgcm aesgcm = NULL;
+	SRDEaesgcm aesgcm = NULL;
 
 
 	/* Compute the key to be used for decrypting the payload. */
@@ -599,7 +599,7 @@ static _Bool _decrypt_message2(CO(SRDEmessage, msg), CO(Buffer, sk), \
 	if ( !msg->get_message(msg, TLV_MESSAGE_AUTHENTICATION_CODE, 1, bufr) )
 		ERR(goto done);
 
-	INIT(NAAAIM, SGXaesgcm, aesgcm, ERR(goto done));
+	INIT(NAAAIM, SRDEaesgcm, aesgcm, ERR(goto done));
 	if ( !aesgcm->decrypt(aesgcm, key, iv, payload, msg2, aaad, bufr) )
 		ERR(goto done);
 
@@ -767,7 +767,7 @@ static _Bool _decrypt_message3(CO(SRDEmessage, msg), CO(Buffer, sk), \
 
 	SGXcmac cmac = NULL;
 
-	SGXaesgcm aesgcm = NULL;
+	SRDEaesgcm aesgcm = NULL;
 
 
 	/* Compute the key to be used for decrypting the payload. */
@@ -813,7 +813,7 @@ static _Bool _decrypt_message3(CO(SRDEmessage, msg), CO(Buffer, sk), \
 	if ( !msg->get_message(msg, TLV_MESSAGE_AUTHENTICATION_CODE, 1, bufr) )
 		ERR(goto done);
 
-	INIT(NAAAIM, SGXaesgcm, aesgcm, ERR(goto done));
+	INIT(NAAAIM, SRDEaesgcm, aesgcm, ERR(goto done));
 	if ( !aesgcm->decrypt(aesgcm, key, iv, payload, msg3, aaad, bufr) )
 		ERR(goto done);
 
