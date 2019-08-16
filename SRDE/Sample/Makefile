@@ -10,12 +10,12 @@
 INSTPATH = ${DESTDIR}/opt/IDfusion
 TESTPATH = ${INSTPATH}/share/unit-tests
 
-FD = ../SGXlibs/SGXfusion
+FD = ../SRDElibs/SGXfusion
 FUSION_SOURCES = ${FD}/test-fusion.c ${FD}/test-fusion-enclave.c	\
 	${FD}/test-fusion-interface.c ${FD}/test-fusion-interface.h	\
 	${FD}/test-fusion-enclave.xml
 
-ND = ../SGXlibs/SGXnaaaim
+ND = ../SRDElibs/SGXnaaaim
 NAAAIM_SOURCES = ${ND}/test-naaaim.c ${ND}/test-naaaim-enclave.c	\
 	${ND}/test-naaaim-interface.c ${ND}/test-naaaim-interface.h	\
 	${ND}/test-naaaim-enclave.xml

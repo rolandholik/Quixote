@@ -15,8 +15,8 @@ INSTINCLUDE   = PCEenclave.h PVEenclave.h QEenclave.h SRDEaesgcm.h SRDEcmac.h \
 	SRDEecdsa.h SRDEepid.h SRDEloader.h SRDEmessage.h SRDEmetadata.h      \
 	SRDEquote.h SRDErsa.h SRDEsigstruct.h SRDE.h SRDEenclave.h
 
-SUBDIRS	    = SGXlibs Attestation ISOidentity Sample
-DEV_SUBDIRS = SGXlibs Sample
+SUBDIRS	    = SRDElibs Attestation ISOidentity Sample
+DEV_SUBDIRS = SRDElibs Sample
 
 CSRC = SRDEmetadata.c SRDEloader.c SRDEenclave.c SRDEsigstruct.c PVEenclave.c \
 	SRDEmessage.c SRDEecdsa.c PCEenclave.c SRDEcmac.c SRDEaesgcm.c	      \
@@ -222,7 +222,7 @@ TE.h: generate-array
 #
 # Subdirectory targets.
 #
-SGXlibs:
+SRDElibs:
 	${MAKE} -C $@;
 
 Attestation:
@@ -251,7 +251,7 @@ install-bin:
 	[ -d ${INSTPATH}/bin ] || mkdir -p ${INSTPATH}/bin;
 	install -s ${INSTALLBIN} ${INSTPATH}/bin;
 	install ${INSTALLSCRIPT} ${INSTPATH}/bin;
-	${MAKE} -C SGXlibs $@;
+	${MAKE} -C SRDElibs $@;
 
 install-dev:
 	[ -d ${INSTPATH}/include ] || mkdir -p ${INSTPATH}/include;

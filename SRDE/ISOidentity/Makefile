@@ -25,9 +25,9 @@ include ${SGXDIR}/Make.sgx
 
 SGX_SSL = /opt/intel/sgxssl
 
-SGX_INCLUDE = -I $(SGX_SDK)/include -I $(SGX_SDK)/include/tlibc \
-	-I $(SGX_SDK)/include/stlport -I ../../ISOidentity	     \
-	-I ../SGXlibs/SGXfusion -I ../SGXlibs/SGXnaaaim -I ../../lib \
+SGX_INCLUDE = -I $(SGX_SDK)/include -I $(SGX_SDK)/include/tlibc	       \
+	-I $(SGX_SDK)/include/stlport -I ../../ISOidentity	       \
+	-I ../SRDElibs/SGXfusion -I ../SRDElibs/SGXnaaaim -I ../../lib \
 	-I ..
 
 ENCLAVE_CFLAGS = -Wall -nostdinc -fvisibility=hidden -fpie -fstack-protector \
@@ -43,7 +43,7 @@ SGX_SERVICE_LIBRARY = sgx_tservice
 ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles   \
 	-Wl,--whole-archive -lsgx_tsgxssl -Wl,--no-whole-archive	      \
 	-L . -L ${SGX_LIBRARY_PATH} -L ${SSL_LIBRARY_PATH}		      \
-	-L ../SGXlibs/SGXfusion	-L ../SGXlibs/SGXnaaaim			      \
+	-L ../SRDElibs/SGXfusion -L ../SRDElibs/SGXnaaaim		      \
 	-Wl,--whole-archive						      \
 	-l${SGX_TRTS_LIB} -lSRDEfusion					      \
 	-Wl,--no-whole-archive						      \
