@@ -13,15 +13,15 @@ INSTALLBIN    = sgx-check sgx-gen-token sgx-gen-verifier sgx-load \
 INSTALLSCRIPT = provision-epid provision-tokens provision-verifier
 INSTINCLUDE   = PCEenclave.h PVEenclave.h QEenclave.h SGXaesgcm.h SGXcmac.h \
 	SGXecdsa.h SRDEepid.h SRDEloader.h SRDEmessage.h SRDEmetadata.h	    \
-	SGXquote.h SRDErsa.h SRDEsigstruct.h SRDE.h SRDEenclave.h
+	SRDEquote.h SRDErsa.h SRDEsigstruct.h SRDE.h SRDEenclave.h
 
 SUBDIRS	    = SGXlibs Attestation ISOidentity Sample
 DEV_SUBDIRS = SGXlibs Sample
 
 CSRC = SRDEmetadata.c SRDEloader.c SRDEenclave.c SRDEsigstruct.c PVEenclave.c \
 	SRDEmessage.c SGXecdsa.c PCEenclave.c SGXcmac.c SGXaesgcm.c SRDErsa.c \
-	QEenclave.c SRDEepid.c SGXquote.c SGXquote_sgxmgr.c sgx_exception.c   \
-	sgx-ocall.c
+	QEenclave.c SRDEepid.c SRDEquote.c SRDEquote_mgr.c		      \
+	sgx_exception.c sgx-ocall.c
 
 ASRC = boot-sgx.s
 
@@ -283,4 +283,4 @@ SRDEsigstruct.o: SRDE.h SRDEsigstruct.h sigstruct.h
 PVEenclave.o: SRDE.h SRDEenclave.h PVEenclave.h
 SRDEmessage.o: SRDEmessage.h
 QEenclave.o: SRDE.h SRDEenclave.h QEenclave.h
-SGXquote.o: SRDE.h QEenclave.h PCEenclave.h SGXquote.h
+SRDEquote.o: SRDE.h QEenclave.h PCEenclave.h SRDEquote.h

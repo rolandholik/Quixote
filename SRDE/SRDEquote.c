@@ -39,7 +39,7 @@
 #include "SRDE.h"
 #include "QEenclave.h"
 #include "PCEenclave.h"
-#include "SGXquote.h"
+#include "SRDEquote.h"
 
 #if !defined(REG_OK)
 #define REG_OK REG_NOERROR
@@ -47,14 +47,14 @@
 
 
 /* Object state extraction macro. */
-#define STATE(var) CO(SGXquote_State, var) = this->state
+#define STATE(var) CO(SRDEquote_State, var) = this->state
 
 /* Verify library/object header file inclusions. */
 #if !defined(NAAAIM_LIBID)
 #error Library identifier not defined.
 #endif
 
-#if !defined(NAAAIM_SGXquote_OBJID)
+#if !defined(NAAAIM_SRDEquote_OBJID)
 #error Object identifier not defined.
 #endif
 
@@ -96,8 +96,8 @@ struct platform_info {
 } __attribute__((packed));
 
 
-/** SGXquote private state information. */
-struct NAAAIM_SGXquote_State
+/** SRDEquote private state information. */
+struct NAAAIM_SRDEquote_State
 {
 	/* The root object. */
 	Origin root;
@@ -125,9 +125,9 @@ struct NAAAIM_SGXquote_State
 	String id;
 	String timestamp;
 
-	enum SGXquote_status status;
+	enum SRDEquote_status status;
 
-	struct SGX_quote quote;
+	struct SRDE_quote quote;
 
 	struct platform_info platform_info;
 };
@@ -136,17 +136,17 @@ struct NAAAIM_SGXquote_State
 /**
  * Internal private method.
  *
- * This method is responsible for initializing the NAAAIM_SGXquote_State
+ * This method is responsible for initializing the NAAAIM_SRDEquote_State
  * structure which holds state information for each instantiated object.
  *
  * \param S A pointer to the object containing the state information which
  *        is to be initialized.
  */
 
-static void _init_state(CO(SGXquote_State, S)) {
+static void _init_state(CO(SRDEquote_State, S)) {
 
 	S->libid = NAAAIM_LIBID;
-	S->objid = NAAAIM_SGXquote_OBJID;
+	S->objid = NAAAIM_SRDEquote_OBJID;
 
 
 	S->poisoned = false;
@@ -159,9 +159,9 @@ static void _init_state(CO(SGXquote_State, S)) {
 	S->version   = NULL;
 	S->id	     = NULL;
 	S->timestamp = NULL;
-	S->status    = SGXquote_status_UNDEFINED;
+	S->status    = SRDEquote_status_UNDEFINED;
 
-	memset(&S->quote, '\0', sizeof(struct SGX_quote));
+	memset(&S->quote, '\0', sizeof(struct SRDE_quote));
 	memset(&S->platform_info, '\0', sizeof(struct platform_info));
 
 	return;
@@ -199,7 +199,7 @@ static void _init_state(CO(SGXquote_State, S)) {
  *		value indicates the quote was successfully initialized.
  */
 
-static _Bool init(CO(SGXquote, this), CO(char *, quote_token), \
+static _Bool init(CO(SRDEquote, this), CO(char *, quote_token), \
 		  CO(char *, pce_token), CO(char *, epid_blob))
 
 {
@@ -274,7 +274,7 @@ static _Bool init(CO(SGXquote, this), CO(char *, quote_token), \
  *		value indicates the quote was successfully initialized.
  */
 
-static _Bool generate_quote(CO(SGXquote, this),				 \
+static _Bool generate_quote(CO(SRDEquote, this),			 \
 			    struct SGX_report *report, CO(Buffer, spid), \
 			    CO(Buffer, nonce), CO(Buffer, quote))
 
@@ -338,7 +338,7 @@ static _Bool generate_quote(CO(SGXquote, this),				 \
  *		value indicates the quote was successfully initialized.
  */
 
-static _Bool generate_report(CO(SGXquote, this), CO(Buffer, quote), \
+static _Bool generate_report(CO(SRDEquote, this), CO(Buffer, quote), \
 			     CO(String, report))
 
 {
@@ -419,7 +419,7 @@ static _Bool generate_report(CO(SGXquote, this), CO(Buffer, quote), \
  * Internal private function.
  *
  * This method parses the supplied input for conformance with the
- * version of IAS services that the SGXquote object is designed to
+ * version of IAS services that the SRDEquote object is designed to
  * handle.  It is a subordinate helper function for the ->decode_report
  * method.
  *
@@ -600,7 +600,7 @@ static _Bool _get_field(CO(String, field), CO(String, rgx), CO(char *, fd), \
  *		value indicates the quote was successfully initialized.
  */
 
-static _Bool decode_report(CO(SGXquote, this), CO(String, report))
+static _Bool decode_report(CO(SRDEquote, this), CO(String, report))
 
 {
 	STATE(S);
@@ -663,13 +663,13 @@ static _Bool decode_report(CO(SGXquote, this), CO(String, report))
 	if ( !base64->decode(base64, field, bufr) )
 		ERR(goto done);
 
-	memcpy(&S->quote, bufr->get(bufr), sizeof(struct SGX_quote));
+	memcpy(&S->quote, bufr->get(bufr), sizeof(struct SRDE_quote));
 
 
 	/* Decode the platform information report if available. */
-	if ( S->status == SGXquote_status_GROUP_OUT_OF_DATE || \
-	     S->status == SGXquote_status_GROUP_REVOKED ||     \
-	     S->status == SGXquote_status_CONFIGURATION_NEEDED ) {
+	if ( S->status == SRDEquote_status_GROUP_OUT_OF_DATE || \
+	     S->status == SRDEquote_status_GROUP_REVOKED ||     \
+	     S->status == SRDEquote_status_CONFIGURATION_NEEDED ) {
 		field->reset(field);
 		if ( !_get_field(report, fregex, "platformInfoBlob", field) )
 			ERR(goto done);
@@ -722,7 +722,7 @@ static _Bool decode_report(CO(SGXquote, this), CO(String, report))
  *		been initialized.
  */
 
-static struct SGX_targetinfo * get_qe_targetinfo(CO(SGXquote, this))
+static struct SGX_targetinfo * get_qe_targetinfo(CO(SRDEquote, this))
 
 {
 	STATE(S);
@@ -746,7 +746,7 @@ static struct SGX_targetinfo * get_qe_targetinfo(CO(SGXquote, this))
  *		been generated.
  */
 
-static struct SGX_quote * get_quoteinfo(CO(SGXquote, this))
+static struct SRDE_quote * get_quoteinfo(CO(SRDEquote, this))
 
 {
 	STATE(S);
@@ -765,7 +765,7 @@ static struct SGX_quote * get_quoteinfo(CO(SGXquote, this))
  *		to be generated.
  */
 
-static void dump_report(CO(SGXquote, this))
+static void dump_report(CO(SRDEquote, this))
 
 {
 	STATE(S);
@@ -788,7 +788,7 @@ static void dump_report(CO(SGXquote, this))
 		fputs("*POISONED*\n", stdout);
 		return;
 	}
-	if ( S->status == SGXquote_status_UNDEFINED ) {
+	if ( S->status == SRDEquote_status_UNDEFINED ) {
 		fputs("No report available.\n", stdout);
 		return;
 	}
@@ -859,8 +859,8 @@ static void dump_report(CO(SGXquote, this))
 	/* Report platform status. */
 	fprintf(stdout, "\nPlatform status: %s\n", Quote_status[S->status]);
 
-	if ( !(S->status == SGXquote_status_GROUP_OUT_OF_DATE ||
-	       S->status == SGXquote_status_GROUP_REVOKED) )
+	if ( !(S->status == SRDEquote_status_GROUP_OUT_OF_DATE ||
+	       S->status == SRDEquote_status_GROUP_REVOKED) )
 		goto done;
 
 
@@ -915,12 +915,12 @@ static void dump_report(CO(SGXquote, this))
 /**
  * External public method.
  *
- * This method implements a destructor for the SGXquote object.
+ * This method implements a destructor for the SRDEquote object.
  *
  * \param this	A pointer to the object which is to be destroyed.
  */
 
-static void whack(CO(SGXquote, this))
+static void whack(CO(SRDEquote, this))
 
 {
 	STATE(S);
@@ -938,18 +938,18 @@ static void whack(CO(SGXquote, this))
 /**
  * External constructor call.
  *
- * This function implements a constructor call for a SGXquote object.
+ * This function implements a constructor call for a SRDEquote object.
  *
- * \return	A pointer to the initialized SGXquote.  A null value
+ * \return	A pointer to the initialized SRDEquote.  A null value
  *		indicates an error was encountered in object generation.
  */
 
-extern SGXquote NAAAIM_SGXquote_Init(void)
+extern SRDEquote NAAAIM_SRDEquote_Init(void)
 
 {
 	Origin root;
 
-	SGXquote this = NULL;
+	SRDEquote this = NULL;
 
 	struct HurdLib_Origin_Retn retn;
 
@@ -958,9 +958,9 @@ extern SGXquote NAAAIM_SGXquote_Init(void)
 	root = HurdLib_Origin_Init();
 
 	/* Allocate the object and internal state. */
-	retn.object_size  = sizeof(struct NAAAIM_SGXquote);
-	retn.state_size   = sizeof(struct NAAAIM_SGXquote_State);
-	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_SGXquote_OBJID, &retn) )
+	retn.object_size  = sizeof(struct NAAAIM_SRDEquote);
+	retn.state_size   = sizeof(struct NAAAIM_SRDEquote_State);
+	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_SRDEquote_OBJID, &retn) )
 		return NULL;
 	this	    	  = retn.object;
 	this->state 	  = retn.state;

@@ -20,7 +20,7 @@
 #include <NAAAIM.h>
 #include <RandomBuffer.h>
 #include <Curve25519.h>
-#include <SGXquote.h>
+#include <SRDEquote.h>
 
 #include "LocalTarget-interface.h"
 
@@ -157,11 +157,11 @@ _Bool test_attestation(char *qe_token, char *pce_token, char *epid_blob, \
 
 	RandomBuffer nonce = NULL;
 
-	SGXquote quoter = NULL;
+	SRDEquote quoter = NULL;
 
 
 	fputs("\nInitializing quote.\n", stdout);
-	INIT(NAAAIM, SGXquote, quoter, ERR(goto done));
+	INIT(NAAAIM, SRDEquote, quoter, ERR(goto done));
 	if ( !quoter->init(quoter, qe_token, pce_token, epid_blob) )
 		ERR(goto done);
 

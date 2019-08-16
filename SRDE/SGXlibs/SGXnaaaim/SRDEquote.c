@@ -1,6 +1,6 @@
 /** \file
  * This file implements methods which encapsulate the OCALL's needed
- * to implement remote attestation quote processing via a SGXquote
+ * to implement remote attestation quote processing via a SRDEquote
  * object running in untrusted userspace.
  */
 
@@ -33,19 +33,19 @@
 
 #include "NAAAIM.h"
 #include "SRDE.h"
-#include "SGXquote.h"
+#include "SRDEquote.h"
 #include "Base64.h"
 
 
 /* Object state extraction macro. */
-#define STATE(var) CO(SGXquote_State, var) = this->state
+#define STATE(var) CO(SRDEquote_State, var) = this->state
 
 /* Verify library/object header file inclusions. */
 #if !defined(NAAAIM_LIBID)
 #error Library identifier not defined.
 #endif
 
-#if !defined(NAAAIM_SGXquote_OBJID)
+#if !defined(NAAAIM_SRDEquote_OBJID)
 #error Object identifier not defined.
 #endif
 
@@ -86,8 +86,8 @@ struct platform_info {
 } __attribute__((packed));
 
 
-/** SGXquote private state information. */
-struct NAAAIM_SGXquote_State
+/** SRDEquote private state information. */
+struct NAAAIM_SRDEquote_State
 {
 	/* The root object. */
 	Origin root;
@@ -112,9 +112,9 @@ struct NAAAIM_SGXquote_State
 	String id;
 	String timestamp;
 
-	enum SGXquote_status status;
+	enum SRDEquote_status status;
 
-	struct SGX_quote quote;
+	struct SRDE_quote quote;
 
 	struct platform_info platform_info;
 };
@@ -137,7 +137,7 @@ struct NAAAIM_SGXquote_State
  *		data marshalling structure.
  */
 
-static int sgxquote_ocall(struct SGXquote_ocall *ocall)
+static int sgxquote_ocall(struct SRDEquote_ocall *ocall)
 
 {
 	_Bool retn = false;
@@ -149,13 +149,13 @@ static int sgxquote_ocall(struct SGXquote_ocall *ocall)
 	size_t quote_token_size = 0,
 	       pce_token_size	= 0,
 	       epid_blob_size	= 0,
-	       arena_size	= sizeof(struct SGXquote_ocall);
+	       arena_size	= sizeof(struct SRDEquote_ocall);
 
-	struct SGXquote_ocall *ocp = NULL;
+	struct SRDEquote_ocall *ocp = NULL;
 
 
 	/* Verify arguements and set size of arena. */
-	if ( ocall->ocall == SGXquote_init ) {
+	if ( ocall->ocall == SRDEquote_init ) {
 		if ( ocall->quote_token != NULL ) {
 			quote_token_size = strlen(ocall->quote_token) + 1;
 			if ( !sgx_is_within_enclave(ocall->quote_token, \
@@ -181,7 +181,7 @@ static int sgxquote_ocall(struct SGXquote_ocall *ocall)
 		}
 	}
 
-	if ( ocall->ocall == SGXquote_generate_report ) {
+	if ( ocall->ocall == SRDEquote_generate_report ) {
 		if ( !sgx_is_within_enclave(ocall->arena, ocall->bufr_size) )
 			goto done;
 		arena_size += ocall->bufr_size;
@@ -197,7 +197,7 @@ static int sgxquote_ocall(struct SGXquote_ocall *ocall)
 
 
 	/* Setup arena and pointers to it. */
-	if ( ocall->ocall == SGXquote_init ) {
+	if ( ocall->ocall == SRDEquote_init ) {
 		ap = ocp->arena;
 
 		if ( ocall->quote_token != NULL ) {
@@ -218,7 +218,7 @@ static int sgxquote_ocall(struct SGXquote_ocall *ocall)
 		}
 	}
 
-	if ( ocall->ocall == SGXquote_generate_report )
+	if ( ocall->ocall == SRDEquote_generate_report )
 		memcpy(ocp->arena, ocall->bufr, ocall->bufr_size);
 
 
@@ -243,17 +243,17 @@ static int sgxquote_ocall(struct SGXquote_ocall *ocall)
 /**
  * Internal private method.
  *
- * This method is responsible for initializing the NAAAIM_SGXquote_State
+ * This method is responsible for initializing the NAAAIM_SRDEquote_State
  * structure which holds state information for each instantiated object.
  *
  * \param S A pointer to the object containing the state information which
  *        is to be initialized.
  */
 
-static void _init_state(CO(SGXquote_State, S)) {
+static void _init_state(CO(SRDEquote_State, S)) {
 
 	S->libid = NAAAIM_LIBID;
-	S->objid = NAAAIM_SGXquote_OBJID;
+	S->objid = NAAAIM_SRDEquote_OBJID;
 
 
 	S->poisoned = false;
@@ -262,9 +262,9 @@ static void _init_state(CO(SGXquote_State, S)) {
 	S->version   = NULL;
 	S->id	     = NULL;
 	S->timestamp = NULL;
-	S->status    = SGXquote_status_UNDEFINED;
+	S->status    = SRDEquote_status_UNDEFINED;
 
-	memset(&S->quote, '\0', sizeof(struct SGX_quote));
+	memset(&S->quote, '\0', sizeof(struct SRDE_quote));
 	memset(&S->platform_info, '\0', sizeof(struct platform_info));
 
 	return;
@@ -296,7 +296,7 @@ static void _init_state(CO(SGXquote_State, S)) {
  *		value indicates the quote was successfully initialized.
  */
 
-static _Bool init(CO(SGXquote, this), CO(char *, quote_token), \
+static _Bool init(CO(SRDEquote, this), CO(char *, quote_token), \
 		  CO(char *, pce_token), CO(char *, epid_blob))
 
 {
@@ -304,7 +304,7 @@ static _Bool init(CO(SGXquote, this), CO(char *, quote_token), \
 
 	_Bool retn = false;
 
-	struct SGXquote_ocall ocall;
+	struct SRDEquote_ocall ocall;
 
 
 	/* Verify object status. */
@@ -313,9 +313,9 @@ static _Bool init(CO(SGXquote, this), CO(char *, quote_token), \
 
 
 	/* Call the untrusted object implementation. */
-	memset(&ocall, '\0', sizeof(struct SGXquote_ocall));
+	memset(&ocall, '\0', sizeof(struct SRDEquote_ocall));
 
-	ocall.ocall	= SGXquote_init;
+	ocall.ocall	= SRDEquote_init;
 	ocall.instance	= S->instance;
 
 	ocall.quote_token = (char *) quote_token;
@@ -361,7 +361,7 @@ static _Bool init(CO(SGXquote, this), CO(char *, quote_token), \
  *		value indicates the quote was successfully initialized.
  */
 
-static _Bool generate_quote(CO(SGXquote, this),				 \
+static _Bool generate_quote(CO(SRDEquote, this),			 \
 			    struct SGX_report *report, CO(Buffer, spid), \
 			    CO(Buffer, nonce), CO(Buffer, quote))
 
@@ -370,7 +370,7 @@ static _Bool generate_quote(CO(SGXquote, this),				 \
 
 	_Bool retn = false;
 
-	struct SGXquote_ocall ocall;
+	struct SRDEquote_ocall ocall;
 
 
 	/* Verify object and arguement status. */
@@ -387,9 +387,9 @@ static _Bool generate_quote(CO(SGXquote, this),				 \
 
 
 	/* Call the untrusted object implementation. */
-	memset(&ocall, '\0', sizeof(struct SGXquote_ocall));
+	memset(&ocall, '\0', sizeof(struct SRDEquote_ocall));
 
-	ocall.ocall	= SGXquote_generate_quote,
+	ocall.ocall	= SRDEquote_generate_quote,
 	ocall.instance	= S->instance;
 
 	ocall.report = *report;
@@ -433,7 +433,7 @@ static _Bool generate_quote(CO(SGXquote, this),				 \
  *		was successfully generated.
  */
 
-static _Bool generate_report(CO(SGXquote, this), CO(Buffer, quote), \
+static _Bool generate_report(CO(SRDEquote, this), CO(Buffer, quote), \
 			     CO(String, report))
 
 {
@@ -443,7 +443,7 @@ static _Bool generate_report(CO(SGXquote, this), CO(Buffer, quote), \
 
 	Buffer bufr = NULL;
 
-	struct SGXquote_ocall ocall;
+	struct SRDEquote_ocall ocall;
 
 
 	/* Verify object and arguement status. */
@@ -454,9 +454,9 @@ static _Bool generate_report(CO(SGXquote, this), CO(Buffer, quote), \
 
 
 	/* Call the untrusted object implementation. */
-	memset(&ocall, '\0', sizeof(struct SGXquote_ocall));
+	memset(&ocall, '\0', sizeof(struct SRDEquote_ocall));
 
-	ocall.ocall	= SGXquote_generate_report,
+	ocall.ocall	= SRDEquote_generate_report,
 	ocall.instance	= S->instance;
 
 	ocall.bufr	= quote->get(quote);
@@ -487,7 +487,7 @@ static _Bool generate_report(CO(SGXquote, this), CO(Buffer, quote), \
  * Internal private function.
  *
  * This method parses the supplied input for conformance with the
- * version of IAS services that the SGXquote object is designed to
+ * version of IAS services that the SRDEquote object is designed to
  * handle.  It is a subordinate helper function for the ->decode_report
  * method.
  *
@@ -668,7 +668,7 @@ static _Bool _get_field(CO(String, field), CO(String, rgx), CO(char *, fd), \
  *		value indicates the quote was successfully initialized.
  */
 
-static _Bool decode_report(CO(SGXquote, this), CO(String, report))
+static _Bool decode_report(CO(SRDEquote, this), CO(String, report))
 
 {
 	STATE(S);
@@ -731,13 +731,13 @@ static _Bool decode_report(CO(SGXquote, this), CO(String, report))
 	if ( !base64->decode(base64, field, bufr) )
 		ERR(goto done);
 
-	memcpy(&S->quote, bufr->get(bufr), sizeof(struct SGX_quote));
+	memcpy(&S->quote, bufr->get(bufr), sizeof(struct SRDE_quote));
 
 
 	/* Decode the platform information report if available. */
-	if ( S->status == SGXquote_status_GROUP_OUT_OF_DATE || \
-	     S->status == SGXquote_status_GROUP_REVOKED ||     \
-	     S->status == SGXquote_status_CONFIGURATION_NEEDED ) {
+	if ( S->status == SRDEquote_status_GROUP_OUT_OF_DATE || \
+	     S->status == SRDEquote_status_GROUP_REVOKED ||     \
+	     S->status == SRDEquote_status_CONFIGURATION_NEEDED ) {
 		field->reset(field);
 		if ( !_get_field(report, fregex, "platformInfoBlob", field) )
 			ERR(goto done);
@@ -789,14 +789,14 @@ static _Bool decode_report(CO(SGXquote, this), CO(String, report))
  *		been initialized.
  */
 
-static struct SGX_targetinfo * get_qe_targetinfo(CO(SGXquote, this))
+static struct SGX_targetinfo * get_qe_targetinfo(CO(SRDEquote, this))
 
 {
 	STATE(S);
 
 	_Bool retn = false;
 
-	struct SGXquote_ocall ocall;
+	struct SRDEquote_ocall ocall;
 
 
 	/* Verify object status. */
@@ -805,9 +805,9 @@ static struct SGX_targetinfo * get_qe_targetinfo(CO(SGXquote, this))
 
 
 	/* Call the untrusted object implementation. */
-	memset(&ocall, '\0', sizeof(struct SGXquote_ocall));
+	memset(&ocall, '\0', sizeof(struct SRDEquote_ocall));
 
-	ocall.ocall	= SGXquote_get_qe_targetinfo;
+	ocall.ocall	= SRDEquote_get_qe_targetinfo;
 	ocall.instance	= S->instance;
 
 	if ( sgxquote_ocall(&ocall) != 0 )
@@ -840,7 +840,7 @@ static struct SGX_targetinfo * get_qe_targetinfo(CO(SGXquote, this))
  *		been generated.
  */
 
-static struct SGX_quote * get_quoteinfo(CO(SGXquote, this))
+static struct SRDE_quote * get_quoteinfo(CO(SRDEquote, this))
 
 {
 	STATE(S);
@@ -859,7 +859,7 @@ static struct SGX_quote * get_quoteinfo(CO(SGXquote, this))
  *		to be generated.
  */
 
-static void dump_report(CO(SGXquote, this))
+static void dump_report(CO(SRDEquote, this))
 
 {
 	STATE(S);
@@ -882,7 +882,7 @@ static void dump_report(CO(SGXquote, this))
 		fputs("*POISONED*\n", stdout);
 		return;
 	}
-	if ( S->status == SGXquote_status_UNDEFINED ) {
+	if ( S->status == SRDEquote_status_UNDEFINED ) {
 		fputs("No report available.\n", stdout);
 		return;
 	}
@@ -953,8 +953,8 @@ static void dump_report(CO(SGXquote, this))
 	/* Report platform status. */
 	fprintf(stdout, "\nPlatform status: %s\n", Quote_status[S->status]);
 
-	if ( !(S->status == SGXquote_status_GROUP_OUT_OF_DATE ||
-	       S->status == SGXquote_status_GROUP_REVOKED) )
+	if ( !(S->status == SRDEquote_status_GROUP_OUT_OF_DATE ||
+	       S->status == SRDEquote_status_GROUP_REVOKED) )
 		goto done;
 
 
@@ -1010,22 +1010,22 @@ static void dump_report(CO(SGXquote, this))
  * External public method.
  *
  * This method implements the OCALL which requests destruction of
- * the userspace instance of the SGXquote object.
+ * the userspace instance of the SRDEquote object.
  *
  * \param this	A pointer to the object which is to be destroyed.
  */
 
-static void whack(CO(SGXquote, this))
+static void whack(CO(SRDEquote, this))
 
 {
 	STATE(S);
 
-	struct SGXquote_ocall ocall;
+	struct SRDEquote_ocall ocall;
 
 
 	/* Release implementation object. */
-	memset(&ocall, '\0', sizeof(struct SGXquote_ocall));
-	ocall.ocall    = SGXquote_whack;
+	memset(&ocall, '\0', sizeof(struct SRDEquote_ocall));
+	ocall.ocall    = SRDEquote_whack;
 	ocall.instance = S->instance;
 	sgxquote_ocall(&ocall);
 
@@ -1043,31 +1043,31 @@ static void whack(CO(SGXquote, this))
 /**
  * External constructor call.
  *
- * This function implements a constructor call for a SGXquote object.
+ * This function implements a constructor call for a SRDEquote object.
  *
- * \return	A pointer to the initialized SGXquote.  A null value
+ * \return	A pointer to the initialized SRDEquote.  A null value
  *		indicates an error was encountered in object generation.
  */
 
-extern SGXquote NAAAIM_SGXquote_Init(void)
+extern SRDEquote NAAAIM_SRDEquote_Init(void)
 
 {
 	Origin root;
 
-	SGXquote this = NULL;
+	SRDEquote this = NULL;
 
 	struct HurdLib_Origin_Retn retn;
 
-	struct SGXquote_ocall ocall;
+	struct SRDEquote_ocall ocall;
 
 
 	/* Get the root object. */
 	root = HurdLib_Origin_Init();
 
 	/* Allocate the object and internal state. */
-	retn.object_size  = sizeof(struct NAAAIM_SGXquote);
-	retn.state_size   = sizeof(struct NAAAIM_SGXquote_State);
-	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_SGXquote_OBJID, &retn) )
+	retn.object_size  = sizeof(struct NAAAIM_SRDEquote);
+	retn.state_size   = sizeof(struct NAAAIM_SRDEquote_State);
+	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_SRDEquote_OBJID, &retn) )
 		return NULL;
 	this	    	  = retn.object;
 	this->state 	  = retn.state;
@@ -1077,8 +1077,8 @@ extern SGXquote NAAAIM_SGXquote_Init(void)
 	_init_state(this->state);
 
 	/* Initialize the untrusted object. */
-	memset(&ocall, '\0', sizeof(struct SGXquote_ocall));
-	ocall.ocall = SGXquote_init_object;
+	memset(&ocall, '\0', sizeof(struct SRDEquote_ocall));
+	ocall.ocall = SRDEquote_init_object;
 	if ( sgxquote_ocall(&ocall) != 0 )
 		goto err;
 	this->state->instance = ocall.instance;

@@ -1,5 +1,5 @@
 /** \file
- * This file contains header definitions for the SGXquote enclave
+ * This file contains header definitions for the SRDEquote enclave
  * object manager.
  */
 
@@ -10,4 +10,4 @@
  * the source tree for copyright and licensing information.
  **************************************************************************/
 
-extern SGXquote_sgxmgr(struct SGXquote_ocall *);
+extern SRDEquote_sgxmgr(struct SRDEquote_ocall *);

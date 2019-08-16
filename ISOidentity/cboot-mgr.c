@@ -52,7 +52,7 @@
 #include <ISOmanager.h>
 
 #include <SRDE.h>
-#include <SGXquote.h>
+#include <SRDEquote.h>
 
 #include "cboot.h"
 

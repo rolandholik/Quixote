@@ -40,7 +40,7 @@
 
 #include <SRDE.h>
 #include <SRDEenclave.h>
-#include <SGXquote.h>
+#include <SRDEquote.h>
 
 #include "test-Possum-interface.h"
 
@@ -98,7 +98,7 @@ static const struct OCALL_api ocall_table = {
 		NULL,
 		ocall2_handler,
 		Duct_sgxmgr,
-		SGXquote_sgxmgr,
+		SRDEquote_sgxmgr,
 	}
 };
 

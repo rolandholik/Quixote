@@ -61,7 +61,7 @@
 #else
 #include <SRDE.h>
 #include <SGXfusion.h>
-#include <SGXquote.h>
+#include <SRDEquote.h>
 #endif
 #include "PossumPipe.h"
 
@@ -117,7 +117,7 @@ struct NAAAIM_PossumPipe_State
 	Duct duct;
 
 	/* Remote software quote. */
-	SGXquote remote;
+	SRDEquote remote;
 
 	/* Packet transmission nonce. */
 	Sha256 nonce;
@@ -1255,7 +1255,7 @@ static _Bool generate_shared_keys(CO(PossumPipe, this), CO(Buffer, nonce1),   \
  */
 
 static _Bool _update_measurement(CO(Buffer, measurement), CO(Buffer, nonce), \
-				 struct SGX_quote *quote)
+				 struct SRDE_quote *quote)
 
 {
 	_Bool retn = false;
@@ -1413,7 +1413,7 @@ static _Bool receive_platform_quote(CO(PossumPipe, this), CO(Buffer, bufr), \
 #else
 	INIT(HurdLib, String, output, ERR(goto done));
 
-	INIT(NAAAIM, SGXquote, S->remote, ERR(goto done));
+	INIT(NAAAIM, SRDEquote, S->remote, ERR(goto done));
 	if ( !S->remote->generate_report(S->remote, quote, output) )
 		ERR(goto done);
 
@@ -1494,13 +1494,13 @@ static _Bool _generate_quote(CO(Buffer, nonce), CO(Buffer, spid), \
 
 	SoftwareStatus software = NULL;
 
-	SGXquote quoter = NULL;
+	SRDEquote quoter = NULL;
 
 	Sha256 sha256 = NULL;
 
 
-	/* Initialize the SGX quoting object. */
-	INIT(NAAAIM, SGXquote, quoter, ERR(goto done));
+	/* Initialize the quoting object. */
+	INIT(NAAAIM, SRDEquote, quoter, ERR(goto done));
 	if ( !quoter->init(quoter, NULL, NULL, NULL) )
 		ERR(goto done);
 	tp = quoter->get_qe_targetinfo(quoter);
@@ -2463,7 +2463,7 @@ static _Bool get_connection(CO(PossumPipe, this), uint64_t *attributes,	 \
 
 	_Bool retn = false;
 
-	struct SGX_quote *quote;
+	struct SRDE_quote *quote;
 
 	struct SGX_reportbody *bp;
 

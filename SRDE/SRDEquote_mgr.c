@@ -1,6 +1,6 @@
 /** \file
- * This file implements an SGXquote manager which manages
- * implementation objects on behalf of an SGXquote object running in
+ * This file implements an SRDEquote manager which manages
+ * implementation objects on behalf of an SRDEquote object running in
  * enclave context.
  */
 
@@ -25,22 +25,22 @@
 
 #include "NAAAIM.h"
 #include "SRDE.h"
-#include "SGXquote.h"
+#include "SRDEquote.h"
 
 
 /** Duct objects under external management. */
-static _Bool SGX_SGXquote_initialized = false;
+static _Bool SRDE_quote_initialized = false;
 
-static Buffer SGXquote_Buffers[16];
+static Buffer SRDEquote_buffers[16];
 
-static SGXquote SGX_SGXquotes[16];
+static SRDEquote SRDE_quotes[16];
 
 
 /**
  * Internal private function.
  *
- * This function manages the initialization of a SGXquote object to
- * implement functionality for an enclave based SGXquote object.  The
+ * This function manages the initialization of a SRDEquote object to
+ * implement functionality for an enclave based SRDEquote object.  The
  * object instance slot is returned and stored in the SGX based object.
  *
  * \param ocp	A pointer to the structure which is marshalling the
@@ -49,7 +49,7 @@ static SGXquote SGX_SGXquotes[16];
  * \return	No return value is defined.
  */
 
-static void sgxquote_init_object(struct SGXquote_ocall *ocp)
+static void sgxquote_init_object(struct SRDEquote_ocall *ocp)
 
 {
 	_Bool retn = false;
@@ -58,31 +58,31 @@ static void sgxquote_init_object(struct SGXquote_ocall *ocp)
 
 	Buffer bufr = NULL;
 
-	SGXquote quote = NULL;
+	SRDEquote quote = NULL;
 
 
-	for (instance= 0; instance < sizeof(SGX_SGXquotes)/sizeof(SGXquote); \
+	for (instance= 0; instance < sizeof(SRDE_quotes)/sizeof(SRDEquote); \
 		     ++instance) {
-		if ( SGX_SGXquotes[instance] == NULL )
+		if ( SRDE_quotes[instance] == NULL )
 			break;
 	}
-	if ( instance == sizeof(SGX_SGXquotes)/sizeof(SGXquote) )
+	if ( instance == sizeof(SRDE_quotes)/sizeof(SRDEquote) )
 		ERR(goto done);
 
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	INIT(NAAAIM, SGXquote, quote, ERR(goto done));
-	ocp->instance		   = instance;
-	SGX_SGXquotes[instance]	   = quote;
-	SGXquote_Buffers[instance] = bufr;
+	INIT(NAAAIM, SRDEquote, quote, ERR(goto done));
+	ocp->instance		    = instance;
+	SRDE_quotes[instance]	    = quote;
+	SRDEquote_buffers[instance] = bufr;
 
 	retn = true;
 
 
  done:
 	if ( !retn ) {
-		if ( (quote = SGX_SGXquotes[instance]) != NULL ) {
+		if ( (quote = SRDE_quotes[instance]) != NULL ) {
 			WHACK(quote);
-			SGX_SGXquotes[instance] = NULL;
+			SRDE_quotes[instance] = NULL;
 		}
 	}
 	ocp->retn = retn;
@@ -103,10 +103,10 @@ static void sgxquote_init_object(struct SGXquote_ocall *ocp)
  * \return	No return value is defined.
  */
 
-static void sgxquote_init(struct SGXquote_ocall *ocp)
+static void sgxquote_init(struct SRDEquote_ocall *ocp)
 
 {
-	SGXquote quote = SGX_SGXquotes[ocp->instance];
+	SRDEquote quote = SRDE_quotes[ocp->instance];
 
 
 	ocp->retn = quote->init(quote, ocp->quote_token, ocp->pce_token, \
@@ -127,16 +127,16 @@ static void sgxquote_init(struct SGXquote_ocall *ocp)
  * \return	No return value is defined.
  */
 
-static void sgxquote_generate_quote(struct SGXquote_ocall *ocp)
+static void sgxquote_generate_quote(struct SRDEquote_ocall *ocp)
 
 {
 	_Bool retn = false;
 
 	Buffer spid	  = NULL,
 	       nonce	  = NULL,
-	       quote_bufr = SGXquote_Buffers[ocp->instance];
+	       quote_bufr = SRDEquote_buffers[ocp->instance];
 
-	SGXquote quote = SGX_SGXquotes[ocp->instance];
+	SRDEquote quote = SRDE_quotes[ocp->instance];
 
 
 	/* Setup local objects. */
@@ -182,17 +182,17 @@ static void sgxquote_generate_quote(struct SGXquote_ocall *ocp)
  * \return	No return value is defined.
  */
 
-static void sgxquote_generate_report(struct SGXquote_ocall *ocp)
+static void sgxquote_generate_report(struct SRDEquote_ocall *ocp)
 
 {
 	_Bool retn = false;
 
 	Buffer quote = NULL,
-	       report_bufr = SGXquote_Buffers[ocp->instance];
+	       report_bufr = SRDEquote_buffers[ocp->instance];
 
 	String output = NULL;
 
-	SGXquote quoter = SGX_SGXquotes[ocp->instance];
+	SRDEquote quoter = SRDE_quotes[ocp->instance];
 
 
 	/* Generate the report. */
@@ -229,7 +229,7 @@ static void sgxquote_generate_report(struct SGXquote_ocall *ocp)
  * Internal private function.
  *
  * This function implements the ->qe_get targetinfo for the enclave
- * based SGXquote object.
+ * based SRDEquote object.
  *
  * \param ocp	A pointer to the structure which is marshalling the
  *		data into and out of the OCALL.
@@ -237,10 +237,10 @@ static void sgxquote_generate_report(struct SGXquote_ocall *ocp)
  * \return	No return value is defined.
  */
 
-static void sgxquote_get_qe_targetinfo(struct SGXquote_ocall *ocp)
+static void sgxquote_get_qe_targetinfo(struct SRDEquote_ocall *ocp)
 
 {
-	SGXquote quote = SGX_SGXquotes[ocp->instance];
+	SRDEquote quote = SRDE_quotes[ocp->instance];
 
 
 	ocp->qe_target_info = quote->get_qe_targetinfo(quote);
@@ -253,7 +253,7 @@ static void sgxquote_get_qe_targetinfo(struct SGXquote_ocall *ocp)
 /**
  * Internal private function.
  *
- * This function manages the destruction of an SGXquote object which
+ * This function manages the destruction of an SRDEquote object which
  * has been previously initialized.
  *
  * \param ocp	A pointer to the structure which is marshalling the
@@ -262,19 +262,19 @@ static void sgxquote_get_qe_targetinfo(struct SGXquote_ocall *ocp)
  * \return	No return value is defined.
  */
 
-static void sgxquote_whack(struct SGXquote_ocall *ocp)
+static void sgxquote_whack(struct SRDEquote_ocall *ocp)
 
 {
-	SGXquote quote = SGX_SGXquotes[ocp->instance];
+	SRDEquote quote = SRDE_quotes[ocp->instance];
 
-	Buffer bufr = SGXquote_Buffers[ocp->instance];
+	Buffer bufr = SRDEquote_buffers[ocp->instance];
 
 
 	quote->whack(quote);
 	bufr->whack(bufr);
 
-	SGX_SGXquotes[ocp->instance]	 = NULL;
-	SGXquote_Buffers[ocp->instance] = NULL;
+	SRDE_quotes[ocp->instance]	 = NULL;
+	SRDEquote_buffers[ocp->instance] = NULL;
 
 	return;
 }
@@ -294,52 +294,52 @@ static void sgxquote_whack(struct SGXquote_ocall *ocp)
  *		the command returns a value of zero.
  */
 
-int SGXquote_sgxmgr(struct SGXquote_ocall *ocp)
+int SRDEquote_sgxmgr(struct SRDEquote_ocall *ocp)
 
 {
 	int rc = -1;
 
 
 	/* Verify on first call that object array is initialized. */
-	if ( !SGX_SGXquote_initialized ) {
-		memset(SGX_SGXquotes, '\0', sizeof(SGX_SGXquotes));
-		memset(SGXquote_Buffers, '\0', sizeof(SGXquote_Buffers));
-		SGX_SGXquote_initialized = true;
+	if ( !SRDE_quote_initialized ) {
+		memset(SRDE_quotes, '\0', sizeof(SRDE_quotes));
+		memset(SRDEquote_buffers, '\0', sizeof(SRDEquote_buffers));
+		SRDE_quote_initialized = true;
 	}
 
 
 	/* Verify ocall method type and instance specification. */
-	if ( (ocp->ocall < 0) || (ocp->ocall >= SGXquote_END) )
+	if ( (ocp->ocall < 0) || (ocp->ocall >= SRDEquote_END) )
 		ERR(goto done);
-	if ( ocp->instance >= sizeof(SGX_SGXquotes)/sizeof(SGXquote) )
+	if ( ocp->instance >= sizeof(SRDE_quotes)/sizeof(SRDEquote) )
 		ERR(goto done);
 
 
 	/* Vector execution to the appropriate method handler. */
 	switch ( ocp->ocall ) {
-		case SGXquote_init_object:
+		case SRDEquote_init_object:
 			sgxquote_init_object(ocp);
 			break;
 
-		case SGXquote_init:
+		case SRDEquote_init:
 			sgxquote_init(ocp);
 			break;
-		case SGXquote_generate_quote:
+		case SRDEquote_generate_quote:
 			sgxquote_generate_quote(ocp);
 			break;
-		case SGXquote_generate_report:
+		case SRDEquote_generate_report:
 			sgxquote_generate_report(ocp);
 			break;
 
-		case SGXquote_get_qe_targetinfo:
+		case SRDEquote_get_qe_targetinfo:
 			sgxquote_get_qe_targetinfo(ocp);
 			break;
 
-		case SGXquote_whack:
+		case SRDEquote_whack:
 			sgxquote_whack(ocp);
 			break;
 
-		case SGXquote_END:
+		case SRDEquote_END:
 			break;
 	}
 	rc = 0;

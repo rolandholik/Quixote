@@ -35,7 +35,7 @@
 
 #include "../SRDE/SRDE.h"
 #include "../SRDE/SRDEenclave.h"
-#include <SGXquote.h>
+#include <SRDEquote.h>
 
 #include <ContourPoint.h>
 #include <ExchangeEvent.h>
@@ -141,7 +141,7 @@ static const struct OCALL_api ocall_table = {
 		fgets_handler,
 		ocall2_handler,
 		Duct_sgxmgr,
-		SGXquote_sgxmgr,
+		SRDEquote_sgxmgr,
 	}
 };
 

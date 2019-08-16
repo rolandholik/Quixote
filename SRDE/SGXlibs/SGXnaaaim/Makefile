@@ -14,8 +14,8 @@ INSTINCLUDE    = IDtoken.h NAAAIM.h PossumPacket.h PossumPipe.h RandomBuffer.h
 
 CSRC   = test-naaaim.c
 ENCSRC = test-naaaim-enclave.c test-naaaim-interface.c
-LIBSRC = SHA256.c RandomBuffer.c Curve25519.c SHA256_hmac.c AES256_cbc.c \
-	Duct.c SGXquote.c Base64.c IDtoken.c PossumPacket.c PossumPipe.c \
+LIBSRC = SHA256.c RandomBuffer.c Curve25519.c SHA256_hmac.c AES256_cbc.c  \
+	Duct.c SRDEquote.c Base64.c IDtoken.c PossumPacket.c PossumPipe.c \
 	SoftwareStatus.c OTEDKS.c IDmgr.c Ivy.c ssl-ocall.c
 ASRC   = rdrand.s
 
@@ -248,7 +248,7 @@ Curve25519.o: ${NAAAIMDIR}/Curve25519.h
 SHA256_hmac.o: ${NAAAIMDIR}/SHA256_hmac.h
 AES256_cbc.o: ${NAAAIMDIR}/AES256_cbc.h
 Duct.o: ${NAAAIMDIR}/Duct.h
-SGXquote.o: ../../SGXquote.h
+SRDEquote.o: ../../SRDEquote.h
 Base64.o: ${NAAAIMDIR}/Base64.h
 IDtoken.o: IDtoken.h
 PossumPacket.o: PossumPacket.h RandomBuffer.h IDtoken.h	 \

@@ -40,7 +40,7 @@
 
 #include "SRDE.h"
 #include "SRDEenclave.h"
-#include "SGXquote.h"
+#include "SRDEquote.h"
 #include "SRDEepid.h"
 
 #include "LocalTarget-interface.h"
@@ -99,7 +99,7 @@ static const struct OCALL_api ocall_table = {
 		NULL, /* fgets handler */
 		ocall2_handler, /*ocall2_handler */
 		NULL, /*Duct_sgxmgr*/
-		SGXquote_sgxmgr,
+		SRDEquote_sgxmgr,
 	}
 };
 
@@ -146,7 +146,7 @@ extern int main(int argc, char *argv[])
 
 	Base64 base64 = NULL;
 
-	SGXquote quoter = NULL;
+	SRDEquote quoter = NULL;
 
 	SRDEenclave source = NULL;
 
@@ -239,7 +239,7 @@ extern int main(int argc, char *argv[])
 	fputs("\nTesting non-enclave attestation.\n", stdout);
 
 	fputs("\nInitializing quote.\n", stdout);
-	INIT(NAAAIM, SGXquote, quoter, ERR(goto done));
+	INIT(NAAAIM, SRDEquote, quoter, ERR(goto done));
 	if ( !quoter->init(quoter, quote_token, pce_token, epid_blob) )
 		ERR(goto done);
 

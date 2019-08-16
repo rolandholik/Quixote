@@ -93,5 +93,5 @@
 #define NAAAIM_SGXaesgcm_OBJID		55
 #define NAAAIM_SRDErsa_OBJID		56
 #define NAAAIM_QEenclave_OBJID		57
-#define NAAAIM_SGXquote_OBJID		58
+#define NAAAIM_SRDEquote_OBJID		58
 #define NAAAIM_ISOmanager_OBJID		59

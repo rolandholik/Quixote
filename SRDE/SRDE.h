@@ -556,7 +556,7 @@ struct SGX_psvn {
  * response to a request to the Quoting Enclave to generate an
  * remote attestation report for an enclave.
  */
-struct SGX_quote {
+struct SRDE_quote {
 	uint16_t version;
 	uint16_t sign_type;
 	uint8_t epid_group_id[4];
