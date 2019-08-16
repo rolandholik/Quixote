@@ -7,7 +7,7 @@
 
 
 # Variable declarations.
-SUBDIRS = SRDEfusion SGXnaaaim
+SUBDIRS = SRDEfusion SRDEnaaaim
 
 
 #
@@ -20,7 +20,7 @@ all: ${SUBDIRS}
 SRDEfusion:
 	${MAKE} -C $@;
 
-SGXnaaaim:
+SRDEnaaaim:
 	${MAKE} -C $@;
 
 install-bin:

@@ -15,7 +15,7 @@ FUSION_SOURCES = ${FD}/test-fusion.c ${FD}/test-fusion-enclave.c	\
 	${FD}/test-fusion-interface.c ${FD}/test-fusion-interface.h	\
 	${FD}/test-fusion-enclave.xml
 
-ND = ../SRDElibs/SGXnaaaim
+ND = ../SRDElibs/SRDEnaaaim
 NAAAIM_SOURCES = ${ND}/test-naaaim.c ${ND}/test-naaaim-enclave.c	\
 	${ND}/test-naaaim-interface.c ${ND}/test-naaaim-interface.h	\
 	${ND}/test-naaaim-enclave.xml
