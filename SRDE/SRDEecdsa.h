@@ -12,32 +12,32 @@
  * the source tree for copyright and licensing information.
  **************************************************************************/
 
-#ifndef NAAAIM_SGXecdsa_HEADER
-#define NAAAIM_SGXecdsa_HEADER
+#ifndef NAAAIM_SRDEecdsa_HEADER
+#define NAAAIM_SRDEecdsa_HEADER
 
 
 /* Object type definitions. */
-typedef struct NAAAIM_SGXecdsa * SGXecdsa;
+typedef struct NAAAIM_SRDEecdsa * SRDEecdsa;
 
-typedef struct NAAAIM_SGXecdsa_State * SGXecdsa_State;
+typedef struct NAAAIM_SRDEecdsa_State * SRDEecdsa_State;
 
 /**
- * External SGXecdsa object representation.
+ * External SRDEecdsa object representation.
  */
-struct NAAAIM_SGXecdsa
+struct NAAAIM_SRDEecdsa
 {
 	/* External methods. */
-	_Bool (*verify)(const SGXecdsa, const Buffer, const Buffer, \
+	_Bool (*verify)(const SRDEecdsa, const Buffer, const Buffer, \
 			const Buffer);
 
-	void (*whack)(const SGXecdsa);
+	void (*whack)(const SRDEecdsa);
 
 
 	/* Private state. */
-	SGXecdsa_State state;
+	SRDEecdsa_State state;
 };
 
 
 /* Sgxmetadata constructor call. */
-extern HCLINK SGXecdsa NAAAIM_SGXecdsa_Init(void);
+extern HCLINK SRDEecdsa NAAAIM_SRDEecdsa_Init(void);
 #endif

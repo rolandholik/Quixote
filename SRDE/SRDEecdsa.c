@@ -32,24 +32,24 @@
 #include <RandomBuffer.h>
 
 #include "NAAAIM.h"
-#include "SGXecdsa.h"
+#include "SRDEecdsa.h"
 
 
 /* Object state extraction macro. */
-#define STATE(var) CO(SGXecdsa_State, var) = this->state
+#define STATE(var) CO(SRDEecdsa_State, var) = this->state
 
 /* Verify library/object header file inclusions. */
 #if !defined(NAAAIM_LIBID)
 #error Library identifier not defined.
 #endif
 
-#if !defined(NAAAIM_SGXecdsa_OBJID)
+#if !defined(NAAAIM_SRDEecdsa_OBJID)
 #error Object identifier not defined.
 #endif
 
 
-/** SGXecdsa private state information. */
-struct NAAAIM_SGXecdsa_State
+/** SRDEecdsa private state information. */
+struct NAAAIM_SRDEecdsa_State
 {
 	/* The root object. */
 	Origin root;
@@ -157,18 +157,18 @@ int sgx_read_rand(unsigned char *out, size_t cnt)
 /**
  * Internal private method.
  *
- * This method is responsible for initializing the NAAAIM_SGXecdsa_State
+ * This method is responsible for initializing the NAAAIM_SRDEecdsa_State
  * structure which holds state information for each instantiated object.
  *
  * \param S A pointer to the object containing the state information which
  *        is to be initialized.
  */
 
-static void _init_state(CO(SGXecdsa_State, S))
+static void _init_state(CO(SRDEecdsa_State, S))
 
 {
 	S->libid = NAAAIM_LIBID;
-	S->objid = NAAAIM_SGXecdsa_OBJID;
+	S->objid = NAAAIM_SRDEecdsa_OBJID;
 
 
 	S->poisoned = false;
@@ -190,7 +190,7 @@ static void _init_state(CO(SGXecdsa_State, S))
  *		enclave has been successfully initialized.
  */
 
-static _Bool verify(CO(SGXecdsa, this), CO(Buffer, key), CO(Buffer, msg), \
+static _Bool verify(CO(SRDEecdsa, this), CO(Buffer, key), CO(Buffer, msg), \
 		    CO(Buffer, sig))
 
 {
@@ -251,12 +251,12 @@ static _Bool verify(CO(SGXecdsa, this), CO(Buffer, key), CO(Buffer, msg), \
 /**
  * External public method.
  *
- * This method implements a destructor for the SGXecdsa object.
+ * This method implements a destructor for the SRDEecdsa object.
  *
  * \param this	A pointer to the object which is to be destroyed.
  */
 
-static void whack(CO(SGXecdsa, this))
+static void whack(CO(SRDEecdsa, this))
 
 {
 	STATE(S);
@@ -270,18 +270,18 @@ static void whack(CO(SGXecdsa, this))
 /**
  * External constructor call.
  *
- * This function implements a constructor call for a SGXecdsa object.
+ * This function implements a constructor call for a SRDEecdsa object.
  *
- * \return	A pointer to the initialized SGXecdsa.  A null value
+ * \return	A pointer to the initialized SRDEecdsa.  A null value
  *		indicates an error was encountered in object generation.
  */
 
-extern SGXecdsa NAAAIM_SGXecdsa_Init(void)
+extern SRDEecdsa NAAAIM_SRDEecdsa_Init(void)
 
 {
 	Origin root;
 
-	SGXecdsa this = NULL;
+	SRDEecdsa this = NULL;
 
 	struct HurdLib_Origin_Retn retn;
 
@@ -290,9 +290,9 @@ extern SGXecdsa NAAAIM_SGXecdsa_Init(void)
 	root = HurdLib_Origin_Init();
 
 	/* Allocate the object and internal state. */
-	retn.object_size  = sizeof(struct NAAAIM_SGXecdsa);
-	retn.state_size   = sizeof(struct NAAAIM_SGXecdsa_State);
-	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_SGXecdsa_OBJID, &retn) )
+	retn.object_size  = sizeof(struct NAAAIM_SRDEecdsa);
+	retn.state_size   = sizeof(struct NAAAIM_SRDEecdsa_State);
+	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_SRDEecdsa_OBJID, &retn) )
 		return NULL;
 	this	    	  = retn.object;
 	this->state 	  = retn.state;

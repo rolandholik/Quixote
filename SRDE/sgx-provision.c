@@ -41,7 +41,7 @@
 #include "SRDEmessage.h"
 #include "SRDEepid.h"
 #include "PVEenclave.h"
-#include "SGXecdsa.h"
+#include "SRDEecdsa.h"
 #include "intel-messages.h"
 
 #include "SRDEaesgcm.h"
@@ -242,7 +242,7 @@ static _Bool _verify_pek(CO(SRDEmessage, msg), CO(Buffer, pekbufr))
 	       key     = NULL,
 	       pbufr   = NULL;
 
-	SGXecdsa ecdsa = NULL;
+	SRDEecdsa ecdsa = NULL;
 
 
 	/* Work on a local copy of the PEK structure. */
@@ -286,7 +286,7 @@ static _Bool _verify_pek(CO(SRDEmessage, msg), CO(Buffer, pekbufr))
 	if ( !key->add(key, (void *) &pek_pub_key, sizeof(pek_pub_key)) )
 		ERR(goto done);
 
-	INIT(NAAAIM, SGXecdsa, ecdsa, ERR(goto done));
+	INIT(NAAAIM, SRDEecdsa, ecdsa, ERR(goto done));
 	if ( !ecdsa->verify(ecdsa, key, pbufr, sig) )
 		ERR(goto done);
 

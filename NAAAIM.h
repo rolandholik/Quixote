@@ -87,7 +87,7 @@
 #define NAAAIM_ISOenclave_OBJID		49
 #define NAAAIM_PVEenclave_OBJID		50
 #define NAAAIM_SRDEmessage_OBJID	51
-#define NAAAIM_SGXecdsa_OBJID		52
+#define NAAAIM_SRDEecdsa_OBJID		52
 #define NAAAIM_PCEenclave_OBJID		53
 #define NAAAIM_SRDEcmac_OBJID		54
 #define NAAAIM_SRDEaesgcm_OBJID		55
