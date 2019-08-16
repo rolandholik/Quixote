@@ -55,7 +55,7 @@
 #include "SRDE.h"
 #include "PCEenclave.h"
 #include "SRDEmessage.h"
-#include "SGXcmac.h"
+#include "SRDEcmac.h"
 #include "SRDEaesgcm.h"
 #include "SRDErsa.h"
 
@@ -450,7 +450,7 @@ static _Bool encode_message2(CO(SRDEmessage, this), CO(RandomBuffer, rnd), \
 
 	Sha256 sha256 = NULL;
 
-	SGXcmac cmac = NULL;
+	SRDEcmac cmac = NULL;
 
 	SRDEaesgcm aesgcm = NULL;
 
@@ -560,7 +560,7 @@ static _Bool encode_message2(CO(SRDEmessage, this), CO(RandomBuffer, rnd), \
 	if ( !this->get_xid(this, tag) )
 		ERR(goto done);
 
-	INIT(NAAAIM, SGXcmac, cmac, ERR(goto done));
+	INIT(NAAAIM, SRDEcmac, cmac, ERR(goto done));
 	bufr->reset(bufr);
 	if ( !cmac->compute(cmac, sk, tag, bufr) )
 		ERR(goto done);

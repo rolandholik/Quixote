@@ -45,7 +45,7 @@
 #include "intel-messages.h"
 
 #include "SRDEaesgcm.h"
-#include "SGXcmac.h"
+#include "SRDEcmac.h"
 
 
 /**
@@ -551,7 +551,7 @@ static _Bool _decrypt_message2(CO(SRDEmessage, msg), CO(Buffer, sk), \
 	       payload = NULL,
 	       encout  = NULL;
 
-	SGXcmac cmac = NULL;
+	SRDEcmac cmac = NULL;
 
 	SRDEaesgcm aesgcm = NULL;
 
@@ -567,7 +567,7 @@ static _Bool _decrypt_message2(CO(SRDEmessage, msg), CO(Buffer, sk), \
 		ERR(goto done);
 
 	INIT(HurdLib, Buffer, key, ERR(goto done));
-	INIT(NAAAIM, SGXcmac, cmac, ERR(goto done));
+	INIT(NAAAIM, SRDEcmac, cmac, ERR(goto done));
 	if ( !cmac->compute(cmac, sk, bufr, key) )
 		ERR(goto done);
 
@@ -765,7 +765,7 @@ static _Bool _decrypt_message3(CO(SRDEmessage, msg), CO(Buffer, sk), \
 	       payload = NULL,
 	       encout  = NULL;
 
-	SGXcmac cmac = NULL;
+	SRDEcmac cmac = NULL;
 
 	SRDEaesgcm aesgcm = NULL;
 
@@ -782,7 +782,7 @@ static _Bool _decrypt_message3(CO(SRDEmessage, msg), CO(Buffer, sk), \
 		ERR(goto done);
 
 	INIT(HurdLib, Buffer, key, ERR(goto done));
-	INIT(NAAAIM, SGXcmac, cmac, ERR(goto done));
+	INIT(NAAAIM, SRDEcmac, cmac, ERR(goto done));
 	if ( !cmac->compute(cmac, sk, bufr, key) )
 		ERR(goto done);
 

@@ -30,24 +30,24 @@
 #include <Buffer.h>
 
 #include "NAAAIM.h"
-#include "SGXcmac.h"
+#include "SRDEcmac.h"
 
 
 /* Object state extraction macro. */
-#define STATE(var) CO(SGXcmac_State, var) = this->state
+#define STATE(var) CO(SRDEcmac_State, var) = this->state
 
 /* Verify library/object header file inclusions. */
 #if !defined(NAAAIM_LIBID)
 #error Library identifier not defined.
 #endif
 
-#if !defined(NAAAIM_SGXcmac_OBJID)
+#if !defined(NAAAIM_SRDEcmac_OBJID)
 #error Object identifier not defined.
 #endif
 
 
-/** SGXcmac private state information. */
-struct NAAAIM_SGXcmac_State
+/** SRDEcmac private state information. */
+struct NAAAIM_SRDEcmac_State
 {
 	/* The root object. */
 	Origin root;
@@ -156,18 +156,18 @@ int sgx_read_rand(unsigned char *out, size_t cnt)
 /**
  * Internal private method.
  *
- * This method is responsible for initializing the NAAAIM_SGXcmac_State
+ * This method is responsible for initializing the NAAAIM_SRDEcmac_State
  * structure which holds state information for each instantiated object.
  *
  * \param S A pointer to the object containing the state information which
  *        is to be initialized.
  */
 
-static void _init_state(CO(SGXcmac_State, S))
+static void _init_state(CO(SRDEcmac_State, S))
 
 {
 	S->libid = NAAAIM_LIBID;
-	S->objid = NAAAIM_SGXcmac_OBJID;
+	S->objid = NAAAIM_SRDEcmac_OBJID;
 
 
 	S->poisoned = false;
@@ -189,7 +189,7 @@ static void _init_state(CO(SGXcmac_State, S))
  *		enclave has been successfully initialized.
  */
 
-static _Bool compute(CO(SGXcmac, this), CO(Buffer, key), CO(Buffer, msg), \
+static _Bool compute(CO(SRDEcmac, this), CO(Buffer, key), CO(Buffer, msg), \
 		     CO(Buffer, mac))
 
 {
@@ -233,12 +233,12 @@ static _Bool compute(CO(SGXcmac, this), CO(Buffer, key), CO(Buffer, msg), \
 /**
  * External public method.
  *
- * This method implements a destructor for the SGXcmac object.
+ * This method implements a destructor for the SRDEcmac object.
  *
  * \param this	A pointer to the object which is to be destroyed.
  */
 
-static void whack(CO(SGXcmac, this))
+static void whack(CO(SRDEcmac, this))
 
 {
 	STATE(S);
@@ -252,18 +252,18 @@ static void whack(CO(SGXcmac, this))
 /**
  * External constructor call.
  *
- * This function implements a constructor call for a SGXcmac object.
+ * This function implements a constructor call for a SRDEcmac object.
  *
- * \return	A pointer to the initialized SGXcmac.  A null value
+ * \return	A pointer to the initialized SRDEcmac.  A null value
  *		indicates an error was encountered in object generation.
  */
 
-extern SGXcmac NAAAIM_SGXcmac_Init(void)
+extern SRDEcmac NAAAIM_SRDEcmac_Init(void)
 
 {
 	Origin root;
 
-	SGXcmac this = NULL;
+	SRDEcmac this = NULL;
 
 	struct HurdLib_Origin_Retn retn;
 
@@ -272,9 +272,9 @@ extern SGXcmac NAAAIM_SGXcmac_Init(void)
 	root = HurdLib_Origin_Init();
 
 	/* Allocate the object and internal state. */
-	retn.object_size  = sizeof(struct NAAAIM_SGXcmac);
-	retn.state_size   = sizeof(struct NAAAIM_SGXcmac_State);
-	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_SGXcmac_OBJID, &retn) )
+	retn.object_size  = sizeof(struct NAAAIM_SRDEcmac);
+	retn.state_size   = sizeof(struct NAAAIM_SRDEcmac_State);
+	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_SRDEcmac_OBJID, &retn) )
 		return NULL;
 	this	    	  = retn.object;
 	this->state 	  = retn.state;

@@ -11,15 +11,15 @@ INSTPATH      = ${DESTDIR}/opt/IDfusion
 INSTALLBIN    = sgx-check sgx-gen-token sgx-gen-verifier sgx-load \
 	sgx-metadata  sgx-provision
 INSTALLSCRIPT = provision-epid provision-tokens provision-verifier
-INSTINCLUDE   = PCEenclave.h PVEenclave.h QEenclave.h SRDEaesgcm.h SGXcmac.h \
-	SGXecdsa.h SRDEepid.h SRDEloader.h SRDEmessage.h SRDEmetadata.h	     \
+INSTINCLUDE   = PCEenclave.h PVEenclave.h QEenclave.h SRDEaesgcm.h SRDEcmac.h \
+	SGXecdsa.h SRDEepid.h SRDEloader.h SRDEmessage.h SRDEmetadata.h	      \
 	SRDEquote.h SRDErsa.h SRDEsigstruct.h SRDE.h SRDEenclave.h
 
 SUBDIRS	    = SGXlibs Attestation ISOidentity Sample
 DEV_SUBDIRS = SGXlibs Sample
 
 CSRC = SRDEmetadata.c SRDEloader.c SRDEenclave.c SRDEsigstruct.c PVEenclave.c \
-	SRDEmessage.c SGXecdsa.c PCEenclave.c SGXcmac.c SRDEaesgcm.c	      \
+	SRDEmessage.c SGXecdsa.c PCEenclave.c SRDEcmac.c SRDEaesgcm.c	      \
 	SRDErsa.c  QEenclave.c SRDEepid.c SRDEquote.c SRDEquote_mgr.c	      \
 	sgx_exception.c sgx-ocall.c
 
@@ -200,7 +200,7 @@ idf-sgx-fandf-unibin.o: idf-sgx-fandf-unibin.c LE_whitelist.h LE.h TE.h
 SGXecdsa.o: SGXecdsa.c
 	$(CC) $(CFLAGS) -I /opt/intel/sgxsdk/include -c $< -o $@;
 
-SGXcmac.o: SGXcmac.c
+SRDEcmac.o: SRDEcmac.c
 	$(CC) $(CFLAGS) -I /opt/intel/sgxsdk/include -c $< -o $@;
 
 SRDEaesgcm.o: SRDEaesgcm.c
