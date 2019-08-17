@@ -9,14 +9,14 @@
 # Variable declarations.
 INSTPATH = ${DESTDIR}/opt/IDfusion
 INSTINCLUDE = ../NAAAIM.h AES256_cbc.h Base64.h Curve25519.h Duct.h	\
-	Duct_sgxmgr.h HTTP.h IDmgr.h IDtoken.h IPC.h Ivy.h LocalDuct.h	\
+	Duct_mgr.h HTTP.h IDmgr.h IDtoken.h IPC.h Ivy.h LocalDuct.h	\
 	OTEDKS.h PossumPacket.h PossumPipe.h RSAkey.h RandomBuffer.h	\
 	SHA256.h  SHA256_hmac.h SmartCard.h SoftwareStatus.h TPM2cmd.h	\
 	TPMcmd.h
 
 CSRC = Duct.c OTEDKS.c Curve25519.c IPC.c SoftwareStatus.c Ivy.c IDmgr.c    \
 	TPMcmd.c TPM2cmd.c PossumPacket.c PossumPipe.c RSAkey.c SmartCard.c \
-	LocalDuct.c HTTP.c Base64.c Duct_sgxmgr.c SHA256.c SHA256_hmac.c    \
+	LocalDuct.c HTTP.c Base64.c Duct_mgr.c SHA256.c SHA256_hmac.c	    \
 	RandomBuffer.c AES256_cbc.c IDtoken.c
 
 TESTS = Duct_test OTEDKS_test Curve25519_test IPC_test PossumPipe_test \

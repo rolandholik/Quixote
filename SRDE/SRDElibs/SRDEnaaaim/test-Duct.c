@@ -92,7 +92,7 @@ static const struct OCALL_api ocall_table = {
 		ocall1_handler,
 		NULL,
 		ocall2_handler,
-		Duct_sgxmgr
+		Duct_mgr
 	}
 };
 

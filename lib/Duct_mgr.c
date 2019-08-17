@@ -25,11 +25,11 @@
 
 
 /** Duct objects under external management. */
-static _Bool SGX_Duct_initialized = false;
+static _Bool Duct_initialized = false;
 
-static Buffer SGX_Buffers[16];
+static Buffer Duct_buffers[16];
 
-static Duct SGX_Ducts[16];
+static Duct Duct_objects[16];
 
 
 /**
@@ -37,7 +37,7 @@ static Duct SGX_Ducts[16];
  *
  * This function manages the initialization of a Duct object to
  * implement functionality for an enclave based Duct object.  The Duct
- * pointer is returned and stored in the SGX based object.
+ * pointer is returned and stored in the enclave based object.
  *
  * \param ocp	A pointer to the structure which is marshalling the
  *		data into and out of the OCALL.
@@ -57,32 +57,32 @@ static void duct_init(struct Duct_ocall *ocp)
 	Duct duct = NULL;
 
 
-	for (instance= 0; instance < sizeof(SGX_Ducts)/sizeof(Duct); \
+	for (instance= 0; instance < sizeof(Duct_objects)/sizeof(Duct); \
 		     ++instance) {
-		if ( SGX_Ducts[instance] == NULL )
+		if ( Duct_objects[instance] == NULL )
 			break;
 	}
-	if ( instance == sizeof(SGX_Ducts)/sizeof(Duct) )
+	if ( instance == sizeof(Duct_objects)/sizeof(Duct) )
 		ERR(goto done);
 
 	INIT(HurdLib, Buffer, buffer, ERR(goto done));
 	INIT(NAAAIM, Duct, duct, ERR(goto done));
-	ocp->instance	      = instance;
-	SGX_Ducts[instance]   = duct;
-	SGX_Buffers[instance] = buffer;
+	ocp->instance		= instance;
+	Duct_objects[instance]	= duct;
+	Duct_buffers[instance]	= buffer;
 
 	retn = true;
 
 
  done:
 	if ( !retn ) {
-		if ( (duct = SGX_Ducts[instance]) != NULL ) {
+		if ( (duct = Duct_objects[instance]) != NULL ) {
 			WHACK(duct);
-			SGX_Ducts[instance] = NULL;
+			Duct_objects[instance] = NULL;
 		}
-		if ( (buffer = SGX_Buffers[instance]) != NULL ) {
+		if ( (buffer = Duct_buffers[instance]) != NULL ) {
 			WHACK(buffer);
-			SGX_Buffers[instance] = NULL;
+			Duct_buffers[instance] = NULL;
 		}
 	}
 	ocp->retn = retn;
@@ -94,8 +94,8 @@ static void duct_init(struct Duct_ocall *ocp)
 /**
  * Internal private function.
  *
- * This function implements the ->init_server method for the SGX
- * Duct object.
+ * This function implements the ->init_server method for the enclave
+ * based Duct object.
  *
  * \param ocp	A pointer to the structure which is marshalling the
  *		data into and out of the OCALL.
@@ -106,7 +106,7 @@ static void duct_init(struct Duct_ocall *ocp)
 static void duct_init_server(struct Duct_ocall *ocp)
 
 {
-	Duct duct = SGX_Ducts[ocp->instance];
+	Duct duct = Duct_objects[ocp->instance];
 
 
 	ocp->retn = duct->init_server(duct);
@@ -117,8 +117,8 @@ static void duct_init_server(struct Duct_ocall *ocp)
 /**
  * Internal private function.
  *
- * This function implements the ->init_client method for the SGX
- * duct object.
+ * This function implements the ->init_client method for the enclave
+ * based duct object.
  *
  * \param ocp	A pointer to the structure which is marshalling the
  *		data into and out of the OCALL.
@@ -129,7 +129,7 @@ static void duct_init_server(struct Duct_ocall *ocp)
 static void duct_init_client(struct Duct_ocall *ocp)
 
 {
-	Duct duct = SGX_Ducts[ocp->instance];
+	Duct duct = Duct_objects[ocp->instance];
 
 
 	ocp->retn = duct->init_client(duct);
@@ -140,8 +140,8 @@ static void duct_init_client(struct Duct_ocall *ocp)
 /**
  * Internal private function.
  *
- * This function implements the ->set_server method for the SGX
- * duct object.
+ * This function implements the ->set_server method for the enclave
+ * basec Duct object.
  *
  * \param ocp	A pointer to the structure which is marshalling the
  *		data into and out of the OCALL.
@@ -152,7 +152,7 @@ static void duct_init_client(struct Duct_ocall *ocp)
 static void duct_set_server(struct Duct_ocall *ocp)
 
 {
-	Duct duct = SGX_Ducts[ocp->instance];
+	Duct duct = Duct_objects[ocp->instance];
 
 
 	ocp->retn = duct->set_server(duct, ocp->hostname);
@@ -163,8 +163,8 @@ static void duct_set_server(struct Duct_ocall *ocp)
 /**
  * Internal private function.
  *
- * This function implements the ->init_port method for the SGX
- * duct object.
+ * This function implements the ->init_port method for the enclave
+ * based Duct object.
  *
  * \param ocp	A pointer to the structure which is marshalling the
  *		data into and out of the OCALL.
@@ -175,7 +175,7 @@ static void duct_set_server(struct Duct_ocall *ocp)
 static void duct_init_port(struct Duct_ocall *ocp)
 
 {
-	Duct duct = SGX_Ducts[ocp->instance];
+	Duct duct = Duct_objects[ocp->instance];
 
 
 	ocp->retn = duct->init_port(duct, ocp->hostname, ocp->port);
@@ -186,8 +186,8 @@ static void duct_init_port(struct Duct_ocall *ocp)
 /**
  * Internal private function.
  *
- * This function implements the ->accept_connection method for the SGX
- * duct object.
+ * This function implements the ->accept_connection method for the enclave
+ * based Duct object.
  *
  * \param ocp	A pointer to the structure which is marshalling the
  *		data into and out of the OCALL.
@@ -198,7 +198,7 @@ static void duct_init_port(struct Duct_ocall *ocp)
 static void duct_get_ipv4(struct Duct_ocall *ocp)
 
 {
-	Duct duct = SGX_Ducts[ocp->instance];
+	Duct duct = Duct_objects[ocp->instance];
 
 	struct in_addr *addr;
 
@@ -214,8 +214,8 @@ static void duct_get_ipv4(struct Duct_ocall *ocp)
 /**
  * Internal private function.
  *
- * This function implements the ->get_client method for the SGX
- * duct object.
+ * This function implements the ->get_client method for the enclave
+ * based Duct object.
  *
  * \param ocp	A pointer to the structure which is marshalling the
  *		data into and out of the OCALL.
@@ -228,9 +228,9 @@ static void duct_get_client(struct Duct_ocall *ocp)
 {
 	char *client;
 
-	Duct duct = SGX_Ducts[ocp->instance];
+	Duct duct = Duct_objects[ocp->instance];
 
-	Buffer bufr = SGX_Buffers[ocp->instance];
+	Buffer bufr = Duct_buffers[ocp->instance];
 
 
 	client = duct->get_client(duct);
@@ -252,8 +252,8 @@ static void duct_get_client(struct Duct_ocall *ocp)
 /**
  * Internal private function.
  *
- * This function implements the ->init_connection method for the SGX
- * duct object.
+ * This function implements the ->init_connection method for the enclave
+ * based Duct object.
  *
  * \param ocp	A pointer to the structure which is marshalling the
  *		data into and out of the OCALL.
@@ -264,7 +264,7 @@ static void duct_get_client(struct Duct_ocall *ocp)
 static void duct_init_connection(struct Duct_ocall *ocp)
 
 {
-	Duct duct = SGX_Ducts[ocp->instance];
+	Duct duct = Duct_objects[ocp->instance];
 
 
 	ocp->retn = duct->init_connection(duct);
@@ -275,8 +275,8 @@ static void duct_init_connection(struct Duct_ocall *ocp)
 /**
  * Internal private function.
  *
- * This function implements the ->accept_connection method for the SGX
- * duct object.
+ * This function implements the ->accept_connection method for the enclave
+ * based Duct object.
  *
  * \param ocp	A pointer to the structure which is marshalling the
  *		data into and out of the OCALL.
@@ -287,7 +287,7 @@ static void duct_init_connection(struct Duct_ocall *ocp)
 static void duct_accept_connection(struct Duct_ocall *ocp)
 
 {
-	Duct duct = SGX_Ducts[ocp->instance];
+	Duct duct = Duct_objects[ocp->instance];
 
 
 	ocp->retn = duct->accept_connection(duct);
@@ -298,8 +298,8 @@ static void duct_accept_connection(struct Duct_ocall *ocp)
 /**
  * Internal private function.
  *
- * This function implements the ->receive_Buffer method for the SGX
- * duct object.
+ * This function implements the ->receive_Buffer method for the enclave
+ * based Duct object.
  *
  * \param ocp	A pointer to the structure which is marshalling the
  *		data into and out of the OCALL.
@@ -310,9 +310,9 @@ static void duct_accept_connection(struct Duct_ocall *ocp)
 static void duct_receive_buffer(struct Duct_ocall *ocp)
 
 {
-	Duct duct = SGX_Ducts[ocp->instance];
+	Duct duct = Duct_objects[ocp->instance];
 
-	Buffer bufr = SGX_Buffers[ocp->instance];
+	Buffer bufr = Duct_buffers[ocp->instance];
 
 
 	bufr->reset(bufr);
@@ -330,8 +330,8 @@ static void duct_receive_buffer(struct Duct_ocall *ocp)
 /**
  * Internal private function.
  *
- * This function implements the ->send_Buffer method for the SGX
- * duct object.
+ * This function implements the ->send_Buffer method for the enclave
+ * based Duct object.
  *
  * \param ocp	A pointer to the structure which is marshalling the
  *		data into and out of the OCALL.
@@ -342,9 +342,9 @@ static void duct_receive_buffer(struct Duct_ocall *ocp)
 static void duct_send_buffer(struct Duct_ocall *ocp)
 
 {
-	Duct duct = SGX_Ducts[ocp->instance];
+	Duct duct = Duct_objects[ocp->instance];
 
-	Buffer bufr = SGX_Buffers[ocp->instance];
+	Buffer bufr = Duct_buffers[ocp->instance];
 
 
 	bufr->reset(bufr);
@@ -364,8 +364,8 @@ static void duct_send_buffer(struct Duct_ocall *ocp)
 /**
  * Internal private function.
  *
- * This function implements the ->eof method for the SGX Duct
- * object.
+ * This function implements the ->eof method for the enclave based
+ * Duct object.
  *
  * \param ocp	A pointer to the structure which is marshalling the
  *		data into and out of the OCALL.
@@ -376,7 +376,7 @@ static void duct_send_buffer(struct Duct_ocall *ocp)
 static void duct_eof(struct Duct_ocall *ocp)
 
 {
-	Duct duct = SGX_Ducts[ocp->instance];
+	Duct duct = Duct_objects[ocp->instance];
 
 
 	ocp->eof = duct->eof(duct);
@@ -387,8 +387,8 @@ static void duct_eof(struct Duct_ocall *ocp)
 /**
  * Internal private function.
  *
- * This function implements the ->do_reverse method for the SGX Duct
- * object.
+ * This function implements the ->do_reverse method for the enclave
+ * based Duct objects.
  *
  * \param ocp	A pointer to the structure which is marshalling the
  *		data into and out of the OCALL.
@@ -399,7 +399,7 @@ static void duct_eof(struct Duct_ocall *ocp)
 static void duct_do_reverse(struct Duct_ocall *ocp)
 
 {
-	Duct duct = SGX_Ducts[ocp->instance];
+	Duct duct = Duct_objects[ocp->instance];
 
 
 	duct->do_reverse(duct, ocp->mode);
@@ -410,7 +410,8 @@ static void duct_do_reverse(struct Duct_ocall *ocp)
 /**
  * Internal private function.
  *
- * This function implements the ->reset method for the SGX Duct object.
+ * This function implements the ->reset method for the enclave based
+ * Duct object.
  *
  * \param ocp	A pointer to the structure which is marshalling the
  *		data into and out of the OCALL.
@@ -421,7 +422,7 @@ static void duct_do_reverse(struct Duct_ocall *ocp)
 static void duct_reset(struct Duct_ocall *ocp)
 
 {
-	Duct duct = SGX_Ducts[ocp->instance];
+	Duct duct = Duct_objects[ocp->instance];
 
 
 	duct->reset(duct);
@@ -444,16 +445,16 @@ static void duct_reset(struct Duct_ocall *ocp)
 static void duct_whack(struct Duct_ocall *ocp)
 
 {
-	Duct duct = SGX_Ducts[ocp->instance];
+	Duct duct = Duct_objects[ocp->instance];
 
-	Buffer buffer = SGX_Buffers[ocp->instance];
+	Buffer buffer = Duct_buffers[ocp->instance];
 
 
 	duct->whack(duct);
 	buffer->whack(buffer);
 
-	SGX_Ducts[ocp->instance]   = NULL;
-	SGX_Buffers[ocp->instance] = NULL;
+	Duct_objects[ocp->instance] = NULL;
+	Duct_buffers[ocp->instance] = NULL;
 
 	return;
 }
@@ -462,27 +463,28 @@ static void duct_whack(struct Duct_ocall *ocp)
 /**
  * External function.
  *
- * This function is the external entry point for the SGX OCALL handler.
+ * This function is the external entry point for the enclave OCALL
+ * handler.
  *
  * \param ocp	A pointer to the structure which is used to marshall
  *		the data being submitted to and returned from the
- *		SGX OCALL handler.
+ *		enclave OCALL handler.
  *
  * \return	If an error is encountered a non-zero value is
  *		returned to the caller.  Successful processing of
  *		the command returns a value of zero.
  */
 
-int Duct_sgxmgr(struct Duct_ocall *ocp)
+int Duct_mgr(struct Duct_ocall *ocp)
 
 {
 	int rc = -1;
 
 
 	/* Verify on first call that object array is initialized. */
-	if ( !SGX_Duct_initialized ) {
-		memset(SGX_Ducts, '\0', sizeof(SGX_Ducts));
-		SGX_Duct_initialized = true;
+	if ( !Duct_initialized ) {
+		memset(Duct_objects, '\0', sizeof(Duct_objects));
+		Duct_initialized = true;
 	}
 
 
@@ -492,7 +494,7 @@ int Duct_sgxmgr(struct Duct_ocall *ocp)
 		ERR(goto done);
 	}
 
-	if ( ocp->instance >= sizeof(SGX_Ducts)/sizeof(SGX_Ducts) )
+	if ( ocp->instance >= sizeof(Duct_objects)/sizeof(Duct) )
 		ERR(goto done);
 
 

@@ -9,4 +9,4 @@
  * the source tree for copyright and licensing information.
  **************************************************************************/
 
-extern Duct_sgxmgr(struct Duct_ocall *);
+extern Duct_mgr(struct Duct_ocall *);

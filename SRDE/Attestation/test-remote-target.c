@@ -96,9 +96,9 @@ static const struct OCALL_api ocall_table = {
 	5,
 	{
 		ocall0_handler,
-		NULL, /* fgets handler */
-		ocall2_handler, /*ocall2_handler */
-		NULL, /*Duct_sgxmgr*/
+		NULL,		/* fgets handler */
+		ocall2_handler,
+		NULL,		/*Duct_sgxmgr*/
 		SRDEquote_mgr,
 	}
 };
