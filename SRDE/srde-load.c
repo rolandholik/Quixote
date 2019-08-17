@@ -14,7 +14,7 @@
  **************************************************************************/
 
 /* Definitions local to this file. */
-#define PGM "sgx-load"
+#define PGM "srde-load"
 
 #include <stdio.h>
 #include <stdbool.h>

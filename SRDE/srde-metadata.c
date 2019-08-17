@@ -11,7 +11,7 @@
  **************************************************************************/
 
 /* Definitions local to this file. */
-#define PGM "sgx-metadata"
+#define PGM "srde-metadata"
 #define COPYRIGHT "2016,2017"
 
 

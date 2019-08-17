@@ -36,7 +36,7 @@ for Enclave_Path in $Intel_Enclaves;
 do
 	Enclave=`basename "$Enclave_Path" .signed.so`;
 	Token="$Token_Dir/$Enclave.token";
-	sgx-gen-token -p -e "$Enclave_Path" -o $Token;
+	srde-gen-token -p -e "$Enclave_Path" -o $Token;
 	echo "Generated: $Token";
 done
 
@@ -48,7 +48,7 @@ for Enclave_Path in $Enclave_Dir/*
 do
 	Enclave=`basename "$Enclave_Path" .signed.so`;
 	Token="$Token_Dir/$Enclave.token";
-	sgx-gen-token -e "$Enclave_Path" -o $Token;
+	srde-gen-token -e "$Enclave_Path" -o $Token;
 	echo "Generated: $Token";
 done;
 

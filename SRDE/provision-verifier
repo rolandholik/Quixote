@@ -128,7 +128,7 @@ fi;
 #
 # Generate the identifier.
 #
-sgx-gen-verifier -q -t /opt/IDfusion/etc/host.idt -m `$Program -M` -f \
+srde-gen-verifier -q -t /opt/IDfusion/etc/host.idt -m `$Program -M` -f \
 	-l "`hostname`.$Enclave";
 if [ $? -ne 0 ]; then
 	echo "$Pgm: Error generating identity verifier.";

@@ -1,7 +1,7 @@
 /** \file
  * This file contains an implemenation of the IDfusion 'oneshot' SGX
- * invocation technology.  All of the infrastructure including the
- * enclave to be executed is implemented in a single binary.
+ * invocation technology.  All of the infrastructure needed to implement
+ * the test-ecall enclave is implemented in a single binary.
  *
  * The functionality of the enclave which implements printing an
  * arbitrary string from inside the enclave is invariant from the
@@ -17,7 +17,7 @@
 
 
 /* Definitions specific to this file. */
-#define PGM "idf-sgx-fandf-unibin"
+#define PGM "srde-fandf"
 
 
 /* Include files. */
@@ -55,10 +55,6 @@
 #include "LE.h"
 
 
-/* Include the execution enclave. */
-#include "TE.h"
-
-
 /**
  * The following defines an empty OCALL table since the Launch Enclave
  * does not support any outgoing calls.
@@ -93,21 +89,6 @@ static struct LE_ecall1_table {
 } LE_ecall1_table;
 
 
-/**
- * The following struct defines the API definition for the ECALL which
- * implements extension and reading of an enclave measurement.
- */
-static struct ecall0_table {
-	uint8_t *buffer;
-	size_t len;
-} ecall0_table;
-
-static struct ecall1_table {
-	uint8_t *buffer;
-	size_t len;
-} ecall1_table;
-
-
 /* Define the OCALL interface for the 'print string' call. */
 struct ocall1_interface {
 	char* str;
@@ -123,6 +104,11 @@ int ocall1_handler(struct ocall1_interface *interface)
 static const struct OCALL_api ocall_table = {
 	1, {ocall1_handler}
 };
+
+static struct ecall0_table {
+	uint8_t *buffer;
+	size_t len;
+} ecall0_table;
 
 
 static _Bool LE_init_ecall0(char *enclave,
@@ -150,8 +136,7 @@ static _Bool LE_init_ecall0(char *enclave,
 
 	/* Get the attributes for an enclave to be signed. */
 	INIT(NAAAIM, SRDEmetadata, init_enclave, ERR(goto done));
-	if ( !init_enclave->load_memory(init_enclave, (char *) TE_image, \
-					sizeof(TE_image)) )
+	if ( !init_enclave->load(init_enclave, enclave) )
 		ERR(goto done);
 	if ( !init_enclave->compute_attributes(init_enclave, true) )
 		ERR(goto done);
@@ -257,57 +242,55 @@ static _Bool generate_token(SRDEenclave enclave, char *init_enclave, \
 }
 
 
+/**
+ * Internal function.
+ *
+ * This function runs in a continuous loop of accepting user input and
+ * echoing it through the enclave.
+ *
+ * \param enclave	The enclave which is to be used to echo user
+ *			input.
+ *
+ * \return		If an error occurs during an enclave call a
+ *			false value is returned.  A true value is
+ *			used to indicate the user has requested
+ *			termination of the loop.
+ */
+
 static _Bool enclave_loop(CO(SRDEenclave, enclave))
 
 {
 	_Bool retn = false;
 
-	char *p;
-
-	uint8_t lp;
-
-	uint8_t inbufr[1024];
-
 	int rc;
 
+	char inbufr[1024];
+
+
+	ecall0_table.len    = sizeof(inbufr);
+	ecall0_table.buffer = (uint8_t *) inbufr;
 
 	while ( true ) {
 		fputs("Input>", stdout);
 		fflush(stdout);
 
-		if ( fgets((char *) inbufr, sizeof(inbufr), stdin) == NULL ) {
+		memset(inbufr, '\0', sizeof(inbufr));
+		if ( fgets(inbufr, sizeof(inbufr), stdin) == NULL ) {
 			fputc('\n', stdout);
 			retn = true;
 			goto done;
 		}
-		if ( (p = strrchr((char *) inbufr, '\n')) != NULL )
-			*p = '\0';
-		if ( strcmp((char *) inbufr, "quit") == 0 ) {
+
+		if ( memcmp(inbufr, "quit\n", 5) == 0 ) {
 			retn = true;
 			goto done;
 		}
 
-		ecall0_table.len    = strlen((char *) inbufr);
-		ecall0_table.buffer = (uint8_t *) inbufr;
 		if ( !enclave->boot_slot(enclave, 0, &ocall_table, \
 					 &ecall0_table, &rc) ) {
 			fprintf(stderr, "Enclave returned: %d\n", rc);
 			goto done;
 		}
-
-		memset(inbufr, '\0', sizeof(inbufr));
-		ecall1_table.len    = sizeof(inbufr);
-		ecall1_table.buffer = (uint8_t *) inbufr;
-		if ( !enclave->boot_slot(enclave, 1, &ocall_table, \
-					 &ecall1_table, &rc) ) {
-			fprintf(stderr, "Enclave returned: %d\n", rc);
-			goto done;
-		}
-
-		fputs("Measurement:\n", stdout);
-		for (lp= 0; lp < 32; ++lp)
-			fprintf(stdout, "%02x", inbufr[lp]);
-		fputs("\n\n", stdout);
 	}
 
 
@@ -341,9 +324,7 @@ extern int main(int argc, char *argv[])
 		PGM);
 	fprintf(stdout, "%s: (C)Copyright 2017, IDfusion, LLC. All rights "
 		"reserved.\n\n", PGM);
-	fputs("Typed input will added to a SHA256 based measurement value "
-	      "maintained\n", stdout);
-	fputs("in an enclave.\n", stdout);
+	fputs("Typed input will be echoed through the enclave.\n", stdout);
 	fputs("Type 'quit' to terminate.\n\n", stdout);
 
 
@@ -368,9 +349,7 @@ extern int main(int argc, char *argv[])
 	/* Load and initialize the execution enclave. */
 	INIT(NAAAIM, SRDEenclave, enclave, ERR(goto done));
 
-	if ( !enclave->open_enclave_memory(enclave, sgx_device,	 \
-					   (char *) TE_image,	 \
-					   sizeof(TE_image), true) )
+	if ( !enclave->open_enclave(enclave, sgx_device, enclave_name, true) )
 		ERR(goto done);
 
 	if ( !enclave->create_enclave(enclave) )

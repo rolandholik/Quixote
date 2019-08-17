@@ -13,7 +13,7 @@
  **************************************************************************/
 
 /* Definitions local to this file. */
-#define PGM "sgx-gen-token"
+#define PGM "srde-gen-token"
 
 
 #include <stdio.h>

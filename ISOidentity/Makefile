@@ -139,8 +139,8 @@ clean:
 
 
 # Source dependencies.
-# sgx-metadata.o: SGX.h
-# sgx-load.o: SGXenclave.h
+# srde-metadata.o: SGX.h
+# srde-load.o: SGXenclave.h
 
 Actor.o: Actor.h
 ContourPoint.o: ContourPoint.h

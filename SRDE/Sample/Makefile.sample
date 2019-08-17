@@ -108,10 +108,10 @@ NAAAIM_ENCOBJS = ${NAAAIM_ENCSRC:.c=.o}
 all: ${SIGNKEY} enclave test-fusion test-naaaim
 
 test: all
-	sgx-gen-token -e test-fusion.signed.so -o test-fusion.token;
+	srde-gen-token -e test-fusion.signed.so -o test-fusion.token;
 	echo "Test-fusion unit test complete." | \
 		./test-fusion -t test-fusion.token;
-	sgx-gen-token -e test-naaaim.signed.so -o test-naaaim.token;
+	srde-gen-token -e test-naaaim.signed.so -o test-naaaim.token;
 	./test-naaaim -t test-naaaim.token;
 
 enclave: ldscript test-fusion.signed.so test-naaaim.signed.so

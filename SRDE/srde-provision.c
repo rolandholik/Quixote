@@ -11,7 +11,7 @@
  **************************************************************************/
 
 /* Definitions local to this file. */
-#define PGM "sgx-provision"
+#define PGM "srde-provision"
 
 
 #include <stdio.h>

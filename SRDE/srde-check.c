@@ -26,7 +26,7 @@
  **************************************************************************/
 
 /* Definitions local to this file. */
-#define PGM "sgx-check"
+#define PGM "srde-check"
 
 
 #include <stdio.h>

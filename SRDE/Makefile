@@ -8,8 +8,8 @@
 
 # Variable declarations.
 INSTPATH      = ${DESTDIR}/opt/IDfusion
-INSTALLBIN    = sgx-check sgx-gen-token sgx-gen-verifier sgx-load \
-	sgx-metadata  sgx-provision
+INSTALLBIN    = srde-check srde-gen-token srde-gen-verifier srde-load \
+	srde-metadata srde-provision
 INSTALLSCRIPT = provision-epid provision-tokens provision-verifier
 INSTINCLUDE   = PCEenclave.h PVEenclave.h QEenclave.h SRDEaesgcm.h SRDEcmac.h \
 	SRDEecdsa.h SRDEepid.h SRDEloader.h SRDEmessage.h SRDEmetadata.h      \
@@ -27,9 +27,9 @@ ASRC = srde-boot.s
 
 LIBRARY = libSRDEruntime.a
 
-TOOLS = sgx-check sgx-metadata sgx-loader sgx-load sgx-sigstruct	     \
-	sgx-gen-token test-ecall test-pcr idf-sgx-fandf	idf-sgx-fandf-unibin \
-	sgx-provision sdk-compute-size sgx-gen-verifier
+TOOLS = srde-check srde-metadata srde-loader srde-load srde-sigstruct	\
+	srde-gen-token test-ecall test-pcr srde-fandf srde-fandf-unibin \
+	srde-provision sdk-compute-size srde-gen-verifier
 
 
 LE	     = /opt/intel/sgxpsw/aesm/libsgx_le.signed.so
@@ -119,46 +119,46 @@ ${LIBRARY}: ${COBJS} ${AOBJS}
 
 tools: ${TOOLS}
 
-demos: idf-sgx-fandf idf-sgx-fandf-unibin
+demos: srde-fandf srde-fandf-unibin
 
-sgx-check: sgx-check.o
+srde-check: srde-check.o
 	${CC} ${LDFLAGS} -o $@ $^;
 
-sgx-metadata: sgx-metadata.o
+srde-metadata: srde-metadata.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO};
 
-sgx-metadata.o: sgx-metadata.c
+srde-metadata.o: srde-metadata.c
 	$(CC) $(CFLAGS) -c $< -o $@;
 
-sgx-loader: sgx-loader.o ${LIBRARY}
+srde-loader: srde-loader.o ${LIBRARY}
 	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
 
-sgx-loader.o: sgx-loader.c
+srde-loader.o: srde-loader.c
 	$(CC) $(CFLAGS) -c $< -o $@;
 
-sgx-load: sgx-load.o ${LIBRARY}
+srde-load: srde-load.o ${LIBRARY}
 	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
 
-sgx-load.o: sgx-load.c
+srde-load.o: srde-load.c
 	$(CC) $(CFLAGS) -c $< -o $@;
 
-sgx-sigstruct: sgx-sigstruct.o ${LIBRARY}
+srde-sigstruct: srde-sigstruct.o ${LIBRARY}
 	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
 
-sgx-sigstruct.o: sgx-sigstruct.c
+srde-sigstruct.o: srde-sigstruct.c
 	$(CC) $(CFLAGS) -c $< -o $@;
 
-sgx-gen-token: sgx-gen-token.o
+srde-gen-token: srde-gen-token.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO};
 
-sgx-gen-token.o: sgx-gen-token.c LE_whitelist.h
+srde-gen-token.o: srde-gen-token.c LE_whitelist.h
 	$(CC) $(CFLAGS) -c $< -o $@;
 
-sgx-provision: sgx-provision.o
+srde-provision: srde-provision.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO} \
 		${INTEL_CRYPTO};
 
-sgx-provision.o: sgx-provision.c
+srde-provision.o: srde-provision.c
 	$(CC) $(CFLAGS) -c $< -o $@;
 
 sdk-compute-size: sdk-compute-size.o
@@ -173,10 +173,10 @@ generate-array: generate-array.o
 generate-array.o: generate-array.c
 	$(CC) $(CFLAGS) -c $< -o $@;
 
-sgx-gen-verifier: sgx-gen-verifier.o
+srde-gen-verifier: srde-gen-verifier.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO};
 
-sgx-gen-verifier.o: sgx-gen-verifier.c
+srde-gen-verifier.o: srde-gen-verifier.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
 test-ecall: test-ecall.o
@@ -185,16 +185,16 @@ test-ecall: test-ecall.o
 test-pcr: test-pcr.o
 	${CC} ${LDFLAGS} -static -o $@ $^ ${LIBS};
 
-idf-sgx-fandf: idf-sgx-fandf.o
+srde-fandf: srde-fandf.o
 	${CC} -static ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO};
 
-idf-sgx-fandf.o: idf-sgx-fandf.c LE_whitelist.h LE.h
+srde-fandf.o: srde-fandf.c LE_whitelist.h LE.h
 	$(CC) $(CFLAGS) -c $< -o $@;
 
-idf-sgx-fandf-unibin: idf-sgx-fandf-unibin.o
+srde-fandf-unibin: srde-fandf-unibin.o
 	${CC} -static ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO};
 
-idf-sgx-fandf-unibin.o: idf-sgx-fandf-unibin.c LE_whitelist.h LE.h TE.h
+srde-fandf-unibin.o: srde-fandf-unibin.c LE_whitelist.h LE.h TE.h
 	$(CC) $(CFLAGS) -c $< -o $@;
 
 SRDEecdsa.o: SRDEecdsa.c
@@ -272,9 +272,9 @@ clean:
 
 
 # Source dependencies.
-sgx-metadata.o: SRDE.h SRDEenclave.h SRDEsigstruct.h SRDEmetadata.h
-sgx-load.o: SRDEenclave.h
-sgx-provision.o: PVEenclave.h
+srde-metadata.o: SRDE.h SRDEenclave.h SRDEsigstruct.h SRDEmetadata.h
+srde-load.o: SRDEenclave.h
+srde-provision.o: PVEenclave.h
 
 SRDEmetadata.o: SRDE.h SRDEmetadata.h
 SRDEloader.o: SRDE.h SRDEloader.h

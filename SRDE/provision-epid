@@ -6,7 +6,7 @@
 # an Enhanced Privacy ID (EPID).
 #
 # While this functionality may be ultimately integrated into the
-# sgx-provision utility this script demonstrates how the utility can
+# srde-provision utility this script demonstrates how the utility can
 # be used to debug the provisioning process.
 #
 
@@ -44,7 +44,7 @@ done;
 #
 # Request an endpoint identifier.
 #
-sgx-provision -E $V -o endpoint;
+srde-provision -E $V -o endpoint;
 
 
 #
@@ -54,9 +54,9 @@ sgx-provision -E $V -o endpoint;
 # captures in a file for subsequent re-use.
 #
 if [ -z "$V" ]; then
-	sgx-provision -1 -i endpoint -o msg1 -k pek > msg1.output;
+	srde-provision -1 -i endpoint -o msg1 -k pek > msg1.output;
 else
-	sgx-provision -1 $V -i endpoint -o msg1 -k pek | tee msg1.output;
+	srde-provision -1 $V -i endpoint -o msg1 -k pek | tee msg1.output;
 fi;
 
 Keyfile=`sed -n '/SK:/ {n;p}' msg1.output`;
@@ -69,18 +69,18 @@ rm msg1.output;
 # the provisioning utility to determine if this is a final mesage
 # and route the message handling appropriately.
 #
-sgx-provision -T $V -i msg1;
+srde-provision -T $V -i msg1;
 if [ $? -eq 0 ]; then
 	mv msg1 msg2;
 else
-	sgx-provision -2 $V -i msg1 -o msg2 -k pek -s $Keyfile;
+	srde-provision -2 $V -i msg1 -o msg2 -k pek -s $Keyfile;
 fi;
 
 
 #
 # Extract the EPID key from the final message.
 #
-sgx-provision -3 $V -i msg2 -o $Output -k pek -s $Keyfile;
+srde-provision -3 $V -i msg2 -o $Output -k pek -s $Keyfile;
 
 
 # Cleanup.
