@@ -45,7 +45,7 @@ endif
 CDEBUG = -O2 -fomit-frame-pointer -march=core2
 CDEBUG = -g ${DMALLOC}
 
-CFLAGS = -Wall ${CDEBUG}
+CFLAGS = -Wall -fpic ${CDEBUG}
 
 LDFLAGS = -g -L ../HurdLib 
 

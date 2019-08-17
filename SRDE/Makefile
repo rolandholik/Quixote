@@ -50,7 +50,7 @@ CINCLUDE = -I/usr/local/IDfusion/include
 endif
 
 CDEBUG = -g -O2 -fomit-frame-pointer -march=core2
-CFLAGS = -Wall ${CDEBUG} ${CINCLUDE}
+CFLAGS = -Wall -fpic ${CDEBUG} ${CINCLUDE}
 
 LDFLAGS = ${STATIC} -g -L ../lib -L ../HurdLib
 ifneq (${CC}, musl-gcc)

@@ -73,8 +73,8 @@ ifneq (${CC}, musl-gcc)
 TOOLS += ${C++TOOLS}
 endif
 
-CFLAGS = -Wall -O2 -fomit-frame-pointer -march=core2 -I ../.. -I ../../.. \
-	-I ../../../HurdLib 
+CFLAGS = -Wall -O2 -fpic -fomit-frame-pointer -march=core2 -I ../.. \
+	-I ../../.. -I ../../../HurdLib 
 ifdef ENCLAVE_DIR
 CFLAGS += -DENCLAVE_DIR=\"${ENCLAVE_DIR}\"
 endif
