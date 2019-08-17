@@ -49,7 +49,7 @@
  *		OCALL.
  */
 
-int sgx_ocall(int slot, void *ocall_api, void *interface, SRDEenclave enclave)
+int srde_ocall(int slot, void *ocall_api, void *interface, SRDEenclave enclave)
 
 {
 	return enclave->boot_ocall(enclave, slot, ocall_api, interface);

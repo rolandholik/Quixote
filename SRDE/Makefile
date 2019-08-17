@@ -21,7 +21,7 @@ DEV_SUBDIRS = SRDElibs Sample
 CSRC = SRDEmetadata.c SRDEloader.c SRDEenclave.c SRDEsigstruct.c PVEenclave.c \
 	SRDEmessage.c SRDEecdsa.c PCEenclave.c SRDEcmac.c SRDEaesgcm.c	      \
 	SRDErsa.c  QEenclave.c SRDEepid.c SRDEquote.c SRDEquote_mgr.c	      \
-	srde-exception.c sgx-ocall.c
+	srde-exception.c srde-ocall.c
 
 ASRC = boot-tee.s
 

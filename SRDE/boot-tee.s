@@ -135,7 +135,7 @@ boot_tee:
 	#	RSI:	Pointer to data marshaling structure.
 	#
 	# The following arguements are needed for the outcall to
-	# the sgx_ocall C interface function:
+	# the srde_ocall C interface function:
 	#
 	#	1:	API slot (RDI)
 	#	2:	API table (RSI)
@@ -145,7 +145,7 @@ boot_tee:
 1:	movq	%rsi, %rdx
 	movq	(-7*8)(%rbp), %rsi
 	movq	(-8*8)(%rbp), %rcx
-	call	sgx_ocall
+	call	srde_ocall
 
 	# The return value from the OCALL target function is in RAX.
 	# Two arguements are passed back into the enclave.  The RDI
