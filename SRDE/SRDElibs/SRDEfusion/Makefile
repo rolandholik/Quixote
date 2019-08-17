@@ -24,7 +24,7 @@ LIBRARY = lib${LIBNAME}.a
 ENCLAVE_CC = gcc64
 
 SGXDIR = ../..
-include ${SGXDIR}/Make.sgx
+include ${SGXDIR}/Make.enclave
 
 SGX_INCLUDE = -I . -I ${SGX_SDK}/include -I ${SGX_SDK}/include/tlibc \
 	-I ${SGX_SDK}/include/stlport

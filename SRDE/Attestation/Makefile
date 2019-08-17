@@ -20,7 +20,7 @@ INSTALLBIN = test-remote-target
 ENCLAVE_CC = gcc64
 
 SGXDIR = ..
-include ${SGXDIR}/Make.sgx
+include ${SGXDIR}/Make.enclave
 
 SGX_SSL	= /opt/intel/sgxssl
 
