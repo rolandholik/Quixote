@@ -41,7 +41,7 @@ static SRDEquote SRDE_quotes[16];
  *
  * This function manages the initialization of a SRDEquote object to
  * implement functionality for an enclave based SRDEquote object.  The
- * object instance slot is returned and stored in the SGX based object.
+ * object instance slot is returned and stored in the enclave based object.
  *
  * \param ocp	A pointer to the structure which is marshalling the
  *		data into and out of the OCALL.
@@ -49,7 +49,7 @@ static SRDEquote SRDE_quotes[16];
  * \return	No return value is defined.
  */
 
-static void sgxquote_init_object(struct SRDEquote_ocall *ocp)
+static void srdequote_init_object(struct SRDEquote_ocall *ocp)
 
 {
 	_Bool retn = false;
@@ -94,7 +94,7 @@ static void sgxquote_init_object(struct SRDEquote_ocall *ocp)
 /**
  * Internal private function.
  *
- * This function implements the ->init method for the SGX
+ * This function implements the ->init method for the enclave
  * Duct object.
  *
  * \param ocp	A pointer to the structure which is marshalling the
@@ -103,7 +103,7 @@ static void sgxquote_init_object(struct SRDEquote_ocall *ocp)
  * \return	No return value is defined.
  */
 
-static void sgxquote_init(struct SRDEquote_ocall *ocp)
+static void srdequote_init(struct SRDEquote_ocall *ocp)
 
 {
 	SRDEquote quote = SRDE_quotes[ocp->instance];
@@ -127,7 +127,7 @@ static void sgxquote_init(struct SRDEquote_ocall *ocp)
  * \return	No return value is defined.
  */
 
-static void sgxquote_generate_quote(struct SRDEquote_ocall *ocp)
+static void srdequote_generate_quote(struct SRDEquote_ocall *ocp)
 
 {
 	_Bool retn = false;
@@ -182,7 +182,7 @@ static void sgxquote_generate_quote(struct SRDEquote_ocall *ocp)
  * \return	No return value is defined.
  */
 
-static void sgxquote_generate_report(struct SRDEquote_ocall *ocp)
+static void srdequote_generate_report(struct SRDEquote_ocall *ocp)
 
 {
 	_Bool retn = false;
@@ -237,7 +237,7 @@ static void sgxquote_generate_report(struct SRDEquote_ocall *ocp)
  * \return	No return value is defined.
  */
 
-static void sgxquote_get_qe_targetinfo(struct SRDEquote_ocall *ocp)
+static void srdequote_get_qe_targetinfo(struct SRDEquote_ocall *ocp)
 
 {
 	SRDEquote quote = SRDE_quotes[ocp->instance];
@@ -262,7 +262,7 @@ static void sgxquote_get_qe_targetinfo(struct SRDEquote_ocall *ocp)
  * \return	No return value is defined.
  */
 
-static void sgxquote_whack(struct SRDEquote_ocall *ocp)
+static void srdequote_whack(struct SRDEquote_ocall *ocp)
 
 {
 	SRDEquote quote = SRDE_quotes[ocp->instance];
@@ -283,18 +283,18 @@ static void sgxquote_whack(struct SRDEquote_ocall *ocp)
 /**
  * External function.
  *
- * This function is the external entry point for the SGX OCALL handler.
+ * This function is the external entry point for the enclave OCALL handler.
  *
  * \param ocp	A pointer to the structure which is used to marshall
  *		the data being submitted to and returned from the
- *		SGX OCALL handler.
+ *		enclave OCALL handler.
  *
  * \return	If an error is encountered a non-zero value is
  *		returned to the caller.  Successful processing of
  *		the command returns a value of zero.
  */
 
-int SRDEquote_sgxmgr(struct SRDEquote_ocall *ocp)
+int SRDEquote_mgr(struct SRDEquote_ocall *ocp)
 
 {
 	int rc = -1;
@@ -318,25 +318,25 @@ int SRDEquote_sgxmgr(struct SRDEquote_ocall *ocp)
 	/* Vector execution to the appropriate method handler. */
 	switch ( ocp->ocall ) {
 		case SRDEquote_init_object:
-			sgxquote_init_object(ocp);
+			srdequote_init_object(ocp);
 			break;
 
 		case SRDEquote_init:
-			sgxquote_init(ocp);
+			srdequote_init(ocp);
 			break;
 		case SRDEquote_generate_quote:
-			sgxquote_generate_quote(ocp);
+			srdequote_generate_quote(ocp);
 			break;
 		case SRDEquote_generate_report:
-			sgxquote_generate_report(ocp);
+			srdequote_generate_report(ocp);
 			break;
 
 		case SRDEquote_get_qe_targetinfo:
-			sgxquote_get_qe_targetinfo(ocp);
+			srdequote_get_qe_targetinfo(ocp);
 			break;
 
 		case SRDEquote_whack:
-			sgxquote_whack(ocp);
+			srdequote_whack(ocp);
 			break;
 
 		case SRDEquote_END:

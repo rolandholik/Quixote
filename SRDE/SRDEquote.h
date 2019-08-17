@@ -108,5 +108,5 @@ struct NAAAIM_SRDEquote
 extern SRDEquote NAAAIM_SRDEquote_Init(void);
 
 /* Definition for entry point for SRDEquote SGX manager. */
-extern HCLINK int SRDEquote_sgxmgr(struct SRDEquote_ocall *ocp);
+extern HCLINK int SRDEquote_mgr(struct SRDEquote_ocall *ocp);
 #endif

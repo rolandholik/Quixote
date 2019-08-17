@@ -98,7 +98,7 @@ static const struct OCALL_api ocall_table = {
 		NULL,
 		ocall2_handler,
 		Duct_sgxmgr,
-		SRDEquote_sgxmgr,
+		SRDEquote_mgr,
 	}
 };
 

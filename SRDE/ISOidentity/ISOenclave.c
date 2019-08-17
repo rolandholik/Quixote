@@ -190,7 +190,7 @@ static const struct OCALL_api ocall_table = {
 		fgets_handler,
 		ocall2_handler,
 		Duct_sgxmgr,
-		SRDEquote_sgxmgr,
+		SRDEquote_mgr,
 		discipline_pid_ocall,
 	}
 };
