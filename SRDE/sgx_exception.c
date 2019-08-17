@@ -54,8 +54,8 @@ static _Bool Handler_installed = false;
  * Prototypes for the assembler functions returning the address of the
  * Asynchronous Enclave eXit (AEX) handler and for entering an enclave.
  */
-extern uint64_t boot_sgx_get_exit_handler(void);
-extern int boot_sgx(struct SGX_tcs *, long fn, const void *, void *, void *);
+extern uint64_t boot_tee_get_exit_handler(void);
+extern int boot_tee(struct SGX_tcs *, long fn, const void *, void *, void *);
 
 
 /**
@@ -145,7 +145,7 @@ void exception_handler(int signal, siginfo_t *siginfo, void *private)
 	rax = sigcontext->uc_mcontext.gregs[REG_RAX];
 	rbp = sigcontext->uc_mcontext.gregs[REG_RBP];
 
-	exit_handler_address = boot_sgx_get_exit_handler();
+	exit_handler_address = boot_tee_get_exit_handler();
 
 
 	/* Detect and handle a standard enclave exception. */
@@ -154,7 +154,7 @@ void exception_handler(int signal, siginfo_t *siginfo, void *private)
 		ocall   = (void *) *(uint64_t *) (rbp - 7*8);
 		enclave = *((SRDEenclave *) (rbp - 8*8));
 
-		retc = boot_sgx(tcs, ECMD_EXCEPT, ocall, NULL, enclave);
+		retc = boot_tee(tcs, ECMD_EXCEPT, ocall, NULL, enclave);
 		if ( retc != 0 ) {
 			fputs("SGXrdk: Fatal enclave exception, aborting " \
 			      "enclave.\n", stderr);

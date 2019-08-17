@@ -63,10 +63,10 @@
 
 	.text
 
-	.global	boot_sgx
-	.type	boot_sgx,@function
+	.global	boot_tee
+	.type	boot_tee,@function
 
-boot_sgx:
+boot_tee:
 	# Save the base pointer and set the new base pointer.
 	pushq	%rbp
 	movq	%rsp, %rbp
@@ -188,9 +188,9 @@ boot_sgx:
 
 
 	/*
-	 * Define the size of the boot_sgx 'function'.
+	 * Define the size of the boot_tee 'function'.
 	 */
-	.size	boot_sgx, .-boot_sgx
+	.size	boot_tee, .-boot_tee
 
 
 	/*
@@ -204,11 +204,11 @@ boot_sgx:
 	 * RAX register.
 	 */
 
-	.global	boot_sgx_get_exit_handler
-	.type	boot_sgx_get_exit_handler,@function
+	.global	boot_tee_get_exit_handler
+	.type	boot_tee_get_exit_handler,@function
 
-boot_sgx_get_exit_handler:
+boot_tee_get_exit_handler:
 	lea	.Laep_handler(%rip), %rax
 	ret
 
-	.size	boot_sgx_get_exit_handler, .-boot_sgx_get_exit_handler
+	.size	boot_tee_get_exit_handler, .-boot_tee_get_exit_handler

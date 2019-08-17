@@ -2,7 +2,7 @@
  * This file contains the C portion of the bridge code which conducts
  * an OCALL from inside an enclave to its implementation in the
  * non protected portion of the application.  It is called from the
- * boot_sgx function implemented in assembly language.
+ * boot_tee function implemented in assembly language.
  */
 
 /**************************************************************************
@@ -27,7 +27,7 @@
  * External public function.
  *
  * This method implements the linkage function which conducts the call
- * from the OCALL return point in the boot_sgx function into its
+ * from the OCALL return point in the boot_tee function into its
  * implementation code written in C.
  *
  * \param slot		The slot number of the OCALL API which is
