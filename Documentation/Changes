@@ -16,3 +16,8 @@ Version 0.8:
 	* Support compilation under GCC.
 
 	* Support library usage in C++ based projects.
+
+	* Implement sample application code.
+
+	* Implement installation targets for runtime and development
+	  systems.
