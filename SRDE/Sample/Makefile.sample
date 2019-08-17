@@ -25,7 +25,7 @@ SSL_LIBRARY_PATH = ${SSL}/lib64
 SSL_INCLUDE	 = ${SSL}/include
 
 
-OPENSSL = /usr/local/ssl/bin/openssl
+OPENSSL = /usr/bin/openssl
 SIGNER	= ${SDK}/bin/sgx_sign
 SIGNKEY = signing-key.pem
 
