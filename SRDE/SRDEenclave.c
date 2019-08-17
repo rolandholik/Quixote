@@ -58,7 +58,7 @@
 
 
 /* Prototype for enclave/TEE bootstrap function. */
-extern int boot_tee(struct SGX_tcs *, long fn, const void *, void *, void *);
+extern int srde_boot(struct SGX_tcs *, long fn, const void *, void *, void *);
 
 
 /** SRDEenclave private state information. */
@@ -1178,7 +1178,7 @@ static _Bool boot_slot(CO(SRDEenclave, this), int slot, CO(void *, ocall), \
 
 	/* Invoke the enclave slot. */
 	_save_fp_state(xsave_buffer);
-	rc = boot_tee(tcs, slot, ocall, ecall, this);
+	rc = srde_boot(tcs, slot, ocall, ecall, this);
 	_restore_fp_state(xsave_buffer);
 	*retc = rc;
 	--S->thread_cnt;

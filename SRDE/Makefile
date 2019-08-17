@@ -23,7 +23,7 @@ CSRC = SRDEmetadata.c SRDEloader.c SRDEenclave.c SRDEsigstruct.c PVEenclave.c \
 	SRDErsa.c  QEenclave.c SRDEepid.c SRDEquote.c SRDEquote_mgr.c	      \
 	srde-exception.c srde-ocall.c
 
-ASRC = boot-tee.s
+ASRC = srde-boot.s
 
 LIBRARY = libSRDEruntime.a
 

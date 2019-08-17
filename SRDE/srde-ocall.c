@@ -2,7 +2,7 @@
  * This file contains the C portion of the bridge code which conducts
  * an OCALL from inside an enclave to its implementation in the
  * non protected portion of the application.  It is called from the
- * boot_tee function implemented in assembly language.
+ * srde_boot function implemented in assembly language.
  */
 
 /**************************************************************************
