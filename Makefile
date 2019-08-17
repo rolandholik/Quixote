@@ -175,6 +175,8 @@ install-bin:
 	set -e; for dir in ${SUBDIRS}; do ${MAKE} -C $$dir $@; done;
 
 install-dev:
+	[ -d ${INSTPATH}/share ] || mkdir -p ${INSTPATH}/share;
+	install -m 644 Documentation/COPYRIGHT ${INSTPATH}/share;
 	[ -d ${INSTPATH}/include ] || mkdir -p ${INSTPATH}/include;
 	[ -d ${INSTPATH}/include/HurdLib ] || \
 		mkdir -p ${INSTPATH}/include/HurdLib;
