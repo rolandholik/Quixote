@@ -38,7 +38,7 @@
 /**
  * Prototype for the function to initialize the SGX exception handler.
  */
-extern HCLINK _Bool sgx_configure_exception(void);
+extern HCLINK _Bool srde_configure_exception(void);
 
 
 /**

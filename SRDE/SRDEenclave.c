@@ -217,7 +217,7 @@ static _Bool setup(CO(SRDEenclave, this), CO(char *, name), \
 
 
 	/* Install the SGX exception handler. */
-	if ( !sgx_configure_exception() )
+	if ( !srde_configure_exception() )
 		ERR(goto done);
 
 

@@ -13,6 +13,7 @@
  **************************************************************************/
 
 /* Local definitions. */
+#define SRDENAME "SRDEruntime"
 
 /* Needed to get symbolic names for register definitions. */
 #define _GNU_SOURCE
@@ -89,7 +90,7 @@ extern int boot_tee(struct SGX_tcs *, long fn, const void *, void *, void *);
  * \param private	A pointer to exception specific data.
  */
 
-void exception_handler(int signal, siginfo_t *siginfo, void *private)
+void srde_exception_handler(int signal, siginfo_t *siginfo, void *private)
 
 {
 	_Bool fatal_signal = true;
@@ -112,17 +113,18 @@ void exception_handler(int signal, siginfo_t *siginfo, void *private)
 	/* Display untrapped faults and abort. */
 	switch ( signal ) {
 		case SIGFPE:
-			fputs("SGXrdk: Enclave floating point exception.\n", \
-			      stderr);
+			fprintf(stderr, "%s: Enclave floating point " \
+				"exception.\n", SRDENAME);
 			break;
 		case SIGSEGV:
-			fputs("SGXrdk: Enclave segmentation fault.\n", stderr);
+			fprintf(stderr, "%s: Enclave segmentation fault.\n", \
+				SRDENAME);
 			break;
 		case SIGBUS:
-			fputs("SGXrdk: Enclave bus fault.\n", stderr);
+			fprintf(stderr, "%s: Enclave bus fault.\n", SRDENAME);
 			break;
 		case SIGTRAP:
-			fputs("SGXrdk: Enclave trap.\n", stderr);
+			fprintf(stderr, "%s: Enclave trap.\n", SRDENAME);
 			break;
 		default:
 			fatal_signal = false;
@@ -177,7 +179,7 @@ void exception_handler(int signal, siginfo_t *siginfo, void *private)
  *		value
  */
 
-_Bool sgx_configure_exception(void)
+_Bool srde_configure_exception(void)
 
 {
 	_Bool retn = false;
@@ -201,7 +203,7 @@ _Bool sgx_configure_exception(void)
 
 	/* Configure the handler. */
 	signal_action.sa_flags     = SA_SIGINFO | SA_NODEFER | SA_RESTART;
-	signal_action.sa_sigaction = exception_handler;
+	signal_action.sa_sigaction = srde_exception_handler;
 
 	if ( sigaction(SIGSEGV, &signal_action, NULL) == -1 )
 		goto done;

@@ -166,9 +166,9 @@ struct {
 } Signals;
 
 /**
- * SGX signal handler.
+ * SRDE signal handler.
  */
-void exception_handler(int, siginfo_t *, void *);
+void srde_exception_handler(int, siginfo_t *, void *);
 
 
 /**
@@ -317,7 +317,7 @@ void signal_handler(int signal, siginfo_t *siginfo, void *private)
 			return;
 	}
 
-	exception_handler(signal, siginfo, private);
+	srde_exception_handler(signal, siginfo, private);
 	return;
 }
 
@@ -1399,8 +1399,8 @@ static void * measurement_mode(CO(char *, enclave_name), CO(char *, token))
 
 
 	/* Install the SGX exception handler for this mode. */
-	if ( !sgx_configure_exception() ) {
-		fputs("SGX signal handler initialization failure.\n", stderr);
+	if ( !srde_configure_exception() ) {
+		fputs("Signal handler initialization failure.\n", stderr);
 		goto done;
 	}
 

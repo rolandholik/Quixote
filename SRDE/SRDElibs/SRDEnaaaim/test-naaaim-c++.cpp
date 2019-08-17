@@ -185,7 +185,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Setup the exception handler. */
-	if ( !sgx_configure_exception() )
+	if ( !srde_configure_exception() )
 		ERR(goto done);
 
 
