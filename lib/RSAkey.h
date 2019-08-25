@@ -34,6 +34,10 @@ typedef enum {
 struct NAAAIM_RSAkey
 {
 	/* External methods. */
+	_Bool (*generate_key)(const RSAkey, int);
+	_Bool (*get_public_key)(const RSAkey, const Buffer);
+	_Bool (*get_private_key)(const RSAkey, const Buffer);
+
 	_Bool (*load_public_key)(const RSAkey, const char *, const char *);
 	_Bool (*load_private_key)(const RSAkey, const char *, const char *);
 

@@ -59,7 +59,7 @@ struct NAAAIM_RSAkey_State
 	_Bool poisoned;
 
 	/* Type of RSA key. */
-	enum {no_key, public_key, private_key, hardware_key} type;
+	enum {no_key, public_key, private_key, hardware_key, generated} type;
 
 	/* Type of padding. */
 	RSAkey_padding padding;
@@ -131,6 +131,201 @@ static int _padding(CO(RSAkey_State, S))
 	}
 
 	return padding;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements the generation of an RSA key with the
+ * specified parameters.
+ *
+ * \param this		A pointer to the key object for which a key
+ *			is being generated.
+ *
+ * \param size		The size of the key in bits.
+ *
+ *
+ * \return	If the generation of the RSA key faileds for any reason
+ *		a falsed value is returned to the caller.  A true
+ *		value indicates the key has been generated and is
+ *		available for use by the object.
+ */
+
+static _Bool generate_key(CO(RSAkey, this), int size)
+
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	BIGNUM *exp = NULL;
+
+
+	/*
+	 * Initialize a big number structure for the exponent and
+	 * set it to the standard exponent value of F4 or 65537.
+	 */
+	if ( (exp = BN_new()) == NULL )
+		ERR(goto done);
+	if ( BN_set_word(exp, RSA_F4) == 0 )
+		ERR(goto done);
+
+
+	/* Initialize and generate the key. */
+	if ( (S->key = RSA_new()) == NULL )
+		ERR(goto done);
+
+	if ( RSA_generate_key_ex(S->key, size, exp, NULL) == 0 )
+		ERR(goto done);
+
+	S->type = generated;
+	retn = true;
+
+
+ done:
+	if ( exp != NULL )
+		BN_free(exp);
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements a method for extracting a public key
+ * from the object.
+ *
+ * \param this		A pointer to the key object for which a key
+ *			is to be extracted
+ *
+ * \param bufr		The object which the key is to be placed
+ *			into.
+ *
+ * \return	If the extraction of a key fails for any reason
+ *		a false value is returned to the caller.  A true
+ *		value indicates the target object has a valid key
+ *		in it.
+ */
+
+static _Bool get_public_key(CO(RSAkey, this), CO(Buffer, bufr))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	char *mp = NULL;
+
+	size_t ms;
+
+	BIO *mb = NULL;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( bufr == NULL )
+		ERR(goto done);
+	if ( bufr->poisoned(bufr) )
+		ERR(goto done);
+	if ( S->type == no_key )
+		ERR(goto done);
+	if ( (S->type != generated) && (S->type != public_key) )
+		ERR(goto done);
+
+
+	/* Write the key to a memory based BIO.*/
+	if ( (mb = BIO_new(BIO_s_mem())) == NULL )
+		ERR(goto done);
+	if ( PEM_write_bio_RSAPublicKey(mb, S->key) == 0 )
+		ERR(goto done);
+
+	ms = BIO_get_mem_data(mb, &mp);
+	if ( !bufr->add(bufr, (unsigned char *) mp, ms) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	if ( mb != NULL )
+		BIO_free(mb);
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements a method for extracting a private key
+ * from the object.
+ *
+ * \param this		A pointer to the key object for which a key
+ *			is to be extracted
+ *
+ * \param bufr		The object which the key is to be placed
+ *			into.
+ *
+ * \return	If the extraction of a key fails for any reason
+ *		a false value is returned to the caller.  A true
+ *		value indicates the target object has a valid key
+ *		in it.
+ */
+
+static _Bool get_private_key(CO(RSAkey, this), CO(Buffer, bufr))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	char *mp = NULL;
+
+	size_t ms;
+
+	BIO *mb = NULL;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( bufr == NULL )
+		ERR(goto done);
+	if ( bufr->poisoned(bufr) )
+		ERR(goto done);
+	if ( S->type == no_key )
+		ERR(goto done);
+	if ( (S->type != generated) && (S->type != private_key) )
+		ERR(goto done);
+
+
+	/* Write the key to a memory based BIO.*/
+	if ( (mb = BIO_new(BIO_s_mem())) == NULL )
+		ERR(goto done);
+	if ( PEM_write_bio_RSAPrivateKey(mb, S->key, NULL, NULL, 0, NULL, \
+					 NULL) == 0 )
+		ERR(goto done);
+
+	ms = BIO_get_mem_data(mb, &mp);
+	if ( !bufr->add(bufr, (unsigned char *) mp, ms) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	if ( mb != NULL )
+		BIO_free(mb);
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
 }
 
 
@@ -366,6 +561,7 @@ static _Bool encrypt(CO(RSAkey, this), CO(Buffer, payload))
 	/* Encrypt with private key. */
 	switch ( S->type ) {
 	case no_key:
+	case generated:
 		ERR(goto done);
 		break;
 	case private_key:
@@ -448,6 +644,7 @@ static _Bool decrypt(CO(RSAkey, this), CO(Buffer, payload))
 	/* Encrypt with the relevant key. */
 	switch ( S->type ) {
 	case no_key:
+	case generated:
 		ERR(goto done);
 		break;
 	case private_key:
@@ -714,6 +911,10 @@ extern RSAkey NAAAIM_RSAkey_Init(void)
 	_init_state(this->state);
 
 	/* Method initialization. */
+	this->generate_key    = generate_key;
+	this->get_public_key  = get_public_key;
+	this->get_private_key = get_private_key;
+
 	this->load_private_key = load_private_key;
 	this->load_public_key  = load_public_key;
 

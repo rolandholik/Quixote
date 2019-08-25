@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 #include <stdbool.h>
+#include <string.h>
 
 #include <openssl/engine.h>
 #include <openssl/ssl.h>
@@ -44,6 +45,7 @@ extern int main(int argc, char *argv[])
 
 	if ( argc == 1 ) {
 		fputs("No arguements specified - usage:\n", stderr);
+		fputs("\tRSAkey_test generate\n", stderr);
 		fputs("\tRSAkey_test pkcs11 keyid\n", stderr);
 		fputs("\tRSAkey_test file public_key private_key\n", stderr);
 		goto done;
@@ -57,6 +59,23 @@ extern int main(int argc, char *argv[])
 	if ( (rsakey = NAAAIM_RSAkey_Init()) == NULL ) {
 		fputs("Failed RSAkey init.\n", stderr);
 		ERR(goto done);
+	}
+
+	if ( strcmp(argv[1], "generate") == 0 ) {
+		if ( !rsakey->generate_key(rsakey, 2048) ) {
+			fputs("Error generating 2048 bit key.\n", stderr);
+			goto done;
+		}
+
+		fputs("Key components:\n", stdout);
+		rsakey->print(rsakey);
+		fputc('\n', stdout);
+
+		fputs("Key in PEM form:\n", stdout);
+		rsakey->get_private_key(rsakey, payload);
+		payload->hprint(payload);
+
+		goto done;
 	}
 
 	if ( strcmp(argv[1], "pkcs11") == 0 ) {
