@@ -14,6 +14,7 @@
 
 /* Include files. */
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
 #include <stdarg.h>
@@ -45,25 +46,49 @@ void printf(const char *fmt, ...)
 
 
 /*
- * Alternate fprintf implementation which uses an OCALL to print
- * to the standard output of the process invoking the enclave.
+ * Alternate fprintf implementation that prints the formatted output
+ * to a buffer with subsequent output of the buffer via an OCALL to
+ * untrusted userspace to be printed to the specified stream
+ * descriptor.
  */
 
 void fprintf(int stream, const char *fmt, ...)
 
 {
-    char bufr[1024];
+	int size;
+
+	char bufr[BUFSIZ];
+
+	char *mb = NULL,
+	     *pb = bufr;
+
+	va_list ap;
 
 
-    memset(bufr, '\0', sizeof(bufr));
+	/* Compute and configure the needed buffer size. */
+	va_start(ap, fmt);
+	size = vsnprintf(NULL, 0, fmt, ap);
+	va_end(ap);
 
-    va_list ap;
-    va_start(ap, fmt);
-    vsnprintf(bufr, sizeof(bufr), fmt, ap);
-    va_end(ap);
+	if ( size <= sizeof(bufr) )
+		size = sizeof(bufr);
+	else {
+		if ( (mb = malloc(size)) != NULL )
+			pb = mb;
+	}
+	memset(pb, size, '\0');
 
-    ocall_print_string(bufr);
-    return;
+
+	/* Print and output the buffer. */
+	va_start(ap, fmt);
+	vsnprintf(pb, size, fmt, ap);
+	va_end(ap);
+
+	ocall_print_string(pb);
+
+
+	free(mb);
+	return;
 }
 
 
