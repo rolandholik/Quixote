@@ -42,7 +42,11 @@
 #define INIT(lib, obj, var, action) \
 	if ( (var = _CCALL(lib,obj,Init)()) == NULL ) action
 
-#define ERR(action) {fprintf(stderr, "[%s,%s,%d]: Error location.\n", __FILE__, __func__, __LINE__); action;}
+#define ERR(action) {						    \
+	fprintf(stderr, "T[%s,%s,%d]: Error location.\n", __FILE__, \
+		__func__, __LINE__);				    \
+	action;							    \
+}
 
 
 /* Library memory debugging. */
