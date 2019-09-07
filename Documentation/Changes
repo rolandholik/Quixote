@@ -21,3 +21,6 @@ Version 0.8:
 
 	* Implement installation targets for runtime and development
 	  systems.
+
+Version 0.9:
+	* Implement RSAkey object in trusted space.
