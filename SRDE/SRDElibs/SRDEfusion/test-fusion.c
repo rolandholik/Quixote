@@ -38,6 +38,7 @@
 #include <NAAAIM.h>
 #include <SRDE.h>
 #include <SRDEenclave.h>
+#include <SRDEocall.h>
 
 
 /* Define the OCALL interface for the 'print string' call. */
@@ -82,15 +83,6 @@ int fgets_handler(struct SRDEfusion_fgets_interface *oc)
 }
 
 
-static const struct OCALL_api ocall_table = {
-	2,
-	{
-		ocall1_handler,
-		fgets_handler
-	}
-};
-
-
 /* Interfaces for the trusted ECALL's. */
 static struct ecall0_table {
 	int test;
@@ -129,7 +121,11 @@ extern int main(int argc, char *argv[])
 
 	struct SGX_einittoken *einit = NULL;
 
+	struct OCALL_api *ocall_table;
+
 	SRDEenclave enclave = NULL;
+
+	SRDEocall ocall = NULL;
 
 	Buffer bufr = NULL;
 
@@ -162,7 +158,6 @@ extern int main(int argc, char *argv[])
 		}
 
 
-
 	/* Load a launch token if one is specified. */
 	if ( (token != NULL) && (token[0] != '\0') ) {
 		INIT(HurdLib, Buffer, bufr, ERR(goto done));
@@ -175,7 +170,7 @@ extern int main(int argc, char *argv[])
 	}
 
 
-	/* Load an initialize the enclave. */
+	/* Load and initialize the enclave. */
 	INIT(NAAAIM, SRDEenclave, enclave, ERR(goto done));
 	if ( debug )
 		enclave->debug(enclave, true);
@@ -194,9 +189,19 @@ extern int main(int argc, char *argv[])
 		ERR(goto done);
 
 
+	/* Setup the OCALL dispatch table. */
+	INIT(NAAAIM, SRDEocall, ocall, ERR(goto done));
+
+	ocall->add(ocall, ocall1_handler);
+	ocall->add(ocall, fgets_handler);
+	if ( !ocall->get_table(ocall, &ocall_table) )
+		ERR(goto done);
+
+
+	/* Iterate throught the test counts. */
 	for (test= 1; test <= NUMBER_OF_TESTS; ++test) {
 		ecall0_table.test = test;
-		if ( !enclave->boot_slot(enclave, 0, &ocall_table, \
+		if ( !enclave->boot_slot(enclave, 0, ocall_table, \
 					 &ecall0_table, &rc) ) {
 			fprintf(stderr, "Enclave returned: %d\n", rc);
 			goto done;
@@ -208,9 +213,10 @@ extern int main(int argc, char *argv[])
 
 
  done:
+	WHACK(enclave);
+	WHACK(ocall);
 	WHACK(bufr);
 	WHACK(token_file);
-	WHACK(enclave);
 
 	return retn;
 
