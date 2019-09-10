@@ -22,20 +22,6 @@ typedef int pid_t;
 /* Prototypes for alternate standard library functions. */
 time_t time(time_t *);
 
-
-/* Prototype for the OCALL used to implement the *printf functions. */
-struct SRDEfusion_ocall0_interface {
-	char *bufr;
-};
-
-struct SRDEfusion_fgets_interface {
-	_Bool retn;
-
-	int stream;
-	char bufr_size;
-	char bufr[];
-};
-
 sgx_status_t ocall_print_string(const char* str);
 
 

@@ -35,6 +35,7 @@
 #include "NAAAIM.h"
 #include "SRDE.h"
 #include "SRDEocall.h"
+#include "SRDEfusion-ocall.h"
 
 
 /* Object state extraction macro. */
@@ -75,6 +76,10 @@ struct NAAAIM_SRDEocall_State
 	/* Buffer object to hold image of OCALL_api structre. */
 	Buffer table;
 };
+
+
+/* Definition for the function used to register SRDEfusion OCALL's. */
+_Bool SRDEfusion_ocall_add(const SRDEocall);
 
 
 /**
@@ -139,6 +144,48 @@ static _Bool add(CO(SRDEocall, this), CO(void *, ptr))
 		ERR(goto done);
 
 	++S->ocall_count;
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements the registration of OCALL functions that
+ * are used by the SRDEfusion trusted library.
+ *
+ * \param this	A pointer to the object that will have the OCALL's
+ *		added to.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the OCALL's were added.  A false value indicates the
+ *		addition is failed and the object is poisoned.  A
+ *		true value indicates the functions were added.
+ */
+
+static _Bool add_SRDEfusion(CO(SRDEocall, this))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+
+	/* Call the registration function and set the return code. */
+	if ( !SRDEfusion_ocall_add(this) )
+		ERR(goto done);
+
 	retn = true;
 
 
@@ -302,7 +349,9 @@ extern SRDEocall NAAAIM_SRDEocall_Init(void)
 	INIT(HurdLib, Buffer, this->state->table, goto err);
 
 	/* Method initialization. */
-	this->add	= add;
+	this->add	     = add;
+	this->add_SRDEfusion = add_SRDEfusion;
+
 	this->get_table = get_table;
 
 	this->print = print;

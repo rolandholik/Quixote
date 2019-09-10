@@ -41,49 +41,7 @@
 #include <SRDEocall.h>
 
 
-/* Define the OCALL interface for the 'print string' call. */
-struct ocall1_interface {
-	char* str;
-} ocall1_string;
-
-int ocall1_handler(struct ocall1_interface *interface)
-
-{
-	fprintf(stdout, "%s", interface->str);
-	return 0;
-}
-
-
-/* Interface and handler for fgets function simulation. */
-struct SRDEfusion_fgets_interface {
-	_Bool retn;
-
-	int stream;
-	char bufr_size;
-	char bufr[];
-};
-
-int fgets_handler(struct SRDEfusion_fgets_interface *oc)
-
-{
-	FILE *instream = NULL;
-
-
-	if ( oc->stream == 3 )
-		instream = stdin;
-	else {
-		fprintf(stderr, "%s: Bad stream number: %d", __func__, \
-			oc->stream);
-		return 1;
-	}
-
-	if ( fgets(oc->bufr, oc->bufr_size, instream) != NULL )
-		oc->retn = true;
-	return 0;
-}
-
-
-/* Interfaces for the trusted ECALL's. */
+/** Interface structure for ECALL0 */
 static struct ecall0_table {
 	int test;
 } ecall0_table;
@@ -192,8 +150,7 @@ extern int main(int argc, char *argv[])
 	/* Setup the OCALL dispatch table. */
 	INIT(NAAAIM, SRDEocall, ocall, ERR(goto done));
 
-	ocall->add(ocall, ocall1_handler);
-	ocall->add(ocall, fgets_handler);
+	ocall->add_SRDEfusion(ocall);
 	if ( !ocall->get_table(ocall, &ocall_table) )
 		ERR(goto done);
 

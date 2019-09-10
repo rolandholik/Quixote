@@ -26,7 +26,7 @@ ENCLAVE_CC = gcc64
 SGXDIR = ../..
 include ${SGXDIR}/Make.enclave
 
-SGX_INCLUDE = -I . -I ${SGX_SDK}/include -I ${SGX_SDK}/include/tlibc \
+SGX_INCLUDE = -I . -I ../.. -I ${SGX_SDK}/include -I ${SGX_SDK}/include/tlibc \
 	-I ${SGX_SDK}/include/stlport
 
 ENCLAVE_CFLAGS = -Wall -nostdinc -fvisibility=hidden -fpie -fstack-protector \

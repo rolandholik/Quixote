@@ -19,6 +19,8 @@
 #include <string.h>
 #include <stdarg.h>
 
+#include <SRDEfusion-ocall.h>
+
 #include "fusion-shim.h"
 
 
@@ -127,10 +129,10 @@ char *fgets(char *bufr, int bufr_size, int stream)
 
 	int status = SGX_ERROR_INVALID_PARAMETER;
 
-	size_t arena_size = sizeof(struct SRDEfusion_fgets_interface) + \
+	size_t arena_size = sizeof(struct SRDEfusion_ocall1_interface) + \
 		bufr_size;
 
-	struct SRDEfusion_fgets_interface *op = NULL;
+	struct SRDEfusion_ocall1_interface *op = NULL;
 
 
 	/* Verify arguements and set size of arena. */
@@ -147,7 +149,7 @@ char *fgets(char *bufr, int bufr_size, int stream)
 
 
 	/* Call the user handler slot. */
-	if ( (status = sgx_ocall(1, op)) != 0 )
+	if ( (status = sgx_ocall(SRDEFUSION_OCALL1, op)) != 0 )
 		goto done;
 
 	if ( op->retn ) {
@@ -201,17 +203,17 @@ sgx_status_t ocall_print_string(const char* str)
 			  sizeof(struct SRDEfusion_ocall0_interface));
 
 	if (str != NULL && sgx_is_within_enclave(str, _len_str)) {
-		ms->bufr = (char*) __tmp;
+		ms->buffer = (char*) __tmp;
 		__tmp = (void *) ((size_t)__tmp + _len_str);
-		memcpy((void *) ms->bufr, str, _len_str);
+		memcpy((void *) ms->buffer, str, _len_str);
 	} else if (str == NULL) {
-		ms->bufr = NULL;
+		ms->buffer = NULL;
 	} else {
 		sgx_ocfree();
 		return SGX_ERROR_INVALID_PARAMETER;
 	}
 
-	status = sgx_ocall(0, ms);
+	status = sgx_ocall(SRDEFUSION_OCALL0, ms);
 
 
 	sgx_ocfree();

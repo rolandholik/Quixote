@@ -26,6 +26,8 @@ struct NAAAIM_SRDEocall
 {
 	/* External methods. */
 	_Bool (*add)(const SRDEocall, const void *);
+	_Bool (*add_SRDEfusion)(const SRDEocall);
+
 	_Bool (*get_table)(const SRDEocall, struct OCALL_api **);
 
 	void (*print)(const SRDEocall);
