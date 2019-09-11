@@ -10,4 +10,4 @@
  * the source tree for copyright and licensing information.
  **************************************************************************/
 
-extern SRDEquote_mgr(struct SRDEquote_ocall *);
+extern int SRDEquote_mgr(struct SRDEquote_ocall *);
