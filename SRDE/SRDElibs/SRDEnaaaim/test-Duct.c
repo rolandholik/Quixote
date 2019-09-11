@@ -36,65 +36,11 @@
 #include <Duct.h>
 #include <SRDE.h>
 #include <SRDEenclave.h>
+#include <SRDEocall.h>
+#include <SRDEfusion-ocall.h>
+#include <SRDEnaaaim-ocall.h>
 
 #include "test-Duct-interface.h"
-
-
-/* Define the OCALL interface for the 'print string' call. */
-struct ocall1_interface {
-	char* str;
-} ocall1_string;
-
-int ocall1_handler(struct ocall1_interface *interface)
-
-{
-	fprintf(stdout, "%s", interface->str);
-	return 0;
-}
-
-struct ocall2_interface {
-	int* ms_cpuinfo;
-	int ms_leaf;
-	int ms_subleaf;
-};
-
-static void cpuid(int *eax, int *ebx, int *ecx, int *edx)\
-
-{
-	__asm("cpuid\n\t"
-	      /* Output. */
-	      : "=a" (*eax), "=b" (*ebx), "=c" (*ecx), "=d" (*edx)
-	      /* Input. */
-	      : "0" (*eax), "2" (*ecx));
-
-	return;
-}
-
-
-int ocall2_handler(struct ocall2_interface *pms)
-
-{
-	struct ocall2_interface *ms = (struct ocall2_interface *) pms;
-
-
-	ms->ms_cpuinfo[0] = ms->ms_leaf;
-	ms->ms_cpuinfo[2] = ms->ms_subleaf;
-
-	cpuid(&ms->ms_cpuinfo[0], &ms->ms_cpuinfo[1], &ms->ms_cpuinfo[2], \
-	      &ms->ms_cpuinfo[3]);
-
-	return 0;
-}
-
-static const struct OCALL_api ocall_table = {
-	4,
-	{
-		ocall1_handler,
-		NULL,
-		ocall2_handler,
-		Duct_mgr
-	}
-};
 
 
 /**
@@ -131,7 +77,11 @@ extern int main(int argc, char *argv[])
 
 	struct SGX_einittoken *einit = NULL;
 
+	struct OCALL_api *ocall_table;
+
 	SRDEenclave enclave = NULL;
+
+	SRDEocall ocall = NULL;
 
 	Buffer bufr = NULL;
 
@@ -222,10 +172,20 @@ extern int main(int argc, char *argv[])
 		ERR(goto done);
 
 
+	/* Build the OCALL dispatch table. */
+	INIT(NAAAIM, SRDEocall, ocall, ERR(goto done));
+
+	ocall->add_table(ocall, SRDEfusion_ocall_table);
+	ocall->add_table(ocall, SRDEnaaaim_ocall_table);
+
+	if ( !ocall->get_table(ocall, &ocall_table) )
+		ERR(goto done);
+
+
 	/* Test server mode. */
 	if ( Mode == server ) {
 		ecall0.port = 11990;
-		if ( !enclave->boot_slot(enclave, 0, &ocall_table, \
+		if ( !enclave->boot_slot(enclave, 0, ocall_table, \
 					 &ecall0, &rc) ) {
 			fprintf(stderr, "Enclave returned: %d\n", rc);
 			goto done;
@@ -239,7 +199,7 @@ extern int main(int argc, char *argv[])
 		ecall1.hostname	     = hostname;
 		ecall1.hostname_size = strlen(hostname) + 1;
 
-		if ( !enclave->boot_slot(enclave, 1, &ocall_table, \
+		if ( !enclave->boot_slot(enclave, 1, ocall_table, \
 					 &ecall1, &rc) ) {
 			fprintf(stderr, "Enclave returned: %d\n", rc);
 			goto done;
@@ -253,6 +213,7 @@ extern int main(int argc, char *argv[])
 	WHACK(bufr);
 	WHACK(token_file);
 	WHACK(enclave);
+	WHACK(ocall);
 
 	return retn;
 

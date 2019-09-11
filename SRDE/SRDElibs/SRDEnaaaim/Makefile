@@ -189,7 +189,7 @@ test-naaaim-c++.o: test-naaaim-c++.cpp
 	${CXX} ${CFLAGS} -c $< -o $@;
 
 test-Duct: test-Duct.o ${LIBRARY_DEPENDS}
-	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS} ${SSL_CRYPTO};
 
 test-Duct.o: test-Duct.c
 	${CC} ${CFLAGS} -I ../../../lib -c $< -o $@;
