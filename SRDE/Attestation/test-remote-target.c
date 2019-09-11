@@ -42,66 +42,11 @@
 #include "SRDEenclave.h"
 #include "SRDEquote.h"
 #include "SRDEepid.h"
+#include "SRDEocall.h"
+#include "SRDEfusion-ocall.h"
+#include "SRDEnaaaim-ocall.h"
 
 #include "LocalTarget-interface.h"
-
-
-/** OCALL interface definition. */
-struct SRDEfusion_ocall0_interface {
-	char* str;
-} SRDEfusion_ocall0;
-
-int ocall0_handler(struct SRDEfusion_ocall0_interface *interface)
-
-{
-	fprintf(stdout, "%s", interface->str);
-	return 0;
-}
-
-struct ocall2_interface {
-	int* ms_cpuinfo;
-	int ms_leaf;
-	int ms_subleaf;
-};
-
-static void cpuid(int *eax, int *ebx, int *ecx, int *edx)\
-
-{
-	__asm("cpuid\n\t"
-	      /* Output. */
-	      : "=a" (*eax), "=b" (*ebx), "=c" (*ecx), "=d" (*edx)
-	      /* Input. */
-	      : "0" (*eax), "2" (*ecx));
-
-	return;
-}
-
-
-int ocall2_handler(struct ocall2_interface *pms)
-
-{
-	struct ocall2_interface *ms = (struct ocall2_interface *) pms;
-
-
-	ms->ms_cpuinfo[0] = ms->ms_leaf;
-	ms->ms_cpuinfo[2] = ms->ms_subleaf;
-
-	cpuid(&ms->ms_cpuinfo[0], &ms->ms_cpuinfo[1], &ms->ms_cpuinfo[2], \
-	      &ms->ms_cpuinfo[3]);
-
-	return 0;
-}
-
-static const struct OCALL_api ocall_table = {
-	5,
-	{
-		ocall0_handler,
-		NULL,		/* fgets handler */
-		ocall2_handler,
-		NULL,		/*Duct_sgxmgr*/
-		SRDEquote_mgr,
-	}
-};
 
 
 /* Program entry point. */
@@ -132,6 +77,8 @@ extern int main(int argc, char *argv[])
 
 	struct LocalTarget_ecall1 source_ecall1;
 
+	struct OCALL_api *ocall_table;
+
 	Buffer spid	= NULL,
 	       quote	= NULL,
 	       http_in	= NULL,
@@ -149,6 +96,8 @@ extern int main(int argc, char *argv[])
 	SRDEquote quoter = NULL;
 
 	SRDEenclave source = NULL;
+
+	SRDEocall ocall = NULL;
 
 	HTTP http = NULL;
 
@@ -198,6 +147,15 @@ extern int main(int argc, char *argv[])
 	}
 
 
+	/* Setup the OCALL dispatch table. */
+	INIT(NAAAIM, SRDEocall, ocall, ERR(goto done));
+
+	ocall->add_table(ocall, SRDEfusion_ocall_table);
+	ocall->add_table(ocall, SRDEnaaaim_ocall_table);
+	if ( !ocall->get_table(ocall, &ocall_table) )
+		ERR(goto done);
+
+
 	/* Test trusted mode. */
 	if ( mode == trusted ) {
 		fputs("\nTesting enclave mode attestation.\n", stdout);
@@ -222,7 +180,7 @@ extern int main(int argc, char *argv[])
 		source_ecall1.spid 	= spid_key->get(spid_key);
 		source_ecall1.spid_size = spid_key->size(spid_key) + 1;
 
-		if ( !source->boot_slot(source, 1, &ocall_table, \
+		if ( !source->boot_slot(source, 1, ocall_table, \
 					&source_ecall1, &rc) ) {
 			fprintf(stderr, "Enclave return error: %d\n", rc);
 			ERR(goto done);
@@ -255,7 +213,7 @@ extern int main(int argc, char *argv[])
 	source_ecall0.mode   = 1;
 	source_ecall0.target = quoter->get_qe_targetinfo(quoter);
 	source_ecall0.report = &enclave_report;
-	if ( !source->boot_slot(source, 0, &ocall_table, &source_ecall0, \
+	if ( !source->boot_slot(source, 0, ocall_table, &source_ecall0, \
 				&rc) ) {
 		fprintf(stderr, "Enclave return error: %d\n", rc);
 		ERR(goto done);
@@ -323,6 +281,7 @@ extern int main(int argc, char *argv[])
 	WHACK(quote);
 	WHACK(nonce);
 	WHACK(source);
+	WHACK(ocall);
 	WHACK(output);
 	WHACK(spid_key);
 	WHACK(spid_file);
