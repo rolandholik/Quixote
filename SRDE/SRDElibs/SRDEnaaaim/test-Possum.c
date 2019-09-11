@@ -41,66 +41,11 @@
 #include <SRDE.h>
 #include <SRDEenclave.h>
 #include <SRDEquote.h>
+#include <SRDEocall.h>
+#include <SRDEfusion-ocall.h>
+#include <SRDEnaaaim-ocall.h>
 
 #include "test-Possum-interface.h"
-
-
-/* Define the OCALL interface for the 'print string' call. */
-struct ocall1_interface {
-	char* str;
-} ocall1_string;
-
-int ocall1_handler(struct ocall1_interface *interface)
-
-{
-	fprintf(stdout, "%s", interface->str);
-	return 0;
-}
-
-struct ocall2_interface {
-	int* ms_cpuinfo;
-	int ms_leaf;
-	int ms_subleaf;
-};
-
-static void cpuid(int *eax, int *ebx, int *ecx, int *edx)\
-
-{
-	__asm("cpuid\n\t"
-	      /* Output. */
-	      : "=a" (*eax), "=b" (*ebx), "=c" (*ecx), "=d" (*edx)
-	      /* Input. */
-	      : "0" (*eax), "2" (*ecx));
-
-	return;
-}
-
-
-int ocall2_handler(struct ocall2_interface *pms)
-
-{
-	struct ocall2_interface *ms = (struct ocall2_interface *) pms;
-
-
-	ms->ms_cpuinfo[0] = ms->ms_leaf;
-	ms->ms_cpuinfo[2] = ms->ms_subleaf;
-
-	cpuid(&ms->ms_cpuinfo[0], &ms->ms_cpuinfo[1], &ms->ms_cpuinfo[2], \
-	      &ms->ms_cpuinfo[3]);
-
-	return 0;
-}
-
-static const struct OCALL_api ocall_table = {
-	5,
-	{
-		ocall1_handler,
-		NULL,
-		ocall2_handler,
-		Duct_mgr,
-		SRDEquote_mgr,
-	}
-};
 
 
 /**
@@ -152,6 +97,10 @@ extern int main(int argc, char *argv[])
 	     spid_file = NULL;
 
 	SRDEenclave enclave = NULL;
+
+	SRDEocall ocall = NULL;
+
+	struct OCALL_api *ocall_table;
 
 	struct Possum_ecall0 ecall0;
 
@@ -207,6 +156,16 @@ extern int main(int argc, char *argv[])
 	}
 
 
+	/* Build the OCALL dispatch table. */
+	INIT(NAAAIM, SRDEocall, ocall, ERR(goto done));
+
+	ocall->add_table(ocall, SRDEfusion_ocall_table);
+	ocall->add_table(ocall, SRDEnaaaim_ocall_table);
+
+	if ( !ocall->get_table(ocall, &ocall_table) )
+		ERR(goto done);
+
+
 	/* Handle request for measurement. */
 	if ( Mode == measure ) {
 		INIT(NAAAIM, SRDEenclave, enclave, ERR(goto done));
@@ -216,7 +175,7 @@ extern int main(int argc, char *argv[])
 
 		memset(&ecall2, '\0', sizeof(struct Possum_ecall2));
 
-		if ( !enclave->boot_slot(enclave, 2, &ocall_table, \
+		if ( !enclave->boot_slot(enclave, 2, ocall_table, \
 					 &ecall2, &rc) ) {
 			fprintf(stderr, "Enclave returned: %d\n", rc);
 			goto done;
@@ -309,7 +268,7 @@ extern int main(int argc, char *argv[])
 	ecall3.verifier	     = ivy->get(ivy);
 	ecall3.verifier_size = ivy->size(ivy);
 
-	if ( !enclave->boot_slot(enclave, 3, &ocall_table, \
+	if ( !enclave->boot_slot(enclave, 3, ocall_table, \
 				 &ecall3, &rc) ) {
 		fprintf(stderr, "Ecall 3 returned: %d\n", rc);
 		goto done;
@@ -333,7 +292,7 @@ extern int main(int argc, char *argv[])
 		ecall0.verifier	     = NULL;
 		ecall0.verifier_size = 0;
 
-		if ( !enclave->boot_slot(enclave, 0, &ocall_table, \
+		if ( !enclave->boot_slot(enclave, 0, ocall_table, \
 					 &ecall0, &rc) ) {
 			fprintf(stderr, "Ecall 0 returned: %d\n", rc);
 			goto done;
@@ -361,7 +320,7 @@ extern int main(int argc, char *argv[])
 		ecall1.verifier	     = NULL;
 		ecall1.verifier_size = 0;
 
-		if ( !enclave->boot_slot(enclave, 1, &ocall_table, \
+		if ( !enclave->boot_slot(enclave, 1, ocall_table, \
 					 &ecall1, &rc) ) {
 			fprintf(stderr, "Ecall 1 returned: %d\n", rc);
 			goto done;
@@ -384,6 +343,7 @@ extern int main(int argc, char *argv[])
 	WHACK(infile);
 	WHACK(spid_file);
 	WHACK(enclave);
+	WHACK(ocall);
 
 	return retn;
 
