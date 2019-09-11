@@ -177,7 +177,7 @@ ldscript:
 tools: ${TOOLS}
 
 test-naaaim: test-naaaim.o ${LIBRARY_DEPENDS}
-	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS} ${SSL_CRYPTO};
 
 test-naaaim.o: test-naaaim.c
 	${CC} ${CFLAGS} -c $< -o $@;
@@ -188,7 +188,7 @@ test-naaaim-c++: test-naaaim-c++.o ${RDK_LIBRARY} ${HURD_LIBRARY}
 test-naaaim-c++.o: test-naaaim-c++.cpp
 	${CXX} ${CFLAGS} -c $< -o $@;
 
-test-Duct: test-Duct.o ${LIBRARY_DEPDNDS}
+test-Duct: test-Duct.o ${LIBRARY_DEPENDS}
 	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
 
 test-Duct.o: test-Duct.c
