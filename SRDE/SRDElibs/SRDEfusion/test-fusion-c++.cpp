@@ -37,59 +37,9 @@
 #include <NAAAIM.h>
 #include <SRDE.h>
 #include <SRDEenclave.h>
-
-
-/* Define the OCALL interface for the 'print string' call. */
-struct ocall1_interface {
-	char* str;
-} ocall1_string;
-
-int ocall1_handler(struct ocall1_interface *interface)
-
-{
-	fprintf(stdout, "%s", interface->str);
-	return 0;
-}
-
-
-/* Interface and handler for fgets function simulation. */
-struct SRDEfusion_fgets_interface {
-	_Bool retn;
-
-	int stream;
-	char bufr_size;
-	char bufr[];
-};
-
-int fgets_handler(struct SRDEfusion_fgets_interface *oc)
-
-{
-	FILE *instream = NULL;
-
-
-	if ( oc->stream == 3 )
-		instream = stdin;
-	else {
-		fprintf(stderr, "%s: Bad stream number: %d", __func__, \
-			oc->stream);
-		return 1;
-	}
-
-	if ( fgets(oc->bufr, oc->bufr_size, instream) != NULL )
-		oc->retn = true;
-	return 0;
-}
-
-static const struct {
-	size_t nr_ocall;
-	void *table[2];
-} ocall_table = {
-	2,
-	{
-		(void *) ocall1_handler,
-		(void *) fgets_handler
-	}
-};
+#include <SRDEocall.h>
+#include <SRDEfusion-ocall.h>
+#include <SRDEnaaaim-ocall.h>
 
 
 /* Interfaces for the trusted ECALL's. */
@@ -130,7 +80,11 @@ extern int main(int argc, char *argv[])
 
 	struct SGX_einittoken *einit = NULL;
 
+	struct OCALL_api *ocall_table;
+
 	SRDEenclave enclave = NULL;
+
+	SRDEocall ocall = NULL;
 
 	Buffer bufr = NULL;
 
@@ -195,9 +149,18 @@ extern int main(int argc, char *argv[])
 		ERR(goto done);
 
 
+	/* Setup the OCALL dispatch table. */
+	INIT(NAAAIM, SRDEocall, ocall, ERR(goto done));
+
+	ocall->add_table(ocall, SRDEfusion_ocall_table);
+	if ( !ocall->get_table(ocall, &ocall_table) )
+		ERR(goto done);
+
+
+	/* Iterate through the test counts. */
 	for (test= 1; test <= NUMBER_OF_TESTS; ++test) {
 		ecall0_table.test = test;
-		if ( !enclave->boot_slot(enclave, 0, &ocall_table, \
+		if ( !enclave->boot_slot(enclave, 0, ocall_table, \
 					 &ecall0_table, &rc) ) {
 			fprintf(stderr, "Enclave returned: %d\n", rc);
 			goto done;
@@ -212,6 +175,7 @@ extern int main(int argc, char *argv[])
 	WHACK(bufr);
 	WHACK(token_file);
 	WHACK(enclave);
+	WHACK(ocall);
 
 	return retn;
 

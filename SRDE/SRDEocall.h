@@ -39,6 +39,6 @@ struct NAAAIM_SRDEocall
 
 
 /* SRDEocall constructor call. */
-extern SRDEocall NAAAIM_SRDEocall_Init(void);
+extern HCLINK SRDEocall NAAAIM_SRDEocall_Init(void);
 
 #endif

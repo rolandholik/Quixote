@@ -183,7 +183,7 @@ test-naaaim.o: test-naaaim.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
 test-naaaim-c++: test-naaaim-c++.o ${RDK_LIBRARY} ${HURD_LIBRARY}
-	${CXX} ${LDFLAGS} -o $@ $< ${RDKLIB} ${ELFLIB} ${HURDLIB};
+	${CXX} ${LDFLAGS} -o $@ $< ${LIBS} ${SSL_CRYPTO};
 
 test-naaaim-c++.o: test-naaaim-c++.cpp
 	${CXX} ${CFLAGS} -c $< -o $@;
