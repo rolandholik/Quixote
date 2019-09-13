@@ -249,7 +249,8 @@ static _Bool load_epid(CO(QEenclave, this), CO(char *, epid_name))
 
 	int rc;
 
-	uint8_t resealed;
+	uint8_t resealed,
+		cpusvn[16];
 
 	File epid_file = NULL;
 
@@ -260,6 +261,7 @@ static _Bool load_epid(CO(QEenclave, this), CO(char *, epid_name))
 		uint8_t *p_blob;
 		uint32_t blob_size;
 		uint8_t *p_is_resealed;
+		uint8_t *cpusvn;
 	} ecall0;
 
 
@@ -283,6 +285,7 @@ static _Bool load_epid(CO(QEenclave, this), CO(char *, epid_name))
 	ecall0.p_blob	     = b->get(b);
 	ecall0.blob_size     = b->size(b);
 	ecall0.p_is_resealed = &resealed;
+	ecall0.cpusvn	     = cpusvn;
 
 	if ( !S->enclave->boot_slot(S->enclave, 0, &QE_ocall_table, &ecall0, \
 				    &rc) ) {
