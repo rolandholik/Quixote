@@ -36,6 +36,9 @@
 #include "../SRDE/SRDE.h"
 #include "../SRDE/SRDEenclave.h"
 #include <SRDEquote.h>
+#include <SRDEocall.h>
+#include <SRDEfusion-ocall.h>
+#include <SRDEnaaaim-ocall.h>
 
 #include <ContourPoint.h>
 #include <ExchangeEvent.h>
@@ -55,95 +58,6 @@
 #if !defined(NAAAIM_ISOmanager_OBJID)
 #error Object identifier not defined.
 #endif
-
-
-/** OCALL interface definitions. */
-struct ocall1_interface {
-	char* str;
-} ocall1_string;
-
-int ocall1_handler(struct ocall1_interface *interface)
-
-{
-	fprintf(stdout, "%s", interface->str);
-	fflush(stdout);
-	return 0;
-}
-
-struct ocall2_interface {
-	int* ms_cpuinfo;
-	int ms_leaf;
-	int ms_subleaf;
-};
-
-static void cpuid(int *eax, int *ebx, int *ecx, int *edx)\
-
-{
-	__asm("cpuid\n\t"
-	      /* Output. */
-	      : "=a" (*eax), "=b" (*ebx), "=c" (*ecx), "=d" (*edx)
-	      /* Input. */
-	      : "0" (*eax), "2" (*ecx));
-
-	return;
-}
-
-
-int ocall2_handler(struct ocall2_interface *pms)
-
-{
-	struct ocall2_interface *ms = (struct ocall2_interface *) pms;
-
-
-	ms->ms_cpuinfo[0] = ms->ms_leaf;
-	ms->ms_cpuinfo[2] = ms->ms_subleaf;
-
-	cpuid(&ms->ms_cpuinfo[0], &ms->ms_cpuinfo[1], &ms->ms_cpuinfo[2], \
-	      &ms->ms_cpuinfo[3]);
-
-	return 0;
-}
-
-
-/* Interface and handler for fgets function simulation. */
-struct SRDEfusion_fgets_interface {
-	_Bool retn;
-
-	int stream;
-	char bufr_size;
-	char bufr[];
-};
-
-int fgets_handler(struct SRDEfusion_fgets_interface *oc)
-
-{
-	FILE *instream = NULL;
-
-
-	if ( oc->stream == 3 )
-		instream = stdin;
-	else {
-		fprintf(stderr, "%s: Bad stream number: %d", __func__, \
-			oc->stream);
-		return 1;
-	}
-
-	if ( fgets(oc->bufr, oc->bufr_size, instream) != NULL )
-		oc->retn = true;
-	return 0;
-}
-
-
-static const struct OCALL_api ocall_table = {
-	5,
-	{
-		ocall1_handler,
-		fgets_handler,
-		ocall2_handler,
-		Duct_mgr,
-		SRDEquote_mgr,
-	}
-};
 
 
 /** ExchangeEvent private state information. */
@@ -168,6 +82,9 @@ struct NAAAIM_ISOmanager_State
 
 	/* SGX enclave object. */
 	SRDEenclave enclave;
+
+	/* OCALL dispatch handlers. */
+	SRDEocall ocall;
 };
 
 
@@ -194,6 +111,7 @@ static void _init_state(CO(ISOmanager_State, S))
 	S->enclave_error = 0;
 
 	S->enclave = NULL;
+	S->ocall   = NULL;
 
 	return;
 }
@@ -240,6 +158,14 @@ static _Bool load_enclave(CO(ISOmanager, this), CO(char *, enclave), \
 
 	if ( !S->enclave->setup(S->enclave, enclave, token, true) )
 		ERR(goto done);
+
+
+	/* Setup the OCALL dispatch table. */
+	INIT(NAAAIM, SRDEocall, S->ocall, ERR(goto done));
+
+	S->ocall->add_table(S->ocall, SRDEfusion_ocall_table);
+	S->ocall->add_table(S->ocall, SRDEnaaaim_ocall_table);
+
 	retn = true;
 
 
@@ -290,8 +216,13 @@ static _Bool connect(CO(ISOmanager, this), char *hostname, \
 
 	int rc;
 
+	struct OCALL_api *ocall_table;
+
 	struct ISOmanager_ecall0 ecall0;
 
+
+	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
+		ERR(goto done);
 
 	memset(&ecall0, '\0', sizeof(struct ISOmanager_ecall0));
 
@@ -308,7 +239,7 @@ static _Bool connect(CO(ISOmanager, this), char *hostname, \
 	ecall0.identity	     = id_bufr->get(id_bufr);
 	ecall0.identity_size = id_bufr->size(id_bufr);
 
-	if ( !S->enclave->boot_slot(S->enclave, 0, &ocall_table, \
+	if ( !S->enclave->boot_slot(S->enclave, 0, ocall_table, \
 				    &ecall0, &rc) ) {
 		fprintf(stderr, "Enclave returned: %d\n", rc);
 		goto done;
@@ -352,6 +283,8 @@ static _Bool generate_identity(CO(ISOmanager, this), CO(Buffer, bufr))
 
 	int rc;
 
+	struct OCALL_api *ocall_table;
+
 	struct ISOmanager_ecall1 ecall1;
 
 	
@@ -361,9 +294,12 @@ static _Bool generate_identity(CO(ISOmanager, this), CO(Buffer, bufr))
 
 
 	/* Call ECALL slot 1 to get the enclave identity. */
+	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
+		ERR(goto done);
+
 	memset(&ecall1, '\0', sizeof(struct ISOmanager_ecall1));
 
-	if ( !S->enclave->boot_slot(S->enclave, 1, &ocall_table, &ecall1, \
+	if ( !S->enclave->boot_slot(S->enclave, 1, ocall_table, &ecall1, \
 				    &rc) ) {
 		fprintf(stderr, "Enclave returned: %d\n", rc);
 		goto done;
@@ -412,6 +348,8 @@ static _Bool add_verifier(CO(ISOmanager, this), CO(Buffer, verifier))
 
 	int rc;
 
+	struct OCALL_api *ocall_table;
+
 	struct ISOmanager_ecall2 ecall2;
 
 
@@ -423,12 +361,15 @@ static _Bool add_verifier(CO(ISOmanager, this), CO(Buffer, verifier))
 
 
 	/* Call the add_verifier() enclave function. */
+	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
+		ERR(goto done);
+
 	memset(&ecall2, '\0', sizeof(struct ISOmanager_ecall2));
 
 	ecall2.verifier      = verifier->get(verifier);
 	ecall2.verifier_size = verifier->size(verifier);
 
-	if ( !S->enclave->boot_slot(S->enclave, 2, &ocall_table, \
+	if ( !S->enclave->boot_slot(S->enclave, 2, ocall_table, \
 				    &ecall2, &rc) ) {
 		fprintf(stderr, "Enclave returned: %d\n", rc);
 		goto done;
@@ -485,6 +426,7 @@ static void whack(CO(ISOmanager, this))
 
 
 	WHACK(S->enclave);
+	WHACK(S->ocall);
 
 	S->root->whack(S->root, this, S);
 	return;

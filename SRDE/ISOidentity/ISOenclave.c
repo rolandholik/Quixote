@@ -34,9 +34,12 @@
 #include <NAAAIM.h>
 #include <Duct.h>
 
-#include "../SRDE/SRDE.h"
-#include "../SRDE/SRDEenclave.h"
+#include <SRDE.h>
+#include <SRDEenclave.h>
 #include <SRDEquote.h>
+#include <SRDEocall.h>
+#include <SRDEfusion-ocall.h>
+#include <SRDEnaaaim-ocall.h>
 
 #include <ContourPoint.h>
 #include <ExchangeEvent.h>
@@ -64,82 +67,6 @@
 static inline int sys_set_bad_actor(pid_t pid, unsigned long flags)
 {
 	return syscall(327, pid, flags);
-}
-
-
-/** OCALL interface definitions. */
-struct ocall1_interface {
-	char* str;
-} ocall1_string;
-
-int ocall1_handler(struct ocall1_interface *interface)
-
-{
-	fprintf(stdout, "%s", interface->str);
-	return 0;
-}
-
-struct ocall2_interface {
-	int* ms_cpuinfo;
-	int ms_leaf;
-	int ms_subleaf;
-};
-
-static void cpuid(int *eax, int *ebx, int *ecx, int *edx)\
-
-{
-	__asm("cpuid\n\t"
-	      /* Output. */
-	      : "=a" (*eax), "=b" (*ebx), "=c" (*ecx), "=d" (*edx)
-	      /* Input. */
-	      : "0" (*eax), "2" (*ecx));
-
-	return;
-}
-
-
-int ocall2_handler(struct ocall2_interface *pms)
-
-{
-	struct ocall2_interface *ms = (struct ocall2_interface *) pms;
-
-
-	ms->ms_cpuinfo[0] = ms->ms_leaf;
-	ms->ms_cpuinfo[2] = ms->ms_subleaf;
-
-	cpuid(&ms->ms_cpuinfo[0], &ms->ms_cpuinfo[1], &ms->ms_cpuinfo[2], \
-	      &ms->ms_cpuinfo[3]);
-
-	return 0;
-}
-
-
-/* Interface and handler for fgets function simulation. */
-struct SRDEfusion_fgets_interface {
-	_Bool retn;
-
-	int stream;
-	char bufr_size;
-	char bufr[];
-};
-
-int fgets_handler(struct SRDEfusion_fgets_interface *oc)
-
-{
-	FILE *instream = NULL;
-
-
-	if ( oc->stream == 3 )
-		instream = stdin;
-	else {
-		fprintf(stderr, "%s: Bad stream number: %d", __func__, \
-			oc->stream);
-		return 1;
-	}
-
-	if ( fgets(oc->bufr, oc->bufr_size, instream) != NULL )
-		oc->retn = true;
-	return 0;
 }
 
 
@@ -183,19 +110,6 @@ int discipline_pid_ocall(struct ISOenclave_ocall *oc)
 }
 
 
-static const struct OCALL_api ocall_table = {
-	OCALL_NUMBER,
-	{
-		ocall1_handler,
-		fgets_handler,
-		ocall2_handler,
-		Duct_mgr,
-		SRDEquote_mgr,
-		discipline_pid_ocall,
-	}
-};
-
-
 /** ExchangeEvent private state information. */
 struct NAAAIM_ISOenclave_State
 {
@@ -218,6 +132,9 @@ struct NAAAIM_ISOenclave_State
 
 	/* SGX enclave object. */
 	SRDEenclave enclave;
+
+	/* OCALL dispatch handlers. */
+	SRDEocall ocall;
 };
 
 
@@ -243,6 +160,7 @@ static void _init_state(CO(ISOenclave_State, S))
 	S->enclave_error = 0;
 
 	S->enclave = NULL;
+	S->ocall   = NULL;
 
 	return;
 }
@@ -284,6 +202,8 @@ static _Bool load_enclave(CO(ISOenclave, this), CO(char *, enclave), \
 
 	struct ISOidentity_ecall0_interface ecall0;
 
+	struct OCALL_api *ocall_table;
+
 	Buffer tbufr = NULL;
 
 	File token_file = NULL;
@@ -316,8 +236,19 @@ static _Bool load_enclave(CO(ISOenclave, this), CO(char *, enclave), \
 		ERR(goto done);
 
 
+	/* Setup the OCALL dispatch table. */
+	INIT(NAAAIM, SRDEocall, S->ocall, ERR(goto done));
+
+	S->ocall->add_table(S->ocall, SRDEfusion_ocall_table);
+	S->ocall->add_table(S->ocall, SRDEnaaaim_ocall_table);
+	S->ocall->add(S->ocall,	discipline_pid_ocall);
+
+	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
+		ERR(goto done);
+
+
 	/* Call ECALL slot 0 to initialize the ISOidentity model. */
-	if ( !S->enclave->boot_slot(S->enclave, 0, &ocall_table, &ecall0, \
+	if ( !S->enclave->boot_slot(S->enclave, 0, ocall_table, &ecall0, \
 				    &rc) ) {
 		S->enclave_error = rc;
 		ERR(goto done);
@@ -369,6 +300,8 @@ static _Bool update(CO(ISOenclave, this), CO(String, update), \
 
 	int rc;
 
+	struct OCALL_api *ocall_table;
+
 	struct ISOidentity_ecall1_interface ecall1;
 
 
@@ -382,9 +315,12 @@ static _Bool update(CO(ISOenclave, this), CO(String, update), \
 
 
 	/* Call ECALL slot 0 to initialize the ISOidentity model. */
+	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
+		ERR(goto done);
+
 	ecall1.update = update->get(update);
 
-	if ( !S->enclave->boot_slot(S->enclave, 1, &ocall_table, &ecall1, \
+	if ( !S->enclave->boot_slot(S->enclave, 1, ocall_table, &ecall1, \
 				    &rc) ) {
 		S->enclave_error = rc;
 		ERR(goto done);
@@ -427,6 +363,8 @@ static _Bool update_map(CO(ISOenclave, this), CO(Buffer, bpoint))
 
 	int rc;
 
+	struct OCALL_api *ocall_table;
+
 	struct ISOidentity_ecall12_interface ecall12;
 
 
@@ -440,9 +378,12 @@ static _Bool update_map(CO(ISOenclave, this), CO(Buffer, bpoint))
 
 
 	/* Call ECALL slot 0 to initialize the ISOidentity model. */
+	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
+		ERR(goto done);
+
 	memcpy(ecall12.point, bpoint->get(bpoint), sizeof(ecall12.point));
 
-	if ( !S->enclave->boot_slot(S->enclave, 12, &ocall_table, &ecall12, \
+	if ( !S->enclave->boot_slot(S->enclave, 12, ocall_table, &ecall12, \
 				    &rc) ) {
 		S->enclave_error = rc;
 		ERR(goto done);
@@ -486,6 +427,8 @@ static _Bool set_aggregate(CO(ISOenclave, this), CO(Buffer, bufr))
 
 	int rc;
 
+	struct OCALL_api *ocall_table;
+
 	struct ISOidentity_ecall5_interface ecall5;
 
 
@@ -499,10 +442,13 @@ static _Bool set_aggregate(CO(ISOenclave, this), CO(Buffer, bufr))
 
 
 	/* Call ECALL slot 5 to set the model aggregate. */
+	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
+		ERR(goto done);
+
 	ecall5.aggregate	= bufr->get(bufr);
 	ecall5.aggregate_length = bufr->size(bufr);
 
-	if ( !S->enclave->boot_slot(S->enclave, 5, &ocall_table, &ecall5, \
+	if ( !S->enclave->boot_slot(S->enclave, 5, ocall_table, &ecall5, \
 				    &rc) ) {
 		S->enclave_error = rc;
 		ERR(goto done);
@@ -545,6 +491,8 @@ static _Bool add_ai_event(CO(ISOenclave, this), CO(String, event))
 
 	int rc;
 
+	struct OCALL_api *ocall_table;
+
 	struct ISOidentity_ecall14 ecall14;
 
 
@@ -558,10 +506,13 @@ static _Bool add_ai_event(CO(ISOenclave, this), CO(String, event))
 
 
 	/* Call ECALL slot 15 to set the AI event. */
+	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
+		ERR(goto done);
+
 	ecall14.ai_event      = (uint8_t *) event->get(event);
 	ecall14.ai_event_size = event->size(event) + 1;
 
-	if ( !S->enclave->boot_slot(S->enclave, 14, &ocall_table, &ecall14, \
+	if ( !S->enclave->boot_slot(S->enclave, 14, ocall_table, &ecall14, \
 				    &rc) ) {
 		S->enclave_error = rc;
 		ERR(goto done);
@@ -605,6 +556,8 @@ static _Bool get_measurement(CO(ISOenclave, this), CO(Buffer, bufr))
 
 	int rc;
 
+	struct OCALL_api *ocall_table;
+
 	struct ISOidentity_ecall6_interface ecall6;
 
 
@@ -618,7 +571,10 @@ static _Bool get_measurement(CO(ISOenclave, this), CO(Buffer, bufr))
 
 
 	/* Call ECALL slot 6 to get model measurement. */
-	if ( !S->enclave->boot_slot(S->enclave, 6, &ocall_table, &ecall6, \
+	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
+		ERR(goto done);
+
+	if ( !S->enclave->boot_slot(S->enclave, 6, ocall_table, &ecall6, \
 				    &rc) ) {
 		S->enclave_error = rc;
 		ERR(goto done);
@@ -665,12 +621,17 @@ static _Bool discipline_pid(CO(ISOenclave, this), pid_t * const pid)
 
 	int rc;
 
+	struct OCALL_api *ocall_table;
+
 	struct ISOidentity_ecall7_interface ecall7;
 
 
+	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
+		ERR(goto done);
+
 	ecall7.retn = false;
 	ecall7.pid  = 0;
-	if ( !S->enclave->boot_slot(S->enclave, 7, &ocall_table, &ecall7, \
+	if ( !S->enclave->boot_slot(S->enclave, 7, ocall_table, &ecall7, \
 				    &rc) ) {
 		S->enclave_error = rc;
 		ERR(goto done);
@@ -722,6 +683,8 @@ static _Bool get_event(CO(ISOenclave, this), String event)
 
 	int rc;
 
+	struct OCALL_api *ocall_table;
+
 	struct ISOidentity_ecall9_interface ecall9;
 
 
@@ -735,8 +698,11 @@ static _Bool get_event(CO(ISOenclave, this), String event)
 
 
 	/* Call slot 9 to get model event. */
+	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
+		ERR(goto done);
+
 	ecall9.type = ISO_IDENTITY_EVENT;
-	if ( !S->enclave->boot_slot(S->enclave, 9, &ocall_table, &ecall9, \
+	if ( !S->enclave->boot_slot(S->enclave, 9, ocall_table, &ecall9, \
 				    &rc) ) {
 		S->enclave_error = rc;
 		ERR(goto done);
@@ -776,6 +742,8 @@ static void rewind_event(CO(ISOenclave, this))
 
 	int rc;
 
+	struct OCALL_api *ocall_table;
+
 	struct ISOidentity_ecall8_interface ecall8;
 
 
@@ -785,8 +753,11 @@ static void rewind_event(CO(ISOenclave, this))
 
 
 	/* Call ECALL slot 8 to rewind event cursor. */
+	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
+		ERR(goto done);
+
 	ecall8.type = ISO_IDENTITY_EVENT;
-	if ( !S->enclave->boot_slot(S->enclave, 8, &ocall_table, &ecall8, \
+	if ( !S->enclave->boot_slot(S->enclave, 8, ocall_table, &ecall8, \
 				    &rc) ) {
 		S->enclave_error = rc;
 		ERR(goto done);
@@ -887,6 +858,8 @@ static _Bool get_forensics(CO(ISOenclave, this), String event)
 
 	int rc;
 
+	struct OCALL_api *ocall_table;
+
 	struct ISOidentity_ecall9_interface ecall9;
 
 
@@ -900,8 +873,11 @@ static _Bool get_forensics(CO(ISOenclave, this), String event)
 
 
 	/* Call ECALL slot 9 to get forensics event. */
+	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
+		ERR(goto done);
+
 	ecall9.type = ISO_IDENTITY_FORENSICS;
-	if ( !S->enclave->boot_slot(S->enclave, 9, &ocall_table, &ecall9, \
+	if ( !S->enclave->boot_slot(S->enclave, 9, ocall_table, &ecall9, \
 				    &rc) ) {
 		S->enclave_error = rc;
 		ERR(goto done);
@@ -942,6 +918,8 @@ static void rewind_forensics(CO(ISOenclave, this))
 
 	int rc;
 
+	struct OCALL_api *ocall_table;
+
 	struct ISOidentity_ecall8_interface ecall8;
 
 
@@ -951,8 +929,11 @@ static void rewind_forensics(CO(ISOenclave, this))
 
 
 	/* Call ECALL slot 8 to get forensics event. */
+	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
+		ERR(goto done);
+
 	ecall8.type = ISO_IDENTITY_FORENSICS;
-	if ( !S->enclave->boot_slot(S->enclave, 8, &ocall_table, &ecall8, \
+	if ( !S->enclave->boot_slot(S->enclave, 8, ocall_table, &ecall8, \
 				    &rc) ) {
 		S->enclave_error = rc;
 		ERR(goto done);
@@ -990,13 +971,18 @@ static size_t forensics_size(CO(ISOenclave, this))
 
 	int rc;
 
+	struct OCALL_api *ocall_table;
+
 	struct ISOidentity_ecall4_interface ecall4;
 
 
 	/* Call ECALL slot 4 to get forensics size. */
+	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
+		ERR(goto done);
+
 	ecall4.type = 1;
 	ecall4.size = 0;
-	if ( !S->enclave->boot_slot(S->enclave, 4, &ocall_table, &ecall4, \
+	if ( !S->enclave->boot_slot(S->enclave, 4, ocall_table, &ecall4, \
 				    &rc) ) {
 		S->enclave_error = rc;
 		ERR(goto done);
@@ -1203,8 +1189,13 @@ static _Bool manager(CO(ISOenclave, this), CO(Buffer, id_bufr), \
 
 	int rc;
 
+	struct OCALL_api *ocall_table;
+
 	struct ISOidentity_ecall10_interface ecall10;
 
+
+	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
+		ERR(goto done);
 
 	memset(&ecall10, '\0', sizeof(struct ISOidentity_ecall10_interface));
 
@@ -1218,7 +1209,7 @@ static _Bool manager(CO(ISOenclave, this), CO(Buffer, id_bufr), \
 	ecall10.identity      = id_bufr->get(id_bufr);
 	ecall10.identity_size = id_bufr->size(id_bufr);
 
-	if ( !S->enclave->boot_slot(S->enclave, 10, &ocall_table, \
+	if ( !S->enclave->boot_slot(S->enclave, 10, ocall_table, \
 				    &ecall10, &rc) ) {
 		fprintf(stderr, "Enclave returned: %d\n", rc);
 		goto done;
@@ -1254,15 +1245,20 @@ static _Bool add_verifier(CO(ISOenclave, this), CO(Buffer, verifier))
 
 	int rc;
 
+	struct OCALL_api *ocall_table;
+
 	struct ISOidentity_ecall13 ecall13;
 
+
+	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
+		ERR(goto done);
 
 	memset(&ecall13, '\0', sizeof(struct ISOidentity_ecall13));
 
 	ecall13.verifier      = verifier->get(verifier);
 	ecall13.verifier_size = verifier->size(verifier);
 
-	if ( !S->enclave->boot_slot(S->enclave, 13, &ocall_table, \
+	if ( !S->enclave->boot_slot(S->enclave, 13, ocall_table, \
 				    &ecall13, &rc) ) {
 		fprintf(stderr, "Enclave returned: %d\n", rc);
 		goto done;
@@ -1300,6 +1296,8 @@ static _Bool seal(CO(ISOenclave, this))
 
 	int rc;
 
+	struct OCALL_api *ocall_table;
+
 
 	/* Verify object status. */
 	if ( S->poisoned )
@@ -1307,7 +1305,10 @@ static _Bool seal(CO(ISOenclave, this))
 
 
 	/* Call ECALL slot 2 to seal the ISOidentity model. */
-	if ( !S->enclave->boot_slot(S->enclave, 2, &ocall_table, NULL, &rc) ) {
+	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
+		ERR(goto done);
+
+	if ( !S->enclave->boot_slot(S->enclave, 2, ocall_table, NULL, &rc) ) {
 		S->enclave_error = rc;
 		ERR(goto done);
 	}
@@ -1342,6 +1343,8 @@ static size_t size(CO(ISOenclave, this))
 
 	int rc;
 
+	struct OCALL_api *ocall_table;
+
 	struct ISOidentity_ecall4_interface ecall4;
 
 
@@ -1351,9 +1354,12 @@ static size_t size(CO(ISOenclave, this))
 
 
 	/* Call ECALL slot 4 to get model size. */
+	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
+		ERR(goto done);
+
 	ecall4.type = 0;
 	ecall4.size = 0;
-	if ( !S->enclave->boot_slot(S->enclave, 4, &ocall_table, &ecall4, \
+	if ( !S->enclave->boot_slot(S->enclave, 4, ocall_table, &ecall4, \
 				    &rc) ) {
 		S->enclave_error = rc;
 		ERR(goto done);
@@ -1396,6 +1402,8 @@ static _Bool generate_identity(CO(ISOenclave, this), CO(Buffer, bufr))
 
 	int rc;
 
+	struct OCALL_api *ocall_table;
+
 	struct ISOidentity_ecall11_interface ecall11;
 
 
@@ -1405,9 +1413,12 @@ static _Bool generate_identity(CO(ISOenclave, this), CO(Buffer, bufr))
 
 
 	/* Call ECALL slot 11 to get the enclave identity. */
+	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
+		ERR(goto done);
+
 	memset(&ecall11, '\0', sizeof(struct ISOidentity_ecall11_interface));
 
-	if ( !S->enclave->boot_slot(S->enclave, 11, &ocall_table, \
+	if ( !S->enclave->boot_slot(S->enclave, 11, ocall_table, \
 				    &ecall11, &rc) ) {
 		fprintf(stderr, "Enclave returned: %d\n", rc);
 		goto done;
@@ -1467,6 +1478,7 @@ static void whack(CO(ISOenclave, this))
 
 
 	WHACK(S->enclave);
+	WHACK(S->ocall);
 
 	S->root->whack(S->root, this, S);
 	return;
