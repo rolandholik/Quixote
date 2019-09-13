@@ -31,6 +31,9 @@
 #include <Buffer.h>
 #include <String.h>
 
+#include <SRDEfusion-ocall.h>
+#include <SRDEnaaaim-ocall.h>
+
 #include "NAAAIM.h"
 #include "SRDE.h"
 #include "SRDEquote.h"
@@ -223,7 +226,7 @@ static int sgxquote_ocall(struct SRDEquote_ocall *ocall)
 
 
 	/* Call the SGX duct manager. */
-	if ( (status = sgx_ocall(4, ocp)) == 0 ) {
+	if ( (status = sgx_ocall(SRDENAAAIM_OCALL2, ocp)) == 0 ) {
 		retn = true;
 		*ocall = *ocp;
 	}

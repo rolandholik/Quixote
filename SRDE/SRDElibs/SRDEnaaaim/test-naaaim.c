@@ -38,69 +38,15 @@
 #include <NAAAIM.h>
 #include <SRDE.h>
 #include <SRDEenclave.h>
-
-
-/* Define the OCALL interface for the 'print string' call. */
-struct ocall1_interface {
-	char* str;
-} ocall1_string;
-
-int ocall1_handler(struct ocall1_interface *interface)
-
-{
-	fprintf(stdout, "%s", interface->str);
-	return 0;
-}
-
-struct ocall2_interface {
-	int* ms_cpuinfo;
-	int ms_leaf;
-	int ms_subleaf;
-};
-
-static void cpuid(int *eax, int *ebx, int *ecx, int *edx)\
-
-{
-	__asm("cpuid\n\t"
-	      /* Output. */
-	      : "=a" (*eax), "=b" (*ebx), "=c" (*ecx), "=d" (*edx)
-	      /* Input. */
-	      : "0" (*eax), "2" (*ecx));
-
-	return;
-}
-
-
-int ocall2_handler(struct ocall2_interface *pms)
-
-{
-	struct ocall2_interface *ms = (struct ocall2_interface *) pms;
-
-
-	ms->ms_cpuinfo[0] = ms->ms_leaf;
-	ms->ms_cpuinfo[2] = ms->ms_subleaf;
-
-	cpuid(&ms->ms_cpuinfo[0], &ms->ms_cpuinfo[1], &ms->ms_cpuinfo[2], \
-	      &ms->ms_cpuinfo[3]);
-
-	return 0;
-}
-
-static const struct OCALL_api ocall_table = {
-	3,
-	{
-		ocall1_handler,
-		NULL,
-		ocall2_handler
-	}
-};
+#include <SRDEocall.h>
+#include <SRDEfusion-ocall.h>
+#include <SRDEnaaaim-ocall.h>
 
 
 /* Interfaces for the trusted ECALL's. */
 static struct ecall0_table {
 	int test;
 } ecall0_table;
-
 
 
 /**
@@ -136,7 +82,11 @@ extern int main(int argc, char *argv[])
 
 	struct SGX_einittoken *einit = NULL;
 
+	struct OCALL_api *table;
+
 	SRDEenclave enclave = NULL;
+
+	SRDEocall ocall = NULL;
 
 	Buffer bufr = NULL;
 
@@ -204,10 +154,19 @@ extern int main(int argc, char *argv[])
 		ERR(goto done);
 
 
+	INIT(NAAAIM, SRDEocall, ocall, ERR(goto done));
+
+	ocall->add_table(ocall, SRDEfusion_ocall_table);
+	ocall->add_table(ocall, SRDEnaaaim_ocall_table);
+
+	if ( !ocall->get_table(ocall, &table) )
+		ERR(goto done);
+
+
 	/* Sequence through all tests. */
 	for (test= 1; test <= NUMBER_OF_TESTS; ++test) {
 		ecall0_table.test = test;
-		if ( !enclave->boot_slot(enclave, 0, &ocall_table, \
+		if ( !enclave->boot_slot(enclave, 0, table, \
 					 &ecall0_table, &rc) ) {
 			fprintf(stderr, "Enclave returned: %d\n", rc);
 			goto done;
@@ -222,6 +181,7 @@ extern int main(int argc, char *argv[])
 	WHACK(bufr);
 	WHACK(token_file);
 	WHACK(enclave);
+	WHACK(ocall);
 
 	return retn;
 

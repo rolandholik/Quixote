@@ -90,34 +90,10 @@ static int SRDEfusion_ocall1(struct SRDEfusion_ocall1_interface *ifp)
 
 
 /**
- * Private function.
- *
- * This function implements the the entry point for registering the
- * SRDEfusion OCALL functions.
- *
- * \param ocall	A pointer to the object that will be used to
- *		build the OCALL dispatch table.
- *
- * \return	A boolean value is returned to indicate whether or
- *		no the functions were registered.  A false value
- *		indicates the functions were not properly registered
- *		while a true value indicates registration of all
- *		functions was successful.
+ * Null terminated table of SRDEfusion ocall pointers.
  */
-
-_Bool SRDEfusion_ocall_add(CO(SRDEocall, ocall))
-
-{
-	_Bool retn = false;
-
-
-	ocall->add(ocall, SRDEfusion_ocall0);
-
-	if ( !ocall->add(ocall, SRDEfusion_ocall1) )
-		goto done;
-	retn = true;
-
-
- done:
-	return retn;
-}
+const void *SRDEfusion_ocall_table[3] = {
+	SRDEfusion_ocall0,
+	SRDEfusion_ocall1,
+	NULL
+};

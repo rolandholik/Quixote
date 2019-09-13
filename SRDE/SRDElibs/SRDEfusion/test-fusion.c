@@ -39,6 +39,7 @@
 #include <SRDE.h>
 #include <SRDEenclave.h>
 #include <SRDEocall.h>
+#include <SRDEfusion-ocall.h>
 
 
 /** Interface structure for ECALL0 */
@@ -150,12 +151,12 @@ extern int main(int argc, char *argv[])
 	/* Setup the OCALL dispatch table. */
 	INIT(NAAAIM, SRDEocall, ocall, ERR(goto done));
 
-	ocall->add_SRDEfusion(ocall);
+	ocall->add_table(ocall, SRDEfusion_ocall_table);
 	if ( !ocall->get_table(ocall, &ocall_table) )
 		ERR(goto done);
 
 
-	/* Iterate throught the test counts. */
+	/* Iterate through the test counts. */
 	for (test= 1; test <= NUMBER_OF_TESTS; ++test) {
 		ecall0_table.test = test;
 		if ( !enclave->boot_slot(enclave, 0, ocall_table, \

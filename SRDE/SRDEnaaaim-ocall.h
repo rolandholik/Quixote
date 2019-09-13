@@ -1,6 +1,6 @@
 /** \file
  * This file contains interface definitions for the OCALL's that
- * are used by the SRDEfusion enclave library.
+ * are used by the SRDEnaaaim enclave library.
  *
  * This file is designed to be included by code from both untrusted
  * and enclave space.
@@ -13,36 +13,35 @@
  * the source tree for copyright and licensing information.
  **************************************************************************/
 
+
 /* Definitions of the OCALL function slots. */
-#define SRDEFUSION_OCALL0	0
-#define SRDEFUSION_OCALL1	1
 
-#define SRDEFUSION_MAX_OCALL	SRDEFUSION_OCALL1
+/* CPUID interrogation. */
+#define SRDENAAAIM_OCALL0	SRDEFUSION_MAX_OCALL+1
 
+/* Duct manager. */
+#define SRDENAAAIM_OCALL1	SRDENAAAIM_OCALL0+1
 
-/**
- * This structure defines the interface used by SRDEFUSION_OCALL0 to
- * pass a formated buffer to untrusted space for output.
- */
-struct SRDEfusion_ocall0_interface {
-	char *buffer;
-};
+/* SRDEquote manager. */
+#define SRDENAAAIM_OCALL2	SRDENAAAIM_OCALL1+1
+
+#define SRDENAAAIM_MAX_OCALL	SRDENAAAIM_OCALL2
 
 
 /**
- * This structure defines the interface used by SRDEFUSION_OCALL1 to
- * read input from untrusted space and return it to enclave context.
+ * This structure defines the interface used by SRDENAAAIM_OCALL0 to
+ * convey a request for CPUI information to untrusted space with
+ * conveyance of the information back into enclave context.
  */
-struct SRDEfusion_ocall1_interface {
-	_Bool retn;
 
-	int stream;
-	char bufr_size;
-	char bufr[];
+struct SRDEnaaaim_ocall0_interface {
+	int leaf;
+	int subleaf;
+	int *cpuinfo;
 };
 
 
 /**
  * Declaration for the function to populate SRDEnaaaim OCALL's.
  */
-extern const void *SRDEfusion_ocall_table[];
+extern const void *SRDEnaaaim_ocall_table[];

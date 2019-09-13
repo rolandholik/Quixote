@@ -12,6 +12,10 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include <SRDEfusion-ocall.h>
+#include <SRDEnaaaim-ocall.h>
+
+
 #define CHECK_REF_POINTER(ptr, siz) do {	\
 	if (!(ptr) || ! sgx_is_outside_enclave((ptr), (siz)))	\
 		return SGX_ERROR_INVALID_PARAMETER;\
@@ -22,47 +26,51 @@
 		return SGX_ERROR_INVALID_PARAMETER;\
 } while (0)
 
-typedef struct ms_sgx_oc_cpuidex_t {
-	int* ms_cpuinfo;
-	int ms_leaf;
-	int ms_subleaf;
-} ms_sgx_oc_cpuidex_t;
 
 sgx_status_t SGX_CDECL sgx_oc_cpuidex(int cpuinfo[4], int leaf, int subleaf)
 {
 	sgx_status_t status = SGX_SUCCESS;
+
 	size_t _len_cpuinfo = 4 * sizeof(*cpuinfo);
 
-	ms_sgx_oc_cpuidex_t* ms = NULL;
-	size_t ocalloc_size = sizeof(ms_sgx_oc_cpuidex_t);
+	struct SRDEnaaaim_ocall0_interface *ms = NULL;
+
+	size_t ocalloc_size = sizeof(struct SRDEnaaaim_ocall0_interface);
+
 	void *__tmp = NULL;
 
-	ocalloc_size += (cpuinfo != NULL && sgx_is_within_enclave(cpuinfo, _len_cpuinfo)) ? _len_cpuinfo : 0;
+
+	ocalloc_size += (cpuinfo != NULL && \
+			 sgx_is_within_enclave(cpuinfo, _len_cpuinfo)) ? \
+		_len_cpuinfo : 0;
 
 	__tmp = sgx_ocalloc(ocalloc_size);
 	if (__tmp == NULL) {
 		sgx_ocfree();
 		return SGX_ERROR_UNEXPECTED;
 	}
-	ms = (ms_sgx_oc_cpuidex_t*)__tmp;
-	__tmp = (void *)((size_t)__tmp + sizeof(ms_sgx_oc_cpuidex_t));
+
+	ms = (struct SRDEnaaaim_ocall0_interface *) __tmp;
+	__tmp = (void *)((size_t)__tmp + \
+			 sizeof(struct SRDEnaaaim_ocall0_interface));
 
 	if (cpuinfo != NULL && sgx_is_within_enclave(cpuinfo, _len_cpuinfo)) {
-		ms->ms_cpuinfo = (int*)__tmp;
+		ms->cpuinfo = (int*)__tmp;
 		__tmp = (void *)((size_t)__tmp + _len_cpuinfo);
-		memcpy(ms->ms_cpuinfo, cpuinfo, _len_cpuinfo);
+		memcpy(ms->cpuinfo, cpuinfo, _len_cpuinfo);
 	} else if (cpuinfo == NULL) {
-		ms->ms_cpuinfo = NULL;
+		ms->cpuinfo = NULL;
 	} else {
 		sgx_ocfree();
 		return SGX_ERROR_INVALID_PARAMETER;
 	}
 
-	ms->ms_leaf = leaf;
-	ms->ms_subleaf = subleaf;
-	status = sgx_ocall(2, ms);
+	ms->leaf    = leaf;
+	ms->subleaf = subleaf;
+	status = sgx_ocall(SRDENAAAIM_OCALL0, ms);
 
-	if (cpuinfo) memcpy((void*)cpuinfo, ms->ms_cpuinfo, _len_cpuinfo);
+	if (cpuinfo)
+		memcpy((void*) cpuinfo, ms->cpuinfo, _len_cpuinfo);
 
 	sgx_ocfree();
 	return status;

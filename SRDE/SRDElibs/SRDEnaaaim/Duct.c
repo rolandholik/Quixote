@@ -23,6 +23,9 @@
 #include <Buffer.h>
 #include <String.h>
 
+#include <SRDEfusion-ocall.h>
+#include <SRDEnaaaim-ocall.h>
+
 #include "NAAAIM.h"
 #include "Duct.h"
 
@@ -182,7 +185,7 @@ static int duct_ocall(struct Duct_ocall *ocall)
 
 
 	/* Call the SGX duct manager. */
-	if ( (status = sgx_ocall(3, ocp)) == 0 ) {
+	if ( (status = sgx_ocall(SRDENAAAIM_OCALL1, ocp)) == 0 ) {
 		retn = true;
 		*ocall = *ocp;
 	}

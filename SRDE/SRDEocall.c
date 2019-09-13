@@ -78,10 +78,6 @@ struct NAAAIM_SRDEocall_State
 };
 
 
-/* Definition for the function used to register SRDEfusion OCALL's. */
-_Bool SRDEfusion_ocall_add(const SRDEocall);
-
-
 /**
  * Internal private method.
  *
@@ -158,11 +154,15 @@ static _Bool add(CO(SRDEocall, this), CO(void *, ptr))
 /**
  * External public method.
  *
- * This method implements the registration of OCALL functions that
- * are used by the SRDEfusion trusted library.
+ * This method implements the registration of a generic table of OCALL
+ * functions.  The array of function pointers is designed to be
+ * NULL terminated.
  *
  * \param this	A pointer to the object that will have the OCALL's
  *		added to.
+ *
+ * \param table	A pointer to the table of function pointers to be
+ *		added.
  *
  * \return	A boolean value is used to indicate whether or not
  *		the OCALL's were added.  A false value indicates the
@@ -170,21 +170,26 @@ static _Bool add(CO(SRDEocall, this), CO(void *, ptr))
  *		true value indicates the functions were added.
  */
 
-static _Bool add_SRDEfusion(CO(SRDEocall, this))
+static _Bool add_table(CO(SRDEocall, this), const void **table)
 
 {
 	STATE(S);
 
 	_Bool retn = false;
 
+	unsigned int lp;
+
 
 	/* Verify object status. */
 	if ( S->poisoned )
 		ERR(goto done);
 
-	/* Call the registration function and set the return code. */
-	if ( !SRDEfusion_ocall_add(this) )
-		ERR(goto done);
+
+	/* Register each function .*/
+	for (lp= 0; table[lp] != NULL; ++lp) {
+		if ( !this->add(this, table[lp]) )
+			ERR(goto done);
+	}
 
 	retn = true;
 
@@ -350,7 +355,7 @@ extern SRDEocall NAAAIM_SRDEocall_Init(void)
 
 	/* Method initialization. */
 	this->add	     = add;
-	this->add_SRDEfusion = add_SRDEfusion;
+	this->add_table	     = add_table;
 
 	this->get_table = get_table;
 
