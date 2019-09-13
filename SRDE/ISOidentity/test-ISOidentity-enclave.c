@@ -123,6 +123,11 @@ extern int main(int argc, char *argv[])
 		}
 
 
+	/* Setup the exception handler. */
+	if ( !srde_configure_exception() )
+		ERR(goto done);
+
+
 	/* Run measurement mode. */
 	if ( mode == measure ) {
 		INIT(NAAAIM, ISOenclave, isoenclave, ERR(goto done));
