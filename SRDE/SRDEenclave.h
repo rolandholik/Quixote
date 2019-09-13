@@ -46,8 +46,8 @@ struct NAAAIM_SRDEenclave
 	_Bool (*add_thread)(const SRDEenclave);
 	_Bool (*get_thread)(const SRDEenclave, unsigned long int *);
 
-	_Bool (*boot_slot)(const SRDEenclave, int, const void *, void *, \
-			   int *);
+	_Bool (*boot_slot)(const SRDEenclave, int, const struct OCALL_api *, \
+			   void *, int *);
 	int (*boot_ocall)(const SRDEenclave, const int, const void *, \
 			  const void *);
 

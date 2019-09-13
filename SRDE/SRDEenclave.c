@@ -1153,8 +1153,8 @@ static void _restore_fp_state(uint8_t *save_area)
  *		the execution was successful.
  */
 
-static _Bool boot_slot(CO(SRDEenclave, this), int slot, CO(void *, ocall), \
-		       void *ecall, int *retc)
+static _Bool boot_slot(CO(SRDEenclave, this), int slot, \
+		       CO(struct OCALL_api *, ocall), void *ecall, int *retc)
 
 {
 	STATE(S);
