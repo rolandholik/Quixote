@@ -162,10 +162,12 @@ struct msg4_input {
  * The following defines an empty OCALL table for the provisioning
  * enclave.
  */
-static const struct {
-	size_t nr_ocall;
-	void *table[1];
-} PVE_ocall_table = { 0, {NULL}};
+static struct OCALL_api PVE_ocall_table = {
+	0,
+	{
+		NULL
+	}
+};
 
 
 /** PVEenclave private state information. */

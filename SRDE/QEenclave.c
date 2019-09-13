@@ -67,10 +67,12 @@
  * The following defines an empty OCALL table for the quoting
  * enclave.
  */
-static const struct {
-	size_t nr_ocall;
-	void *table[1];
-} QE_ocall_table = { 0, {NULL}};
+static const struct OCALL_api QE_ocall_table = {
+	0,
+	{
+		NULL
+	}
+};
 
 
 /** QEenclave private state information. */

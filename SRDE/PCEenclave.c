@@ -64,10 +64,12 @@
  * The following defines an empty OCALL table for the provisioning
  * enclave.
  */
-static const struct {
-	size_t nr_ocall;
-	void *table[1];
-} PCE_ocall_table = { 0, {NULL}};
+static const struct OCALL_api PCE_ocall_table = {
+	0,
+	{
+		NULL
+	}
+};
 
 
 /**

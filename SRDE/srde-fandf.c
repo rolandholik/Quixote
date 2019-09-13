@@ -59,10 +59,12 @@
  * The following defines an empty OCALL table since the Launch Enclave
  * does not support any outgoing calls.
  */
-static const struct {
-	size_t nr_ocall;
-	void *table[1];
-} LE_ocall_table = { 0, {NULL}};
+static const struct OCALL_api LE_ocall_table = {
+	0,
+	{
+		NULL
+	}
+};
 
 
 /**
