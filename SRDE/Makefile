@@ -13,7 +13,8 @@ INSTALLBIN    = srde-check srde-gen-token srde-gen-verifier srde-load \
 INSTALLSCRIPT = provision-epid provision-tokens provision-verifier
 INSTINCLUDE   = PCEenclave.h PVEenclave.h QEenclave.h SRDEaesgcm.h SRDEcmac.h \
 	SRDEecdsa.h SRDEepid.h SRDEloader.h SRDEmessage.h SRDEmetadata.h      \
-	SRDEquote.h SRDErsa.h SRDEsigstruct.h SRDE.h SRDEenclave.h SRDEocall.h
+	SRDEquote.h SRDErsa.h SRDEsigstruct.h SRDE.h SRDEenclave.h	      \
+	SRDEocall.h SRDEfusion-ocall.h SRDEnaaaim-ocall.h
 
 SUBDIRS	    = SRDElibs Attestation ISOidentity Sample
 DEV_SUBDIRS = SRDElibs Sample

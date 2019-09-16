@@ -48,9 +48,13 @@ endif
 
 ELFLIB	       = elf
 HURDLIB	       = HurdLib
+NAAAIMLIB      = NAAAIM
 SRDEFUSIONLIB  = SRDEfusion
 SRDERUNLIB     = SRDEruntime
 SRDENAAAIMLIB  = SRDEnaaaim
+
+SSL_TRTS_LIB   = sgx_tsgxssl
+SSLCRYPTO      = -lcrypto -ldl -lpthread
 
 SDK_TRTS_LIB	    = sgx_trts
 SDK_CRYPTO_LIB	    = sgx_tcrypto
@@ -72,11 +76,11 @@ FUSION_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles   \
 NAAAIM_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles   \
 	-L${SDK_LIBRARY_PATH} -L${SSL_LIBRARY_PATH} -L${LIBDIR}		     \
 	-Wl,--whole-archive						     \
-	-l${SDK_TRTS_LIB}						     \
+	-l${SDK_TRTS_LIB} -l${SSL_TRTS_LIB}				     \
 	-Wl,--no-whole-archive						     \
 	-Wl,--start-group						     \
 	-lsgx_tstdc -l${SDK_CRYPTO_LIB} -l${SDK_SERVICE_LIBRARY}	     \
-	-l${SRDENAAAIMLIB} -lsgx_tsgxssl_crypto  -lsgx_tsgxssl -lsgx_tcxx    \
+	-l${SRDENAAAIMLIB} -lsgx_tsgxssl_crypto -lsgx_tcxx		     \
 	-l${SRDEFUSIONLIB}						     \
 	-Wl,--end-group							     \
 	-Wl,-Bstatic -Wl,-Bsymbolic -Wl,--no-undefined			     \
@@ -150,13 +154,15 @@ test-fusion.o: test-fusion.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
 test-fusion-c++: test-fusion-c++.o
-	${CXX} ${LDFLAGS} -o $@ $< -l${SRDERUNLIB} -l${ELFLIB} -l${HURDLIB};
+	${CXX} ${LDFLAGS} -o $@ $< -l${SRDERUNLIB} -l${ELFLIB} \
+		-l${NAAAIMLIB} -l${HURDLIB} ${SSLCRYPTO};
 
 test-fusion-c++.o: test-fusion-c++.cpp
 	${CXX} ${CFLAGS} -c $< -o $@;
 
 test-naaaim: test-naaaim.o
-	${CC} ${LDFLAGS} -o $@ $< -l${SRDERUNLIB} -l${ELFLIB} -l${HURDLIB};
+	${CC} ${LDFLAGS} -o $@ $< -l${SRDERUNLIB} -l${ELFLIB} \
+		-l ${NAAAIMLIB} -l${HURDLIB} ${SSLCRYPTO};
 
 test-naaaim.o: test-naaaim.c
 	${CC} ${CFLAGS} -c $< -o $@;
