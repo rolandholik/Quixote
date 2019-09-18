@@ -23,6 +23,7 @@
 #include "SHA256_hmac.h"
 #include "AES256_cbc.h"
 #include "Base64.h"
+#include "RSAkey.h"
 
 
 void test_one()
@@ -342,6 +343,99 @@ void test_six()
 }
 
 
+void test_seven()
+
+{
+	RSAkey key = NULL;
+
+	Buffer public  = NULL,
+	       private = NULL,
+	       payload = NULL;
+
+	const static uint8_t encdata[32] = {			\
+		0x70, 0x53, 0x4d, 0x06, 0x62, 0xe1, 0x4b, 0x8e, \
+		0xef, 0xc7, 0x9e, 0x02, 0x3d, 0x95, 0xa1, 0x7d, \
+		0xcf, 0x79, 0x2b, 0xbc, 0x2d, 0xb6, 0xd8, 0x4d, \
+		0x31, 0x88, 0xfb, 0x04, 0xb6, 0xa9, 0x1d, 0xf5  \
+	};
+
+
+	INIT(HurdLib, Buffer, public, ERR(goto done));
+	INIT(HurdLib, Buffer, private, ERR(goto done));
+
+	fputs("Generating 2048 bit RSA key.\n", stdout);
+	INIT(NAAAIM, RSAkey, key, ERR(goto done));
+	if ( !key->generate_key(key, 2048) )
+		ERR(goto done);
+
+	fputs("\nKey components:\n", stdout);
+	key->print(key);
+
+	fputs("\nPrivate key in PEM form:\n", stdout);
+	key->get_private_key(key, private);
+	private->hprint(private);
+
+	fputs("\nPublic key in PEM form:\n", stdout);
+	key->get_public_key(key, public);
+	public->hprint(public);
+
+	WHACK(key);
+	INIT(NAAAIM, RSAkey, key, ERR(goto done));
+	INIT(HurdLib, Buffer, payload, ERR(goto done));
+
+	if ( !key->load_public(key, public) )
+		ERR(goto done);
+
+	if ( !payload->add(payload, encdata, sizeof(encdata)) )
+		ERR(goto done);
+	fputs("\nPayload to be encrypted:\n", stdout);
+	payload->hprint(payload);
+
+	if ( !key->encrypt(key, payload) )
+		ERR(goto done);
+	fputs("\nPayload encrypted with public key:\n", stdout);
+	payload->hprint(payload);
+
+	WHACK(key);
+	INIT(NAAAIM, RSAkey, key, ERR(goto done));
+
+	if ( !key->load_private(key, private) )
+		ERR(goto done);
+	if ( !key->decrypt(key, payload) )
+		ERR(goto done);
+
+	fputs("\nPayload decrypted with private key:\n", stdout);
+	payload->hprint(payload);
+
+
+	if ( !key->encrypt(key, payload) )
+		ERR(goto done);
+	fputs("\nPayload encrypted with private key:\n", stdout);
+	payload->hprint(payload);
+
+	WHACK(key);
+	INIT(NAAAIM, RSAkey, key, ERR(goto done));
+
+	if ( !key->load_public(key, public) )
+		ERR(goto done);
+	if ( !key->decrypt(key, payload) )
+		ERR(goto done);
+
+	fputs("\nPayload decrypted with public key:\n", stdout);
+	payload->hprint(payload);
+
+
+ done:
+	WHACK(key);
+
+	WHACK(public);
+	WHACK(private);
+	WHACK(payload);
+
+	return;
+}
+
+
 void test_naaaim(unsigned int test)
 
 {
@@ -365,6 +459,9 @@ void test_naaaim(unsigned int test)
 			break;
 		case 6:
 			test_six();
+			break;
+		case 7:
+			test_seven();
 			break;
 
 		default:

@@ -2,6 +2,15 @@
  * This file implements methods for managing and manipulating
  * operations using assymetric RSA keys.  The RSAkey.h file provides
  * the API definitions and contracts for this object.
+ *
+ * This implementation is currently tuned to the needs of manipulating
+ * RSA keys by an enclave.  As such the interface for loading public
+ * and private keys use Buffer objects rather then the name of
+ * a file.
+ *
+ * The implemenation assumes that the enclave will be responsible for
+ * decrypting the PEM object before passing it into the key loading
+ * method.
  */
 
 /**************************************************************************
@@ -332,64 +341,6 @@ static _Bool get_private_key(CO(RSAkey, this), CO(Buffer, bufr))
 /**
  * External public method.
  *
- * This method implements loading of an RSA public key and sets
- * the object type to be a public key object.
- *
- * \param this		A pointer to the key object whose public key
- *			is to be loaded.
- *
- * \param key		The object containing the public key.
- *
- * \return	If the load of the public key failed for any reason
- *		a falsed value is returned to the caller.  A true
- *		value indicates the key has been loaded and the
- *		object is ready for use.
- */
-
-static _Bool load_public(CO(RSAkey, this), CO(Buffer, bufr))
-
-{
-	STATE(S);
-
-	_Bool retn = false;
-
-	BIO *key = NULL;
-
-
-	/* Verify object status. */
-	if ( S->poisoned )
-		ERR(goto done);
-	if ( bufr == NULL )
-		ERR(goto done);
-	if ( bufr->poisoned(bufr) )
-		ERR(goto done);
-	if ( S->type != no_key )
-		ERR(goto done);
-
-	/* Load key from a memory based BIO based on the Buffer object. */
-	key = BIO_new_mem_buf(bufr->get(bufr), bufr->size(bufr));
-
-	if ( PEM_read_bio_RSAPublicKey(key, &S->key, NULL, NULL) == NULL )
-		ERR(goto done);
-
-	retn	= true;
-	S->type = public_key;
-
-
- done:
-	if ( key != NULL )
-		BIO_free(key);
-
-	if ( !retn )
-		S->poisoned = true;
-
-	return retn;
-}
-
-
-/**
- * External public method.
- *
  * This method implements loading of an RSA private key and sets
  * the object type to be a private key object.
  *
@@ -459,8 +410,67 @@ static _Bool load_private(CO(RSAkey, this), CO(Buffer, bufr))
 /**
  * External public method.
  *
- * This method implements loading of an RSA private key and sets
- * the object type to be a private key object.
+ * This method implements loading of an RSA public key and sets
+ * the object type to be a public key object.
+ *
+ * \param this		A pointer to the key object whose public key
+ *			is to be loaded.
+ *
+ * \param key		The object containing the public key.
+ *
+ * \return	If the load of the public key failed for any reason
+ *		a falsed value is returned to the caller.  A true
+ *		value indicates the key has been loaded and the
+ *		object is ready for use.
+ */
+
+static _Bool load_public(CO(RSAkey, this), CO(Buffer, bufr))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	BIO *key = NULL;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( bufr == NULL )
+		ERR(goto done);
+	if ( bufr->poisoned(bufr) )
+		ERR(goto done);
+	if ( S->type != no_key )
+		ERR(goto done);
+
+	/* Load key from a memory based BIO based on the Buffer object. */
+	key = BIO_new_mem_buf(bufr->get(bufr), bufr->size(bufr));
+
+	if ( PEM_read_bio_RSAPublicKey(key, &S->key, NULL, NULL) == NULL )
+		ERR(goto done);
+
+	retn	= true;
+	S->type = public_key;
+
+
+ done:
+	if ( key != NULL )
+		BIO_free(key);
+
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements loading of an RSA private key from a file
+ * source and sets the object type to be a private key object.  This
+ * function is currently not implemented in enclave context.
  *
  * \param this		A pointer to the key object whose private key
  *			is to be loaded.
@@ -487,78 +497,16 @@ static _Bool load_private_key(CO(RSAkey, this), CO(char *, source), \
 			      CO(char *, prompt))
 
 {
-	STATE(S);
-
-	_Bool retn = false;
-
-	FILE *infile = NULL;
-
-	struct {
-		const void *pwd;
-		const void *prompt;
-	} cb_data;
-
-	EVP_PKEY *key = NULL;
-
-	UI_METHOD *method = UI_OpenSSL();
-
-
-	/* Load the key from an alternate engine. */
-	if ( S->engine != NULL ) {
-		memset(&cb_data, '\0', sizeof(cb_data));
-		if ( prompt != NULL )
-			cb_data.prompt = prompt;
-
-		key = ENGINE_load_private_key(S->engine, source, method, \
-					      &cb_data);
-		if ( key == NULL )
-			ERR(goto done);
-		if ( (S->key = EVP_PKEY_get1_RSA(key)) == NULL )
-			ERR(goto done);
-
-		retn	= true;
-		S->type = hardware_key;
-		goto done;
-	}
-
-	/* Handle a load from a file. */
-	if ( source != NULL ) {
-		if ( (infile = fopen(source, "r")) == NULL )
-			ERR(goto done);
-
-		if ( PEM_read_RSAPrivateKey(infile, &S->key, NULL, NULL) == \
-		     NULL )
-			ERR(goto done);
-
-		retn	= true;
-		S->type = private_key;
-		goto done;
-	}
-
-
-	/* Load the key from an alternate engine if supplied. */
-	if ( S->engine == NULL )
-		ERR(goto done);
-
-
-
-
- done:
-	if ( !retn )
-		S->poisoned = true;
-
-	if ( infile != NULL )
-		fclose(infile);
-
-	return retn;
+	ERR(return false);
 }
 
 
 /**
  * External public method.
  *
- * This method implements loading of an RSA public key and sets
- * the object type to be a public key object.
+ * This method implements loading of an RSA public key from a file
+ * source and sets the object type to be a public key object.  This
+ * method is currently not implemented in enclave context.
  *
  * \param this		A pointer to the key object whose public key
  *			is to be loaded.
@@ -585,58 +533,7 @@ static _Bool load_public_key(CO(RSAkey, this), CO(char *, file), \
 			     CO(char *, prompt))
 
 {
-	STATE(S);
-
-	_Bool retn = false;
-
-	FILE *infile = NULL;
-
-	struct {
-		const void *pwd;
-		const void *prompt;
-	} cb_data;
-
-	EVP_PKEY *key = NULL;
-
-	UI_METHOD *method = UI_OpenSSL();
-
-
-	/* Load the key from an alternate engine. */
-	if ( S->engine != NULL ) {
-		memset(&cb_data, '\0', sizeof(cb_data));
-		if ( prompt != NULL )
-			cb_data.prompt = prompt;
-
-		key = ENGINE_load_public_key(S->engine, file, method, \
-					     &cb_data);
-		if ( key == NULL )
-			ERR(goto done);
-		if ( (S->key = EVP_PKEY_get1_RSA(key)) == NULL )
-			ERR(goto done);
-
-		retn	= true;
-		S->type = hardware_key;
-		goto done;
-	}
-
-	if ( (infile = fopen(file, "r")) == NULL )
-		ERR(goto done);
-
-	if ( PEM_read_RSA_PUBKEY(infile, &S->key, NULL, NULL) == NULL )
-		ERR(goto done);
-
-	retn	= true;
-	S->type = public_key;
-
-
- done:
-	if ( !retn )
-		S->poisoned = true;
-
-	if ( infile != NULL )
-		fclose(infile);
-
-	return retn;
+	ERR(return false);
 }
 
 
@@ -951,6 +848,10 @@ static void print(CO(RSAkey, this))
 {
 	STATE(S);
 
+	char *mp = NULL;
+
+	size_t ms;
+
 	BIO *output;
 
 
@@ -963,11 +864,20 @@ static void print(CO(RSAkey, this))
 		return;
 	}
 
-        output=BIO_new(BIO_s_file());
-	BIO_set_fp(output, stdout, BIO_NOCLOSE);
-	if ( !RSA_print(output, S->key, 0) )
-		fputs("Error printing key.\n", stderr);
+	if ( (output = BIO_new(BIO_s_mem())) == NULL )
+		ERR(goto done);
 
+	if ( !RSA_print(output, S->key, 0) )
+		ERR(goto done);
+
+	ms = BIO_get_mem_data(output, &mp);
+	if ( ms == 0 )
+		ERR(goto done);
+
+	fprintf(stdout, "%s", mp);
+
+
+ done:
 	return;
 }
 

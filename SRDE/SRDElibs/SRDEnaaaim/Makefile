@@ -16,7 +16,7 @@ CSRC   = test-naaaim.c
 ENCSRC = test-naaaim-enclave.c test-naaaim-interface.c
 LIBSRC = SHA256.c RandomBuffer.c Curve25519.c SHA256_hmac.c AES256_cbc.c  \
 	Duct.c SRDEquote.c Base64.c IDtoken.c PossumPacket.c PossumPipe.c \
-	SoftwareStatus.c OTEDKS.c IDmgr.c Ivy.c ssl-ocall.c
+	SoftwareStatus.c OTEDKS.c IDmgr.c Ivy.c RSAkey.c ssl-ocall.c
 ASRC   = rdrand.s
 
 DUCTSRC	  = test-Duct-enclave.c test-Duct-interface.c
