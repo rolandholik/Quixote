@@ -439,40 +439,58 @@ void test_seven()
 
 void test_eight()
 {
-	Buffer keyid = NULL;
+	Buffer iv    = NULL,
+	       keyid = NULL,
+	       key   = NULL;
 
-	SEALkey key = NULL;
+	SEALkey sealkey = NULL;
 
 
-	INIT(NAAAIM, SEALkey, key, ERR(goto done));
+	INIT(NAAAIM, SEALkey, sealkey, ERR(goto done));
 
-	if ( !key->generate_mrsigner(key) )
+	if ( !sealkey->generate_mrsigner(sealkey) )
 		ERR(goto done);
-	key->print(key);
+	sealkey->print(sealkey);
 
 
 	/* Request the keyid. */
 	INIT(HurdLib, Buffer, keyid, ERR(goto done));
 
-	if ( !key->get_keyid(key, keyid) )
+	if ( !sealkey->get_keyid(sealkey, keyid) )
 		ERR(goto done);
 
 
 	/* Test re-generation of the key. */
 	fputs("\nTesting key re-generation.\n\n", stdout);
 
-	key->reset(key);
-	if ( !key->set_keyid(key, keyid) )
+	sealkey->reset(sealkey);
+	if ( !sealkey->set_keyid(sealkey, keyid) )
 		ERR(goto done);
 
-	if ( !key->generate_mrsigner(key) )
+	if ( !sealkey->generate_mrsigner(sealkey) )
 		ERR(goto done);
-	key->print(key);
+
+	INIT(HurdLib, Buffer, iv, ERR(goto done));
+	INIT(HurdLib, Buffer, key, ERR(goto done));
+
+	if ( !sealkey->get_iv_key(sealkey, iv, key) )
+		ERR(goto done);
+
+	fputs("Keyid:\n", stdout);
+	keyid->hprint(keyid);
+
+	fputs("IV:\n", stdout);
+	iv->hprint(iv);
+
+	fputs("Key:\n", stdout);
+	key->hprint(key);
 
 
  done:
+	WHACK(iv);
 	WHACK(keyid);
 	WHACK(key);
+	WHACK(sealkey);
 
 	return;
 }

@@ -362,6 +362,73 @@ static _Bool get_keyid(CO(SEALkey, this), CO(Buffer, keyid))
 /**
  * External public method.
  *
+ * This method implements an accessor method for retrieving the
+ * initialization vector and key that were generated.
+ *
+ * \param this		A pointer to the object that will have its
+ *			its keying components retrieved.
+ *
+ * \param iv		A pointer to the object that the
+ *			initialization vector will be loaded into.
+ *
+ * \param key		A pointer to the object that the encryption
+ *			key will be loaded into.
+ *
+ * \return	A boolean value is used to indicate the status of
+ *		fetching the keying elements.  A false value
+ *		indicates an error was encountered and neither of
+ *		the supplied objects can be considered to have
+ *		valid data in them.  A true value idnicates that the
+ *		keying elements were successfully returned.
+ */
+
+static _Bool get_iv_key(CO(SEALkey, this), CO(Buffer, iv), CO(Buffer, key))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Check object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( S->keyiv == NULL )
+		ERR(goto done);
+	if ( S->key == NULL )
+		ERR(goto done);
+
+	if ( iv == NULL )
+		ERR(goto done);
+	if ( iv->poisoned(iv) )
+		ERR(goto done);
+
+	if ( key == NULL )
+		ERR(goto done);
+	if ( key->poisoned(key) )
+		ERR(goto done);
+
+
+	/* Load the necessary elements. */
+	if ( !iv->add_Buffer(iv, S->keyiv) )
+		ERR(goto done);
+	if ( !key->add_Buffer(key, S->key) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements the output of the various key elements.
  *
  * \param this	A pointer to the object whose key elements are
@@ -389,7 +456,7 @@ static void print(CO(SEALkey, this))
 	S->keyiv->hprint(S->keyiv);
 
 	fputs("Key:\n", stdout);
-	S->keyid->hprint(S->key);
+	S->key->hprint(S->key);
 
 	return;
 }
@@ -483,6 +550,8 @@ extern SEALkey NAAAIM_SEALkey_Init(void)
 
 	this->set_keyid = set_keyid;
 	this->get_keyid = get_keyid;
+
+	this->get_iv_key  = get_iv_key;
 
 	this->print = print;
 	this->reset = reset;
