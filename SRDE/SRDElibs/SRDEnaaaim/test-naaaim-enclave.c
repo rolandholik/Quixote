@@ -24,6 +24,7 @@
 #include "AES256_cbc.h"
 #include "Base64.h"
 #include "RSAkey.h"
+#include "SEALkey.h"
 
 
 void test_one()
@@ -436,6 +437,47 @@ void test_seven()
 }
 
 
+void test_eight()
+{
+	Buffer keyid = NULL;
+
+	SEALkey key = NULL;
+
+
+	INIT(NAAAIM, SEALkey, key, ERR(goto done));
+
+	if ( !key->generate_mrsigner(key) )
+		ERR(goto done);
+	key->print(key);
+
+
+	/* Request the keyid. */
+	INIT(HurdLib, Buffer, keyid, ERR(goto done));
+
+	if ( !key->get_keyid(key, keyid) )
+		ERR(goto done);
+
+
+	/* Test re-generation of the key. */
+	fputs("\nTesting key re-generation.\n\n", stdout);
+
+	key->reset(key);
+	if ( !key->set_keyid(key, keyid) )
+		ERR(goto done);
+
+	if ( !key->generate_mrsigner(key) )
+		ERR(goto done);
+	key->print(key);
+
+
+ done:
+	WHACK(keyid);
+	WHACK(key);
+
+	return;
+}
+
+
 void test_naaaim(unsigned int test)
 
 {
@@ -462,6 +504,9 @@ void test_naaaim(unsigned int test)
 			break;
 		case 7:
 			test_seven();
+			break;
+		case 8:
+			test_eight();
 			break;
 
 		default:

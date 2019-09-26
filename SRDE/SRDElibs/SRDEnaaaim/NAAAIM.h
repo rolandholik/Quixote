@@ -81,3 +81,4 @@
 #define NAAAIM_ISOidentity_OBJID	44
 #define NAAAIM_ContourPoint_OBJID	45
 #define NAAAIM_SRDEquote_OBJID		46
+#define NAAAIM_SEALkey_OBJID		47

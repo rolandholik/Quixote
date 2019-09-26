@@ -12,7 +12,7 @@
 
 
 /* Number of tests. */
-#define NUMBER_OF_TESTS 7
+#define NUMBER_OF_TESTS 8
 
 /* Program and enclave name. */
 #define PGM "test-naaaim"
