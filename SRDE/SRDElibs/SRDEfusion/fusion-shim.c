@@ -19,9 +19,48 @@
 #include <string.h>
 #include <stdarg.h>
 
+#include <sys/limits.h>
+
 #include <SRDEfusion-ocall.h>
 
 #include "fusion-shim.h"
+
+
+/**
+ * External function.
+ *
+ * This function implements a replacement for the sprintf function that
+ * is not included in the Intel SDK.  The strategy used is similar to
+ * what is implemented in the MUSL C library, obviously a dangerous
+ * proposition.
+ *
+ * \param bufr		A pointer to the buffer which the formatted
+ *			string will be written to.
+ *
+ * \param format	A pointer to a null-terminated buffer containing
+ *			the formatting string to be used for printing
+ *			to the aforementioned buffer.
+ *
+ * \return		This function returns the value returned by
+ *			the vsnprintf library function which is the
+ *			number of characters written to the output
+ *			buffer not including the null character.
+ */
+
+int sprintf(char *bufr, const char *fmt, ...)
+
+{
+	size_t cnt;
+
+	va_list ap;
+
+
+	va_start(ap, fmt);
+	cnt = vsnprintf(bufr, INT_MAX, fmt, ap);
+	va_end(ap);
+
+	return cnt;
+}
 
 
 /*

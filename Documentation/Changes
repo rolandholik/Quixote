@@ -26,3 +26,5 @@ Version 0.9:
 	* Implement RSAkey object in trusted space.
 
 	* Transition to version 2.6 of Intel pre-built enclaves.
+
+	* Implement basic time handling in SRDEFusion.
