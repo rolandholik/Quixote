@@ -232,8 +232,8 @@ typedef struct _metadata_t
 
 #define SGX_SECS_RESERVED1_SIZE 24
 #define SGX_SECS_RESERVED2_SIZE 32
-#define SGX_SECS_RESERVED3_SIZE 96
-#define SGX_SECS_RESERVED4_SIZE 3836
+#define SGX_SECS_RESERVED3_SIZE 32
+#define SGX_SECS_RESERVED4_SIZE 3834
 
 struct SGX_secs {
 	uint64_t size;
@@ -247,8 +247,10 @@ struct SGX_secs {
 	uint8_t reserved2[SGX_SECS_RESERVED2_SIZE];
 	uint32_t mrsigner[8];
 	uint8_t reserved3[SGX_SECS_RESERVED3_SIZE];
+	uint8_t config_id[64];
 	uint16_t isvprodid;
 	uint16_t isvsvn;
+	uint16_t config_svn;
 	uint8_t reserved[SGX_SECS_RESERVED4_SIZE];
 };
 
@@ -440,10 +442,12 @@ struct SGX_reportbody {
 	sgx_measurement_t mr_enclave;
 	uint8_t reserved2[32];
 	uint8_t mrsigner[32];
-	uint8_t reserved3[96];
+	uint8_t reserved3[32];
+	uint8_t config_id[64];
 	uint16_t isvprodid;
 	uint16_t isvsvn;
-	uint8_t reserved4[60];
+	uint16_t config_svn;
+	uint8_t reserved4[58];
 	uint8_t reportdata[64];
 };
 
@@ -476,7 +480,8 @@ struct SGX_keyrequest {
 	sgx_attributes_t attributes;
 	uint8_t keyid[32];
 	uint32_t miscselect;
-	uint8_t reserved2[436];
+	uint16_t config_svn;
+	uint8_t reserved2[434];
 } __attribute__((aligned(512)));
 
 
