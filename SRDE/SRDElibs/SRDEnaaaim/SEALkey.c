@@ -296,7 +296,9 @@ _Bool _generate_iv_key(CO(SEALkey_State, S), int type)
  *
  * \return	A boolean value is used to indicate the status of
  *		the requested key generation.  A false value indicates
- *		the
+ *		the the generation of the key failed and the object
+ *		is poisoned.  A true value indicates the object is
+ *		in posession of valid keying material.
  */
 
 static _Bool generate_mrsigner(CO(SEALkey, this))
@@ -313,6 +315,48 @@ static _Bool generate_mrsigner(CO(SEALkey, this))
 
 	/* Call key generator. */
 	if ( !_generate_iv_key(S, SGX_KEYPOLICY_SIGNER) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements the generation of a sealing key based on
+ * the MRENCLAVE value.
+ *
+ * \param this		A pointer to the object generating the key.
+ *
+ *
+ * \return	A boolean value is used to indicate the status of
+ *		the requested key generation.  A false value indicates
+ *		the the generation of the key failed and the object
+ *		is poisoned.  A true value indicates the object is
+ *		in posession of valid keying material.
+ */
+
+static _Bool generate_mrenclave(CO(SEALkey, this))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Verify object and arguement status. */
+	if ( S->poisoned )
+		ERR(goto done);
+
+	/* Call key generator. */
+	if ( !_generate_iv_key(S, SGX_KEYPOLICY_ENCLAVE) )
 		ERR(goto done);
 	retn = true;
 
@@ -672,7 +716,8 @@ extern SEALkey NAAAIM_SEALkey_Init(void)
 	_init_state(this->state);
 
 	/* Method initialization. */
-	this->generate_mrsigner = generate_mrsigner;
+	this->generate_mrsigner	 = generate_mrsigner;
+	this->generate_mrenclave = generate_mrenclave;
 
 	this->get_iv_key  = get_iv_key;
 
