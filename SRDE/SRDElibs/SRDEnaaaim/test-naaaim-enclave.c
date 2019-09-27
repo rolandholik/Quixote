@@ -439,7 +439,8 @@ void test_seven()
 
 void test_eight()
 {
-	Buffer iv    = NULL,
+	Buffer kreq  = NULL,
+	       iv    = NULL,
 	       keyid = NULL,
 	       key   = NULL;
 
@@ -454,17 +455,19 @@ void test_eight()
 
 
 	/* Request the keyid. */
-	INIT(HurdLib, Buffer, keyid, ERR(goto done));
+	INIT(HurdLib, Buffer, kreq,  ERR(goto done));
 
-	if ( !sealkey->get_keyid(sealkey, keyid) )
+	if ( !sealkey->get_request(sealkey, kreq) )
 		ERR(goto done);
+	fputs("\nDER encoded key request:\n", stdout);
+	kreq->hprint(kreq);
 
 
 	/* Test re-generation of the key. */
 	fputs("\nTesting key re-generation.\n\n", stdout);
 
 	sealkey->reset(sealkey);
-	if ( !sealkey->set_keyid(sealkey, keyid) )
+	if ( !sealkey->set_request(sealkey, kreq) )
 		ERR(goto done);
 
 	if ( !sealkey->generate_mrsigner(sealkey) )
@@ -476,9 +479,6 @@ void test_eight()
 	if ( !sealkey->get_iv_key(sealkey, iv, key) )
 		ERR(goto done);
 
-	fputs("Keyid:\n", stdout);
-	keyid->hprint(keyid);
-
 	fputs("IV:\n", stdout);
 	iv->hprint(iv);
 
@@ -487,6 +487,7 @@ void test_eight()
 
 
  done:
+	WHACK(kreq);
 	WHACK(iv);
 	WHACK(keyid);
 	WHACK(key);

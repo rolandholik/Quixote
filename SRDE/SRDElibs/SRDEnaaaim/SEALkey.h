@@ -33,6 +33,9 @@ struct NAAAIM_SEALkey
 
 	_Bool (*get_iv_key)(const SEALkey, const Buffer, const Buffer);
 
+	_Bool (*get_request)(const SEALkey, const Buffer);
+	_Bool (*set_request)(const SEALkey, const Buffer);
+
 	void (*print)(const SEALkey);
 	void (*reset)(const SEALkey);
 	void (*whack)(const SEALkey);

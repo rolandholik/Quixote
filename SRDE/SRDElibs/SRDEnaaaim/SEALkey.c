@@ -39,6 +39,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <openssl/asn1.h>
+#include <openssl/asn1t.h>
+
 #include <Origin.h>
 #include <HurdLib.h>
 #include <Buffer.h>
@@ -65,6 +68,30 @@
 #endif
 
 
+/**
+ * The following definitions define the ASN1 encoding sequence for
+ * the DER encoding of the key request that will be saved as a
+ * preamble to the encrypted payload.
+ */
+typedef struct {
+	ASN1_INTEGER *isv_svn;
+	ASN1_INTEGER *config_svn;
+	ASN1_INTEGER *key_policy;
+	ASN1_OCTET_STRING *cpu_svn;
+	ASN1_OCTET_STRING *key_id;
+} keyrequest_payload;
+
+ASN1_SEQUENCE(keyrequest_payload) = {
+	ASN1_SIMPLE(keyrequest_payload, isv_svn,	ASN1_INTEGER),
+	ASN1_SIMPLE(keyrequest_payload, config_svn,	ASN1_INTEGER),
+	ASN1_SIMPLE(keyrequest_payload, key_policy,	ASN1_INTEGER),
+	ASN1_SIMPLE(keyrequest_payload, cpu_svn,	ASN1_OCTET_STRING),
+	ASN1_SIMPLE(keyrequest_payload, key_id,		ASN1_OCTET_STRING),
+} ASN1_SEQUENCE_END(keyrequest_payload)
+
+IMPLEMENT_ASN1_FUNCTIONS(keyrequest_payload)
+
+
 /** SEALkey private state information. */
 struct NAAAIM_SEALkey_State
 {
@@ -88,6 +115,12 @@ struct NAAAIM_SEALkey_State
 
 	/* The object containing the generated key. */
 	Buffer key;
+
+	/* Boolean to indicate a key request is available. */
+	_Bool have_request;
+
+	/* Structure used to define the keyrequest. */
+	struct SGX_keyrequest keyrequest;
 };
 
 
@@ -113,6 +146,8 @@ static void _init_state(CO(SEALkey_State, S))
 	S->keyid = NULL;
 	S->keyiv = NULL;
 	S->key	 = NULL;
+
+	S->have_request = NULL;
 
 	return;
 }
@@ -172,10 +207,12 @@ static _Bool generate_mrsigner(CO(SEALkey, this))
 		ERR(goto done);
 
 
-	/* Use the specified keyid or generate one. */
+	/* Initialize the key request. */
 	memset(&keyrequest, '\0', sizeof(struct SGX_keyrequest));
 
-	if ( S->keyid == NULL ) {
+	if ( S->have_request )
+		keyrequest = S->keyrequest;
+	else {
 		INIT(HurdLib, Buffer, S->keyid, ERR(goto done));
 		INIT(NAAAIM, RandomBuffer, randbufr, ERR(goto done));
 
@@ -187,31 +224,33 @@ static _Bool generate_mrsigner(CO(SEALkey, this))
 
 		if ( !S->keyid->add_Buffer(S->keyid, rbp) )
 			ERR(goto done);
-	} else {
-		memcpy(keyrequest.keyid, S->keyid->get(S->keyid), \
-		       sizeof(keyrequest.keyid));
+
+		keyrequest.keypolicy  = SGX_KEYPOLICY_SIGNER;
+
+		keyrequest.isvsvn     = report.body.isvsvn;
+		keyrequest.config_svn = report.body.config_svn;
+
+		memcpy(keyrequest.cpusvn, report.body.cpusvn, \
+		       sizeof(keyrequest.cpusvn));
+
+		S->keyrequest = keyrequest;
 	}
 
-	/* Request a signer based key. */
-	memset(keydata, '\0', sizeof(keydata));
 
-	keyrequest.keyname   = SGX_KEYSELECT_SEAL;
-	keyrequest.keypolicy = SGX_KEYPOLICY_SIGNER;
-
-	keyrequest.isvsvn     = report.body.isvsvn;
-	keyrequest.config_svn = report.body.config_svn;
-
-	memcpy(keyrequest.cpusvn, report.body.cpusvn, \
-	       sizeof(keyrequest.cpusvn));
+	/* Set the key type and security attribute masks. */
+	keyrequest.keyname = SGX_KEYSELECT_SEAL;
 
 	keyrequest.attributes.flags = 0xFF0000000000000BULL;
 	keyrequest.attributes.xfrm  = 0x0ULL;
 
 	keyrequest.miscselect = 0xF0000000;
 
+
 	/* Generate the derived base key. */
+	memset(keydata, '\0', sizeof(keydata));
 	if ( enclu_egetkey(&keyrequest, keydata) != 0 )
 		ERR(goto done);
+
 
 	/* Hash the derived base key to obtain the encryption key. */
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
@@ -429,6 +468,168 @@ static _Bool get_iv_key(CO(SEALkey, this), CO(Buffer, iv), CO(Buffer, key))
 /**
  * External public method.
  *
+ * This method implements an accessor method for retrieving the
+ * DER encoded keyrequest that the derived key is based on.
+ *
+ * \param this		A pointer to the object that will have its
+ *			its key request components retrieved.
+ *
+ * \param req		A pointer to the object that the DER
+ *			encoded request is loaded into.
+ *
+ * \return	A boolean value is used to indicate the status of
+ *		fetching the key request components.  A false value
+ *		indicates an error was encountered and the request
+ *		object does not have a valid key request encoding.
+ *		A true value idnicates that the keying elements were
+ *		successfully returned in the provided object.
+ */
+
+static _Bool get_request(CO(SEALkey, this), CO(Buffer, req))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+        unsigned char *asn = NULL;
+
+        unsigned char **p = &asn;
+
+	int asn_size;
+
+	keyrequest_payload *keyreq = NULL;
+
+
+	/* Check object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( req == NULL )
+		ERR(goto done);
+	if ( req->poisoned(req) )
+		ERR(goto done);
+
+
+	/* Encode the keying request elements. */
+	if ( (keyreq = keyrequest_payload_new()) == NULL )
+		goto done;
+
+	if ( ASN1_INTEGER_set(keyreq->isv_svn, S->keyrequest.isvsvn) != 1 )
+		goto done;
+	if ( ASN1_INTEGER_set(keyreq->config_svn, S->keyrequest.config_svn) \
+	     != 1 )
+		goto done;
+	if ( ASN1_INTEGER_set(keyreq->key_policy, S->keyrequest.keypolicy) \
+	     != 1 )
+		goto done;
+
+	if ( ASN1_OCTET_STRING_set(keyreq->cpu_svn, S->keyrequest.cpusvn, \
+				   sizeof(S->keyrequest.cpusvn)) != 1 )
+		goto done;
+	if ( ASN1_OCTET_STRING_set(keyreq->key_id, S->keyrequest.keyid, \
+				   sizeof(S->keyrequest.keyid)) != 1 )
+		goto done;
+
+        asn_size = i2d_keyrequest_payload(keyreq, p);
+        if ( asn_size < 0 )
+                goto done;
+	if ( !req->add(req, asn, asn_size) )
+		goto done;
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+	if ( keyreq != NULL )
+		keyrequest_payload_free(keyreq);
+	if ( asn != NULL )
+		OPENSSL_free(asn);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements a method for setting the key request
+ * attributes from a previously encoded key request.
+ *
+ * \param this		A pointer to the object that will have its
+ *			its key request components retrieved.
+ *
+ * \param req		A pointer to the object containing the
+ *			DER encoded key request.
+ *
+ * \return	A boolean value is used to indicate the status of
+ *		setting the  key request components.  A false value
+ *		indicates an error was encountered and the object
+ *		does not have a correctly defined key request
+ *		structure.  A true value indicates that the keying
+ *		elements were successfully decoded and the
+ *		key request structure has been initialized.
+ */
+
+static _Bool set_request(CO(SEALkey, this), CO(Buffer, req))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+        unsigned char *asn = NULL;
+
+        unsigned const char *p = asn;
+
+	int asn_size;
+
+	keyrequest_payload *keyreq = NULL;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( req == NULL )
+		ERR(goto done);
+	if ( req->poisoned(req) )
+		ERR(goto done);
+
+
+	/* Unmarshall the key elements. */
+	p	 = req->get(req);
+	asn_size = req->size(req);
+
+        if ( !d2i_keyrequest_payload(&keyreq, &p, asn_size) )
+                ERR(goto done);
+
+	S->keyrequest.isvsvn	 = ASN1_INTEGER_get(keyreq->isv_svn);
+	S->keyrequest.config_svn = ASN1_INTEGER_get(keyreq->config_svn);
+	S->keyrequest.keypolicy	 = ASN1_INTEGER_get(keyreq->key_policy);
+
+	memcpy(S->keyrequest.cpusvn, ASN1_STRING_get0_data(keyreq->cpu_svn), \
+	       ASN1_STRING_length(keyreq->cpu_svn));
+	memcpy(S->keyrequest.keyid, ASN1_STRING_get0_data(keyreq->key_id), \
+	       ASN1_STRING_length(keyreq->key_id));
+
+	retn = true;
+	S->have_request = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+	if ( keyreq != NULL )
+		keyrequest_payload_free(keyreq);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements the output of the various key elements.
  *
  * \param this	A pointer to the object whose key elements are
@@ -477,6 +678,9 @@ static void reset(CO(SEALkey, this))
 	STATE(S);
 
 
+	S->have_request = false;
+	memset(&S->keyrequest, '\0', sizeof(S->keyrequest));
+
 	if ( S->keyid != NULL )
 		S->keyid->reset(S->keyid);
 	if ( S->keyiv != NULL )
@@ -501,6 +705,7 @@ static void whack(CO(SEALkey, this))
 
 {
 	STATE(S);
+
 
 	WHACK(S->keyid);
 	WHACK(S->keyiv);
@@ -552,6 +757,9 @@ extern SEALkey NAAAIM_SEALkey_Init(void)
 	this->get_keyid = get_keyid;
 
 	this->get_iv_key  = get_iv_key;
+
+	this->get_request = get_request;
+	this->set_request = set_request;
 
 	this->print = print;
 	this->reset = reset;
