@@ -173,15 +173,15 @@ static _Bool generate_mrsigner(CO(SEALkey, this))
 
 	_Bool retn = false;
 
-	uint8_t keydata[16] __attribute__((aligned(128)));
+	uint8_t __attribute__((aligned(128))) keydata[16];
 
-	char report_data[64] __attribute__((aligned(128)));
+	char __attribute__((aligned(128))) report_data[64];
 
 	struct SGX_report __attribute__((aligned(512))) report;
 
-	struct SGX_targetinfo target;
+	struct SGX_targetinfo __attribute__((aligned(512))) target;
 
-	struct SGX_keyrequest keyrequest;
+	struct SGX_keyrequest __attribute__((aligned(512))) keyrequest;
 
 	Buffer rbp,
 	       bufr = NULL;
