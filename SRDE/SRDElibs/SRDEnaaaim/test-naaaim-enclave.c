@@ -447,25 +447,30 @@ void test_eight()
 	SEALkey sealkey = NULL;
 
 
+	INIT(HurdLib, Buffer, iv, ERR(goto done));
+	INIT(HurdLib, Buffer, key, ERR(goto done));
 	INIT(NAAAIM, SEALkey, sealkey, ERR(goto done));
 
 	if ( !sealkey->generate_mrsigner(sealkey) )
 		ERR(goto done);
 	sealkey->print(sealkey);
 
+	if ( !sealkey->get_iv_key(sealkey, iv, key) )
+		ERR(goto done);
+	fputs("Unshrouded key:\n", stdout);
+	key->hprint(key);
 
-	/* Request the keyid. */
+
+	/* Retrieve the key request components. */
 	INIT(HurdLib, Buffer, kreq,  ERR(goto done));
 
 	if ( !sealkey->get_request(sealkey, kreq) )
 		ERR(goto done);
-	fputs("\nDER encoded key request:\n", stdout);
+	fputs("\nRe-generating key on DER encoded key request:\n", stdout);
 	kreq->hprint(kreq);
 
 
 	/* Test re-generation of the key. */
-	fputs("\nTesting key re-generation.\n\n", stdout);
-
 	sealkey->reset(sealkey);
 	if ( !sealkey->set_request(sealkey, kreq) )
 		ERR(goto done);
@@ -473,16 +478,15 @@ void test_eight()
 	if ( !sealkey->generate_mrsigner(sealkey) )
 		ERR(goto done);
 
-	INIT(HurdLib, Buffer, iv, ERR(goto done));
-	INIT(HurdLib, Buffer, key, ERR(goto done));
+	fputs("\n", stdout);
+	sealkey->print(sealkey);
 
+	iv->reset(iv);
+	key->reset(key);
 	if ( !sealkey->get_iv_key(sealkey, iv, key) )
 		ERR(goto done);
 
-	fputs("IV:\n", stdout);
-	iv->hprint(iv);
-
-	fputs("Key:\n", stdout);
+	fputs("Unshrouded key:\n", stdout);
 	key->hprint(key);
 
 

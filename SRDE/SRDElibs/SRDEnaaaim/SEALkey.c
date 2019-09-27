@@ -113,8 +113,12 @@ struct NAAAIM_SEALkey_State
 	/* The object containing the generated key. */
 	Buffer key;
 
-	/* Boolean to indicate a key request is available. */
+	/* Boolean to indicate that key requests are available. */
+	_Bool have_shroud;
 	_Bool have_request;
+
+	/* Structure used to define the shroud key request. */
+	struct SGX_keyrequest shroud_request;
 
 	/* Structure used to define the keyrequest. */
 	struct SGX_keyrequest keyrequest;
@@ -143,9 +147,150 @@ static void _init_state(CO(SEALkey_State, S))
 	S->keyiv = NULL;
 	S->key	 = NULL;
 
+	S->have_shroud	= NULL;
 	S->have_request = NULL;
 
 	return;
+}
+
+
+/**
+ * Internal private method.
+ *
+ * This method implements the generation of a shroud key based on
+ * an MRENCLAVE derived key.  This key is used as an XOR cloak for
+ * the generated key.
+ *
+ * \param S	A pointer to the state of the object generating the
+ *		key.
+ *
+ * \param key	The buffer containing the key to be processed by
+ *		the shouding request.
+ *
+ * \return	A boolean value is used to indicate the status of
+ *		the cloaking request.  A false value indicates
+ *		an error was encountered the key was not cloaked.  A
+ *		true value indicates the key was properly cloaked.
+ */
+
+_Bool _shroud_key(CO(SEALkey_State, S), CO(Buffer, key))
+
+{
+	_Bool retn = false;
+
+	uint8_t lp;
+
+	uint8_t __attribute__((aligned(128))) keydata[16];
+
+	unsigned char *p1,
+		      *p2;
+
+	char __attribute__((aligned(128))) report_data[64];
+
+	struct SGX_report __attribute__((aligned(512))) report;
+
+	struct SGX_targetinfo __attribute__((aligned(512))) target;
+
+	struct SGX_keyrequest __attribute__((aligned(512))) keyrequest;
+
+	Buffer rbp,
+	       bufr = NULL;
+
+	RandomBuffer randbufr = NULL;
+
+	Sha256 sha256 = NULL;
+
+
+	/* Verify we are working with a valid key. */
+	if ( key == NULL )
+		ERR(goto done);
+	if ( key->poisoned == NULL )
+		ERR(goto done);
+	if ( key->size(key) != SGX_HASH_SIZE )
+		ERR(goto done);
+
+
+	/* Request a self report to get the measurement. */
+	memset(&target, '\0', sizeof(struct SGX_targetinfo));
+	memset(&report, '\0', sizeof(struct SGX_report));
+	memset(report_data, '\0', sizeof(report_data));
+	enclu_ereport(&target, &report, report_data);
+
+	if ( !(report.body.attributes.flags  & 0x0000000000000001ULL) || \
+	     !(report.body.attributes.flags  & 0x0000000000000002ULL) )
+		ERR(goto done);
+
+
+	/* Initialize the key request. */
+	if ( S->have_shroud )
+		keyrequest = S->shroud_request;
+	else {
+		memset(&keyrequest, '\0', sizeof(struct SGX_keyrequest));
+
+		INIT(NAAAIM, RandomBuffer, randbufr, ERR(goto done));
+		if ( !randbufr->generate(randbufr, 32) )
+			ERR(goto done);
+		rbp = randbufr->get_Buffer(randbufr);
+		memcpy(keyrequest.keyid, rbp->get(rbp), \
+		       sizeof(keyrequest.keyid));
+
+		keyrequest.keyname   = SGX_KEYSELECT_SEAL;
+		keyrequest.keypolicy = SGX_KEYPOLICY_ENCLAVE;
+
+		keyrequest.isvsvn     = report.body.isvsvn;
+		keyrequest.config_svn = report.body.config_svn;
+
+		memcpy(keyrequest.cpusvn, report.body.cpusvn, \
+		       sizeof(keyrequest.cpusvn));
+
+		/* Set the key type and security attribute masks. */
+		keyrequest.attributes.flags = 0xFF0000000000000BULL;
+		keyrequest.attributes.xfrm  = 0x0ULL;
+
+		keyrequest.miscselect = 0xF0000000;
+
+		S->have_shroud	  = true;
+		S->shroud_request = keyrequest;
+	}
+
+
+	/* Generate the derived base key. */
+	memset(keydata, '\0', sizeof(keydata));
+	if ( enclu_egetkey(&keyrequest, keydata) != 0 )
+		ERR(goto done);
+
+
+	/* Hash the derived base key to obtain the cloaking key. */
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	INIT(NAAAIM, Sha256, sha256, ERR(goto done));
+
+	if ( !bufr->add(bufr, keydata, sizeof(keydata)) )
+		ERR(goto done);
+
+	sha256->add(sha256, bufr);
+	if ( !sha256->compute(sha256) )
+		ERR(goto done);
+	rbp = sha256->get_Buffer(sha256);
+
+
+	/* XOR the key being shrouded with the shrouding key. */
+	p1 = key->get(key);
+	p2 = rbp->get(rbp);
+	for (lp= 0; lp < key->size(key); ++lp)
+		*p1++ ^= *p2++;
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	WHACK(bufr);
+	WHACK(randbufr);
+	WHACK(sha256);
+
+	return retn;
 }
 
 
@@ -316,6 +461,11 @@ static _Bool generate_mrsigner(CO(SEALkey, this))
 	/* Call key generator. */
 	if ( !_generate_iv_key(S, SGX_KEYPOLICY_SIGNER) )
 		ERR(goto done);
+
+	/* Shroud the key. */
+	if ( !_shroud_key(S, S->key) )
+		ERR(goto done);
+
 	retn = true;
 
 
@@ -358,6 +508,11 @@ static _Bool generate_mrenclave(CO(SEALkey, this))
 	/* Call key generator. */
 	if ( !_generate_iv_key(S, SGX_KEYPOLICY_ENCLAVE) )
 		ERR(goto done);
+
+	/* Shroud the key. */
+	if ( !_shroud_key(S, S->key) )
+		ERR(goto done);
+
 	retn = true;
 
 
@@ -423,6 +578,10 @@ static _Bool get_iv_key(CO(SEALkey, this), CO(Buffer, iv), CO(Buffer, key))
 	if ( !iv->add_Buffer(iv, S->keyiv) )
 		ERR(goto done);
 	if ( !key->add_Buffer(key, S->key) )
+		ERR(goto done);
+
+	/* Unshroud the key being returned. */
+	if ( !_shroud_key(S, key) )
 		ERR(goto done);
 
 	retn = true;
