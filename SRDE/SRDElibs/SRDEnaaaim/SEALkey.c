@@ -154,23 +154,35 @@ static void _init_state(CO(SEALkey_State, S))
 
 
 /**
- * External public method.
+ * Internal private method.
  *
- * This method implements the generation of a sealing key based on
- * the MRSIGNER value.
+ * This method implements the fundamentals of generating a 128 bit
+ * initialization vector and a 256 bit encryption key based on a
+ * particular sealing key type.  This translates the external
+ * methods into a simple wrapper that sets the key type.
  *
- * \param this		A pointer to the object generating the key.
+ * \param S	A pointer to the state of the object generating the
+ *		key.
+ *
+ * \param type	The type of the key to be generated.
+ *
+ * \param iv	The object that the initialization vector is to
+ *		be copied into.
+ *
+ * \param key	The object that the encryption key will be copied
+ *		into.
  *
  * \return	A boolean value is used to indicate the status of
  *		the requested key generation.  A false value indicates
- *		the
+ *		an error was encountered and neither the iv or key
+ *		objects can be expected to contain valid values.  A
+ *		true value indicates the objects contain valid keying
+ *		elements
  */
 
-static _Bool generate_mrsigner(CO(SEALkey, this))
+_Bool _generate_iv_key(CO(SEALkey_State, S), int type)
 
 {
-	STATE(S);
-
 	_Bool retn = false;
 
 	uint8_t __attribute__((aligned(128))) keydata[16];
@@ -189,11 +201,6 @@ static _Bool generate_mrsigner(CO(SEALkey, this))
 	RandomBuffer randbufr = NULL;
 
 	Sha256 sha256 = NULL;
-
-
-	/* Verify object and arguement status. */
-	if ( S->poisoned )
-		ERR(goto done);
 
 
 	/* Request a self report to get the measurement. */
@@ -225,7 +232,7 @@ static _Bool generate_mrsigner(CO(SEALkey, this))
 		if ( !S->keyid->add_Buffer(S->keyid, rbp) )
 			ERR(goto done);
 
-		keyrequest.keypolicy  = SGX_KEYPOLICY_SIGNER;
+		keyrequest.keypolicy  = type;
 
 		keyrequest.isvsvn     = report.body.isvsvn;
 		keyrequest.config_svn = report.body.config_svn;
@@ -283,6 +290,42 @@ static _Bool generate_mrsigner(CO(SEALkey, this))
 	WHACK(randbufr);
 	WHACK(sha256);
 
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements the generation of a sealing key based on
+ * the MRSIGNER value.
+ *
+ * \param this		A pointer to the object generating the key.
+ *
+ * \return	A boolean value is used to indicate the status of
+ *		the requested key generation.  A false value indicates
+ *		the
+ */
+
+static _Bool generate_mrsigner(CO(SEALkey, this))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Verify object and arguement status. */
+	if ( S->poisoned )
+		ERR(goto done);
+
+	/* Call key generator. */
+	if ( !_generate_iv_key(S, SGX_KEYPOLICY_SIGNER) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
 	if ( !retn )
 		S->poisoned = true;
 
