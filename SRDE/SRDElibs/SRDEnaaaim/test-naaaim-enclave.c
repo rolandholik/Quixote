@@ -439,9 +439,15 @@ void test_seven()
 
 void test_eight()
 {
+	static unsigned char id[32] = {
+		0x37, 0x34, 0xd3, 0xa8, 0x52, 0xa0, 0x95, 0x87, \
+		0x50, 0xe5, 0x8a, 0xb3, 0xb0, 0xa6, 0x38, 0x5e, \
+		0xc9, 0xca, 0x6c, 0x64, 0x40, 0xc4, 0x2c, 0xf8, \
+		0x47, 0x61, 0x51, 0x4e, 0x1c, 0x5e, 0xd7, 0x56  \
+	};
+
 	Buffer kreq  = NULL,
 	       iv    = NULL,
-	       keyid = NULL,
 	       key   = NULL;
 
 	SEALkey sealkey = NULL;
@@ -490,10 +496,27 @@ void test_eight()
 	key->hprint(key);
 
 
+	/* Test a re-generatable key. */
+	key->reset(key);
+	sealkey->reset(sealkey);
+
+	if ( !key->add(key, id, sizeof(id)) )
+		ERR(goto done);
+	if ( !sealkey->generate_static_key(sealkey, 1 /* SIGNER KEY*/, key) )
+		ERR(goto done);
+
+	iv->reset(iv);
+	key->reset(key);
+	if ( !sealkey->get_iv_key(sealkey, iv, key) )
+		ERR(goto done);
+
+	fputs("\nStatic key:\n", stdout);
+	key->hprint(key);
+
+
  done:
 	WHACK(kreq);
 	WHACK(iv);
-	WHACK(keyid);
 	WHACK(key);
 	WHACK(sealkey);
 

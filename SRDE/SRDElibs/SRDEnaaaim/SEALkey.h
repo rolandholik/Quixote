@@ -28,6 +28,7 @@ struct NAAAIM_SEALkey
 	/* External methods. */
 	_Bool (*generate_mrsigner)(const SEALkey);
 	_Bool (*generate_mrenclave)(const SEALkey);
+	_Bool (*generate_static_key)(const SEALkey, int, Buffer);
 
 	_Bool (*get_iv_key)(const SEALkey, const Buffer, const Buffer);
 

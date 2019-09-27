@@ -527,6 +527,82 @@ static _Bool generate_mrenclave(CO(SEALkey, this))
 /**
  * External public method.
  *
+ * This method implements the ability to generate a static key of
+ * either major type (MRSIGNER OR MRENCLAVE) using a keyid supplied by
+ * the caller.  A static is one that has all elements of keying
+ * elements set to null values except for a key identifier.  These
+ * keys should used with caution since they are not tied to the
+ * trusted computing base of the platform, ie any enclave can
+ * generate them.
+ *
+ * \param this	A pointer to the object generating the key.
+ *
+ * \param type	The type of key to be generated.
+ *
+ * \param keyid	An object containing the key identifier to be used
+ *		to generate the key.
+ *
+ * \return	A boolean value is used to indicate the status of
+ *		the requested key generation.  A false value indicates
+ *		the the generation of the key failed and the object
+ *		is poisoned.  A true value indicates the object is
+ *		in posession of valid keying material.
+ */
+
+static _Bool generate_static_key(CO(SEALkey, this), int type, \
+				 CO(Buffer, keyid))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	struct SGX_keyrequest __attribute__((aligned(512))) keyrequest;
+
+
+	/* Verify object and arguement status. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( keyid == NULL )
+		ERR(goto done);
+	if ( keyid->poisoned(keyid) )
+		ERR(goto done);
+	if ( (type != SGX_KEYPOLICY_SIGNER) && \
+	     (type != SGX_KEYPOLICY_ENCLAVE) )
+		ERR(goto done);
+
+
+	/* Setup a null key request with a keyid value set. */
+	memset(&S->keyrequest, '\0', sizeof(keyrequest));
+	memcpy(&S->keyrequest.keyid, keyid->get(keyid), \
+	       sizeof(keyrequest.keyid));
+
+	S->have_request = true;
+
+
+	/* Call key generator. */
+	if ( !_generate_iv_key(S, type) )
+		ERR(goto done);
+
+
+	/* Shroud the key. */
+	if ( !_shroud_key(S, S->key) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements an accessor method for retrieving the
  * initialization vector and key that were generated.
  *
@@ -875,8 +951,9 @@ extern SEALkey NAAAIM_SEALkey_Init(void)
 	_init_state(this->state);
 
 	/* Method initialization. */
-	this->generate_mrsigner	 = generate_mrsigner;
-	this->generate_mrenclave = generate_mrenclave;
+	this->generate_mrsigner	  = generate_mrsigner;
+	this->generate_mrenclave  = generate_mrenclave;
+	this->generate_static_key = generate_static_key;
 
 	this->get_iv_key  = get_iv_key;
 
