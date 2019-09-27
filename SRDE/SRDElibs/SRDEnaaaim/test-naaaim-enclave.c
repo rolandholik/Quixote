@@ -11,7 +11,7 @@
 
 #include <sgx_tcrypto.h>
 
-#include "test-fusion-interface.h"
+#include "test-naaaim-interface.h"
 
 #include <HurdLib.h>
 #include <Buffer.h>
