@@ -28,9 +28,6 @@ struct NAAAIM_SEALkey
 	/* External methods. */
 	_Bool (*generate_mrsigner)(const SEALkey);
 
-	_Bool (*set_keyid)(const SEALkey, const Buffer);
-	_Bool (*get_keyid)(const SEALkey, const Buffer);
-
 	_Bool (*get_iv_key)(const SEALkey, const Buffer, const Buffer);
 
 	_Bool (*get_request)(const SEALkey, const Buffer);

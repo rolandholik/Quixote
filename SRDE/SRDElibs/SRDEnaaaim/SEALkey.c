@@ -107,9 +107,6 @@ struct NAAAIM_SEALkey_State
 	/* Object status. */
 	_Bool poisoned;
 
-	/* The object containing the key identifier. */
-	Buffer keyid;
-
 	/* The object containing an initialization vector for the key. */
 	Buffer keyiv;
 
@@ -143,7 +140,6 @@ static void _init_state(CO(SEALkey_State, S))
 
 	S->poisoned = false;
 
-	S->keyid = NULL;
 	S->keyiv = NULL;
 	S->key	 = NULL;
 
@@ -220,7 +216,6 @@ _Bool _generate_iv_key(CO(SEALkey_State, S), int type)
 	if ( S->have_request )
 		keyrequest = S->keyrequest;
 	else {
-		INIT(HurdLib, Buffer, S->keyid, ERR(goto done));
 		INIT(NAAAIM, RandomBuffer, randbufr, ERR(goto done));
 
 		if ( !randbufr->generate(randbufr, 32) )
@@ -228,9 +223,6 @@ _Bool _generate_iv_key(CO(SEALkey_State, S), int type)
 		rbp = randbufr->get_Buffer(randbufr);
 		memcpy(keyrequest.keyid, rbp->get(rbp), \
 		       sizeof(keyrequest.keyid));
-
-		if ( !S->keyid->add_Buffer(S->keyid, rbp) )
-			ERR(goto done);
 
 		keyrequest.keypolicy  = type;
 
@@ -322,114 +314,6 @@ static _Bool generate_mrsigner(CO(SEALkey, this))
 	/* Call key generator. */
 	if ( !_generate_iv_key(S, SGX_KEYPOLICY_SIGNER) )
 		ERR(goto done);
-	retn = true;
-
-
- done:
-	if ( !retn )
-		S->poisoned = true;
-
-	return retn;
-}
-
-
-/**
- * External public method.
- *
- * This method implements the ability to set the keyid for an instance
- * of seal key.  This is a necessary requirement in order to create
- * reproducible keys.
- *
- * \param this		A pointer to the object that will have its
- *			keyid set.
- *
- * \param keyid		A pointer to the object containing the
- *			keyid value that is to be set.
- *
- * \return	A boolean value is used to indicate the status of
- *		setting the keyid.  A false value indicates the keyid
- *		was not properly set.  A true value indicates a new
- *		keyid value has been registerd.
- */
-
-static _Bool set_keyid(CO(SEALkey, this), CO(Buffer, keyid))
-
-{
-	STATE(S);
-
-	_Bool retn = false;
-
-
-	/* Check object status. */
-	if ( S->poisoned )
-		ERR(goto done);
-	if ( keyid == NULL )
-		ERR(goto done);
-	if ( keyid->poisoned(keyid) )
-		ERR(goto done);
-	if ( keyid->size(keyid) != SGX_HASH_SIZE )
-		ERR(goto done);
-
-	/* Allocate the keyid object if it has not been initialized. */
-	if ( S->keyid == NULL )
-		INIT(HurdLib, Buffer, S->keyid, ERR(goto done));
-
-	/* Add the keyid. */
-	if ( !S->keyid->add_Buffer(S->keyid, keyid) )
-		ERR(goto done);
-
-	retn = true;
-
-
- done:
-	if ( !retn )
-		S->poisoned = true;
-
-	return retn;
-}
-
-
-/**
- * External public method.
- *
- * This method implements the ability to get the keyid for an instance
- * of a seal key.  This is a necessary requirement in order to create
- * reproducible keys.
- *
- * \param this		A pointer to the object that will have its
- *			keyid set.
- *
- * \param keyid		A pointer to the object that the keyid will
- *			be loaded into.
- *
- * \return	A boolean value is used to indicate the status of
- *		fetching the keyid.  A false value indicates the
- *		supplied keyid object does not have a valid keyid.  A
- *		true value indicates the object has a valid keyid.
- */
-
-static _Bool get_keyid(CO(SEALkey, this), CO(Buffer, keyid))
-
-{
-	STATE(S);
-
-	_Bool retn = false;
-
-
-	/* Check object status. */
-	if ( S->poisoned )
-		ERR(goto done);
-	if ( S->keyid == NULL )
-		ERR(goto done);
-	if ( keyid == NULL )
-		ERR(goto done);
-	if ( keyid->poisoned(keyid) )
-		ERR(goto done);
-
-	/* Allocate the keyid object if it has not been initialized. */
-	if ( !keyid->add_Buffer(keyid, S->keyid) )
-		ERR(goto done);
-
 	retn = true;
 
 
@@ -693,9 +577,6 @@ static void print(CO(SEALkey, this))
 
 
 	/* Output elements. */
-	fputs("Keyid:\n", stdout);
-	S->keyid->hprint(S->keyid);
-
 	fputs("IV:\n", stdout);
 	S->keyiv->hprint(S->keyiv);
 
@@ -724,8 +605,6 @@ static void reset(CO(SEALkey, this))
 	S->have_request = false;
 	memset(&S->keyrequest, '\0', sizeof(S->keyrequest));
 
-	if ( S->keyid != NULL )
-		S->keyid->reset(S->keyid);
 	if ( S->keyiv != NULL )
 		S->keyiv->reset(S->keyiv);
 	if ( S->key != NULL )
@@ -750,7 +629,6 @@ static void whack(CO(SEALkey, this))
 	STATE(S);
 
 
-	WHACK(S->keyid);
 	WHACK(S->keyiv);
 	WHACK(S->key);
 
@@ -795,9 +673,6 @@ extern SEALkey NAAAIM_SEALkey_Init(void)
 
 	/* Method initialization. */
 	this->generate_mrsigner = generate_mrsigner;
-
-	this->set_keyid = set_keyid;
-	this->get_keyid = get_keyid;
 
 	this->get_iv_key  = get_iv_key;
 
