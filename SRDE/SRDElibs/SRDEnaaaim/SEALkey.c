@@ -881,8 +881,11 @@ static void reset(CO(SEALkey, this))
 	STATE(S);
 
 
+	S->have_shroud  = false;
 	S->have_request = false;
-	memset(&S->keyrequest, '\0', sizeof(S->keyrequest));
+
+	memset(&S->shroud_request, '\0', sizeof(S->keyrequest));
+	memset(&S->keyrequest,	   '\0', sizeof(S->keyrequest));
 
 	if ( S->keyiv != NULL )
 		S->keyiv->reset(S->keyiv);
