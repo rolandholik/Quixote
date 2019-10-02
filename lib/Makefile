@@ -35,10 +35,12 @@ LIBRARY = lib${LIBNAME}.a
 ifeq (${CC}, musl-gcc)
 SSL_INCLUDE = /usr/local/musl/include
 SSL_CRYPTO = -L /usr/local/musl/lib -lcrypto
+SC_INCLUDE = /usr/local/include/PCSC
 else
 SSL_INCLUDE = /usr/local/IDfusion/include
 SSL_CRYPTO = -Wl,-rpath=/usr/local/IDfusion/lib -L /usr/local/IDfusion/lib \
 	-lcrypto
+SC_INCLUDE = /usr/local/IDfusion/include/PCSC
 endif
 
 
@@ -106,6 +108,9 @@ SmartCard_test: SmartCard_test.o SmartCard.o
 	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib \
 		-L/usr/local/lib -lpcsclite
 
+SmartCard.o: SmartCard.c SmartCard.h
+	$(CC) $(CFLAGS) -I ${SC_INCLUDE} -c $< -o $@;
+
 install-dev:
 	[ -d ${INSTPATH}/include ] || mkdir -p ${INSTPATH}/include;
 	[ -d ${INSTPATH}/include/NAAAIM ] || \
@@ -121,9 +126,6 @@ clean:
 	rm -f *.o *~ TAGS;
 	rm -f ${LIBRARY};
 	rm -f ${TESTS} OTEDKS.out;
-
-SmartCard.o: SmartCard.c SmartCard.h
-	$(CC) $(CFLAGS) -I/usr/local/include/PCSC -c $< -o $@;
 
 
 # Source dependencies.
