@@ -593,8 +593,8 @@ _Bool generate_identity(uint8_t *id)
 	memset(keydata, '\0', sizeof(keydata));
 	memset(&keyrequest, '\0', sizeof(struct SGX_keyrequest));
 
-	keyrequest.keyname   = SGX_KEYSELECT_SEAL;
-	keyrequest.keypolicy = SGX_KEYPOLICY_SIGNER;
+	keyrequest.keyname   = SRDE_KEYSELECT_SEAL;
+	keyrequest.keypolicy = SRDE_KEYPOLICY_SIGNER;
 	memcpy(keyrequest.keyid, report.body.mr_enclave.m, \
 	       sizeof(keyrequest.keyid));
 

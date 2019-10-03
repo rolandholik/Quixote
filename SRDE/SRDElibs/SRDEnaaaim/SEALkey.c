@@ -234,8 +234,8 @@ _Bool _shroud_key(CO(SEALkey_State, S), CO(Buffer, key))
 		memcpy(keyrequest.keyid, rbp->get(rbp), \
 		       sizeof(keyrequest.keyid));
 
-		keyrequest.keyname   = SGX_KEYSELECT_SEAL;
-		keyrequest.keypolicy = SGX_KEYPOLICY_ENCLAVE;
+		keyrequest.keyname   = SRDE_KEYSELECT_SEAL;
+		keyrequest.keypolicy = SRDE_KEYPOLICY_ENCLAVE;
 
 		keyrequest.isvsvn     = report.body.isvsvn;
 		keyrequest.config_svn = report.body.config_svn;
@@ -382,7 +382,7 @@ _Bool _generate_iv_key(CO(SEALkey_State, S), int type)
 
 
 	/* Set the key type and security attribute masks. */
-	keyrequest.keyname = SGX_KEYSELECT_SEAL;
+	keyrequest.keyname = SRDE_KEYSELECT_SEAL;
 
 	keyrequest.attributes.flags = 0xFF0000000000000BULL;
 	keyrequest.attributes.xfrm  = 0x0ULL;
@@ -459,7 +459,7 @@ static _Bool generate_mrsigner(CO(SEALkey, this))
 		ERR(goto done);
 
 	/* Call key generator. */
-	if ( !_generate_iv_key(S, SGX_KEYPOLICY_SIGNER) )
+	if ( !_generate_iv_key(S, SRDE_KEYPOLICY_SIGNER) )
 		ERR(goto done);
 
 	/* Shroud the key. */
@@ -506,7 +506,7 @@ static _Bool generate_mrenclave(CO(SEALkey, this))
 		ERR(goto done);
 
 	/* Call key generator. */
-	if ( !_generate_iv_key(S, SGX_KEYPOLICY_ENCLAVE) )
+	if ( !_generate_iv_key(S, SRDE_KEYPOLICY_ENCLAVE) )
 		ERR(goto done);
 
 	/* Shroud the key. */
@@ -567,8 +567,8 @@ static _Bool generate_static_key(CO(SEALkey, this), int type, \
 		ERR(goto done);
 	if ( keyid->poisoned(keyid) )
 		ERR(goto done);
-	if ( (type != SGX_KEYPOLICY_SIGNER) && \
-	     (type != SGX_KEYPOLICY_ENCLAVE) )
+	if ( (type != SRDE_KEYPOLICY_SIGNER) && \
+	     (type != SRDE_KEYPOLICY_ENCLAVE) )
 		ERR(goto done);
 
 

@@ -107,7 +107,7 @@ _Bool verify_report(unsigned int mode, struct SGX_targetinfo *target, \
 	memset(keydata, '\0', sizeof(keydata));
 	memset(&keyrequest, '\0', sizeof(struct SGX_keyrequest));
 
-	keyrequest.keyname = SGX_KEYSELECT_REPORT;
+	keyrequest.keyname = SRDE_KEYSELECT_REPORT;
 	memcpy(keyrequest.keyid, report->keyid, sizeof(keyrequest.keyid));
 
 

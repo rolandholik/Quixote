@@ -197,8 +197,8 @@ static _Bool measure(CO(SoftwareStatus, this))
 	memset(keydata, '\0', sizeof(keydata));
 	memset(&keyrequest, '\0', sizeof(struct SGX_keyrequest));
 
-	keyrequest.keyname   = SGX_KEYSELECT_SEAL;
-	keyrequest.keypolicy = SGX_KEYPOLICY_SIGNER;
+	keyrequest.keyname   = SRDE_KEYSELECT_SEAL;
+	keyrequest.keypolicy = SRDE_KEYPOLICY_SIGNER;
 	memcpy(keyrequest.keyid, report.body.mr_enclave.m, \
 	       sizeof(keyrequest.keyid));
 
@@ -287,8 +287,8 @@ static _Bool measure_derived(CO(SoftwareStatus, this), CO(uint8_t *, nonce))
 	memset(keydata, '\0', sizeof(keydata));
 	memset(&keyrequest, '\0', sizeof(struct SGX_keyrequest));
 
-	keyrequest.keyname    = SGX_KEYSELECT_SEAL;
-	keyrequest.keypolicy  = SGX_KEYPOLICY_ENCLAVE;
+	keyrequest.keyname    = SRDE_KEYSELECT_SEAL;
+	keyrequest.keypolicy  = SRDE_KEYPOLICY_ENCLAVE;
 	keyrequest.miscselect = report.body.miscselect;
 	keyrequest.attributes = report.body.attributes;
 	memcpy(keyrequest.keyid, nonce, sizeof(keyrequest.keyid));

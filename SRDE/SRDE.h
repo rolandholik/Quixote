@@ -464,12 +464,16 @@ struct SGX_report {
  * returns keys which are derived from the current processor identity.
  */
 
-/* Definition of numeric constants used to select various keys. */
-#define SGX_KEYPOLICY_SIGNER	0x1
-#define SGX_KEYPOLICY_ENCLAVE	0x2
+/* Numeric constants used to select key generation policies. */
+#define SRDE_KEYPOLICY_ENCLAVE		0x1
+#define SRDE_KEYPOLICY_SIGNER		0x2
+#define SRDE_KEYPOLICY_NOISVPRODID	0x4
+#define SRDE_KEYPOLICY_CONFIGID		0x8
+#define SRDE_KEYPOLICY_ISVFAMILYID	0x10
+#define SRDE_KEYPOLICY_ISVEXTPRODID	0x20
 
-#define SGX_KEYSELECT_REPORT	0x3
-#define SGX_KEYSELECT_SEAL	0x4
+#define SRDE_KEYSELECT_REPORT	0x3
+#define SRDE_KEYSELECT_SEAL	0x4
 
 struct SGX_keyrequest {
 	uint16_t keyname;

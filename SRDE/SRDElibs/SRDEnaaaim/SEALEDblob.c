@@ -334,7 +334,7 @@ static _Bool seal(CO(SEALEDblob, this))
 		ERR(goto done);
 
 	sealkey->reset(sealkey);
-	if ( !sealkey->generate_static_key(sealkey, SGX_KEYPOLICY_SIGNER, \
+	if ( !sealkey->generate_static_key(sealkey, SRDE_KEYPOLICY_SIGNER, \
 					   key) )
 		ERR(goto done);
 
@@ -491,7 +491,7 @@ static _Bool unseal(CO(SEALEDblob, this))
 		ERR(goto done);
 
 	INIT(NAAAIM, SEALkey, sealkey, ERR(goto done))
-	if ( !sealkey->generate_static_key(sealkey, SGX_KEYPOLICY_SIGNER, \
+	if ( !sealkey->generate_static_key(sealkey, SRDE_KEYPOLICY_SIGNER, \
 					   key) )
 		ERR(goto done);
 
