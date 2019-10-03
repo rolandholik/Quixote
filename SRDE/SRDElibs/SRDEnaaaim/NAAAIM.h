@@ -82,3 +82,4 @@
 #define NAAAIM_ContourPoint_OBJID	45
 #define NAAAIM_SRDEquote_OBJID		46
 #define NAAAIM_SEALkey_OBJID		47
+#define NAAAIM_SEALEDblob_OBJID		48

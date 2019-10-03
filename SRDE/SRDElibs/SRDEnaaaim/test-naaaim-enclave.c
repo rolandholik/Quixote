@@ -25,6 +25,7 @@
 #include "Base64.h"
 #include "RSAkey.h"
 #include "SEALkey.h"
+#include "SEALEDblob.h"
 
 
 void test_one()
@@ -524,6 +525,63 @@ void test_eight()
 }
 
 
+void test_nine()
+
+{
+	Buffer bufr = NULL;
+
+	SEALEDblob blob = NULL;
+
+	const unsigned char msg[] = {
+		0xfe, 0xad, 0xbe, 0xaf, 0x00, 0xde, 0xad, 0xbe, 0xaf
+	};
+
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	if ( !bufr->add(bufr, msg, sizeof(msg)) )
+		ERR(goto done);
+
+	fputs("Payload:\n", stdout);
+	bufr->hprint(bufr);
+
+
+	INIT(NAAAIM, SEALEDblob, blob, ERR(goto done));
+	if ( !blob->add_Buffer(blob, bufr) )
+		ERR(goto done);
+	if ( !blob->seal(blob) )
+		ERR(goto done);
+
+	bufr->reset(bufr);
+	if ( !blob->get_Buffer(blob, bufr) )
+		ERR(goto done);
+
+	fputs("\nSealed payload:\n", stdout);
+	bufr->hprint(bufr);
+
+
+	WHACK(blob);
+	INIT(NAAAIM, SEALEDblob, blob, ERR(goto done));
+
+	if ( !blob->add_Buffer(blob, bufr) )
+		ERR(goto done);
+	if ( !blob->unseal(blob) )
+		ERR(goto done);
+
+	bufr->reset(bufr);
+	if ( !blob->get_Buffer(blob, bufr) )
+		ERR(goto done);
+	fputs("\nUnsealed payload:\n", stdout);
+	bufr->hprint(bufr);
+
+
+ done:
+	WHACK(bufr);
+	WHACK(blob);
+
+	return;
+}
+
+
 void test_naaaim(unsigned int test)
 
 {
@@ -553,6 +611,9 @@ void test_naaaim(unsigned int test)
 			break;
 		case 8:
 			test_eight();
+			break;
+		case 9:
+			test_nine();
 			break;
 
 		default:
