@@ -31,7 +31,7 @@ LIBRARY = libSRDEruntime.a
 
 TOOLS = srde-check srde-metadata srde-loader srde-load srde-sigstruct	\
 	srde-gen-token test-ecall test-pcr srde-fandf srde-fandf-unibin \
-	srde-provision sdk-compute-size srde-gen-verifier
+	srde-provision srde-gen-verifier
 
 
 LE	     = /opt/intel/sgxpsw/aesm/libsgx_le.signed.so
@@ -270,7 +270,7 @@ clean:
 	rm -f *.o *~ TAGS sigstruct.h LE_whitelist.h LE.h TE.h;
 	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i clean; done
 	rm -f ${LIBRARY};
-	rm -f generate-array ${TOOLS};
+	rm -f generate-array sdk-compute-size ${TOOLS};
 
 
 # Source dependencies.
