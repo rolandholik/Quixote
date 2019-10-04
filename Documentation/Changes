@@ -28,3 +28,7 @@ Version 0.9:
 	* Transition to version 2.6 of Intel pre-built enclaves.
 
 	* Implement basic time handling in SRDEFusion.
+
+	* Implement dynamic OCALL table generation.
+
+	* Implement object based key management and data sealing.
