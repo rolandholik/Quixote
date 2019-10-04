@@ -242,7 +242,7 @@ static _Bool get_public_key(CO(RSAkey, this), CO(Buffer, bufr))
 	/* Write the key to a memory based BIO.*/
 	if ( (mb = BIO_new(BIO_s_mem())) == NULL )
 		ERR(goto done);
-	if ( PEM_write_bio_RSAPublicKey(mb, S->key) == 0 )
+	if ( PEM_write_bio_RSA_PUBKEY(mb, S->key) == 0 )
 		ERR(goto done);
 
 	ms = BIO_get_mem_data(mb, &mp);
@@ -369,7 +369,7 @@ static _Bool load_public(CO(RSAkey, this), CO(Buffer, bufr))
 	/* Load key from a memory based BIO based on the Buffer object. */
 	key = BIO_new_mem_buf(bufr->get(bufr), bufr->size(bufr));
 
-	if ( PEM_read_bio_RSAPublicKey(key, &S->key, NULL, NULL) == NULL )
+	if ( PEM_read_bio_RSA_PUBKEY(key, &S->key, NULL, NULL) == NULL )
 		ERR(goto done);
 
 	retn	= true;
