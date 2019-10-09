@@ -28,7 +28,7 @@ LIBNAME	   = SRDEnaaaim
 LIBRARY	   = lib${LIBNAME}.a
 NAAAIMDIR  = ../../../lib
 
-ENCLAVE_CC = gcc64
+ENCLAVE_CC = gcc
 
 SGXDIR = ../..
 include ${SGXDIR}/Make.enclave

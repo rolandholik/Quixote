@@ -21,7 +21,7 @@ ASRC   = enclu_ereport.s enclu_egetkey.s
 LIBNAME = SRDEfusion
 LIBRARY = lib${LIBNAME}.a
 
-ENCLAVE_CC = gcc64
+ENCLAVE_CC = gcc
 
 SGXDIR = ../..
 include ${SGXDIR}/Make.enclave

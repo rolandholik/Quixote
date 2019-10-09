@@ -18,7 +18,7 @@ MGRSRC = ISOmanager-enclave.c ISOmanager-interface.c
 TOOLS = test-ISOidentity-enclave
 
 
-ENCLAVE_CC = gcc64
+ENCLAVE_CC = gcc
 
 SGXDIR = ..
 include ${SGXDIR}/Make.enclave

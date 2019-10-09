@@ -17,7 +17,7 @@ ENCSRC2 = LocalSource-enclave.c LocalSource-interface.c
 TOOLS	   = test-local-target test-remote-target
 INSTALLBIN = test-remote-target
 
-ENCLAVE_CC = gcc64
+ENCLAVE_CC = gcc
 
 SGXDIR = ..
 include ${SGXDIR}/Make.enclave
