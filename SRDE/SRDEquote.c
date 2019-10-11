@@ -379,14 +379,14 @@ static _Bool generate_report(CO(SRDEquote, this), CO(Buffer, quote), \
 	INIT(HurdLib, Buffer, http_out, ERR(goto done));
 	INIT(NAAAIM, HTTP, http, ERR(goto done));
 
-	http->add_arg(http, "-v");
-	http->add_arg(http, "-S");
+	http->add_arg(http, "-q");
+	http->add_arg(http, "--save-headers");
+	http->add_arg(http, "--header=Content-Type: application/json");
+
 	http->add_arg(http, "--secure-protocol=TLSv1_2");
 	http->add_arg(http, "--ca-certificate="CA_BUNDLE);
 	http->add_arg(http, "--private-key="PRIVATE_KEY);
 	http->add_arg(http, "--certificate="PUBLIC_CERT);
-	http->add_arg(http, "--header=Content-Type: application/json");
-	http->add_arg(http, "-oias.log");
 
 	if ( !http_in->add(http_in, (unsigned char *) report->get(report), \
 			   report->size(report)) )
