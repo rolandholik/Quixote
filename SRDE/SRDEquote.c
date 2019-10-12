@@ -59,7 +59,6 @@
 #endif
 
 
-
 /**
  * The following array defines the strings used to indicate the
  * general result of the attestation.
@@ -121,9 +120,14 @@ struct NAAAIM_SRDEquote_State
 	QEenclave qe;
 
 	/* Information derived from an attestation report. */
+	String report;
+
 	String version;
 	String id;
 	String timestamp;
+
+	String signature;
+	String certificate;
 
 	enum SRDEquote_status status;
 
@@ -156,9 +160,15 @@ static void _init_state(CO(SRDEquote_State, S)) {
 
 	S->qe	 = NULL;
 
+	S->report    = NULL;
+
 	S->version   = NULL;
 	S->id	     = NULL;
 	S->timestamp = NULL;
+
+	S->signature   = NULL;
+	S->certificate = NULL;
+
 	S->status    = SRDEquote_status_UNDEFINED;
 
 	memset(&S->quote, '\0', sizeof(struct SRDE_quote));
@@ -501,6 +511,79 @@ static _Bool _get_version(CO(String, field), CO(String, rgx), \
 /**
  * Internal private function.
  *
+ * This method parses the supplied input and extracts the brace
+ * delimited report.
+ *
+ * \param field		The object containing the field to be parsed.
+ *
+ * \param value		A pointer to the object that will be loaded
+ *			with the parsed report.
+ *
+ * \return	A boolean value is used to indicate the success or
+ *		failure of the report extraction.  A false value is
+ *		used to indicate a failure occurred during the
+ *		extraction.  A true value indicates the report has
+ *		been successfully extracted and the value object
+ *		contains a legitimate value.
+ */
+
+static _Bool _get_report(CO(String, field), CO(String, report))
+
+{
+	_Bool retn       = false,
+	      have_regex = false;
+
+	char *fp,
+	     element[2];
+
+	const char *rgx = "(\\{[^\\}]*\\})";
+
+	size_t len;
+
+	regex_t regex;
+
+	regmatch_t regmatch[2];
+
+
+	/* Match the report field. */
+	if ( regcomp(&regex, rgx, REG_EXTENDED) != 0 )
+		ERR(goto done);
+	have_regex = true;
+
+	if ( regexec(&regex, field->get(field), 2, regmatch, 0) != REG_OK )
+		ERR(goto done);
+
+	len = regmatch[1].rm_eo - regmatch[1].rm_so;
+	if ( len > field->size(field) )
+		ERR(goto done);
+
+
+	/* Copy the field element to the output object. */
+	memset(element, '\0', sizeof(element));
+	fp = field->get(field) + regmatch[1].rm_so;
+
+	while ( len-- ) {
+		element[0] = *fp;
+		report->add(report, element);
+		++fp;
+	}
+	if ( report->poisoned(report) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	if ( have_regex )
+		regfree(&regex);
+
+	return retn;
+}
+
+
+/**
+ * Internal private function.
+ *
  * This method parses the supplied input for a single JSON field.  It
  * is a subordinate helper function for the ->decode_report method.
  *
@@ -583,6 +666,176 @@ static _Bool _get_field(CO(String, field), CO(String, rgx), CO(char *, fd), \
 
 
 /**
+ * Internal private function.
+ *
+ * This is a support function for the ->decode_report method that
+ * compartmentalizes the extraction of the report signature and
+ * certificate.  This method leaves the binary form of the signature
+ * in the object state and the percent-decoded certification in the
+ * object state.
+ *
+ * \param S		A pointer to the object state.
+ *
+ * \param field		The report data that is to be parsed.
+ *
+ * \param rgx		A pointer to the object that will be used to
+ *			hold the regular expression.
+ *
+ * \param hd		The header definition that is to be extracted.
+ *
+ * \param header	The object that the extracted header will be
+ *			placed into.
+ *
+ * \return	A boolean value is used to indicate the success or
+ *		failure of the header extraction.  A false value is
+ *		used to indicate a failure occurred during the
+ *		extraction.  A true value indicates the signature and
+ *		certificate have been successfully extracted.
+ */
+
+static _Bool _get_header(CO(String, field), CO(String, rgx), CO(char *, hd), \
+			 CO(String, header))
+
+{
+	_Bool retn       = false,
+	      have_regex = false;
+
+	char *fp,
+	     element[2];
+
+	size_t len;
+
+	regex_t regex;
+
+	regmatch_t regmatch[2];
+
+
+	/* Extract and convert the signature to binary form. */
+	rgx->reset(rgx);
+	if ( !rgx->add(rgx, hd) )
+		ERR(goto done);
+	if ( !rgx->add(rgx, ": ([^\r]*)\r") )
+		ERR(goto done);
+
+	if ( regcomp(&regex, rgx->get(rgx), REG_EXTENDED) != 0 )
+		ERR(goto done);
+	have_regex = true;
+
+	if ( regexec(&regex, field->get(field), 2, regmatch, 0) != REG_OK )
+		ERR(goto done);
+
+	len = regmatch[1].rm_eo - regmatch[1].rm_so;
+	if ( len > field->size(field) )
+		ERR(goto done);
+
+
+	/* Copy the field element to the output object. */
+	memset(element, '\0', sizeof(element));
+	fp = field->get(field) + regmatch[1].rm_so;
+
+	while ( len-- ) {
+		element[0] = *fp;
+		header->add(header, element);
+		++fp;
+	}
+
+	if ( header->poisoned(header) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	if ( have_regex )
+		regfree(&regex);
+
+	return retn;
+}
+
+
+/**
+ * Internal private function.
+ *
+ * This is a support function for the ->decode_report method that
+ * converts the certificate from a percent encoded object into
+ * a standard ASCII object.  This routine should hardly be considered
+ * a full implementation of URL percent decoding but rather something
+ * sufficient to get the certificate extracted.
+ *
+ * \param certificate	A pointer to the object containing the
+ *			certificate.  The decoded certificate will
+ *			be placed back into this object.
+ *
+ * \return	A boolean value is used to indicate the success or
+ *		failure of the decoding.  A false value is
+ *		used to indicate a failure occurred during the
+ *		the process and the contents of the supplied object
+ *		must be considered to be in an indeterminate state.
+ *		A true value indicates the certificate has been
+ *		successfully decoded and the supplied object contains
+ *		a valid copy of the certificate.
+ */
+
+static _Bool _decode_certificate(CO(String, certificate))
+
+{
+	_Bool retn = false;
+
+	char *cp,
+	     element[3];
+
+	size_t len;
+
+	Buffer cert = NULL;
+
+
+	/* Verify object status. */
+	if ( certificate == NULL )
+		ERR(goto done);
+	if ( certificate->size == 0 )
+		ERR(goto done);
+	if ( certificate->size(certificate) < 3 )
+		ERR(goto done);
+
+
+	INIT(HurdLib, Buffer, cert, ERR(goto done));
+
+	cp  = certificate->get(certificate);
+	len = certificate->size(certificate);
+
+	memset(element, '\0', sizeof(element));
+
+	while ( len-- ) {
+		if ( (*cp == '%') && (len >= 2) ) {
+			memcpy(element, cp+1, 2);
+			if ( !cert->add_hexstring(cert, element) )
+				ERR(goto done);
+			cp += 3;
+		} else {
+			if ( !cert->add(cert, (unsigned char *) cp, 1) )
+				ERR(goto done);
+			++cp;
+		}
+	}
+
+	element[0] = '\0';
+	if ( !cert->add(cert, (unsigned char *) element, 1) )
+		ERR(goto done);
+
+	certificate->reset(certificate);
+	if ( !certificate->add(certificate, (char *) cert->get(cert)) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	WHACK(cert);
+
+	return retn;
+}
+
+
+/**
  * External public method.
  *
  * This method implements the decoding of an enclave attestation report
@@ -591,8 +844,8 @@ static _Bool _get_field(CO(String, field), CO(String, rgx), CO(char *, fd), \
  * \param this		A pointer to the quoting object which is to
  *			be used for decoding the report.
  *
- * \param report	The object containing the report that is to
- *			be decoded.
+ * \param report	The object containing the report data that is
+ *			to be decoded.
  *
  * \return	A boolean value is returned to indicate the
  *		status of the initialization of the quote.  A false
@@ -617,13 +870,14 @@ static _Bool decode_report(CO(SRDEquote, this), CO(String, report))
 
 	Buffer bufr = NULL;
 
-	String field  = NULL,
+	String rpt    = NULL,
+	       field  = NULL,
 	       fregex = NULL;
 
 	Base64 base64 = NULL;
 
 
-	/* Decode the mandatory information fields. */
+	/* Decode the version file and abort if not correct. */
 	INIT(HurdLib, String, fregex, ERR(goto done));
 
 	INIT(HurdLib, String, S->version, ERR(goto done));
@@ -633,16 +887,35 @@ static _Bool decode_report(CO(SRDEquote, this), CO(String, report))
 		    S->version->size(S->version)) != 0 )
 		ERR(goto done);
 
+	/* Extract the report itself. */
+	INIT(HurdLib, String, S->report, ERR(goto done));
+	if ( !_get_report(report, S->report) )
+		ERR(goto done);
+
+	/* Extract the report signature and certificate. */
+	INIT(HurdLib, String, S->signature, ERR(goto done));
+	if ( !_get_header(report, fregex, "x-iasreport-signature", \
+			  S->signature) )
+		ERR(goto done);
+
+	INIT(HurdLib, String, S->certificate, ERR(goto done));
+	if ( !_get_header(report, fregex, "x-iasreport-signing-certificate", \
+			  S->certificate) )
+		ERR(goto done);
+	if ( !_decode_certificate(S->certificate) )
+		ERR(goto done);
+
+	/* Extract the report fields. */
 	INIT(HurdLib, String, S->id, ERR(goto done));
-	if ( !_get_field(report, fregex, "id", S->id) )
+	if ( !_get_field(S->report, fregex, "id", S->id) )
 		ERR(goto done);
 
 	INIT(HurdLib, String, S->timestamp, ERR(goto done));
-	if ( !_get_field(report, fregex, "timestamp", S->timestamp) )
+	if ( !_get_field(S->report, fregex, "timestamp", S->timestamp) )
 		ERR(goto done);
 
 	INIT(HurdLib, String, field, ERR(goto done));
-	if ( !_get_field(report, fregex, "isvEnclaveQuoteStatus", field) )
+	if ( !_get_field(S->report, fregex, "isvEnclaveQuoteStatus", field) )
 		ERR(goto done);
 
 	for (S->status= 0; Quote_status[S->status] != NULL; ++S->status) {
@@ -654,7 +927,7 @@ static _Bool decode_report(CO(SRDEquote, this), CO(String, report))
 
 	/* Decode the quote body. */
 	field->reset(field);
-	if ( !_get_field(report, fregex, "isvEnclaveQuoteBody", field) )
+	if ( !_get_field(S->report, fregex, "isvEnclaveQuoteBody", field) )
 		ERR(goto done);
 
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
@@ -671,7 +944,8 @@ static _Bool decode_report(CO(SRDEquote, this), CO(String, report))
 	     S->status == SRDEquote_status_GROUP_REVOKED ||     \
 	     S->status == SRDEquote_status_CONFIGURATION_NEEDED ) {
 		field->reset(field);
-		if ( !_get_field(report, fregex, "platformInfoBlob", field) )
+		if ( !_get_field(S->report, fregex, "platformInfoBlob", \
+				 field) )
 			ERR(goto done);
 
 		bufr->reset(bufr);
@@ -697,10 +971,12 @@ static _Bool decode_report(CO(SRDEquote, this), CO(String, report))
 
 
  done:
+	WHACK(bufr);
+
+	WHACK(rpt);
 	WHACK(field);
 	WHACK(fregex);
 
-	WHACK(bufr);
 	WHACK(base64);
 
 	return retn;
@@ -792,6 +1068,13 @@ static void dump_report(CO(SRDEquote, this))
 		fputs("No report available.\n", stdout);
 		return;
 	}
+
+	fputs("Signature:\n", stdout);
+	S->signature->print(S->signature);
+
+	fputs("\nCertificate:\n", stdout);
+	S->certificate->print(S->certificate);
+
 
 	fputs("ID:        ", stdout);
 	S->id->print(S->id);
@@ -926,9 +1209,15 @@ static void whack(CO(SRDEquote, this))
 	STATE(S);
 
 	WHACK(S->qe);
+
+	WHACK(S->report);
+
 	WHACK(S->id);
 	WHACK(S->version);
 	WHACK(S->timestamp);
+
+	WHACK(S->signature);
+	WHACK(S->certificate);
 
 	S->root->whack(S->root, this, S);
 	return;
