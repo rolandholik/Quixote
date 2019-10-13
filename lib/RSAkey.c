@@ -69,6 +69,9 @@ struct NAAAIM_RSAkey_State
 
 	/* RSA key. */
 	RSA *key;
+
+	/* Certificate pointer for public key from certificate. */
+	X509 *certificate;
 };
 
 
@@ -93,7 +96,9 @@ static void _init_state(CO(RSAkey_State, S))
 	S->type	   = no_key;
 	S->padding = RSAkey_pad_pkcs1;
 	S->engine  = NULL;
-	S->key	   = NULL;
+
+	S->key	       = NULL;
+	S->certificate = NULL;
 
 	return;
 }
@@ -451,6 +456,80 @@ static _Bool load_private(CO(RSAkey, this), CO(Buffer, bufr))
 
 	if ( !retn )
 		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements loading of an RSA public key from a
+ * certificate.  The primary purpose of this method is to support
+ * validation of a signature generated against the private key
+ * of a certificate.  Since a certificate is defined as containing
+ * a public key this method sets the object type to public_key.
+ *
+ * \param this		A pointer to the key object whose public key
+ *			is to be loaded from the provided certificate.
+ *
+ * \param certificate	The object containing the certificate that
+ *			will be used to supply the public key.  The
+ *			incoming object is assumed to be PEM encoded.
+ *
+ * \return	If the load of the certificate based private key fails
+ *		for any reason a false value is returned to the caller.
+ *		A true value indicates the key has been loaded and the
+ *		object is ready for use.
+ */
+
+static _Bool load_certificate(CO(RSAkey, this), CO(Buffer, bufr))
+
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	BIO *bio = NULL;
+
+	EVP_PKEY *pkey = NULL;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( bufr == NULL )
+		ERR(goto done);
+	if ( bufr->poisoned(bufr) )
+		ERR(goto done);
+	if ( S->type != no_key )
+		ERR(goto done);
+
+	/* Load certificate from a memory based BIO. */
+	bio = BIO_new_mem_buf(bufr->get(bufr), bufr->size(bufr));
+
+	if ( (S->certificate = PEM_read_bio_X509(bio, NULL, 0, NULL)) == NULL )
+		ERR(goto done);
+
+	/* Extract the public key and convert to RSA format. */
+	if ( (pkey = X509_get_pubkey(S->certificate)) == NULL )
+		ERR(goto done);
+	if ( (S->key = EVP_PKEY_get1_RSA(pkey)) == NULL )
+		ERR(goto done);
+
+	retn	= true;
+	S->type = public_key;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	if ( bio != NULL )
+		BIO_free(bio);
+	if ( pkey != NULL )
+		EVP_PKEY_free(pkey);
 
 	return retn;
 }
@@ -990,6 +1069,8 @@ static void whack(CO(RSAkey, this))
 		ENGINE_free(S->engine);
 	if ( S->key != NULL )
 		RSA_free(S->key);
+	if ( S->certificate != NULL )
+		X509_free(S->certificate);
 
 	S->root->whack(S->root, this, S);
 
@@ -1044,6 +1125,8 @@ extern RSAkey NAAAIM_RSAkey_Init(void)
 
 	this->load_public  = load_public;
 	this->load_private = load_private;
+
+	this->load_certificate = load_certificate;
 
 	this->load_private_key = load_private_key;
 	this->load_public_key  = load_public_key;

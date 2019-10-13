@@ -33,6 +33,8 @@ extern int main(int argc, char *argv[])
 
 	RSAkey rsakey = NULL;
 
+	File certfile = NULL;
+
 	const char *engine_cmds[] = {
 		"SO_PATH", "/usr/local/musl/lib/engines/engine_pkcs11.so", \
 		"ID", "pkcs11",					    	   \
@@ -46,6 +48,7 @@ extern int main(int argc, char *argv[])
 	if ( argc == 1 ) {
 		fputs("No arguements specified - usage:\n", stderr);
 		fputs("\tRSAkey_test generate\n", stderr);
+		fputs("\tRSAkey_test certifificate certfile\n", stderr);
 		fputs("\tRSAkey_test pkcs11 keyid\n", stderr);
 		fputs("\tRSAkey_test file public_key private_key\n", stderr);
 		goto done;
@@ -74,6 +77,27 @@ extern int main(int argc, char *argv[])
 		fputs("Key in PEM form:\n", stdout);
 		rsakey->get_private_key(rsakey, payload);
 		payload->hprint(payload);
+
+		goto done;
+	}
+
+	if ( strcmp(argv[1], "certificate") == 0 ) {
+		if ( argc < 3 ) {
+			fputs("No certificate file specified.\n", stderr);
+			goto done;
+		}
+
+		INIT(HurdLib, File, certfile, ERR(goto done));
+		if ( !certfile->open_ro(certfile, argv[2]) )
+			ERR(goto done);
+		if ( !certfile->slurp(certfile, payload) )
+			ERR(goto done);
+
+		if ( !rsakey->load_certificate(rsakey, payload) )
+			ERR(goto done);
+
+		fputs("Public key from certificate.\n\n", stdout);
+		rsakey->print(rsakey);
 
 		goto done;
 	}
@@ -170,6 +194,7 @@ extern int main(int argc, char *argv[])
  done:
 	WHACK(payload);
 	WHACK(rsakey);
+	WHACK(certfile);
 
 	return 0;
 }

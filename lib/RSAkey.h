@@ -41,6 +41,8 @@ struct NAAAIM_RSAkey
 	_Bool (*load_public)(const RSAkey, const Buffer);
 	_Bool (*load_private)(const RSAkey, const Buffer);
 
+	_Bool (*load_certificate)(const RSAkey, const Buffer);
+
 	_Bool (*load_public_key)(const RSAkey, const char *, const char *);
 	_Bool (*load_private_key)(const RSAkey, const char *, const char *);
 
