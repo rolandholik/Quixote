@@ -23,13 +23,16 @@
 extern int main(int argc, char *argv[])
 
 {
+	_Bool valid = false;
+
 	char *pubkey,
 	     *privkey;
 	unsigned char *encrypted;
 
 	unsigned int lp;
 
-	Buffer payload = NULL;
+	Buffer payload	 = NULL,
+	       signature = NULL;
 
 	RSAkey rsakey = NULL;
 
@@ -99,6 +102,46 @@ extern int main(int argc, char *argv[])
 		fputs("Public key from certificate.\n\n", stdout);
 		rsakey->print(rsakey);
 
+		goto done;
+	}
+
+	if ( strcmp(argv[1], "signature") == 0 ) {
+		if ( argc < 5 ) {
+			fputs("Insufficient arguements specified.\n", stdout);
+			fputs("Usage: signature certfile sigfile payload\n", \
+			      stdout);
+			goto done;
+		}
+
+		INIT(HurdLib, File, certfile, ERR(goto done));
+		if ( !certfile->open_ro(certfile, argv[2]) )
+			ERR(goto done);
+		if ( !certfile->slurp(certfile, payload) )
+			ERR(goto done);
+		if ( !rsakey->load_certificate(rsakey, payload) )
+			ERR(goto done);
+
+		certfile->reset(certfile);
+		if ( !certfile->open_ro(certfile, argv[3]) )
+			ERR(goto done);
+
+		INIT(HurdLib, Buffer, signature, ERR(goto done));
+		if ( !certfile->slurp(certfile, signature) )
+			ERR(goto done);
+
+		certfile->reset(certfile);
+		if ( !certfile->open_ro(certfile, argv[4]) )
+			ERR(goto done);
+
+		payload->reset(payload);
+		if ( !certfile->slurp(certfile, payload) )
+			ERR(goto done);
+
+		if ( !rsakey->verify(rsakey, signature, payload, &valid) )
+			ERR(goto done);
+
+		fprintf(stdout, "Signature status: %s\n", \
+			valid ? "OK" : "INVALID");
 		goto done;
 	}
 
@@ -193,6 +236,7 @@ extern int main(int argc, char *argv[])
 
  done:
 	WHACK(payload);
+	WHACK(signature);
 	WHACK(rsakey);
 	WHACK(certfile);
 

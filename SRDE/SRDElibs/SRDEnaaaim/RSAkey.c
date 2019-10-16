@@ -788,6 +788,99 @@ done:
 /**
  * External public method.
  *
+ * This method implements verification of a signature using a public
+ * key.
+ *
+ * \param this		A pointer to the object describing the key that
+ *			is to be used for verifying a signature.
+ *
+ * \param signature	The object containing the signature that is to
+ *			be verified.
+ *
+ * \param data		The object containing the data whose signature
+ *			is to be verified.
+ *
+ * \param status	A pointer to a boolean value used to indicate
+ *			whether or not the provided signature was
+ *			correct.
+ *
+ * \return		A boolean value is returned to indicate the
+ *			status of the verification process.  A false
+ *			value implies an error was encountered and
+ *			no assumptions can be made about the status
+ *			value.  A true value indicates the process
+ *			succeeded and the status variable will be
+ *			updated to reflect the status of the
+ *			signature verification.
+ */
+
+static _Bool verify(CO(RSAkey, this), CO(Buffer, signature), \
+		    CO(Buffer, data), _Bool *status)
+
+{
+	STATE(S);
+
+	_Bool retn	  = false,
+	      verify_retn = false;
+
+	EVP_PKEY *pkey = NULL;
+
+	EVP_MD_CTX *md_ctx = NULL;
+
+
+	/* Verify object status. */
+	if ( signature == NULL )
+		ERR(goto done);
+	if ( signature->poisoned(signature) )
+		ERR(goto done);
+	if ( data == NULL )
+		ERR(goto done);
+	if ( data->poisoned(data) )
+		ERR(goto done);
+	if ( S->certificate == NULL )
+		ERR(goto done);
+
+
+	/* Setup the RSA key that will be used. */
+	if ( (pkey = X509_get_pubkey(S->certificate)) == NULL )
+		ERR(goto done);
+
+
+	/* Initialize a message digest and verification context. */
+	if ( (md_ctx = EVP_MD_CTX_new()) == NULL )
+		ERR(goto done);
+	if ( EVP_DigestVerifyInit(md_ctx, NULL, EVP_sha256(), NULL, \
+				  pkey) == 0 )
+		ERR(goto done);
+
+
+	/* Verify the signature. */
+	if ( EVP_DigestVerifyUpdate(md_ctx, data->get(data), \
+				    data->size(data)) == 0 )
+		ERR(goto done);
+	verify_retn = EVP_DigestVerifyFinal(md_ctx,		       \
+					    signature->get(signature), \
+					    signature->size(signature));
+	if ( verify_retn < 0 )
+		ERR(goto done);
+
+	retn	= true;
+	*status = verify_retn;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = false;
+
+	EVP_MD_CTX_free(md_ctx);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements initialization of an alternate engine for
  * executing the RSA key operations.  The engine is specifically
  * attached to the current RSA key instance.
@@ -1043,6 +1136,8 @@ extern RSAkey NAAAIM_RSAkey_Init(void)
 
 	this->encrypt = encrypt;
 	this->decrypt = decrypt;
+
+	this->verify = verify;
 
 	this->init_engine = init_engine;
 	this->set_padding = set_padding;
