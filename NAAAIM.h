@@ -96,3 +96,4 @@
 #define NAAAIM_SRDEquote_OBJID		58
 #define NAAAIM_ISOmanager_OBJID		59
 #define NAAAIM_SRDEocall_OBJID		60
+#define NAAAIM_X509cert_OBJID		61

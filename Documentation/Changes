@@ -32,3 +32,5 @@ Version 0.9:
 	* Implement dynamic OCALL table generation.
 
 	* Implement object based key management and data sealing.
+
+	* Implement object for verifying X.509 certificates.
