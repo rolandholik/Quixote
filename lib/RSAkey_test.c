@@ -52,6 +52,7 @@ extern int main(int argc, char *argv[])
 		fputs("No arguements specified - usage:\n", stderr);
 		fputs("\tRSAkey_test generate\n", stderr);
 		fputs("\tRSAkey_test certifificate certfile\n", stderr);
+		fputs("\tRSAkey_test sigkey pubkey signature data\n", stderr);
 		fputs("\tRSAkey_test pkcs11 keyid\n", stderr);
 		fputs("\tRSAkey_test file public_key private_key\n", stderr);
 		goto done;
@@ -119,6 +120,46 @@ extern int main(int argc, char *argv[])
 		if ( !certfile->slurp(certfile, payload) )
 			ERR(goto done);
 		if ( !rsakey->load_certificate(rsakey, payload) )
+			ERR(goto done);
+
+		certfile->reset(certfile);
+		if ( !certfile->open_ro(certfile, argv[3]) )
+			ERR(goto done);
+
+		INIT(HurdLib, Buffer, signature, ERR(goto done));
+		if ( !certfile->slurp(certfile, signature) )
+			ERR(goto done);
+
+		certfile->reset(certfile);
+		if ( !certfile->open_ro(certfile, argv[4]) )
+			ERR(goto done);
+
+		payload->reset(payload);
+		if ( !certfile->slurp(certfile, payload) )
+			ERR(goto done);
+
+		if ( !rsakey->verify(rsakey, signature, payload, &valid) )
+			ERR(goto done);
+
+		fprintf(stdout, "Signature status: %s\n", \
+			valid ? "OK" : "INVALID");
+		goto done;
+	}
+
+	if ( strcmp(argv[1], "sigkey") == 0 ) {
+		if ( argc < 5 ) {
+			fputs("Insufficient arguements specified.\n", stdout);
+			fputs("Usage: sigkey pubkey sigfile payload\n", \
+			      stdout);
+			goto done;
+		}
+
+		INIT(HurdLib, File, certfile, ERR(goto done));
+		if ( !certfile->open_ro(certfile, argv[2]) )
+			ERR(goto done);
+		if ( !certfile->slurp(certfile, payload) )
+			ERR(goto done);
+		if ( !rsakey->load_public(rsakey, payload) )
 			ERR(goto done);
 
 		certfile->reset(certfile);

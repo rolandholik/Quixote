@@ -19,6 +19,7 @@
 
 #include <openssl/rsa.h>
 #include <openssl/pem.h>
+#include <openssl/evp.h>
 #include <openssl/err.h>
 #include <openssl/engine.h>
 
@@ -59,7 +60,14 @@ struct NAAAIM_RSAkey_State
 	_Bool poisoned;
 
 	/* Type of RSA key. */
-	enum {no_key, public_key, private_key, hardware_key, generated} type;
+	enum {
+		no_key,
+		public_key,
+		private_key,
+		hardware_key,
+		generated,
+		certificate
+	} type;
 
 	/* Type of padding. */
 	RSAkey_padding padding;
@@ -493,8 +501,6 @@ static _Bool load_certificate(CO(RSAkey, this), CO(Buffer, bufr))
 
 	BIO *bio = NULL;
 
-	EVP_PKEY *pkey = NULL;
-
 
 	/* Verify object status. */
 	if ( S->poisoned )
@@ -512,14 +518,8 @@ static _Bool load_certificate(CO(RSAkey, this), CO(Buffer, bufr))
 	if ( (S->certificate = PEM_read_bio_X509(bio, NULL, 0, NULL)) == NULL )
 		ERR(goto done);
 
-	/* Extract the public key and convert to RSA format. */
-	if ( (pkey = X509_get_pubkey(S->certificate)) == NULL )
-		ERR(goto done);
-	if ( (S->key = EVP_PKEY_get1_RSA(pkey)) == NULL )
-		ERR(goto done);
-
 	retn	= true;
-	S->type = public_key;
+	S->type = certificate;
 
 
  done:
@@ -528,8 +528,6 @@ static _Bool load_certificate(CO(RSAkey, this), CO(Buffer, bufr))
 
 	if ( bio != NULL )
 		BIO_free(bio);
-	if ( pkey != NULL )
-		EVP_PKEY_free(pkey);
 
 	return retn;
 }
@@ -768,6 +766,7 @@ static _Bool encrypt(CO(RSAkey, this), CO(Buffer, payload))
 	switch ( S->type ) {
 	case no_key:
 	case generated:
+	case certificate:
 		ERR(goto done);
 		break;
 	case private_key:
@@ -851,6 +850,7 @@ static _Bool decrypt(CO(RSAkey, this), CO(Buffer, payload))
 	switch ( S->type ) {
 	case no_key:
 	case generated:
+	case certificate:
 		ERR(goto done);
 		break;
 	case private_key:
@@ -940,13 +940,20 @@ static _Bool verify(CO(RSAkey, this), CO(Buffer, signature), \
 		ERR(goto done);
 	if ( data->poisoned(data) )
 		ERR(goto done);
-	if ( S->certificate == NULL )
+	if ( (S->certificate == NULL) && (S->type != public_key) )
 		ERR(goto done);
 
 
 	/* Setup the RSA key that will be used. */
-	if ( (pkey = X509_get_pubkey(S->certificate)) == NULL )
-		ERR(goto done);
+	if ( S->certificate != NULL ) {
+		if ( (pkey = X509_get_pubkey(S->certificate)) == NULL )
+			ERR(goto done);
+	} else {
+		if ( (pkey = EVP_PKEY_new()) == NULL )
+			ERR(goto done);
+		if ( EVP_PKEY_set1_RSA(pkey, S->key) == 0 )
+			ERR(goto done);
+	}
 
 
 	/* Initialize a message digest and verification context. */
@@ -975,6 +982,7 @@ static _Bool verify(CO(RSAkey, this), CO(Buffer, signature), \
 	if ( !retn )
 		S->poisoned = false;
 
+	EVP_PKEY_free(pkey);
 	EVP_MD_CTX_free(md_ctx);
 
 	return retn;
