@@ -97,3 +97,4 @@
 #define NAAAIM_ISOmanager_OBJID		59
 #define NAAAIM_SRDEocall_OBJID		60
 #define NAAAIM_X509cert_OBJID		61
+#define NAAAIM_Prompt_OBJID		62
