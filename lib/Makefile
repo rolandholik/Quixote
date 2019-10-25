@@ -20,7 +20,7 @@ CSRC = Duct.c OTEDKS.c Curve25519.c IPC.c SoftwareStatus.c Ivy.c IDmgr.c    \
 	RandomBuffer.c AES256_cbc.c IDtoken.c X509cert.c
 
 TESTS = Duct_test OTEDKS_test Curve25519_test IPC_test PossumPipe_test \
-	RSAkey_test LocalDuct_test X509cert_test #SmartCard_test
+	RSAkey_test LocalDuct_test X509cert_test Prompt_test #SmartCard_test
 
 CC = musl-gcc
 
@@ -105,6 +105,9 @@ RSAkey_test: RSAkey_test.o RSAkey.o
 	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${SSL_CRYPTO}
 
 X509cert_test: X509cert_test.o X509cert.o
+	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${SSL_CRYPTO}
+
+Prompt_test: Prompt_test.o
 	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${SSL_CRYPTO}
 
 SmartCard_test: SmartCard_test.o SmartCard.o

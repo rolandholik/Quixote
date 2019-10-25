@@ -30,7 +30,7 @@
 #include "X509cert.h"
 
 
-static uint8_t __attribute__ ((unused)) Key[1675] = {
+static uint8_t Key[1675] = {
 	0x2d, 0x2d, 0x2d, 0x2d, 0x2d, 0x42, 0x45, 0x47, \
 	0x49, 0x4e, 0x20, 0x52, 0x53, 0x41, 0x20, 0x50, \
 	0x52, 0x49, 0x56, 0x41, 0x54, 0x45, 0x20, 0x4b, \
@@ -1183,6 +1183,45 @@ void test_seven()
 		ERR(goto done);
 
 	fprintf(stdout, "\nPublic key signature status: %s\n", \
+		valid ? "OK" : "INVALID");
+
+
+	/* Test key signing. */
+	WHACK(key);
+	key = NULL;
+	INIT(NAAAIM, RSAkey, key, ERR(goto done));
+
+	private->reset(private);
+	if ( !private->add(private, Key, sizeof(Key)) )
+		ERR(goto done);
+	if ( !key->load_private(key, private) )
+		ERR(goto done);
+
+	private->reset(private);
+	if ( !private->add(private, Certificate, sizeof(Certificate)) )
+		ERR(goto done);
+
+	payload->reset(payload);
+	if ( !key->sign(key, private, payload) )
+		ERR(goto done);
+
+	fputs("\nPrivate key signature:\n", stdout);
+	payload->hprint(payload);
+
+	WHACK(key);
+	key = NULL;
+	INIT(NAAAIM, RSAkey, key, ERR(goto done));
+
+	public->reset(public);
+	if ( !public->add(public, PublicKey, sizeof(PublicKey)) )
+		ERR(goto done);
+	if ( !key->load_public(key, public) )
+		ERR(goto done);
+
+	if ( !key->verify(key, payload, private, &valid) )
+		ERR(goto done);
+
+	fprintf(stdout, "\nPrivate key signature status: %s\n", \
 		valid ? "OK" : "INVALID");
 
 

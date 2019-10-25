@@ -50,6 +50,7 @@ struct NAAAIM_RSAkey
 	_Bool (*decrypt)(const RSAkey, Buffer);
 
 	_Bool (*verify)(const RSAkey, const Buffer, const Buffer, _Bool *);
+	_Bool (*sign)(const RSAkey, const Buffer, const Buffer);
 
 	_Bool (*init_engine)(const RSAkey, const char **);
 	_Bool (*set_padding)(const RSAkey, const int);

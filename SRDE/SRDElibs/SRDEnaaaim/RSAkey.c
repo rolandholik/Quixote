@@ -889,6 +889,102 @@ static _Bool verify(CO(RSAkey, this), CO(Buffer, signature), \
 /**
  * External public method.
  *
+ * This method implements signing of a block of data with the private
+ * key assigned to an object.
+ *
+ * \param this		A pointer to the object describing the key that
+ *			is to be used for generating the signature.
+ *
+ * \param data		The object containing the data whose signature
+ *			is to be generated.
+ *
+ * \param signature	The object which the signature will be loaded
+ *			into.
+ *
+ * \return		A boolean value is returned to indicate the
+ *			status of the signature generation.  A false
+ *			value implies an error was encountered and
+ *			no assumptions can be made about the data
+ *			in the output object.  A true value indicates
+ *			the signing succeeded and the output object
+ *			contains a valid signature.
+ */
+
+static _Bool sign(CO(RSAkey, this), CO(Buffer, data), CO(Buffer, signature))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	unsigned int outsize;
+
+	EVP_PKEY *pkey = NULL;
+
+	EVP_MD_CTX *md_ctx = NULL;
+
+
+	/* Verify object status. */
+	if ( data == NULL )
+		ERR(goto done);
+	if ( data->poisoned(data) )
+		ERR(goto done);
+	if ( signature == NULL )
+		ERR(goto done);
+	if ( signature->poisoned(signature) )
+		ERR(goto done);
+	if ( signature->size(signature) != 0 )
+		ERR(goto done);
+	if ( S->type != private_key )
+		ERR(goto done);
+
+
+	/* Setup the RSA key that will be used. */
+	if ( (pkey = EVP_PKEY_new()) == NULL )
+			ERR(goto done);
+	if ( EVP_PKEY_set1_RSA(pkey, S->key) == 0 )
+		ERR(goto done);
+
+
+	/* Initialize a message digest and verification context. */
+	if ( (md_ctx = EVP_MD_CTX_new()) == NULL )
+		ERR(goto done);
+	if ( EVP_DigestSignInit(md_ctx, NULL, EVP_sha256(), NULL, \
+				  pkey) == 0 )
+		ERR(goto done);
+
+
+	/* Scale the output object. */
+	while ( signature->size(signature) < EVP_PKEY_size(pkey) )
+		signature->add(signature, (unsigned char *) "\0", 1);
+	if ( signature->poisoned(signature) )
+		ERR(goto done);
+
+
+	/* Verify the signature. */
+	if ( EVP_SignUpdate(md_ctx, data->get(data), data->size(data)) == 0 )
+		ERR(goto done);
+	if ( EVP_SignFinal(md_ctx, signature->get(signature), &outsize, \
+			   pkey) == 0 )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = false;
+
+	EVP_PKEY_free(pkey);
+	EVP_MD_CTX_free(md_ctx);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements initialization of an alternate engine for
  * executing the RSA key operations.  The engine is specifically
  * attached to the current RSA key instance.
@@ -1146,6 +1242,7 @@ extern RSAkey NAAAIM_RSAkey_Init(void)
 	this->decrypt = decrypt;
 
 	this->verify = verify;
+	this->sign   = sign;
 
 	this->init_engine = init_engine;
 	this->set_padding = set_padding;
