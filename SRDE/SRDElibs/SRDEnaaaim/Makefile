@@ -11,7 +11,7 @@ INSTPATH       = ${DESTDIR}/opt/IDfusion
 INSTALLENCLAVE = test-naaaim.signed.so test-Duct.signed.so \
 	test-Possum.signed.so
 INSTINCLUDE    = IDtoken.h NAAAIM.h PossumPacket.h PossumPipe.h \
-	RandomBuffer.h SEALkey.h SEALEDblob.h Prompt.c
+	RandomBuffer.h SEALkey.h SEALEDblob.h
 
 CSRC   = test-naaaim.c
 ENCSRC = test-naaaim-enclave.c test-naaaim-interface.c
