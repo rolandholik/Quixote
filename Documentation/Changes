@@ -34,3 +34,7 @@ Version 0.9:
 	* Implement object based key management and data sealing.
 
 	* Implement object for verifying X.509 certificates.
+
+	* Implement object for OpenSSL passphrase prompting.
+
+	* Add signature support for RSAkey object.
