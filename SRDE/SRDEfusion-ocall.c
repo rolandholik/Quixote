@@ -45,6 +45,7 @@ static int SRDEfusion_ocall0(struct SRDEfusion_ocall0_interface *ifp)
 
 {
 	fprintf(stdout, "%s", ifp->buffer);
+	fflush(stdout);
 	return 0;
 }
 
