@@ -59,6 +59,9 @@ CC = musl-gcc
 
 CFLAGS = -Wall -O2 -fomit-frame-pointer -march=core2 -I .. -I ../.. \
 	-I ../../HurdLib -I ../../ISOidentity -I ../../lib
+ifdef ENCLAVE_DIR
+CFLAGS += -DENCLAVE_DIR=\"${ENCLAVE_DIR}\"
+endif
 
 LDFLAGS = -g
 ifneq (${CC}, musl-gcc)
