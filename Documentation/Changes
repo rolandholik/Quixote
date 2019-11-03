@@ -38,3 +38,5 @@ Version 0.9:
 	* Implement object for OpenSSL passphrase prompting.
 
 	* Add signature support for RSAkey object.
+
+	* Update to standard and trusted OpenSSL 1.1.1d.

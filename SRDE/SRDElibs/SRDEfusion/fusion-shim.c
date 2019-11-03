@@ -27,6 +27,31 @@
 
 
 /**
+ * Replacement for strdup not provided by Intel C library.
+ */
+char *strdup(const char *s)
+
+{
+	size_t len;
+
+	void *mem;
+
+
+	len = strlen(s) + 1;
+	if ( (mem = malloc(len)) == NULL )
+		return NULL;
+
+	return memcpy(mem, s, len);
+}
+
+
+/**
+ * Weak alias for GCC generated intrinsic.
+ */
+char *__strdup(const char *s) __attribute__((weak, alias("strdup")));
+
+
+/**
  * External function.
  *
  * This function implements a replacement for the sprintf function that

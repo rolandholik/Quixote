@@ -47,7 +47,7 @@ ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles   \
 	-Wl,--no-whole-archive						      \
 	-Wl,--start-group						      \
 	-lsgx_tstdc -l${SGX_CRYPTO_LIB} -l${SGX_SERVICE_LIBRARY} -lSRDEnaaaim \
-	-lsgx_tsgxssl_crypto -lsgx_tcxx					      \
+	-lsgx_tsgxssl_crypto						      \
 	-Wl,--end-group							      \
 	-Wl,-Bstatic -Wl,-Bsymbolic -Wl,--no-undefined			      \
 	-Wl,-pie,-eenclave_entry -Wl,--export-dynamic			      \
