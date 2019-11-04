@@ -300,7 +300,6 @@ static _Bool seal(CO(SEALEDblob, this))
 
 
 	/* Encrypt the buffer. */
-	INIT(NAAAIM, AES256_cbc, cipher, ERR(goto done));
 	if ( (cipher = NAAAIM_AES256_cbc_Init_encrypt(key, iv)) == NULL )
 		ERR(goto done);
 	if ( !cipher->encrypt(cipher, S->blob) )
@@ -343,7 +342,6 @@ static _Bool seal(CO(SEALEDblob, this))
 	if ( !sealkey->get_iv_key(sealkey, iv, key) )
 		ERR(goto done);
 
-	INIT(NAAAIM, AES256_cbc, cipher, ERR(goto done));
 	if ( (cipher = NAAAIM_AES256_cbc_Init_encrypt(key, iv)) == NULL )
 		ERR(goto done);
 
@@ -522,7 +520,6 @@ static _Bool unseal(CO(SEALEDblob, this))
 
 
 	/* Decrypt blob header. */
-	INIT(NAAAIM, AES256_cbc, cipher, ERR(goto done));
 	if ( (cipher = NAAAIM_AES256_cbc_Init_decrypt(key, iv)) == NULL )
 		ERR(goto done);
 	if ( !cipher->decrypt(cipher, kreq) )
@@ -580,7 +577,6 @@ static _Bool unseal(CO(SEALEDblob, this))
 			S->blob->size(S->blob) - VERSION1_SIZE - 48) )
 		ERR(goto done);
 
-	INIT(NAAAIM, AES256_cbc, cipher, ERR(goto done));
 	if ( (cipher = NAAAIM_AES256_cbc_Init_decrypt(key, iv)) == NULL )
 		ERR(goto done);
 	if ( !cipher->decrypt(cipher, mac1) )
