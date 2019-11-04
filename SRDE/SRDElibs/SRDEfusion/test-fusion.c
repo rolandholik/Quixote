@@ -66,7 +66,8 @@ static struct ecall0_table {
 extern int main(int argc, char *argv[])
 
 {
-	_Bool debug	    = false,
+	_Bool test_lost	    = false,
+	      debug	    = false,
 	      debug_enclave = true;
 
 	char *token	   = SGX_TOKEN_DIRECTORY"/test-fusion.token",
@@ -99,8 +100,11 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "dpn:t:")) != EOF )
+	while ( (opt = getopt(argc, argv, "Ldpn:t:")) != EOF )
 		switch ( opt ) {
+			case 'L':
+				test_lost = true;
+				break;
 			case 'd':
 				debug = true;
 				break;
@@ -159,6 +163,16 @@ extern int main(int argc, char *argv[])
 	/* Iterate through the test counts. */
 	for (test= 1; test <= NUMBER_OF_TESTS; ++test) {
 		ecall0_table.test = test;
+		if ( !enclave->boot_slot(enclave, 0, ocall_table, \
+					 &ecall0_table, &rc) ) {
+			fprintf(stderr, "Enclave returned: %d\n", rc);
+			goto done;
+		}
+		fputc('\n', stdout);
+	}
+
+	if ( test_lost ) {
+		ecall0_table.test = 100;
 		if ( !enclave->boot_slot(enclave, 0, ocall_table, \
 					 &ecall0_table, &rc) ) {
 			fprintf(stderr, "Enclave returned: %d\n", rc);

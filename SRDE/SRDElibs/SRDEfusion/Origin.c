@@ -77,7 +77,7 @@ static void _check_state(void)
 {
 	if ( Root->state->init_count != 0 ) {
 		fprintf(stderr, "%s[%s]:\n", __FILE__, __FUNCTION__);
-		fprintf(stderr, "\tUnmatched object allocation, " \
+		fprintf(stderr, "\tUnmatched trusted object allocation, " \
 			"count = %d\n", Root->state->init_count);
 	}
 

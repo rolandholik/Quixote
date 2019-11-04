@@ -109,6 +109,19 @@ static void test_three(void)
 	return;
 }
 
+static void test_lost_object(void)
+
+{
+	Buffer bufr = NULL;
+
+	fputs("Test number: 100\n", stdout);
+
+	fputs("Allocating lost Buffer object.\n", stdout);
+	INIT(HurdLib, Buffer, bufr, return);
+
+	return;
+}
+
 
 void test_fusion(int test)
 
@@ -122,6 +135,9 @@ void test_fusion(int test)
 			break;
 		case 3:
 			test_three();
+			break;
+		case 100:
+			test_lost_object();
 			break;
 		default:
 			fputs("Invalid test.\n", stderr);

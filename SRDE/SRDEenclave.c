@@ -39,6 +39,7 @@
 
 #include "NAAAIM.h"
 #include "SRDE.h"
+#include "SRDEfusion-ocall.h"
 #include "SRDEenclave.h"
 #include "SRDEloader.h"
 #include "SRDEsigstruct.h"
@@ -1129,12 +1130,14 @@ static void _restore_fp_state(uint8_t *save_area)
  * defined for this enclave.  The enclave defined routines begin
  * number with slot 0.
  *
- * In addition there are three default execution slots which implement
+ * In addition there are five default execution slots which implement
  * the following:
  *
  *	-1 -> Enclave initialization.
  *	-2 -> Enclave OCALL return.
  *	-3 -> Enclave exception handling.
+ *	-4 -> Creation of a new Task Control Structure (TCS).
+ *	-5 -> Uninitialize the enclave.
  *
  * \param this		A pointer to the object representing the enclave
  *			whose execution slot is to be called.
@@ -1415,6 +1418,20 @@ static void whack(CO(SRDEenclave, this))
 
 {
 	STATE(S);
+
+	int retn;
+
+	struct {
+		size_t nr_ocall;
+		const void *table[2];
+	} ocall;
+
+
+	/* Run enclave uninitialization routine. */
+	ocall.nr_ocall = 1;
+	ocall.table[0] = SRDEfusion_ocall_table[0];
+	ocall.table[1] = NULL;
+	this->boot_slot(this, -5, (struct OCALL_api *) &ocall, NULL, &retn);
 
 
 	if ( S->enclave_address != 0 )

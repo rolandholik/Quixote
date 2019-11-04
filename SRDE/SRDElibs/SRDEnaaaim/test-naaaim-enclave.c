@@ -910,8 +910,9 @@ void test_four()
 
 
  done:
+	WHACK(key);
 	WHACK(bufr);
-	WHACK(hmac)
+	WHACK(hmac);
 
 	return;
 }
@@ -1238,6 +1239,7 @@ void test_seven()
 
 
 void test_eight()
+
 {
 	static unsigned char id[32] = {
 		0x37, 0x34, 0xd3, 0xa8, 0x52, 0xa0, 0x95, 0x87, \
@@ -1474,6 +1476,11 @@ void test_passphrase(void)
 
 
  done:
+	WHACK(prompt);
+	WHACK(vprompt);
+	WHACK(phrase);
+	WHACK(pwd);
+
 	return;
 }
 
