@@ -406,7 +406,7 @@ _Bool _generate_iv_key(CO(SEALkey_State, S), int type)
 	if ( !sha256->compute(sha256) )
 		ERR(goto done);
 
-	INIT(HurdLib, Buffer, S->key, ERR(goto done));
+	S->key->reset(S->key);
 	rbp = sha256->get_Buffer(sha256);
 	if ( !S->key->add_Buffer(S->key, rbp) )
 		ERR(goto done);
@@ -415,7 +415,7 @@ _Bool _generate_iv_key(CO(SEALkey_State, S), int type)
 	if ( !sha256->rehash(sha256, 512) )
 		ERR(goto done);
 
-	INIT(HurdLib, Buffer, S->keyiv, ERR(goto done));
+	S->keyiv->reset(S->keyiv);
 	if ( !S->keyiv->add(S->keyiv, rbp->get(rbp), 16) )
 		ERR(goto done);
 
@@ -953,6 +953,10 @@ extern SEALkey NAAAIM_SEALkey_Init(void)
 	/* Initialize object state. */
 	_init_state(this->state);
 
+	/* Initialize aggregate objects. */
+	INIT(HurdLib, Buffer, this->state->keyiv, goto fail);
+	INIT(HurdLib, Buffer, this->state->key,	  goto fail);
+
 	/* Method initialization. */
 	this->generate_mrsigner	  = generate_mrsigner;
 	this->generate_mrenclave  = generate_mrenclave;
@@ -968,4 +972,14 @@ extern SEALkey NAAAIM_SEALkey_Init(void)
 	this->whack = whack;
 
 	return this;
+
+
+ fail:
+	if ( this->state->keyiv != NULL )
+		this->state->keyiv->whack(this->state->keyiv);
+	if ( this->state->key != NULL )
+		this->state->key->whack(this->state->key);
+
+	root->whack(root, this, this->state);
+	return NULL;
 }
