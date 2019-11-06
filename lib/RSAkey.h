@@ -35,8 +35,10 @@ struct NAAAIM_RSAkey
 {
 	/* External methods. */
 	_Bool (*generate_key)(const RSAkey, int);
+
 	_Bool (*get_public_key)(const RSAkey, const Buffer);
 	_Bool (*get_private_key)(const RSAkey, const Buffer);
+	_Bool (*get_modulus)(const RSAkey, const Buffer);
 
 	_Bool (*load_public)(const RSAkey, const Buffer);
 	_Bool (*load_private)(const RSAkey, const Buffer);

@@ -1071,6 +1071,7 @@ void test_seven()
 
 	INIT(HurdLib, Buffer, public, ERR(goto done));
 	INIT(HurdLib, Buffer, private, ERR(goto done));
+	INIT(HurdLib, Buffer, payload, ERR(goto done));
 
 	fputs("Generating 2048 bit RSA key.\n", stdout);
 	INIT(NAAAIM, RSAkey, key, ERR(goto done));
@@ -1088,13 +1089,18 @@ void test_seven()
 	key->get_public_key(key, public);
 	public->hprint(public);
 
+	if ( !key->get_modulus(key, payload) )
+		ERR(goto done);
+	fputs("\nModulus:\n", stdout);
+	payload->hprint(payload);
+
 	WHACK(key);
 	INIT(NAAAIM, RSAkey, key, ERR(goto done));
-	INIT(HurdLib, Buffer, payload, ERR(goto done));
 
 	if ( !key->load_public(key, public) )
 		ERR(goto done);
 
+	payload->reset(payload);
 	if ( !payload->add(payload, encdata, sizeof(encdata)) )
 		ERR(goto done);
 	fputs("\nPayload to be encrypted:\n", stdout);

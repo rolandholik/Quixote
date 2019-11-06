@@ -55,6 +55,7 @@ extern int main(int argc, char *argv[])
 		fputs("\tRSAkey_test sigkey pubkey signature data\n", stderr);
 		fputs("\tRSAkey_test sign privkey datafile [sigfile]\n", \
 		      stderr);
+		fputs("\tRSAkey_test modulus privkey\n", stderr);
 		fputs("\tRSAkey_test pkcs11 keyid\n", stderr);
 		fputs("\tRSAkey_test file public_key private_key\n", stderr);
 		goto done;
@@ -228,6 +229,36 @@ extern int main(int argc, char *argv[])
 				ERR(goto done);
 			fprintf(stdout, "Signature: %s\n", argv[4]);
 		}
+		goto done;
+	}
+
+	if ( strcmp(argv[1], "modulus") == 0 ) {
+		if ( argc != 4 ) {
+			fputs("Insufficient arguements specified.\n", stdout);
+			fputs("Usage: modulus [private|public] key\n", \
+			      stdout);
+			goto done;
+		}
+
+		INIT(HurdLib, File, certfile, ERR(goto done));
+		if ( !certfile->open_ro(certfile, argv[3]) )
+			ERR(goto done);
+		if ( !certfile->slurp(certfile, payload) )
+			ERR(goto done);
+
+		if ( strcmp(argv[2], "private") == 0 )
+			if ( !rsakey->load_private(rsakey, payload) )
+				ERR(goto done);
+		if ( strcmp(argv[2], "public") == 0 )
+			if ( !rsakey->load_public(rsakey, payload) )
+				ERR(goto done);
+
+		payload->reset(payload);
+		if ( !rsakey->get_modulus(rsakey, payload) )
+			ERR(goto done);
+
+		fputs("Modulus:\n", stdout);
+		payload->hprint(payload);
 		goto done;
 	}
 

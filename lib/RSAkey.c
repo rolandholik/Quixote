@@ -345,6 +345,71 @@ static _Bool get_private_key(CO(RSAkey, this), CO(Buffer, bufr))
 /**
  * External public method.
  *
+ * This method implements a method for extracting the modulus of
+ * a public/private keypair.
+ *
+ * \param this		A pointer to the key object whose modulus is
+ *			to be extracted.
+ *
+ * \param bufr		The object which the big-endian value of
+ *			the modulus is to be loaded into.
+ *
+ * \return	If extraction of the modulus fails for any reason
+ *		a false value is returned to the caller and the output
+ *		object is considered to be in an indeterminate state.
+ *		A true value indicates the output object can be
+ *		considered to have a valid modulus value.
+ */
+
+static _Bool get_modulus(CO(RSAkey, this), CO(Buffer, bufr))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	const BIGNUM *modulus;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( bufr == NULL )
+		ERR(goto done);
+	if ( bufr->poisoned(bufr) )
+		ERR(goto done);
+	if ( S->type == no_key )
+		ERR(goto done);
+	if ( (S->type != generated) && (S->type != private_key) && \
+	     (S->type != public_key) )
+		ERR(goto done);
+
+
+	/* Extract the modulus as a big number and transfer to buffer. */
+	if ( (modulus = RSA_get0_n(S->key)) == NULL )
+		ERR(goto done);
+
+	/* Stage the buffer size and copy the binary modulus. */
+	while ( bufr->size(bufr) < RSA_size(S->key) )
+		bufr->add(bufr, (unsigned char *) "\0", 1);
+	if ( bufr->poisoned(bufr) )
+		ERR(goto done);
+
+	BN_bn2bin(modulus, bufr->get(bufr));
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements loading of an RSA public key and sets
  * the object type to be a public key object.
  *
@@ -1317,8 +1382,10 @@ extern RSAkey NAAAIM_RSAkey_Init(void)
 
 	/* Method initialization. */
 	this->generate_key    = generate_key;
+
 	this->get_public_key  = get_public_key;
 	this->get_private_key = get_private_key;
+	this->get_modulus     = get_modulus;
 
 	this->load_public  = load_public;
 	this->load_private = load_private;
