@@ -40,3 +40,5 @@ Version 0.9:
 	* Add signature support for RSAkey object.
 
 	* Update to standard and trusted OpenSSL 1.1.1d.
+
+	* Implement support for enclave de-initialization and atexit().
