@@ -28,6 +28,7 @@
 #include "SEALkey.h"
 #include "SEALEDblob.h"
 #include "X509cert.h"
+#include "Prompt.h"
 
 
 static uint8_t Key[1675] = {
@@ -1442,6 +1443,41 @@ void test_ten()
 }
 
 
+void test_passphrase(void)
+
+{
+	_Bool pwdfail = false;
+
+	String prompt  = NULL,
+	       vprompt = NULL,
+	       phrase  = NULL;
+
+	Prompt pwd = NULL;
+
+
+	INIT(HurdLib, String, prompt, ERR(goto done));
+	if ( !prompt->add(prompt, "Passphrase: ") )
+		ERR(goto done);
+
+	INIT(HurdLib, String, vprompt, ERR(goto done));
+	if ( !vprompt->add(vprompt, "Verify - ") )
+		ERR(goto done);
+
+	INIT(HurdLib, String, phrase, ERR(goto done));
+
+	INIT(NAAAIM, Prompt, pwd, ERR(goto done));
+	if ( !pwd->get(pwd, prompt, vprompt, 32, phrase, &pwdfail) )
+		ERR(goto done);
+
+	fputs("Passphrase: ", stdout);
+	phrase->print(phrase);
+
+
+ done:
+	return;
+}
+
+
 void test_naaaim(unsigned int test)
 
 {
@@ -1477,6 +1513,9 @@ void test_naaaim(unsigned int test)
 			break;
 		case 10:
 			test_ten();
+			break;
+		case 100:
+			test_passphrase();
 			break;
 
 		default:

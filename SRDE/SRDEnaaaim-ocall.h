@@ -25,7 +25,10 @@
 /* SRDEquote manager. */
 #define SRDENAAAIM_OCALL2	SRDENAAAIM_OCALL1+1
 
-#define SRDENAAAIM_MAX_OCALL	SRDENAAAIM_OCALL2
+/* Passphrase input. */
+#define SRDENAAAIM_OCALL3	SRDENAAAIM_OCALL2+1
+
+#define SRDENAAAIM_MAX_OCALL	SRDENAAAIM_OCALL3
 
 
 /**
@@ -40,6 +43,25 @@ struct SRDEnaaaim_ocall0_interface {
 	int *cpuinfo;
 };
 
+
+/**
+ * This structure defines the interface used by SRDENAAAIM_OCALL3 to
+ * retrieve a passphrase from userspace using using the OpenSSL
+ * UI API.
+ */
+
+struct SRDEnaaaim_ocall3_interface {
+	_Bool retn;
+	_Bool verify;
+	_Bool pwdfail;
+
+	size_t maximum;
+
+	char prompt[64];
+	char vprompt[64];
+
+	char pwd[64];
+};
 
 /**
  * Declaration for the function to populate SRDEnaaaim OCALL's.

@@ -84,3 +84,4 @@
 #define NAAAIM_SEALkey_OBJID		47
 #define NAAAIM_SEALEDblob_OBJID		48
 #define NAAAIM_X509cert_OBJID		49
+#define NAAAIM_Prompt_OBJID		50

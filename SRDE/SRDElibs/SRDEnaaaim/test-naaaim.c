@@ -68,7 +68,8 @@ extern int main(int argc, char *argv[])
 
 {
 	_Bool debug	    = false,
-	      debug_enclave = true;
+	      debug_enclave = true,
+	      passphrase    = false;
 
 	char *token	   = SGX_TOKEN_DIRECTORY"/test-naaaim.token",
 	     *sgx_device   = "/dev/isgx",
@@ -100,8 +101,11 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "dpn:t:")) != EOF )
+	while ( (opt = getopt(argc, argv, "Pdpn:t:")) != EOF )
 		switch ( opt ) {
+			case 'P':
+				passphrase = true;
+				break;
 			case 'd':
 				debug = true;
 				break;
@@ -166,6 +170,16 @@ extern int main(int argc, char *argv[])
 	/* Sequence through all tests. */
 	for (test= 1; test <= NUMBER_OF_TESTS; ++test) {
 		ecall0_table.test = test;
+		if ( !enclave->boot_slot(enclave, 0, table, \
+					 &ecall0_table, &rc) ) {
+			fprintf(stderr, "Enclave returned: %d\n", rc);
+			goto done;
+		}
+		fputc('\n', stdout);
+	}
+
+	if ( passphrase ) {
+		ecall0_table.test = 100;
 		if ( !enclave->boot_slot(enclave, 0, table, \
 					 &ecall0_table, &rc) ) {
 			fprintf(stderr, "Enclave returned: %d\n", rc);

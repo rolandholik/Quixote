@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 #include <HurdLib.h>
 
@@ -24,6 +25,7 @@
 #include <Buffer.h>
 #include <String.h>
 #include <Duct.h>
+#include <Prompt.h>
 
 #include "SRDE.h"
 #include "SRDEocall.h"
@@ -104,12 +106,80 @@ int SRDEnaaaim_ocall0(struct SRDEnaaaim_ocall0_interface *ifp)
 
 
 /**
+ * Private function.
+ *
+ * This function implements the SRDENAAAIM_OCALL3 that accepts a
+ * structure containing information to be used to execute the
+ * standard userspace version of a Prompt object.
+ *
+ * \param ifp	A pointer to the OCALL interface structure.
+ *
+ * \return	A numeric value is returned to indicate the
+ *		success or failure of the call.  A value of
+ *		0 is used to indicate success which is the
+ *		only currently defined value.
+ */
+
+int SRDEnaaaim_ocall3(struct SRDEnaaaim_ocall3_interface *ifp)
+
+{
+	int retn = 1;
+
+	String prompt = NULL,
+	       verify = NULL,
+	       phrase = NULL;
+
+	Prompt pwd = NULL;
+
+
+	INIT(HurdLib, String, prompt, ERR(goto done));
+	if ( !prompt->add(prompt, ifp->prompt) )
+		ERR(goto done);
+
+	if ( ifp->verify ) {
+		INIT(HurdLib, String, verify, ERR(goto done));
+		if ( !verify->add(verify, ifp->vprompt) )
+			ERR(goto done);
+	}
+
+
+	/* Request the passphrase. */
+	INIT(HurdLib, String, phrase, ERR(goto done));
+
+	INIT(NAAAIM, Prompt, pwd, ERR(goto done));
+	if ( !pwd->get(pwd, prompt, verify, ifp->maximum, phrase, \
+		       &ifp->pwdfail) )
+		ERR(goto done);
+
+	ifp->retn = true;
+	memset(ifp->pwd, '\0', sizeof(ifp->pwd));
+	memcpy(ifp->pwd, phrase->get(phrase), phrase->size(phrase));
+
+	retn = 0;
+
+
+ done:
+	if ( retn )
+		ifp->retn = false;
+
+	WHACK(prompt);
+	WHACK(verify);
+	WHACK(phrase);
+
+	WHACK(pwd);
+
+	return retn;
+}
+
+
+/**
  * Null terminated table of SRDEnaaaim ocall pointers.
  */
-const void *SRDEnaaaim_ocall_table[4] = {
+const void *SRDEnaaaim_ocall_table[5] = {
 	SRDEnaaaim_ocall0,
 	Duct_mgr,
 	SRDEquote_mgr,
+	SRDEnaaaim_ocall3,
 	NULL
 };
 
