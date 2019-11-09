@@ -18,6 +18,7 @@
 #include <NAAAIM.h>
 #include <IDtoken.h>
 #include <Ivy.h>
+#include <RSAkey.h>
 #include <PossumPipe.h>
 
 #include <SRDE.h>

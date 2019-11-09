@@ -29,17 +29,15 @@
 #include <Buffer.h>
 
 #include <RandomBuffer.h>
-#include <IDtoken.h>
-#include <Ivy.h>
-#include <SHA256.h>
 #include <RSAkey.h>
+#include <SHA256.h>
 
 #include <SRDE.h>
 #include <SRDEfusion.h>
 
 #include "PossumPipe.h"
 
-#include "test-Possum-interface.h"
+#include "test-Possum2-interface.h"
 
 
 /* Macro to clear an array object. */
@@ -70,14 +68,15 @@ enum test_mode {
 
 
 /**
- * The device identity to be used.
+ * The device identity to be used.  This is unused for mode 2
+ * authentication but needed in order to satisfy the link dependency
+ * from the PossumPipe object.
  */
 size_t Identity_size	= 0;
 unsigned char *Identity = NULL;
 
-
 /**
- * The device verified for the communication counter-party.
+ * The list of verifiers for communication counter-parties.
  */
 Buffer Verifiers = NULL;
 
@@ -91,12 +90,11 @@ static time_t Current_Time;
 /**
  * Static private function.
  *
- * The following function is used to add a host verifier to the
- * current list of hosts that are permitted to connect to the
- * enclave.
+ * The following function is used to add a verifier key to the current
+ * list current verifies that are permitted to connect to the enclave.
  *
  * \param verifier	A character pointer to the buffer containing
- *			the raw Ivy blob that will be added to the
+ *			the raw key blob that will be added to the
  *			verifier list.
  *
  * \param size		The number of bytes in the verifier buffer.
@@ -115,31 +113,30 @@ static _Bool _add_verifier(uint8_t *verifier, size_t size)
 
 	Buffer bufr = NULL;
 
-	Ivy ivy = NULL;
+	RSAkey key = NULL;
 
 
-	/* Decode the raw Ivy buffer. */
+	/* Decode the raw RSAkey buffer. */
+	INIT(NAAAIM, RSAkey, key, ERR(goto done));
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	INIT(NAAAIM, Ivy, ivy, ERR(goto done));
 
 	if ( !bufr->add(bufr, verifier, size) )
 		ERR(goto done);
-	if ( !ivy->decode(ivy, bufr) )
+	if ( !key->load_public(key, bufr) )
 		ERR(goto done);
 
 
-	/* Add the Ivy object to the verifier list. */
+	/* Add the RSAkey object to the verifier list. */
 	if ( Verifiers == NULL )
 		INIT(HurdLib, Buffer, Verifiers, ERR(goto done));
 
-	if ( !Verifiers->add(Verifiers, (unsigned char *) &ivy, sizeof(Ivy)) )
+	if ( !Verifiers->add(Verifiers, (unsigned char *) &key, \
+			     sizeof(RSAkey)) )
 		ERR(goto done);
 	retn = true;
 
 
  done:
-	if ( !retn )
-		WHACK(ivy);
 	WHACK(bufr);
 
 	return retn;
@@ -258,42 +255,19 @@ static _Bool ping(CO(PossumPipe, pipe))
 /**
  * ECALL 0
  *
- * This function implements the ecall entry point for a function which
- * implements the server side of the Duct test.
+ * This function implements the ecall entry point for the function that
+ * implements the server side of the PossumpPipe mode 2 protocol test.
  *
- * \param debug		A flag which specifies whether or not the
- *			PossumPipe object is to be placed in debug
- *			mode.
- *
- * \param port		The port number the server is to listen on.
- *
- * \param current_time	The time to be used as the seed for intra-enclave
- *			time.
- *
- * \param spid_key	A pointer to the Service Provider ID (SPID)
- *			encoded in ASCII hexadecimal form.
- *
- * \param id_size	The size of the buffer containing the
- *			identity token.
- *
- * \param identity	A pointer to a buffer containing the identity
- *			token which will identify the enclave.
- *
- * \param vfy_size	The size of the buffer containing the identity
- *			verifier that will be used.
- *
- * \param verifier	A pointer to a buffer containing the identity
- *			verifier that will be used.
+ * \param ifp		A pointer to the structure containing the
+ *			server mode arguements.
  *
  * \return	A boolean value is used to indicate the status of the
- *		test.  A false value indicates an error was encountered
- *		while a true value indicates the test was successfully
- *		conducted.
+ *		server mode test.  A false value indicates an error was
+ *		encountered while a true value indicates the test was
+ *		successfully conducted.
  */
 
-_Bool test_server(_Bool debug, unsigned int port, time_t current_time,	   \
-		  char *spid_key, size_t id_size, unsigned char *identity, \
-		  size_t vfy_size, unsigned char *verifier)
+_Bool test_server(struct Possum2_ecall0 *ifp)
 
 {
 	_Bool retn = false;
@@ -312,32 +286,22 @@ _Bool test_server(_Bool debug, unsigned int port, time_t current_time,	   \
 
 
 	/* Initialize the time. */
-	Current_Time = current_time;
+	Current_Time = ifp->current_time;
 
 	/* Convert the SPID value into binary form. */
 	INIT(HurdLib, Buffer, spid, ERR(goto done));
-	if ( !spid->add_hexstring(spid, spid_key) )
+	if ( !spid->add_hexstring(spid, ifp->spid) )
 		ERR(goto done);
 
 
-	/* Stash the identity token and verifier buffer descriptions. */
-	Identity      = identity;
-	Identity_size = id_size;
-
-	if ( vfy_size != 0 ) {
-		if ( !_add_verifier(verifier, vfy_size) )
-			ERR(goto done);
-	}
-
-
 	/* Start the server listening. */
-	fprintf(stdout, "Server mode: port=%d\n", port);
+	fprintf(stdout, "Server mode: port=%d\n", ifp->port);
 
 	INIT(NAAAIM, PossumPipe, pipe, ERR(goto done));
-	if ( debug )
-		pipe->debug(pipe, debug);
+	if ( ifp->debug_mode )
+		pipe->debug(pipe, ifp->debug_mode);
 
-	if ( !pipe->init_server(pipe, NULL, port, false) )
+	if ( !pipe->init_server(pipe, NULL, ifp->port, false) )
 		ERR(goto done);
 
 	if ( !pipe->accept_connection(pipe) ) {
@@ -345,7 +309,7 @@ _Bool test_server(_Bool debug, unsigned int port, time_t current_time,	   \
 		ERR(goto done);
 	}
 
-	if ( !pipe->start_host_mode(pipe, spid) ) {
+	if ( !pipe->start_host_mode2(pipe, spid) ) {
 		fputs("Error receiving data.\n", stderr);
 		goto done;
 	}
@@ -373,7 +337,7 @@ _Bool test_server(_Bool debug, unsigned int port, time_t current_time,	   \
 
 
  done:
-	GWHACK(Ivy, Verifiers);
+	GWHACK(RSAkey, Verifiers);
 
 	WHACK(pipe);
 	WHACK(spid);
@@ -389,46 +353,19 @@ _Bool test_server(_Bool debug, unsigned int port, time_t current_time,	   \
  * ECALL 1
  *
  * This function implements the ecall entry point for a function which
- * implements the client side of the Duct test.
+ * implements the client side of the PossumPipe authentication mode2
+ * test.
  *
- * \param debug		A flag which specifies whether or not the
- *			PossumPipe object is to be placed in debug
- *			mode.
+ * \param ifp		A pointer to the structure that contains the
+ *			client arguements.
  *
- * \param hostname	A pointer to a null-terminated character buffer
- *			containing the hostname which the client is to
- *			connect to.
- *
- * \param current_time	The time to be used as the seed for intra-enclave
- *			time.
- *
- * \param port		The port number to connect to on the remote
- *			server.
- *
- * \param spid_key	A pointer to the Service Provider ID (SPID)
- *			encoded in ASCII hexadecimal form.
- *
- * \param id_size	The size of the buffer containing the
- *			identity token.
- *
- * \param identity	A pointer to a buffer containing the identity
- *			token which will identify the enclave.
- *
- * \param vfy_size	The size of the buffer containing the identity
- *			verifier that will be used.
- *
- * \param verifier	A pointer to a buffer containing the identity
- *			verifier that will be used.
- *
- * \return	A boolean value is used to indicate the status of the
- *		test.  A false value indicates an error was encountered
+ * \return	A boolean value is used to indicate the status of client
+ *		mode.  A false value indicates an error was encountered
  *		while a true value indicates the test was successfully
  *		conducted.
  */
 
-_Bool test_client(_Bool debug, char *hostname, int port, time_t current_time, \
-		  char *spid_key, size_t id_size, unsigned char *identity,    \
-		  size_t vfy_size, unsigned char *verifier)
+_Bool test_client(struct Possum2_ecall1 *ifp)
 
 {
 	_Bool retn = false;
@@ -440,56 +377,49 @@ _Bool test_client(_Bool debug, char *hostname, int port, time_t current_time, \
 
 	PossumPipe pipe = NULL;
 
-	Buffer bufr	   = NULL,
-	       spid	   = NULL,
-	       signer	   = NULL,
+	Buffer signer	   = NULL,
 	       measurement = NULL;
 
-	Ivy ivy = NULL;
-
-	IDtoken idt = NULL;
+	RSAkey key = NULL;
 
 
 	/* Initialize the time. */
-	Current_Time = current_time;
+	Current_Time = ifp->current_time;
 
 
-	/* Convert the SPID value into binary form. */
-	INIT(HurdLib, Buffer, spid, ERR(goto done));
-	if ( !spid->add_hexstring(spid, spid_key) )
+	/* Load the identifier key. */
+	INIT(HurdLib, Buffer, signer, ERR(goto done));
+	if ( !signer->add(signer, ifp->key, ifp->key_size) )
+		ERR(goto done);
+	fputs("private key:\n", stdout);
+	signer->hprint(signer);
+
+	INIT(NAAAIM, RSAkey, key, ERR(goto done));
+	if ( !key->load_private(key, signer) )
 		ERR(goto done);
 
 
-	/* Stash the identity token and verifier buffer descriptions. */
-	Identity      = identity;
-	Identity_size = id_size;
-
-	if ( vfy_size > 0 ) {
-		if ( !_add_verifier(verifier, vfy_size) )
-			ERR(goto done);
-	}
-
-
 	/* Start client mode. */
-	fprintf(stdout, "Client mode: connecting to %s:%d\n", hostname, port);
+	fprintf(stdout, "Client mode: connecting to %s:%d\n", \
+		ifp->hostname, ifp->port);
 	INIT(NAAAIM, PossumPipe, pipe, ERR(goto done));
-	if ( debug )
-		pipe->debug(pipe, debug);
+	if ( ifp->debug_mode )
+		pipe->debug(pipe, ifp->debug_mode);
 
-	if ( !pipe->init_client(pipe, hostname, port) ) {
+	if ( !pipe->init_client(pipe, ifp->hostname, ifp->port) ) {
 		fputs("Cannot initialize client pipe.\n", stderr);
 		goto done;
 	}
-	if ( !pipe->start_client_mode(pipe, spid)) {
+	if ( !pipe->start_client_mode2(pipe, key)) {
 		fputs("Error starting client mode.\n", stderr);
 		goto done;
 	}
 
 
 	/* Display remote connection parameters. */
-	INIT(HurdLib, Buffer, signer, ERR(goto done));
 	INIT(HurdLib, Buffer, measurement, ERR(goto done));
 
+	signer->reset(signer);
 	if ( !pipe->get_connection(pipe, &attributes, signer, measurement, \
 				   &vendor, &svn) )
 		ERR(goto done);
@@ -511,15 +441,11 @@ _Bool test_client(_Bool debug, char *hostname, int port, time_t current_time, \
 
 
  done:
-	GWHACK(Ivy, Verifiers);
+	GWHACK(RSAkey, Verifiers);
 
 	WHACK(pipe);
-	WHACK(bufr);
-	WHACK(spid);
 	WHACK(signer);
 	WHACK(measurement);
-	WHACK(ivy);
-	WHACK(idt);
 
 	return retn ? 0 : 1;
 }
@@ -527,91 +453,6 @@ _Bool test_client(_Bool debug, char *hostname, int port, time_t current_time, \
 
 /**
  * ECALL 2
- *
- * This function implements the ecall entry point for a function which
- * generates the platform specific device identity.
- *
- * \param id		A pointer containing the buffer which will
- *			be loaded with the 32 byte platform
- *			specific enclave identity.
- *
- * \return	A boolean value is used to indicate the status of the
- *		test.  A false value indicates an error was encountered
- *		while a true value indicates the test was successfully
- *		conducted.
- */
-
-_Bool generate_identity(uint8_t *id)
-
-{
-	_Bool retn = false;
-
-	int rc;
-
-	uint8_t keydata[16] __attribute__((aligned(128)));
-
-	char report_data[64] __attribute__((aligned(128)));
-
-	Buffer b,
-	       bufr = NULL;
-
-	Sha256 sha256 = NULL;
-
-	struct SGX_report __attribute__((aligned(512))) report;
-
-	struct SGX_targetinfo target;
-
-	struct SGX_keyrequest keyrequest;
-
-
-	/* Request a self report to get the measurement. */
-	memset(&target, '\0', sizeof(struct SGX_targetinfo));
-	memset(&report, '\0', sizeof(struct SGX_report));
-	memset(report_data, '\0', sizeof(report_data));
-	enclu_ereport(&target, &report, report_data);
-
-
-	/* Request the key. */
-	memset(keydata, '\0', sizeof(keydata));
-	memset(&keyrequest, '\0', sizeof(struct SGX_keyrequest));
-
-	keyrequest.keyname   = SRDE_KEYSELECT_SEAL;
-	keyrequest.keypolicy = SRDE_KEYPOLICY_SIGNER;
-	memcpy(keyrequest.keyid, report.body.mr_enclave.m, \
-	       sizeof(keyrequest.keyid));
-
-
-	/* Generate the derived key and return it to the caller. */
-	if ( (rc = enclu_egetkey(&keyrequest, keydata)) != 0 ) {
-		fprintf(stdout, "EGETKEY return: %d\n", rc);
-		goto done;
-	}
-
-	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	if ( !bufr->add(bufr, keydata, sizeof(keydata)) )
-		ERR(goto done);
-
-	INIT(NAAAIM, Sha256, sha256, ERR(goto done));
-	sha256->add(sha256, bufr);
-	if ( !sha256->compute(sha256) )
-		ERR(goto done);
-
-	b = sha256->get_Buffer(sha256);
-	memcpy(id, b->get(b), 32);
-
-	retn = true;
-
-
- done:
-	WHACK(bufr);
-	WHACK(sha256);
-
-	return retn;
-}
-
-
-/**
- * ECALL 3
  *
  * This function implements the ecall entry point for a function which
  * adds an identity verifier to the list of valid POSSUM communication
@@ -627,17 +468,17 @@ _Bool generate_identity(uint8_t *id)
  *		was successfully registered.
  */
 
-_Bool add_verifier(struct Possum_ecall3 *ecall3)
+_Bool add_verifier(struct Possum2_ecall2 *ecall2)
 
 {
 	_Bool retn = false;
 
 
 	/* Verify arguements. */
-	if ( ecall3->verifier_size == 0 )
+	if ( ecall2->key_size == 0 )
 		ERR(goto done);
 
-	retn = _add_verifier(ecall3->verifier, ecall3->verifier_size);
+	retn = _add_verifier(ecall2->key, ecall2->key_size);
 
 
  done:

@@ -21,8 +21,9 @@ LIBSRC = SHA256.c RandomBuffer.c Curve25519.c SHA256_hmac.c AES256_cbc.c  \
 	SEALEDblob.c X509cert.c Prompt.c ssl-ocall.c
 ASRC   = rdrand.s
 
-DUCTSRC	  = test-Duct-enclave.c test-Duct-interface.c
-POSSUMSRC = test-Possum-enclave.c test-Possum-interface.c RandomBuffer.c
+DUCTSRC	   = test-Duct-enclave.c test-Duct-interface.c
+POSSUMSRC  = test-Possum-enclave.c test-Possum-interface.c RandomBuffer.c
+POSSUM2SRC = test-Possum2-enclave.c test-Possum2-interface.c RandomBuffer.c
 
 LIBNAME	   = SRDEnaaaim
 LIBRARY	   = lib${LIBNAME}.a
@@ -66,7 +67,7 @@ ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles   \
 
 CC = musl-gcc
 
-TOOLS = test-naaaim test-Duct test-Possum
+TOOLS = test-naaaim test-Duct test-Possum test-Possum2
 INSTALLBIN = ${TOOLS}
 
 C++TOOLS = test-naaaim-c++
@@ -124,11 +125,12 @@ LIBS		= ${RDKLIB} ${ELFLIB} ${NAAAIMLIB} ${HURDLIB}
 #
 # Automatic definition of classes and objects.
 #
-COBJS	   = ${CSRC:.c=.o}
-LIBOBJS	   = ${LIBSRC:.c=.o} ${ASRC:.s=.o}
-ENCOBJS	   = ${ENCSRC:.c=.o}
-DUCTOBJS   = ${DUCTSRC:.c=.o}
-POSSUMOBJS = ${POSSUMSRC:.c=.o}
+COBJS	    = ${CSRC:.c=.o}
+LIBOBJS	    = ${LIBSRC:.c=.o} ${ASRC:.s=.o}
+ENCOBJS	    = ${ENCSRC:.c=.o}
+DUCTOBJS    = ${DUCTSRC:.c=.o}
+POSSUMOBJS  = ${POSSUMSRC:.c=.o}
+POSSUM2OBJS = ${POSSUM2SRC:.c=.o}
 
 
 #
@@ -141,7 +143,7 @@ POSSUMOBJS = ${POSSUMSRC:.c=.o}
 all: ${LIBRARY} enclave tools
 
 enclave: ldscript test-naaaim.signed.so test-Duct.signed.so \
-	test-Possum.signed.so
+	test-Possum.signed.so test-Possum2.signed.so
 
 test-naaaim.signed.so: test-naaaim.so
 	${SGX_SIGNER} sign -key ${SGXKEY} -enclave $^ -out $@ \
@@ -163,6 +165,13 @@ test-Possum.signed.so: test-Possum.so
 
 test-Possum.so: ${POSSUMOBJS} ${LIBRARY}
 	${ENCLAVE_CC} -o $@ ${POSSUMOBJS} ${ENCLAVE_LDFLAGS};
+
+test-Possum2.signed.so: test-Possum2.so
+	${SGX_SIGNER} sign -key ${SGXKEY} -enclave $^ -out $@ \
+		-config test-Possum-enclave.xml;
+
+test-Possum2.so: ${POSSUM2OBJS} ${LIBRARY}
+	${ENCLAVE_CC} -o $@ ${POSSUM2OBJS} ${ENCLAVE_LDFLAGS};
 
 ldscript:
 	echo "{"			>  ldscript;
@@ -199,6 +208,12 @@ test-Possum: test-Possum.o ${LIBRARY_DEPENDS}
 	${CC} ${LDFLAGS} -o $@ $< ${LIBS} ${SSL_CRYPTO};
 
 test-Possum.o: test-Possum.c
+	${CC} ${CFLAGS} -I ../../../lib -c $< -o $@;
+
+test-Possum2: test-Possum2.o ${LIBRARY_DEPENDS}
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS} ${SSL_CRYPTO};
+
+test-Possum2.o: test-Possum2.c
 	${CC} ${CFLAGS} -I ../../../lib -c $< -o $@;
 
 ${LIBRARY}: ${LIBOBJS}

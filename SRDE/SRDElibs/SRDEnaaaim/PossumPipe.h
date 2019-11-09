@@ -56,6 +56,9 @@ struct NAAAIM_PossumPipe
 	_Bool (*start_host_mode)(const PossumPipe, const Buffer);
 	_Bool (*start_client_mode)(const PossumPipe, const Buffer);
 
+	_Bool (*start_host_mode2)(const PossumPipe, const Buffer);
+	_Bool (*start_client_mode2)(const PossumPipe, const RSAkey);
+
 	_Bool (*send_packet)(const PossumPipe, PossumPipe_type, const Buffer);
 	PossumPipe_type (*receive_packet)(const PossumPipe, const Buffer);
 

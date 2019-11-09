@@ -48,6 +48,7 @@
 #include <SHA256_hmac.h>
 #include <AES256_cbc.h>
 #include <RandomBuffer.h>
+#include <RSAkey.h>
 
 #include "NAAAIM.h"
 #include "Duct.h"
@@ -2067,6 +2068,37 @@ static _Bool start_host_mode(CO(PossumPipe, this), CO(Buffer, spid))
 
 
 /**
+ * External public method.
+ *
+ * This method implements handling the authentication and initiation of
+ * a client connection using mode 2 authentication.  The mode 2
+ * authentication strategy uses the public modulus of a provisioned
+ * private/public keypair as the platform identifier.  It is designed
+ * primarily as a bootstrap enabling method for establishing standard
+ * host identity based credentials on a platform.
+ *
+ * \param this		A pointer to the object which is to be initiated
+ *			in server mode.
+ *
+ * \param spid		The object containing the service provider
+ *			identity that that will be used to generate
+ *			platform reports for both the host and client.
+ *
+ * \return		A boolean value is returned to indicate the
+ *			status of session initiation.  A false value
+ *			indicates that connection setup failed while
+ *			a true value indicates a session has been
+ *			established and is valid.
+ */
+
+static _Bool start_host_mode2(CO(PossumPipe, this), CO(Buffer, spid))
+
+{
+	return true;
+}
+
+
+/**
  * Private function.
  *
  * This function transmits confirmation for the host to move forward
@@ -2427,6 +2459,38 @@ static _Bool start_client_mode(CO(PossumPipe, this), CO(Buffer, spid))
 /**
  * External public method.
  *
+ * This method implements handling the initiation and setup of a
+ * connection to a remote server port using mode 2 authentication.
+ * Mode 2 authention uses the modulus of a public key as the identity
+ * of the entity making the host connection.  It is intended to be a
+ * bootstrapping mechanism for establishing a host identity on the
+ * platform.
+ *
+ * \param this		A pointer to the object which is to initiate
+ *			a remote connection.
+ *
+ * \param id		The object containing the key that will be
+ *			to authenticate the connection identity of the
+ *			platform.
+ *
+ * \return		A boolean value is returned to indicate the
+ *			status of session initiation.  A false value
+ *			indicates that connection setup failed while
+ *			a true value indicates a session has been
+ *			established and is valid.
+ */
+
+static _Bool start_client_mode2(CO(PossumPipe, this), CO(RSAkey, id))
+
+{
+	fputs("Starting client mode2.\n", stdout);
+	return true;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a method for obtaining the status of the remote
  * enclave that the object is connected to.
  *
@@ -2697,6 +2761,9 @@ extern PossumPipe NAAAIM_PossumPipe_Init(void)
 
 	this->start_host_mode	= start_host_mode;
 	this->start_client_mode = start_client_mode;
+
+	this->start_host_mode2	 = start_host_mode2;
+	this->start_client_mode2 = start_client_mode2;
 
 	this->get_connection	 = get_connection;
 	this->display_connection = display_connection;
