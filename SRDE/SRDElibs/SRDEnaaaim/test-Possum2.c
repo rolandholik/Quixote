@@ -183,18 +183,10 @@ extern int main(int argc, char *argv[])
 	}
 
 
-	/* Setup the SPID if we are running in server mode. */
-	if ( Mode == server ) {
-	}
-
-
 	/* Load the enclave. */
 	INIT(NAAAIM, SRDEenclave, enclave, ERR(goto done));
 	if ( !enclave->setup(enclave, enclave_name, token, debug_enclave) )
 		ERR(goto done);
-
-
-	/* Load the identity verifiers. */
 
 
 	/* Test server mode. */
@@ -264,6 +256,7 @@ extern int main(int argc, char *argv[])
 			fprintf(stderr, "Ecall 1 returned: %d\n", rc);
 			goto done;
 		}
+		fputs("Completed client mode.\n", stdout);
 	}
 
 	retn = 0;
@@ -271,6 +264,7 @@ extern int main(int argc, char *argv[])
 
  done:
 	WHACK(bufr);
+	WHACK(keybufr);
 	WHACK(spid);
 	WHACK(infile);
 	WHACK(enclave);

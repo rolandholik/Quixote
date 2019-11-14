@@ -240,7 +240,6 @@ static _Bool ping(CO(PossumPipe, pipe))
 			bufr->print(bufr);
 		}
 
-		fputs("\nClient mode done.\n", stdout);
 		retn = true;
 	}
 
@@ -338,12 +337,13 @@ _Bool test_server(struct Possum2_ecall0 *ifp)
 
  done:
 	GWHACK(RSAkey, Verifiers);
+	WHACK(Verifiers);
 
 	WHACK(pipe);
 	WHACK(spid);
+	WHACK(bufr);
 	WHACK(signer);
 	WHACK(measurement);
-	WHACK(bufr);
 
 	return retn;
 }
@@ -391,8 +391,6 @@ _Bool test_client(struct Possum2_ecall1 *ifp)
 	INIT(HurdLib, Buffer, signer, ERR(goto done));
 	if ( !signer->add(signer, ifp->key, ifp->key_size) )
 		ERR(goto done);
-	fputs("private key:\n", stdout);
-	signer->hprint(signer);
 
 	INIT(NAAAIM, RSAkey, key, ERR(goto done));
 	if ( !key->load_private(key, signer) )
@@ -441,11 +439,10 @@ _Bool test_client(struct Possum2_ecall1 *ifp)
 
 
  done:
-	GWHACK(RSAkey, Verifiers);
-
 	WHACK(pipe);
 	WHACK(signer);
 	WHACK(measurement);
+	WHACK(key);
 
 	return retn ? 0 : 1;
 }

@@ -51,12 +51,17 @@ struct NAAAIM_PossumPacket
 	_Bool (*create_packet1)(const PossumPacket, const IDtoken, \
 				const Curve25519, const uint32_t,  \
 				const Buffer);
+	_Bool (*create_packet2)(const PossumPacket, const RSAkey, \
+				const Curve25519, const Buffer, const Buffer);
 	_Bool (*encode_packet1)(const PossumPacket, const Buffer, \
 				const Buffer);
 	_Bool (*decode_packet1)(const PossumPacket, const IDtoken, \
 				const Buffer, const Buffer);
+	_Bool (*decode_packet2)(const PossumPacket, const RSAkey, \
+				const Buffer, const Buffer);
 	_Bool (*set_schedule)(const PossumPacket, const IDtoken, \
 			      time_t);
+	_Bool (*set_schedule2)(const PossumPacket, const RSAkey, time_t);
 	uint32_t (*get_value)(const PossumPacket, const PossumPacket_value);
 	Buffer (*get_element)(const PossumPacket, const PossumPacket_element);
 	void (*print)(const PossumPacket);

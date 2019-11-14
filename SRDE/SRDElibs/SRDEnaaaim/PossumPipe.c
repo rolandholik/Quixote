@@ -81,6 +81,17 @@
 
 
 /**
+ * Pseudo-status for mode 2 authentication.
+ */
+static uint8_t mode2_status[32] = {
+	0xec, 0x80, 0x17, 0x35, 0x76, 0x42, 0x42, 0x70, \
+	0xf9, 0xb0, 0xab, 0xbd, 0xe5, 0x95, 0x12, 0x3d, \
+	0x01, 0x5e, 0x48, 0x2e, 0xf8, 0xe2, 0x2e, 0x3a, \
+	0xca, 0x76, 0x03, 0x60, 0xcc, 0xbf, 0x31, 0xd7
+};
+
+
+/**
  * Reference to the device identity provided.
  */
 extern size_t Identity_size;
@@ -1050,6 +1061,106 @@ static _Bool find_client(CO(Buffer, packet), CO(IDtoken, token), \
 	return retn;
 }
 
+
+/**
+ * Private function.
+ *
+ * This function is responsible for searching the list of attestable
+ * client identities based on the identification challenge.
+ *
+ * \param packet	The Buffer object containing the type 1 POSSUM
+ *			packet which was received.
+ *
+ * \param id		A pointer to the object that will be loaded
+ *			with the identity key of the client.
+ *
+ * \return		A true value is used to indicate the search
+ *			for the client was successful.  A false value
+ *			is returned if the search was unsuccessful.
+ */
+
+static _Bool find_client2(CO(Buffer, packet), RSAkey *id)
+
+{
+	_Bool retn = false;
+
+	size_t lp,
+	       cnt;
+
+	Buffer bufr	= NULL,
+	       idkey	= NULL,
+	       identity = NULL;
+
+	RSAkey *keyp,
+		key;
+
+	SHA256_hmac idf = NULL;
+
+
+	/* Verify packet status. */
+	if ( packet->poisoned(packet) )
+		ERR(goto done);
+	if ( Verifiers == NULL )
+		ERR(goto done);
+	if ( Verifiers->size(Verifiers) == 0 )
+		ERR(goto done);
+
+
+	/* Initialize objects to be used. */
+	INIT(HurdLib, Buffer, idkey, ERR(goto done));
+	INIT(HurdLib, Buffer, identity, ERR(goto done));
+
+
+	/* Load the identity key/salt and the asserted client identity. */
+	if ( !idkey->add(idkey, packet->get(packet), NAAAIM_IDSIZE) )
+		ERR(goto done);
+
+	if ( !identity->add(identity, packet->get(packet) + NAAAIM_IDSIZE, \
+			    NAAAIM_IDSIZE) )
+		ERR(goto done);
+	if ( (idf = NAAAIM_SHA256_hmac_Init(idkey)) == NULL )
+		ERR(goto done);
+
+
+	/*
+	 * Loop over the list of counter-party identities and determine
+	 * which of the identities match the identity assertion issued
+	 * by the POSSUM counter-party.
+	 */
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+
+	keyp = (RSAkey *) Verifiers->get(Verifiers);
+	cnt  = Verifiers->size(Verifiers) / sizeof(RSAkey);
+
+	for (lp= 0; lp < cnt; ++lp) {
+		key = *keyp;
+
+		if ( !key->get_modulus(key, bufr) )
+			ERR(goto done);
+		idf->add_Buffer(idf, bufr);
+		if ( !idf->compute(idf) )
+			ERR(goto done);
+
+		if ( identity->equal(identity, idf->get_Buffer(idf)) ) {
+			*id = *keyp;
+			retn = true;
+			goto done;
+		}
+
+		++keyp;
+		bufr->reset(bufr);
+	}
+
+
+ done:
+	WHACK(bufr);
+	WHACK(idkey);
+	WHACK(identity);
+	WHACK(idf);
+
+	return retn;
+}
+
 #if 0
 /**
  * Private function.
@@ -1449,6 +1560,128 @@ static _Bool receive_platform_quote(CO(PossumPipe, this), CO(Buffer, bufr), \
 
 
 /**
+ * Private method.
+ *
+ * This method receives and authenticates an enclave attestation report.
+ *
+ * \param this		The object which is to receive the hardware
+ *			reference quote.
+ *
+ * \param bufr		The Buffer object which is to be used to receive
+ *			the platform quote.
+ *
+ * \param nonce		The nonce that was used to create the reference.
+ *
+ * \return		A false value is returned if an error is
+ *			encountered in receiving or verifying the
+ *			attestation report.  A true value is returned
+ *			if the report was successfully received and
+ *			verified.
+ */
+
+static _Bool receive_platform_report(CO(PossumPipe, this), CO(Buffer, bufr), \
+				     CO(Buffer, nonce))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	size_t payload;
+
+	Buffer key   = S->shared2->get_Buffer(S->shared2),
+	       cksum = NULL,
+	       iv    = NULL,
+	       quote = NULL;
+
+	String output = NULL;
+
+	AES256_cbc cipher = NULL;
+
+	SHA256_hmac hmac = NULL;
+
+
+	if ( !S->duct->receive_Buffer(S->duct, bufr) ) {
+		if ( S->duct->eof(S->duct) ) {
+			S->error = PossumPipe_error_closed_pipe;
+			goto done;
+		}
+		ERR(goto done);
+	}
+	if ( bufr->size(bufr) == 0 ) {
+		S->error = PossumPipe_error_closed_pipe;
+		goto done;
+	}
+
+	INIT(HurdLib, Buffer, cksum, goto done);
+	payload = bufr->size(bufr) - 32;
+	cksum->add(cksum, bufr->get(bufr) + payload, 32);
+
+
+	if ( (hmac = NAAAIM_SHA256_hmac_Init(key)) == NULL )
+		ERR(goto done);
+	bufr->shrink(bufr, 32);
+	hmac->add_Buffer(hmac, bufr);
+	if ( !hmac->compute(hmac) )
+		ERR(goto done);
+	if ( !cksum->equal(cksum, hmac->get_Buffer(hmac)) )
+		ERR(goto done);
+
+
+	INIT(HurdLib, Buffer, iv, goto done);
+	if ( !iv->add(iv, bufr->get(bufr), 16) )
+		ERR(goto done);
+
+	if ( (cipher = NAAAIM_AES256_cbc_Init_decrypt(key, iv)) \
+	     == NULL )
+		ERR(goto done);
+
+	INIT(HurdLib, Buffer, quote, goto done);
+	cksum->reset(cksum);
+	if ( !cksum->add(cksum, bufr->get(bufr) + 16, bufr->size(bufr) - 16) )
+		ERR(goto done);
+	if ( !cipher->decrypt(cipher, cksum) )
+		ERR(goto done);
+	if ( !quote->add_Buffer(quote, cipher->get_Buffer(cipher)) )
+		ERR(goto done);
+
+	if ( S->debug ) {
+		fputs("\nClient platform quote:\n", stdout);
+		quote->hprint(quote);
+	}
+
+	INIT(HurdLib, String, output, ERR(goto done));
+	if ( !output->add(output, (char *) quote->get(quote)) )
+		ERR(goto done);
+
+	INIT(NAAAIM, SRDEquote, S->remote, ERR(goto done));
+	if ( !S->remote->decode_report(S->remote, output) )
+		ERR(goto done);
+
+	if ( S->debug ) {
+		fputs("\nAttestation report:\n", stdout);
+		S->remote->dump_report(S->remote);
+	}
+
+	if ( !_update_measurement(S->software, nonce, \
+				  S->remote->get_quoteinfo(S->remote)) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	WHACK(cksum);
+	WHACK(iv);
+	WHACK(quote);
+	WHACK(output);
+	WHACK(cipher);
+	WHACK(hmac);
+
+	return retn;
+}
+
+
+/**
  * Internal private function.
  *
  * This function is a helper function for the send_platform_quote
@@ -1672,6 +1905,117 @@ static _Bool send_platform_quote(CO(PossumPipe, this), CO(Buffer, bufr), \
 	WHACK(iv);
 	WHACK(cipher);
 	WHACK(hmac);
+
+	return retn;
+}
+
+
+/**
+ * Private method.
+ *
+ * This method creates and sends an enclave attestation report.  It is
+ * designed for an environment where the communication's counter-party
+ * is not in a position to query Intel IAS for a report on a given
+ * quote.  The security predicate is based on the notion that the
+ * relying party can verify that the report is valid based on the
+ * Intel signature over the report.
+ *
+ * \param this		The object which is to send the reference quote.
+ *
+ * \param bufr		The Buffer object which is to be used to transmit
+ *			the platform quote.
+ *
+ * \param key		The shared key to be used to encrypt the reference
+ *			quote.
+ *
+ * \param nonce		The nonce to be used to generate the quote.
+ *
+ * \param spid		The object containing the service provider
+ *			identity that is to be used to generate the
+ *			quote.
+ *
+ * \return		If an error is encountered during report generation
+ *			or transmission a value value is returned.  A
+ *			true value is returned if the report is
+ *			successfully generated and sent.
+ */
+
+static _Bool send_platform_report(CO(PossumPipe, this), CO(Buffer, bufr), \
+				  CO(Buffer, nonce), CO(Buffer, spid))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	Duct duct = S->duct;
+
+	Buffer b,
+	       key   = S->shared2->get_Buffer(S->shared2),
+	       quote = NULL;
+
+	String rpt = NULL;
+
+	AES256_cbc cipher = NULL;
+
+	RandomBuffer iv = NULL;
+
+	SHA256_hmac hmac = NULL;
+
+	SRDEquote report = NULL;
+
+
+	/* Generate the platform quote and report. */
+	INIT(HurdLib, Buffer, quote, ERR(goto done));
+	INIT(NAAAIM, RandomBuffer, iv, ERR(goto done));
+
+	if ( !_generate_quote(nonce, spid, quote) )
+		ERR(goto done);
+	memcpy(S->software_nonce, nonce->get(nonce), \
+	       sizeof(S->software_nonce));
+
+	INIT(NAAAIM, SRDEquote, report, ERR(goto done));
+	INIT(HurdLib, String, rpt, ERR(goto done));
+	if ( !report->generate_report(report, quote, rpt) )
+		ERR(goto done);
+
+	quote->reset(quote);
+	if ( !quote->add(quote, (unsigned char *) rpt->get(rpt), \
+			 rpt->size(rpt) + 1) )
+		ERR(goto done);
+
+	if ( !iv->generate(iv, 16) )
+		ERR(goto done);
+	b = iv->get_Buffer(iv);
+	bufr->add_Buffer(bufr, b);
+
+	if ( (cipher = NAAAIM_AES256_cbc_Init_encrypt(key, b)) == NULL )
+		ERR(goto done);
+	if ( !cipher->encrypt(cipher, quote) )
+		ERR(goto done);
+	if ( !bufr->add_Buffer(bufr, cipher->get_Buffer(cipher)) )
+		ERR(goto done);
+
+	if ( (hmac = NAAAIM_SHA256_hmac_Init(key)) == NULL )
+		ERR(goto done);
+	hmac->add_Buffer(hmac, bufr);
+	if ( !hmac->compute(hmac) )
+		ERR(goto done);
+	if ( !bufr->add_Buffer(bufr, hmac->get_Buffer(hmac)) )
+		ERR(goto done);
+
+	if ( !duct->send_Buffer(duct, bufr) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	WHACK(quote);
+	WHACK(rpt);
+	WHACK(cipher);
+	WHACK(iv);
+	WHACK(hmac);
+	WHACK(report);
 
 	return retn;
 }
@@ -2094,7 +2438,220 @@ static _Bool start_host_mode(CO(PossumPipe, this), CO(Buffer, spid))
 static _Bool start_host_mode2(CO(PossumPipe, this), CO(Buffer, spid))
 
 {
-	return true;
+	STATE(S);
+
+	_Bool retn = false;
+
+	Duct duct = S->duct;
+
+	Buffer b,
+	       our_nonce,
+	       netbufr		= NULL,
+	       nonce		= NULL,
+	       quote_nonce	= NULL,
+	       public		= NULL;
+
+	String name	 = NULL,
+	       remote_ip = NULL;
+
+	PossumPacket packet = NULL;
+
+	Curve25519 dhkey = NULL;
+
+	SHA256_hmac hmac = NULL;
+
+	RSAkey identity;
+
+
+	/* Configure default mode2 software status. */
+	INIT(HurdLib, Buffer, S->software, ERR(goto done));
+	if ( !S->software->add(S->software, mode2_status, \
+			       sizeof(mode2_status)) )
+		ERR(goto done);
+
+	/* Setup the network port. */
+	INIT(HurdLib, Buffer, netbufr, goto done);
+
+	/* Wait for a packet to arrive. */
+	if ( S->debug )
+		fprintf(stderr, "\n%s: Waiting for initialization packet.\n", \
+			__func__);
+	if ( !duct->receive_Buffer(duct, netbufr) )
+		ERR(goto done);
+
+	if ( S->debug ) {
+		fprintf(stdout, "\n%s: Received client initialization " \
+			"packet:\n", __func__);
+		netbufr->hprint(netbufr);
+	}
+
+	/* Lookup the client identity. */
+	if ( !find_client2(netbufr, &identity) ) {
+		S->error = PossumPipe_error_no_identity;
+		goto done;
+	}
+
+
+	/* Verify and decode packet. */
+	INIT(HurdLib, Buffer, nonce, goto done);
+	INIT(NAAAIM, PossumPacket, packet, goto done);
+	if ( !packet->decode_packet2(packet, identity, S->software, \
+				     netbufr) ) {
+		S->error = PossumPipe_error_invalid_identity;
+		goto done;
+	}
+
+	/* Create the perturbed software status. */
+	if ( (b = packet->get_element(packet, PossumPacket_hardware)) == NULL )
+		ERR(goto done);
+	nonce->add_Buffer(nonce, b);
+	if ( !identity->decrypt(identity, nonce) )
+		ERR(goto done);
+
+	if ( (hmac = NAAAIM_SHA256_hmac_Init(nonce)) == NULL )
+		ERR(goto done);
+
+	if ( !hmac->add_Buffer(hmac, S->software) )
+		ERR(goto done);
+	if ( !hmac->compute(hmac) )
+		ERR(goto done);
+
+	S->software->reset(S->software);
+	if ( !S->software->add_Buffer(S->software, hmac->get_Buffer(hmac)) )
+		ERR(goto done);
+
+	if ( S->debug ) {
+		fprintf(stdout, "\n%s: Incoming client packet 1:\n", __func__);
+		packet->print(packet);
+	}
+
+
+	/* Extract the replay and quote nonces supplied by client. */
+	nonce->reset(nonce);
+	INIT(HurdLib, Buffer, quote_nonce, goto done);
+	if ( (b = packet->get_element(packet, PossumPacket_replay_nonce)) \
+	     == NULL )
+		ERR(goto done);
+	if ( !nonce->add_Buffer(nonce, b) )
+		ERR(goto done);
+	if ( (b = packet->get_element(packet, PossumPacket_quote_nonce)) \
+	     == NULL )
+		ERR(goto done);
+
+	if ( !quote_nonce->add_Buffer(quote_nonce, b) )
+		ERR(goto done);
+
+	/* Verify hardware quote. */
+
+	/* Verify protocol. */
+
+	INIT(HurdLib, Buffer, public, goto done);
+	if ( (b = packet->get_element(packet, PossumPacket_public)) == NULL )
+		ERR(goto done);
+	if ( !public->add_Buffer(public, b) )
+		ERR(goto done);
+
+	/* Generate DH public key for shared secret. */
+	INIT(NAAAIM, Curve25519, dhkey, goto done);
+	dhkey->generate(dhkey);
+
+	packet->reset(packet);
+	netbufr->reset(netbufr);
+
+	packet->set_schedule2(packet, identity, time(NULL));
+	packet->create_packet2(packet, identity, dhkey, NULL, spid);
+
+	/* Reset the section back to the original. */
+	if ( !packet->encode_packet1(packet, S->software, netbufr) )
+		ERR(goto done);
+
+	if ( S->debug ) {
+		fprintf(stdout, "\n%s: Sending host packet 1:\n", __func__);
+		packet->print(packet);
+	}
+
+	if ( !duct->send_Buffer(duct, netbufr) )
+		ERR(goto done);
+
+	if ( (our_nonce = packet->get_element(packet,			  \
+					      PossumPacket_replay_nonce)) \
+	     == NULL )
+		ERR(goto done);
+	if ( !generate_shared_keys(this, our_nonce, nonce, dhkey, public) ) {
+		fputs("Failed key generation.\n", stderr);
+		ERR(goto done);
+	}
+
+	/* Wait for platform verification reference quote. */
+	netbufr->reset(netbufr);
+	if ( (b = packet->get_element(packet, PossumPacket_quote_nonce)) == \
+	     NULL )
+		ERR(goto done);
+	if ( !receive_platform_quote(this, netbufr, NULL, nonce) ) {
+		if ( S->error == PossumPipe_error_internal )
+			ERR(goto done);
+		goto done;
+	}
+
+	/* Send platform verification quote. */
+	netbufr->reset(netbufr);
+	if ( !send_platform_report(this, netbufr, our_nonce, spid) )
+		ERR(goto done);
+
+	/* Get connection confirmation start. */
+	netbufr->reset(netbufr);
+	if ( !receive_connection_start(this, netbufr) ) {
+		fputs("Failed connection start.\n", stderr);
+		ERR(goto done);
+	}
+
+	if ( S->debug ) {
+		fputs("\nShared 1:\n", stderr);
+		S->shared1->print(S->shared1);
+		fputs("Shared 2:\n", stderr);
+		S->shared2->print(S->shared2);
+	}
+
+	INIT(NAAAIM, Sha256, S->sent, goto done);
+	S->sent->add(S->sent, S->shared1->get_Buffer(S->shared1));
+	S->sent->add(S->sent, S->shared2->get_Buffer(S->shared2));
+	if ( !S->sent->compute(S->sent) )
+		ERR(goto done);
+	if ( S->debug ) {
+		fputs("\nTransmit root:\n", stderr);
+		S->sent->print(S->sent);
+	}
+
+	INIT(NAAAIM, Sha256, S->received, goto done);
+	S->received->add(S->received, S->shared2->get_Buffer(S->shared2));
+	S->received->add(S->received, S->shared1->get_Buffer(S->shared1));
+	if ( !S->received->compute(S->received) )
+		ERR(goto done);
+	if ( S->debug ) {
+		fputs("Receive root:\n", stderr);
+		S->received->print(S->received);
+	}
+
+
+	/* Setup host nonce generator. */
+	if ( !_setup_nonce(S) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	WHACK(netbufr);
+	WHACK(nonce);
+	WHACK(quote_nonce);
+	WHACK(public);
+	WHACK(name);
+	WHACK(remote_ip);
+	WHACK(packet);
+	WHACK(dhkey);
+	WHACK(hmac);
+
+	return retn;
 }
 
 
@@ -2483,8 +3040,207 @@ static _Bool start_client_mode(CO(PossumPipe, this), CO(Buffer, spid))
 static _Bool start_client_mode2(CO(PossumPipe, this), CO(RSAkey, id))
 
 {
-	fputs("Starting client mode2.\n", stdout);
-	return true;
+	STATE(S);
+
+	_Bool retn = false;
+
+	Duct duct = S->duct;
+
+	Buffer b,
+	       public,
+	       their_nonce,
+	       nonce	   = NULL,
+	       quote_nonce = NULL,
+	       bufr	   = NULL,
+	       status	   = NULL;
+
+	RandomBuffer rnd = NULL;
+
+	Curve25519 dhkey = NULL;
+
+	PossumPacket packet = NULL;
+
+	SHA256_hmac hmac = NULL;
+
+
+	/* Measure the current software state. */
+	INIT(HurdLib, Buffer, status, ERR(goto done));
+	if ( !status->add(status, mode2_status, sizeof(mode2_status)) )
+		ERR(goto done);
+
+
+	/* Send a session initiation packet. */
+	INIT(NAAAIM, PossumPacket, packet, goto done);
+	packet->set_schedule2(packet, id, time(NULL));
+
+	INIT(NAAAIM, Curve25519, dhkey, goto done);
+	dhkey->generate(dhkey);
+
+	INIT(NAAAIM, RandomBuffer, rnd, ERR(goto done));
+	rnd->generate(rnd, 256 / 8);
+
+	INIT(HurdLib, Buffer, bufr, goto done);
+	packet->create_packet2(packet, id, dhkey, rnd->get_Buffer(rnd), NULL);
+
+	if ( !packet->encode_packet1(packet, status, bufr) )
+		ERR(goto done);
+	if ( !duct->send_Buffer(duct, bufr) )
+		ERR(goto done);
+
+	if ( S->debug ) {
+		fprintf(stdout, "\n%s: Sent client packet 1:\n", __func__);
+		packet->print(packet);
+	}
+
+	/* Save transmitted nonces for subsequent use. */
+	INIT(HurdLib, Buffer, nonce, goto done);
+	INIT(HurdLib, Buffer, quote_nonce, goto done);
+	if ( (b = packet->get_element(packet, PossumPacket_quote_nonce)) == \
+	     NULL )
+		ERR(goto done);
+	if ( !quote_nonce->add_Buffer(quote_nonce, b) )
+		ERR(goto done);
+
+	if ( (b = packet->get_element(packet, PossumPacket_replay_nonce)) \
+	     == NULL )
+		ERR(goto done);
+	if ( !nonce->add_Buffer(nonce, b) )
+		ERR(goto done);
+
+	/* Wait for a packet to arrive. */
+	packet->reset(packet);
+	bufr->reset(bufr);
+	if ( !duct->receive_Buffer(duct, bufr) ) {
+		if ( duct->eof(duct) || (bufr->size(bufr) == 0) ) {
+			S->error = PossumPipe_error_closed_pipe;
+			goto done;
+		}
+		ERR(goto done);
+	}
+
+	if ( S->debug ) {
+		fprintf(stdout, "\n%s: Received host initialization " \
+			"packet:\n", __func__);
+		bufr->hprint(bufr);
+	}
+
+	/* Set the host configuration personality. */
+	INIT(HurdLib, Buffer, S->software, goto done);
+	if ( !S->software->add(S->software, mode2_status, \
+			       sizeof(mode2_status)) )
+		ERR(goto done);
+
+	if ( (hmac = NAAAIM_SHA256_hmac_Init(rnd->get_Buffer(rnd))) == NULL )
+		ERR(goto done);
+	hmac->add_Buffer(hmac, S->software);
+	if ( !hmac->compute(hmac) )
+		ERR(goto done);
+
+	S->software->reset(S->software);
+	if ( !S->software->add_Buffer(S->software, hmac->get_Buffer(hmac)) )
+		ERR(goto done);
+
+	if ( S->debug ) {
+		fprintf(stdout, "\n%s: Using host software status:\n", \
+			__func__, stdout);
+		S->software->print(S->software);
+	}
+
+	if ( !packet->decode_packet2(packet, id, S->software, bufr) ) {
+		S->error = PossumPipe_error_invalid_identity;
+		goto done;
+	}
+
+	if ( S->debug ) {
+		fprintf(stdout, "\n%s: Received host packet 1.\n", __func__);
+		packet->print(packet);
+	}
+
+	if ( (b = packet->get_element(packet, PossumPacket_public)) == NULL )
+		ERR(goto done);
+	public = b;
+
+	if ( (their_nonce = packet->get_element(packet,			    \
+						PossumPacket_replay_nonce)) \
+	     == NULL )
+		ERR(goto done);
+	bufr->reset(bufr);
+	if ( !bufr->add_Buffer(bufr, their_nonce) )
+		ERR(goto done);
+
+	if ( !generate_shared_keys(this, bufr, nonce, dhkey, public) )
+		ERR(goto done);
+
+	/* Send platform reference. */
+	if ( (b = packet->get_element(packet, PossumPacket_quote_nonce)) \
+	     == NULL )
+		ERR(goto done);
+	bufr->reset(bufr);
+	if ( !send_platform_quote(this, bufr, nonce, b) )
+		ERR(goto done);
+
+	/* Receive platform reference. */
+	bufr->reset(bufr);
+	if ( !receive_platform_report(this, bufr, their_nonce) ) {
+		if ( S->error == PossumPipe_error_internal )
+			ERR(goto done);
+		goto done;
+	}
+
+	if ( S->debug ) {
+		fprintf(stdout, "\n%s: Verified server:\n", __func__);
+	}
+
+	/* Send initiation packet. */
+	bufr->reset(bufr);
+	if ( !send_connection_start(this, bufr) )
+		ERR(goto done);
+
+	if ( S->debug ) {
+		fputs("\nShared 1:\n", stderr);
+		S->shared1->print(S->shared1);
+		fputs("Shared 2:\n", stderr);
+		S->shared2->print(S->shared2);
+	}
+
+	INIT(NAAAIM, Sha256, S->sent, goto done);
+	S->sent->add(S->sent, S->shared2->get_Buffer(S->shared2));
+	S->sent->add(S->sent, S->shared1->get_Buffer(S->shared1));
+	if ( !S->sent->compute(S->sent) )
+		ERR(goto done);
+	if ( S->debug ) {
+		fputs("\nTransmit root:\n", stderr);
+		S->sent->print(S->sent);
+	}
+
+	INIT(NAAAIM, Sha256, S->received, goto done);
+	S->received->add(S->received, S->shared1->get_Buffer(S->shared1));
+	S->received->add(S->received, S->shared2->get_Buffer(S->shared2));
+	if ( !S->received->compute(S->received) )
+		ERR(goto done);
+	if ( S->debug ) {
+		fputs("Receive root:\n", stderr);
+		S->received->print(S->received);
+	}
+
+	/* Setup client nonce generator. */
+	if ( !_setup_nonce(S) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	WHACK(nonce);
+	WHACK(quote_nonce);
+	WHACK(bufr);
+	WHACK(status);
+	WHACK(rnd);
+	WHACK(dhkey);
+	WHACK(packet);
+	WHACK(hmac);
+
+	return retn;
 }
 
 

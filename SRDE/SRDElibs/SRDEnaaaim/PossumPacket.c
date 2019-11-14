@@ -33,6 +33,7 @@
 #include <Buffer.h>
 
 #include "NAAAIM.h"
+#include "RSAkey.h"
 #include "RandomBuffer.h"
 #include "IDtoken.h"
 #include "AES256_cbc.h"
@@ -363,6 +364,119 @@ static _Bool create_packet1(CO(PossumPacket, this), CO(IDtoken, token),	\
 	retn = true;
 
  done:
+	WHACK(rnd);
+	WHACK(hmac);
+
+	if ( retn == false )
+		S->poisoned = true;
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements the creation of the first mode 2 POSSUM
+ * exchange packet.  This packet is sent by the client to identify
+ * and attest the state of the client.
+ *
+ * \param this		The object whose packet 1 state is to be
+ *			created.
+ *
+ * \param id		The identity key to be used to identity the
+ *			packet.
+ *
+ * \param dh		The elliptic curve to be used to implement
+ *			the shared key.
+ *
+ * \param nonce		The nonce that will be used to perturb the
+ *			remote software status.
+ *
+ * \param spid		The SPID value that is to be used to generate
+ *			the platform quote.  This value will be
+ *			NULL when called from the start_host_mode2()
+ *			function.
+ *
+ * \return	A boolean value is used to indicate the sucess or
+ *		failure of creating the packet.  A false value
+ *		indicates creation failed while a true indicates it
+ *		was successful.
+ */
+
+static _Bool create_packet2(CO(PossumPacket, this), CO(RSAkey, id), \
+			    CO(Curve25519, dh), CO(Buffer, nonce),  \
+			    CO(Buffer, spid))
+
+{
+
+	STATE(S);
+
+	_Bool retn = false;
+
+	Buffer b,
+	       bufr = NULL;
+
+	RandomBuffer rnd = NULL;
+
+	SHA256_hmac hmac = NULL;
+
+
+	/* Status checks. */
+	if ( S->poisoned )
+		goto done;
+	if ( id == NULL )
+		goto done;
+	if ( (dh == NULL) || dh->poisoned(dh) )
+		goto done;
+
+	/* Load the identification challenge nonce. */
+	INIT(NAAAIM, RandomBuffer, rnd, goto done);
+	rnd->generate(rnd, 256 / 8);
+	S->identity->add_Buffer(S->identity, rnd->get_Buffer(rnd));
+
+	/* Hash the identity key modulus with the nonce. */
+	if ( (hmac = NAAAIM_SHA256_hmac_Init(S->identity)) == NULL )
+		goto done;
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	if ( !id->get_modulus(id, bufr) )
+		ERR(goto done);
+	hmac->add_Buffer(hmac, bufr);
+
+	hmac->compute(hmac);
+	if ( !S->identity->add_Buffer(S->identity, hmac->get_Buffer(hmac)) )
+		goto done;
+
+	/* Add replay nonce and SPID value for attestation. */
+	rnd->generate(rnd, REPLAY_NONCE);
+	if ( !S->replay_nonce->add_Buffer(S->replay_nonce, \
+					  rnd->get_Buffer(rnd)) )
+		goto done;
+	if ( spid != NULL ) {
+		if ( !S->quote_nonce->add_Buffer(S->quote_nonce, spid) )
+			ERR(goto done);
+	}
+
+	/* Add the Diffie-Hellman key. */
+	if ( (b = dh->get_public(dh)) == NULL )
+		goto done;
+	if ( !S->public->add_Buffer(S->public, b) )
+		goto done;
+
+	/* Add software status perturbation challenge if available. */
+	if ( nonce != NULL ) {
+		bufr->reset(bufr);
+		bufr->add_Buffer(bufr, nonce);
+		if ( !id->encrypt(id, bufr) )
+			ERR(goto done);
+		if ( !S->hardware->add_Buffer(S->hardware, bufr) )
+			goto done;
+	}
+
+	retn = true;
+
+ done:
+	WHACK(bufr);
 	WHACK(rnd);
 	WHACK(hmac);
 
@@ -798,6 +912,146 @@ static _Bool decode_packet1(CO(PossumPacket, this), CO(IDtoken, token),
 /**
  * External public method.
  *
+ * This method implements verification of a type 1 packet and
+ * subjsequent decoding of the authenticator.  The type 1 packet
+ * consists of the following three fields:
+ *
+ *	Identity assertion
+ *	32-bit authentication time in network byte order.
+ *	Authenticator
+ *	HMAC-SHA256 checksum over the three data elements of the
+ *	packet.
+ *
+ * \param this		The PossumPacket object which is to receive the
+ *			encoded object.
+ *
+ * \param token		The identity key of the client which had
+ *			initiated the connection.
+ *
+ * \param status	The anticipated software status of the client.
+ *
+ * \param packet	The type 1 packet being decoded.
+ *
+ * \return	A boolean value is used to return success or failure of
+ *		the decoding.  A true value is used to indicate
+ *		success.  Failure results in poisoning of the object.
+ */
+
+static _Bool decode_packet2(CO(PossumPacket, this), CO(RSAkey, id),
+			    CO(Buffer, status), CO(Buffer, packet))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+        unsigned char *asn = NULL;
+
+        unsigned const char *p = asn;
+
+	int asn_size;
+
+	packet1_payload *packet1 = NULL;
+
+	Buffer b,
+	       iv,
+	       key,
+	       payload	= NULL,
+	       checksum = NULL;
+
+	AES256_cbc cipher = NULL;
+
+
+	/* Arguement status checks. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( id == NULL )
+		ERR(goto done);
+	if ( (status == NULL) || status->poisoned(status) )
+		ERR(goto done);
+	if ( (packet == NULL) || packet->poisoned(packet) )
+		ERR(goto done);
+
+	/* Extract the authentication time and initialize the scheduler. */
+	S->identity->add(S->identity, packet->get(packet), 2*NAAAIM_IDSIZE);
+	S->auth_time = *((uint32_t *) (packet->get(packet) + 2*NAAAIM_IDSIZE));
+	S->auth_time = ntohl(S->auth_time);
+	this->set_schedule2(this, id, S->auth_time);
+
+
+	/* Compute the checksum over the packet. */
+	INIT(HurdLib, Buffer, payload, ERR(goto done));
+	if ( !payload->add(payload, packet->get(packet), \
+			   packet->size(packet) - NAAAIM_IDSIZE) )
+		ERR(goto done);
+
+	INIT(HurdLib, Buffer, checksum, ERR(goto done));
+	if ( !compute_checksum(S, status, payload, checksum) )
+		ERR(goto done);
+
+	p  = packet->get(packet) + packet->size(packet);
+	p -= NAAAIM_IDSIZE;
+	if ( memcmp(checksum->get(checksum), p, NAAAIM_IDSIZE) != 0 )
+		ERR(goto done);
+
+
+	/* Extract the encrypted authenticator. */
+	p = packet->get(packet) + 2*NAAAIM_IDSIZE + sizeof(uint32_t);
+	asn_size = packet->size(packet) - 3*NAAAIM_IDSIZE - sizeof(uint32_t);
+	payload->reset(payload);
+	if ( !payload->add(payload, p, asn_size) )
+		ERR(goto done);
+
+	/* Decrypt the authenticator.. */
+	iv  = S->otedks->get_iv(S->otedks);
+	key = S->otedks->get_key(S->otedks);
+	if ( (cipher = NAAAIM_AES256_cbc_Init_decrypt(key, iv)) == NULL )
+		ERR(goto done);
+	if ( !cipher->decrypt(cipher, payload) )
+		ERR(goto done);
+	b = cipher->get_Buffer(cipher);
+
+	/* Unmarshall the ASN1 structure. */
+	p = b->get(b);
+        if ( !d2i_packet1_payload(&packet1, &p, asn_size) )
+                ERR(goto done);
+
+	S->magic    = ASN1_INTEGER_get(packet1->magic);
+	S->protocol = ASN1_INTEGER_get(packet1->protocol);
+	S->spi	    = ASN1_INTEGER_get(packet1->spi);
+
+	S->replay_nonce->add(S->replay_nonce,				   \
+			     ASN1_STRING_get0_data(packet1->replay_nonce), \
+			     ASN1_STRING_length(packet1->replay_nonce));
+	S->quote_nonce->add(S->quote_nonce,				  \
+			     ASN1_STRING_get0_data(packet1->quote_nonce), \
+			     ASN1_STRING_length(packet1->quote_nonce));
+	S->public->add(S->public, ASN1_STRING_get0_data(packet1->public), \
+		       ASN1_STRING_length(packet1->public));
+	S->hardware->add(S->hardware,				   \
+			 ASN1_STRING_get0_data(packet1->hardware), \
+			 ASN1_STRING_length(packet1->hardware));
+
+	if ( S->magic == POSSUMPACKET_MAGIC1 )
+		retn = true;
+
+ done:
+	if ( retn == false )
+		S->poisoned = true;
+	if ( packet1 != NULL )
+		packet1_payload_free(packet1);
+
+	WHACK(payload);
+	WHACK(checksum);
+	WHACK(cipher);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method sets the key schedule to be used for the POSSUM exchange.
  *
  * \param this		The exchange for which the schedule is to be set.
@@ -857,6 +1111,72 @@ static _Bool set_schedule(CO(PossumPacket, this), CO(IDtoken, token), \
 		retn = true;
 
  done:
+	WHACK(hash);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method sets the key schedule to be used for mode 2 POSSUM
+ * authentication.
+ *
+ * \param this		The exchange for which the schedule is to be set.
+ *
+ * \param id		The identity key to be used to set the
+ *			schedule.
+ *
+ * \param auth_time	The authentication time to be used for scheduling
+ *			the key.
+ *
+ * \return		A boolean value is used to indicate whether or
+ *			not key scheduling was successful.  A true
+ *			value indicates the schedule was set with a false
+ *			value indicating an error was experienced.
+ */
+
+static _Bool set_schedule2(CO(PossumPacket, this), CO(RSAkey, id), \
+			  time_t auth_time)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	Buffer idhash,
+	       idkey = NULL;
+
+	Sha256 hash = NULL;
+
+
+	/* Verify arguements. */
+	if ( S->poisoned )
+		goto done;
+
+	/* Set the authentication time. */
+	S->auth_time = auth_time;
+
+	/*
+	 * Construct an identity value with the public modulus of
+	 * the key and the hash of the key.
+	 */
+	INIT(HurdLib, Buffer, idkey, ERR(goto done));
+	if ( !id->get_modulus(id, idkey) )
+		ERR(goto done);
+
+	INIT(NAAAIM, Sha256, hash, goto done);
+	hash->add(hash, idkey);
+	if ( !hash->compute(hash) )
+		goto done;
+	idhash = hash->get_Buffer(hash);
+
+	if ( S->otedks->compute(S->otedks, S->auth_time, idkey, idhash) )
+		retn = true;
+
+ done:
+	WHACK(idkey);
 	WHACK(hash);
 
 	return retn;
@@ -1103,13 +1423,19 @@ extern PossumPacket NAAAIM_PossumPacket_Init(void)
 	INIT(HurdLib, Buffer, this->state->hardware, goto err);
 	INIT(HurdLib, Buffer, this->state->identity, goto err);
 
+
 	/* Method initialization. */
 	this->create_packet1 = create_packet1;
+	this->create_packet2 = create_packet2;
+
 	this->encode_packet1 = encode_packet1;
 
 	this->decode_packet1 = decode_packet1;
+	this->decode_packet2 = decode_packet2;
 
-	this->set_schedule = set_schedule;
+	this->set_schedule  = set_schedule;
+	this->set_schedule2 = set_schedule2;
+
 	this->get_value	   = get_value;
 	this->get_element  = get_element;
 
