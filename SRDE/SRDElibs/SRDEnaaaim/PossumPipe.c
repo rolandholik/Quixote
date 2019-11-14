@@ -1585,7 +1585,8 @@ static _Bool receive_platform_report(CO(PossumPipe, this), CO(Buffer, bufr), \
 {
 	STATE(S);
 
-	_Bool retn = false;
+	_Bool report_valid,
+	      retn = false;
 
 	size_t payload;
 
@@ -1656,6 +1657,10 @@ static _Bool receive_platform_report(CO(PossumPipe, this), CO(Buffer, bufr), \
 
 	INIT(NAAAIM, SRDEquote, S->remote, ERR(goto done));
 	if ( !S->remote->decode_report(S->remote, output) )
+		ERR(goto done);
+	if ( !S->remote->validate_report(S->remote, &report_valid) )
+		ERR(goto done);
+	if ( !report_valid )
 		ERR(goto done);
 
 	if ( S->debug ) {
