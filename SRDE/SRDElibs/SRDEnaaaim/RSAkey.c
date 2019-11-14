@@ -35,8 +35,10 @@
 #include <Origin.h>
 #include <HurdLib.h>
 #include <Buffer.h>
+#include <String.h>
 
 #include "NAAAIM.h"
+#include "Prompt.h"
 #include "RSAkey.h"
 
 
@@ -417,6 +419,67 @@ static _Bool get_modulus(CO(RSAkey, this), CO(Buffer, bufr))
 
 
 /**
+ * Internal private function.
+ *
+ * This function is responsible for issuing a prompt for the
+ * passphrase needed to decrypt the private key if it has been
+ * encrypted.  It makes use of the Prompt object to issue an OCALL
+ * to standard userspace in order to obtain the passphrase.
+ *
+ * \param bufr	The bufr which has been allocated for the password.
+ *
+ * \param size	The size of the allocated buffer.
+ *
+ * \param rw	Read/write flag (unused).
+ *
+ * \param data	A pointer to a character buffer which contains the
+ *		prompt to be displayed to the user.
+ *
+ * \return	The size of password which was loaded into the
+ *		bufr variable.
+ */
+
+static int pwd_cb(char *bufr, int size, int rw, void *data)
+
+{
+	_Bool pwdfail = false;
+
+	int retn = -1;
+
+	String prompt  = NULL,
+	       phrase  = NULL;
+
+	Prompt pwd = NULL;
+
+
+	/* Setup the prompt. */
+	INIT(HurdLib, String, prompt, ERR(goto done));
+	if ( !prompt->add(prompt, data) )
+		ERR(goto done);
+
+	/* Prompt for the passpharase. */
+	INIT(HurdLib, String, phrase, ERR(goto done));
+
+	INIT(NAAAIM, Prompt, pwd, ERR(goto done));
+	if ( !pwd->get(pwd, prompt, NULL, 63, phrase, &pwdfail) )
+		ERR(goto done);
+	if ( pwdfail )
+		ERR(goto done);
+
+	retn = phrase->size(phrase);
+	memcpy(bufr, phrase->get(phrase), phrase->size(phrase) + 1);
+
+
+ done:
+	WHACK(prompt);
+	WHACK(phrase);
+	WHACK(pwd);
+
+	return retn;
+}
+
+
+/**
  * External public method.
  *
  * This method implements loading of an RSA private key and sets
@@ -451,6 +514,8 @@ static _Bool load_private(CO(RSAkey, this), CO(Buffer, bufr))
 
 	_Bool retn = false;
 
+	static char *prompt = "Private key passphrase: ";
+
 	BIO *key = NULL;
 
 
@@ -467,7 +532,7 @@ static _Bool load_private(CO(RSAkey, this), CO(Buffer, bufr))
 	/* Load key from a memory based BIO based on the Buffer object. */
 	key = BIO_new_mem_buf(bufr->get(bufr), bufr->size(bufr));
 
-	if ( PEM_read_bio_RSAPrivateKey(key, &S->key, NULL, NULL) == NULL )
+	if ( PEM_read_bio_RSAPrivateKey(key, &S->key, pwd_cb, prompt) == NULL )
 		ERR(goto done);
 
 	retn	= true;
