@@ -588,14 +588,20 @@ static _Bool generate_quote(CO(SRDEquote, this),			 \
  * \param quote		The object which the binary quote is to be
  *			loaded into.
  *
+ * \param apikey	An object containing the authentication key
+ *			that should be used when communicating with
+ *			Intel IAS services.  Setting this value to
+ *			NULL will cause the older certificate/key
+ *			mechanism to be used.
+ *
  * \return	A boolean value is returned to indicate the
- *		status of the initialization of the quote.  A false
+ *		status of the generation of the quote.  A false
  *		value indicates an error occurred while a true
- *		value indicates the quote was successfully initialized.
+ *		value indicates the quote was successfully generated.
  */
 
 static _Bool generate_report(CO(SRDEquote, this), CO(Buffer, quote), \
-			     CO(String, report))
+			     CO(String, report), CO(String, apikey))
 
 {
 	STATE(S);
@@ -606,6 +612,8 @@ static _Bool generate_report(CO(SRDEquote, this), CO(Buffer, quote), \
 
 	Buffer http_in	= NULL,
 	       http_out = NULL;
+
+	String key = NULL;
 
 	Base64 base64 = NULL;
 
@@ -641,8 +649,18 @@ static _Bool generate_report(CO(SRDEquote, this), CO(Buffer, quote), \
 
 	http->add_arg(http, "--secure-protocol=TLSv1_2");
 	http->add_arg(http, "--ca-certificate="CA_BUNDLE);
-	http->add_arg(http, "--private-key="PRIVATE_KEY);
-	http->add_arg(http, "--certificate="PUBLIC_CERT);
+
+	if ( apikey == NULL ) {
+		http->add_arg(http, "--private-key="PRIVATE_KEY);
+		http->add_arg(http, "--certificate="PUBLIC_CERT);
+	} else {
+		INIT(HurdLib, String, key, ERR(goto done));
+		key->add(key, "--header=Ocp-Apim-Subscription-Key: ");
+		if ( !key->add(key, apikey->get(apikey)) )
+			ERR(goto done);
+		http->add_arg(http, key->get(key));
+	}
+
 
 	if ( !http_in->add(http_in, (unsigned char *) report->get(report), \
 			   report->size(report)) )
@@ -664,6 +682,7 @@ static _Bool generate_report(CO(SRDEquote, this), CO(Buffer, quote), \
 
 	WHACK(http_in);
 	WHACK(http_out);
+	WHACK(key);
 	WHACK(base64);
 	WHACK(http)
 

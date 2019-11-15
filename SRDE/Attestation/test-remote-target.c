@@ -260,7 +260,7 @@ extern int main(int argc, char *argv[])
 
 	/* Request a report on the quote. */
 	INIT(HurdLib, String, output, ERR(goto done));
-	if ( !quoter->generate_report(quoter, quote, output) )
+	if ( !quoter->generate_report(quoter, quote, output, NULL) )
 		ERR(goto done);
 
 	fputs("Attestation report:\n", stdout);

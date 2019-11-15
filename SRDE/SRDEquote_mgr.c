@@ -203,7 +203,7 @@ static void srdequote_generate_report(struct SRDEquote_ocall *ocp)
 		ERR(goto done);
 
 	INIT(HurdLib, String, output, ERR(goto done));
-	if ( !quoter->generate_report(quoter, quote, output) )
+	if ( !quoter->generate_report(quoter, quote, output, NULL) )
 		ERR(goto done);
 
 	if ( !report_bufr->add(report_bufr, (void *) output->get(output), \

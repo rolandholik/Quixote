@@ -1526,7 +1526,7 @@ static _Bool receive_platform_quote(CO(PossumPipe, this), CO(Buffer, bufr), \
 	INIT(HurdLib, String, output, ERR(goto done));
 
 	INIT(NAAAIM, SRDEquote, S->remote, ERR(goto done));
-	if ( !S->remote->generate_report(S->remote, quote, output) )
+	if ( !S->remote->generate_report(S->remote, quote, output, NULL) )
 		ERR(goto done);
 
 	if ( !S->remote->decode_report(S->remote, output) )
@@ -1981,7 +1981,7 @@ static _Bool send_platform_report(CO(PossumPipe, this), CO(Buffer, bufr), \
 
 	INIT(NAAAIM, SRDEquote, report, ERR(goto done));
 	INIT(HurdLib, String, rpt, ERR(goto done));
-	if ( !report->generate_report(report, quote, rpt) )
+	if ( !report->generate_report(report, quote, rpt, NULL) )
 		ERR(goto done);
 
 	quote->reset(quote);

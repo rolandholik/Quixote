@@ -39,6 +39,7 @@ enum SRDEquote_ocalls {
  */
 struct SRDEquote_ocall {
 	_Bool retn;
+	_Bool apikey;
 	enum SRDEquote_ocalls ocall;
 	unsigned int instance;
 
@@ -51,6 +52,7 @@ struct SRDEquote_ocall {
 
 	unsigned char spid[16];
 	unsigned char nonce[16];
+	unsigned char key[33];
 
 	size_t bufr_size;
 	unsigned char *bufr;
@@ -89,7 +91,8 @@ struct NAAAIM_SRDEquote
 		      const char *);
 	_Bool (*generate_quote)(const SRDEquote, struct SGX_report *report, \
 				const Buffer, const Buffer, const Buffer);
-	_Bool (*generate_report)(const SRDEquote, const Buffer, const String);
+	_Bool (*generate_report)(const SRDEquote, const Buffer, const String, \
+				 const String);
 	_Bool (*decode_report)(const SRDEquote, const String);
 	_Bool (*validate_report)(const SRDEquote, _Bool *);
 

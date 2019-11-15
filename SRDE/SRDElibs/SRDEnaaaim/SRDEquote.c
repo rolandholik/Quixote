@@ -471,7 +471,7 @@ static int sgxquote_ocall(struct SRDEquote_ocall *ocall)
 		}
 	}
 
-	if ( ocall->ocall == SRDEquote_generate_report )
+	if ( ocall->ocall == SRDEquote_generate_report)
 		memcpy(ocp->arena, ocall->bufr, ocall->bufr_size);
 
 
@@ -685,6 +685,12 @@ static _Bool generate_quote(CO(SRDEquote, this),			 \
  * \param report	The object that will be loaded with the report
  *			that is returned.
  *
+ * \param apikey	An object containing the authentication key
+ *			that should be used when communicating with
+ *			Intel IAS services.  Setting this value to
+ *			NULL will cause the older certificate/key
+ *			mechanism to be used.
+ *
  * \return	A boolean value is returned to indicate the
  *		status of the report generation.  A false value indicates
  *		an error occurred while a true value indicates the report
@@ -692,7 +698,7 @@ static _Bool generate_quote(CO(SRDEquote, this),			 \
  */
 
 static _Bool generate_report(CO(SRDEquote, this), CO(Buffer, quote), \
-			     CO(String, report))
+			     CO(String, report), CO(String, apikey))
 
 {
 	STATE(S);
@@ -713,6 +719,11 @@ static _Bool generate_report(CO(SRDEquote, this), CO(Buffer, quote), \
 
 	/* Call the untrusted object implementation. */
 	memset(&ocall, '\0', sizeof(struct SRDEquote_ocall));
+
+	if ( apikey != NULL ) {
+		ocall.apikey = true;
+		memcpy(ocall.key, apikey->get(apikey), apikey->size(apikey));
+	}
 
 	ocall.ocall	= SRDEquote_generate_report,
 	ocall.instance	= S->instance;

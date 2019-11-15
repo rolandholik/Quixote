@@ -217,7 +217,7 @@ _Bool test_attestation(char *qe_token, char *pce_token, char *epid_blob, \
 
 	/* Generate the verifying report. */
 	INIT(HurdLib, String, output, ERR(goto done));
-	if ( !quoter->generate_report(quoter, quote, output) )
+	if ( !quoter->generate_report(quoter, quote, output, NULL) )
 		ERR(goto done);
 
 	fputs("\nAttestation report:\n", stdout);
