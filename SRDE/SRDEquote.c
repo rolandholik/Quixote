@@ -15,6 +15,11 @@
 #define PRIVATE_KEY "/opt/IDfusion/etc/ias-key.pem"
 #define PUBLIC_CERT "/opt/IDfusion/etc/ias-cert.pem"
 
+#define IAS_URL		"https://as.sgx.trustedservices.intel.com:443/attestation/sgx/v3/report"
+
+#define APIKEY_URL	"https://api.trustedservices.intel.com/sgx/attestation/v3/report"
+#define APIKEY_DEVURL	"https://api.trustedservices.intel.com/sgx/dev/attestation/v3/report"
+
 #define IAS_VERSION "3"
 
 
@@ -608,7 +613,9 @@ static _Bool generate_report(CO(SRDEquote, this), CO(Buffer, quote), \
 
 	_Bool retn = false;
 
-	char *url = "https://as.sgx.trustedservices.intel.com:443/attestation/sgx/v3/report";
+	char *url,
+	     *ias_url	 = IAS_URL,
+	     *apikey_url = APIKEY_URL;
 
 	Buffer http_in	= NULL,
 	       http_out = NULL;
@@ -644,6 +651,7 @@ static _Bool generate_report(CO(SRDEquote, this), CO(Buffer, quote), \
 	INIT(NAAAIM, HTTP, http, ERR(goto done));
 
 	http->add_arg(http, "-q");
+
 	http->add_arg(http, "--save-headers");
 	http->add_arg(http, "--header=Content-Type: application/json");
 
@@ -651,9 +659,13 @@ static _Bool generate_report(CO(SRDEquote, this), CO(Buffer, quote), \
 	http->add_arg(http, "--ca-certificate="CA_BUNDLE);
 
 	if ( apikey == NULL ) {
+		url = ias_url;
+
 		http->add_arg(http, "--private-key="PRIVATE_KEY);
 		http->add_arg(http, "--certificate="PUBLIC_CERT);
 	} else {
+		url = apikey_url;
+
 		INIT(HurdLib, String, key, ERR(goto done));
 		key->add(key, "--header=Ocp-Apim-Subscription-Key: ");
 		if ( !key->add(key, apikey->get(apikey)) )
@@ -1159,13 +1171,13 @@ static _Bool decode_report(CO(SRDEquote, this), CO(String, report))
 
 	/* Extract the report signature and certificate. */
 	INIT(HurdLib, String, S->signature, ERR(goto done));
-	if ( !_get_header(report, fregex, "x-iasreport-signature", \
-			  S->signature) )
+	if ( !_get_header(report, fregex, "[xX]-[iI][aA][sS][rR]" \
+			  "eport-[sS]ignature", S->signature) )
 		ERR(goto done);
 
 	INIT(HurdLib, String, S->certificate, ERR(goto done));
-	if ( !_get_header(report, fregex, "x-iasreport-signing-certificate", \
-			  S->certificate) )
+	if ( !_get_header(report, fregex, "[xX]-[iI][aA][sS][rR]" \
+			  "eport-[sS]igning-[cC]ertificate", S->certificate) )
 		ERR(goto done);
 	if ( !_decode_certificate(S->certificate) )
 		ERR(goto done);

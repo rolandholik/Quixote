@@ -1221,13 +1221,13 @@ static _Bool decode_report(CO(SRDEquote, this), CO(String, report))
 
 	/* Extract the report signature and certificate. */
 	INIT(HurdLib, String, S->signature, ERR(goto done));
-	if ( !_get_header(report, fregex, "x-iasreport-signature", \
-			  S->signature) )
+	if ( !_get_header(report, fregex, "[xX]-[iI][aA][sS][rR]" \
+			  "eport-[sS]ignature", S->signature) )
 		ERR(goto done);
 
 	INIT(HurdLib, String, S->certificate, ERR(goto done));
-	if ( !_get_header(report, fregex, "x-iasreport-signing-certificate", \
-			  S->certificate) )
+	if ( !_get_header(report, fregex, "[xX]-[iI][aA][sS][rR]" \
+			  "eport-[sS]igning-[cC]ertificate", S->certificate) )
 		ERR(goto done);
 	if ( !_decode_certificate(S->certificate) )
 		ERR(goto done);

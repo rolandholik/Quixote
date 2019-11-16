@@ -55,7 +55,8 @@ extern int main(int argc, char *argv[])
 {
 	_Bool debug = true;
 
-	char *epid_blob	     = "/var/lib/IDfusion/data/EPID.bin",
+	char *key	     = NULL,
+	     *epid_blob	     = "/var/lib/IDfusion/data/EPID.bin",
 	     *quote_token    = SGX_TOKEN_DIRECTORY"/libsgx_qe.token",
 	     *pce_token	     = SGX_TOKEN_DIRECTORY"/libsgx_pce.token",
 	     *spid_fname     = SPID_FILENAME,
@@ -85,6 +86,7 @@ extern int main(int argc, char *argv[])
 	       http_out = NULL;
 
 	String output	= NULL,
+	       apikey	= NULL,
 	       spid_key = NULL;
 
 	File spid_file = NULL;
@@ -103,13 +105,16 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "Te:p:q:s:t:")) != EOF )
+	while ( (opt = getopt(argc, argv, "Te:k:p:q:s:t:")) != EOF )
 		switch ( opt ) {
 			case 'T':
 				mode = trusted;
 				break;
 			case 'e':
 				epid_blob = optarg;
+				break;
+			case 'k':
+				key = optarg;
 				break;
 			case 'p':
 				pce_token = optarg;
@@ -260,7 +265,17 @@ extern int main(int argc, char *argv[])
 
 	/* Request a report on the quote. */
 	INIT(HurdLib, String, output, ERR(goto done));
-	if ( !quoter->generate_report(quoter, quote, output, NULL) )
+	if ( key != NULL ) {
+		INIT(HurdLib, String, apikey, ERR(goto done));
+
+		spid_file->reset(spid_file);
+		if ( !spid_file->open_ro(spid_file, key) )
+			ERR(goto done);
+		if ( !spid_file->read_String(spid_file, apikey) )
+			ERR(goto done);
+	}
+
+	if ( !quoter->generate_report(quoter, quote, output, apikey) )
 		ERR(goto done);
 
 	fputs("Attestation report:\n", stdout);
@@ -283,6 +298,7 @@ extern int main(int argc, char *argv[])
 	WHACK(source);
 	WHACK(ocall);
 	WHACK(output);
+	WHACK(apikey);
 	WHACK(spid_key);
 	WHACK(spid_file);
 	WHACK(base64);
