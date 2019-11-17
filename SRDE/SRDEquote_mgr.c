@@ -150,6 +150,9 @@ static void srdequote_generate_quote(struct SRDEquote_ocall *ocp)
 
 
 	/* Generate the quote. */
+	if ( ocp->development )
+		quote->development(quote, true);
+
 	quote_bufr->reset(quote_bufr);
 	if ( !quote->generate_quote(quote, &ocp->report, spid, nonce, \
 				    quote_bufr) )

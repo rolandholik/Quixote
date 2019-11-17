@@ -53,7 +53,8 @@
 extern int main(int argc, char *argv[])
 
 {
-	_Bool debug = true;
+	_Bool debug	  = true,
+	      development = false;
 
 	char *key	     = NULL,
 	     *epid_blob	     = "/var/lib/IDfusion/data/EPID.bin",
@@ -105,8 +106,11 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "Te:k:p:q:s:t:")) != EOF )
+	while ( (opt = getopt(argc, argv, "DTe:k:p:q:s:t:")) != EOF )
 		switch ( opt ) {
+			case 'D':
+				development = true;
+				break;
 			case 'T':
 				mode = trusted;
 				break;
@@ -205,6 +209,8 @@ extern int main(int argc, char *argv[])
 	INIT(NAAAIM, SRDEquote, quoter, ERR(goto done));
 	if ( !quoter->init(quoter, quote_token, pce_token, epid_blob) )
 		ERR(goto done);
+	if ( development )
+		quoter->development(quoter, true);
 
 
 	/*

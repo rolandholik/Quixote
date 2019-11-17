@@ -352,6 +352,9 @@ struct NAAAIM_SRDEquote_State
 	/* Object status. */
 	_Bool poisoned;
 
+	/* Flag to indicate that development mode is in effect. */
+	_Bool development;
+
 	/* Quoting enclave target information. */
 	struct SGX_targetinfo qe_target_info;
 
@@ -724,6 +727,8 @@ static _Bool generate_report(CO(SRDEquote, this), CO(Buffer, quote), \
 		ocall.apikey = true;
 		memcpy(ocall.key, apikey->get(apikey), apikey->size(apikey));
 	}
+
+	ocall.development = S->development;
 
 	ocall.ocall	= SRDEquote_generate_report,
 	ocall.instance	= S->instance;
@@ -1495,6 +1500,29 @@ static struct SRDE_quote * get_quoteinfo(CO(SRDEquote, this))
 /**
  * External public method.
  *
+ * This method implements setting whether or not the development version
+ * of the IAS service should be used.
+ *
+ * \param this	A pointer to the object whose development status is to
+ *		be set.
+ *
+ * \param mode	The value that the development flag is to be set to.
+ */
+
+static void development(CO(SRDEquote, this), const _Bool mode)
+
+{
+	STATE(S);
+
+
+	S->development = mode;
+	return;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements the decoding and print out of an attestation
  * report
  *
@@ -1756,6 +1784,7 @@ extern SRDEquote NAAAIM_SRDEquote_Init(void)
 	this->get_qe_targetinfo = get_qe_targetinfo;
 	this->get_quoteinfo	= get_quoteinfo;
 
+	this->development = development;
 	this->dump_report = dump_report;
 	this->whack	  = whack;
 

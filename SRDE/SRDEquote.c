@@ -361,6 +361,9 @@ struct NAAAIM_SRDEquote_State
 	/* Object status. */
 	_Bool poisoned;
 
+	/* Flag to indicate that development mode is in effect. */
+	_Bool development;
+
 	/* The PCE platform security version. */
 	struct SGX_psvn pce_psvn;
 
@@ -404,7 +407,8 @@ static void _init_state(CO(SRDEquote_State, S)) {
 	S->objid = NAAAIM_SRDEquote_OBJID;
 
 
-	S->poisoned = false;
+	S->poisoned    = false;
+	S->development = false;
 
 	memset(&S->pce_psvn, '\0', sizeof(struct SGX_psvn));
 	memset(&S->qe_target_info, '\0', sizeof(struct SGX_targetinfo));
@@ -615,7 +619,7 @@ static _Bool generate_report(CO(SRDEquote, this), CO(Buffer, quote), \
 
 	char *url,
 	     *ias_url	 = IAS_URL,
-	     *apikey_url = APIKEY_URL;
+	     *apikey_url = S->development ? APIKEY_DEVURL : APIKEY_URL;
 
 	Buffer http_in	= NULL,
 	       http_out = NULL;
@@ -1422,6 +1426,29 @@ static struct SRDE_quote * get_quoteinfo(CO(SRDEquote, this))
 /**
  * External public method.
  *
+ * This method implements setting whether or not the development version
+ * of the IAS service should be used.
+ *
+ * \param this	A pointer to the object whose development status is to
+ *		be set.
+ *
+ * \param mode	The value that the development flag is to be set to.
+ */
+
+static void development(CO(SRDEquote, this), const _Bool mode)
+
+{
+	STATE(S);
+
+
+	S->development = mode;
+	return;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements the decoding and print out of an attestation
  * report
  *
@@ -1665,6 +1692,7 @@ extern SRDEquote NAAAIM_SRDEquote_Init(void)
 	this->get_qe_targetinfo = get_qe_targetinfo;
 	this->get_quoteinfo	= get_quoteinfo;
 
+	this->development = development;
 	this->dump_report = dump_report;
 	this->whack	  = whack;
 

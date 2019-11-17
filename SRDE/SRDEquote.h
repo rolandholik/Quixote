@@ -40,6 +40,8 @@ enum SRDEquote_ocalls {
 struct SRDEquote_ocall {
 	_Bool retn;
 	_Bool apikey;
+	_Bool development;
+
 	enum SRDEquote_ocalls ocall;
 	unsigned int instance;
 
@@ -99,6 +101,7 @@ struct NAAAIM_SRDEquote
 	struct SGX_targetinfo * (*get_qe_targetinfo)(const SRDEquote);
 	struct SRDE_quote * (*get_quoteinfo)(const SRDEquote);
 
+	void (*development)(const SRDEquote, const _Bool mode);
 	void (*dump_report)(const SRDEquote);
 	void (*whack)(const SRDEquote);
 
