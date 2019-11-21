@@ -121,6 +121,9 @@ _Bool get_report(unsigned int mode, struct SGX_targetinfo *target, \
 
 
  done:
+	WHACK(bufr);
+	WHACK(key);
+
 	return true;
 }
 
@@ -249,6 +252,8 @@ _Bool test_attestation(struct LocalTarget_ecall1 *ip)
 
 
  done:
+	WHACK(SharedKey);
+
 	WHACK(spid);
 	WHACK(quote);
 	WHACK(apikey);
