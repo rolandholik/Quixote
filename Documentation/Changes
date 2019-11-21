@@ -42,3 +42,7 @@ Version 0.9:
 	* Update to standard and trusted OpenSSL 1.1.1d.
 
 	* Implement support for enclave de-initialization and atexit().
+
+	* Implement mode 2 authentication support for PossumPipe.
+
+	* Support APIkey based development and production reports.
