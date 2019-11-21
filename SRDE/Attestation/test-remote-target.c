@@ -240,7 +240,7 @@ extern int main(int argc, char *argv[])
 	if ( !source->setup(source, source_enclave, source_token, debug) )
 		ERR(goto done);
 
-	source_ecall0.mode   = 1;
+	source_ecall0.mode   = 3;
 	source_ecall0.target = quoter->get_qe_targetinfo(quoter);
 	source_ecall0.report = &enclave_report;
 	if ( !source->boot_slot(source, 0, ocall_table, &source_ecall0, \

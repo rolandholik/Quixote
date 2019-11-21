@@ -65,7 +65,7 @@ _Bool get_report(unsigned int mode, struct SGX_targetinfo *target, \
 	       key  = NULL;
 
 
-	if ( mode == 1) {
+	if ( (mode == 1) || (mode == 3) ) {
 		INIT(NAAAIM, Curve25519, SharedKey, goto done);
 
 		memset(report, '\0', sizeof(struct SGX_report));
@@ -77,6 +77,9 @@ _Bool get_report(unsigned int mode, struct SGX_targetinfo *target, \
 		memcpy(report_data, b->get(b), b->size(b));
 
 		enclu_ereport(target, report, report_data);
+
+		if ( mode == 3 )
+			WHACK(SharedKey);
 		return true;
 	}
 
