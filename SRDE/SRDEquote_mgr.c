@@ -150,9 +150,6 @@ static void srdequote_generate_quote(struct SRDEquote_ocall *ocp)
 
 
 	/* Generate the quote. */
-	if ( ocp->development )
-		quote->development(quote, true);
-
 	quote_bufr->reset(quote_bufr);
 	if ( !quote->generate_quote(quote, &ocp->report, spid, nonce, \
 				    quote_bufr) )
@@ -201,6 +198,7 @@ static void srdequote_generate_report(struct SRDEquote_ocall *ocp)
 
 	/* Generate the report. */
 	report_bufr->reset(report_bufr);
+	quoter->development(quoter, ocp->development);
 
 	if ( ocp->apikey ) {
 		INIT(HurdLib, String, apikey, ERR(goto done));

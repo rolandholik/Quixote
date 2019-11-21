@@ -34,7 +34,7 @@
 /* Prototype definitions for enclave functions. */
 extern _Bool get_report(unsigned int, struct SGX_targetinfo *, \
 			struct SGX_report *);
-extern _Bool test_attestation(char *, char *, char *, char *);
+extern _Bool test_attestation(struct LocalTarget_ecall1 *);
 
 
 static _Bool SGXidf_untrusted_region(void *ptr, size_t size)
@@ -84,72 +84,87 @@ static sgx_status_t sgx_get_report(void *args)
 
 
 /* ECALL 1 interface function. */
-static sgx_status_t sgx_test_attestation(void *arg)
+static sgx_status_t sgx_test_attestation(void *ifp)
 
 {
 	sgx_status_t status = SGX_ERROR_INVALID_PARAMETER;
 
-	char *qe_token  = NULL,
-	     *pce_token = NULL,
-	     *epid_blob = NULL,
-	     *spid	= NULL;
-
-	struct LocalTarget_ecall1 *ms;
+	struct LocalTarget_ecall1 *ip,
+				  *ep,
+				  ecall1;
 
 
-	/* Verify marshalled arguements and setup parameters. */
-	if ( !SGXidf_untrusted_region(arg, sizeof(struct LocalTarget_ecall1)) )
+	/* Verify interface structure pointer. */
+	if ( !SGXidf_untrusted_region(ifp, sizeof(struct LocalTarget_ecall1)) )
 		goto done;
-	ms = (struct LocalTarget_ecall1 *) arg;
+	ip = (struct LocalTarget_ecall1 *) ifp;
+	ep = &ecall1;
+	memset(&ecall1, '\0', sizeof(struct LocalTarget_ecall1));
 
-	if ( ms->qe_token != NULL ) {
-		if ( !SGXidf_untrusted_region(ms->qe_token, \
-					      ms->qe_token_size) )
+	ep->apikey	   = ip->apikey;
+	ep->development	   = ip->development;
+	ep->qe_token_size  = ip->qe_token_size;
+	ep->pce_token_size = ip->pce_token_size;
+	ep->epid_blob_size = ip->epid_blob_size;
+	ep->spid_size	   = ip->spid_size;
+
+	if ( ip->qe_token != NULL ) {
+		if ( !SGXidf_untrusted_region(ip->qe_token, \
+					      ep->qe_token_size) )
 			goto done;
-		if ( (qe_token = malloc(ms->qe_token_size)) == NULL )
+		if ( (ep->qe_token = malloc(ep->qe_token_size)) == NULL )
 			goto done;
-		memcpy(qe_token, ms->qe_token, ms->qe_token_size);
+		memcpy(ep->qe_token, ip->qe_token, ep->qe_token_size);
 	}
 
-	if ( ms->pce_token != NULL ) {
-		if ( !SGXidf_untrusted_region(ms->pce_token, \
-					      ms->pce_token_size) )
+	if ( ip->pce_token != NULL ) {
+		if ( !SGXidf_untrusted_region(ip->pce_token, \
+					      ep->pce_token_size) )
 			goto done;
-		if ( (pce_token = malloc(ms->pce_token_size)) == NULL )
+		if ( (ep->pce_token = malloc(ep->pce_token_size)) == NULL )
 			goto done;
-		memcpy(pce_token, ms->pce_token, ms->pce_token_size);
+		memcpy(ep->pce_token, ip->pce_token, ep->pce_token_size);
 	}
 
-	if ( ms->epid_blob != NULL ) {
-		if ( !SGXidf_untrusted_region(ms->epid_blob, \
-					      ms->epid_blob_size) )
+	if ( ip->epid_blob != NULL ) {
+		if ( !SGXidf_untrusted_region(ip->epid_blob, \
+					      ep->epid_blob_size) )
 			goto done;
-		if ( (epid_blob = malloc(ms->epid_blob_size)) == NULL )
+		if ( (ep->epid_blob = malloc(ep->epid_blob_size)) == NULL )
 			goto done;
-		memcpy(epid_blob, ms->epid_blob, ms->epid_blob_size);
+		memcpy(ep->epid_blob, ip->epid_blob, ep->epid_blob_size);
 	}
 
-	if ( !SGXidf_untrusted_region(ms->spid, ms->spid_size) )
+	if ( !SGXidf_untrusted_region(ip->spid, ep->spid_size) )
 		goto done;
-	if ( (spid = malloc(ms->spid_size)) == NULL )
-		goto done;
-	memcpy(spid, ms->spid, ms->spid_size);
+	if ( (ep->spid = malloc(ep->spid_size)) == NULL )
+		ERR(goto done);
+	memcpy(ep->spid, ip->spid, ep->spid_size);
+
+	memcpy(ep->key, ip->key, sizeof(ep->key));
 
 	__builtin_ia32_lfence();
 
 
 	/* Call trusted function. */
-	ms->retn = test_attestation(qe_token, pce_token, epid_blob, spid);
+	ip->retn = test_attestation(ep);
 	status = SGX_SUCCESS;
 
 
  done:
-	if ( qe_token != NULL )
-		free(qe_token);
-	if ( pce_token != NULL )
-		free(pce_token);
-	if ( epid_blob != NULL )
-		free(epid_blob);
+	memset(ep->qe_token, '\0', ep->qe_token_size);
+	free(ep->qe_token);
+
+	memset(ep->pce_token, '\0', ep->pce_token_size);
+	free(ep->pce_token);
+
+	memset(ep->epid_blob, '\0', ep->epid_blob_size);
+	free(ep->epid_blob);
+
+	memset(ep->spid, '\0', ep->spid_size);
+	free(ep->spid);
+
+	memset(ep, '\0', sizeof(struct LocalTarget_ecall1));
 
 	return status;
 }
@@ -175,6 +190,7 @@ SGX_EXTERNC const struct {
 } g_dyn_entry_table = {
 	OCALL_NUMBER,
 	{
+		{0, 0},
 		{0, 0},
 		{0, 0},
 		{0, 0},

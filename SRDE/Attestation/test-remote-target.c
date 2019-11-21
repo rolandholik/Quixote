@@ -174,6 +174,25 @@ extern int main(int argc, char *argv[])
 				    debug) )
 			ERR(goto done);
 
+		memset(&source_ecall1, '\0', \
+		       sizeof(struct LocalTarget_ecall1));
+
+		source_ecall1.development = development;
+
+		if ( key != NULL ) {
+			source_ecall1.apikey = true;
+
+			INIT(HurdLib, String, apikey, ERR(goto done));
+
+			spid_file->reset(spid_file);
+			if ( !spid_file->open_ro(spid_file, key) )
+				ERR(goto done);
+			if ( !spid_file->read_String(spid_file, apikey) )
+				ERR(goto done);
+
+			strcpy(source_ecall1.key, apikey->get(apikey));
+		}
+
 		source_ecall1.qe_token	    = quote_token;
 		if ( quote_token != NULL )
 			source_ecall1.qe_token_size = strlen(quote_token) + 1;
@@ -279,12 +298,14 @@ extern int main(int argc, char *argv[])
 			ERR(goto done);
 		if ( !spid_file->read_String(spid_file, apikey) )
 			ERR(goto done);
+		fputs("Using APIkey: ", stdout);
+		apikey->print(apikey);
 	}
 
 	if ( !quoter->generate_report(quoter, quote, output, apikey) )
 		ERR(goto done);
 
-	fputs("Attestation report:\n", stdout);
+	fputs("\nAttestation report:\n", stdout);
 	output->print(output);
 
 

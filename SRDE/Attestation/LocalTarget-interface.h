@@ -12,7 +12,7 @@
 
 /* Number of enclave interfaces. */
 #define ECALL_NUMBER 2
-#define OCALL_NUMBER 5
+#define OCALL_NUMBER 6
 
 
 /* ECALL interface definitions. */
@@ -26,6 +26,8 @@ struct LocalTarget_ecall0_interface {
 /* ECALL interface definitions. */
 struct LocalTarget_ecall1 {
 	_Bool retn;
+	_Bool apikey;
+	_Bool development;
 
 	size_t qe_token_size;
 	char *qe_token;
@@ -38,4 +40,6 @@ struct LocalTarget_ecall1 {
 
 	size_t spid_size;
 	char *spid;
+
+	char key[33];
 };

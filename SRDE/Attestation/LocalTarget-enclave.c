@@ -131,15 +131,16 @@ _Bool get_report(unsigned int mode, struct SGX_targetinfo *target, \
  * This method implements the generation of a remote attestion quote
  * and its verification from within an enclave.
  *
+ * ip:		A pointer to the structure that marshalls the arguements
+ *		for this ECALL.
+ *
  * \return	A boolean value is used to indicate whether or not
  *		verification of the report succeeded.  A false value
  *		indicates the report verification failed..  A true
  *		value indicates the report is valid.
  */
 
-_Bool test_attestation(char *qe_token, char *pce_token, char *epid_blob, \
-		       char *spid_key)
-
+_Bool test_attestation(struct LocalTarget_ecall1 *ip)
 
 {
 	char report_data[64] __attribute__((aligned(128)));
@@ -153,7 +154,8 @@ _Bool test_attestation(char *qe_token, char *pce_token, char *epid_blob, \
 	       spid  = NULL,
 	       quote = NULL;
 
-	String output = NULL;
+	String apikey = NULL,
+	       output = NULL;
 
 	RandomBuffer nonce = NULL;
 
@@ -162,8 +164,10 @@ _Bool test_attestation(char *qe_token, char *pce_token, char *epid_blob, \
 
 	fputs("\nInitializing quote.\n", stdout);
 	INIT(NAAAIM, SRDEquote, quoter, ERR(goto done));
-	if ( !quoter->init(quoter, qe_token, pce_token, epid_blob) )
+	if ( !quoter->init(quoter, ip->qe_token, ip->pce_token, \
+			   ip->epid_blob) )
 		ERR(goto done);
+	quoter->development(quoter, ip->development);
 
 	fputs("\nGetting quoting enclave target information.\n", stdout);
 	tp = quoter->get_qe_targetinfo(quoter);
@@ -187,7 +191,7 @@ _Bool test_attestation(char *qe_token, char *pce_token, char *epid_blob, \
 
 	/* Setup spid and nonce for quote generation. */
 	INIT(HurdLib, Buffer, spid, ERR(goto done));
-	if ( !spid->add_hexstring(spid, spid_key) ) {
+	if ( !spid->add_hexstring(spid, ip->spid) ) {
 		fputs("Invalid SPID.\n", stderr);
 		goto done;
 	}
@@ -200,7 +204,9 @@ _Bool test_attestation(char *qe_token, char *pce_token, char *epid_blob, \
 	}
 
 	fputs("\nGenerating quote with:\n", stdout);
-	fprintf(stdout, "\tSPID:  %s\n", spid_key);
+	fputs("\tSPID:  ", stdout);
+	spid->print(spid);
+
 	fputs("\tNONCE: ", stdout);
 	nonce->get_Buffer(nonce)->print(nonce->get_Buffer(nonce));
 
@@ -216,8 +222,19 @@ _Bool test_attestation(char *qe_token, char *pce_token, char *epid_blob, \
 
 
 	/* Generate the verifying report. */
+	if ( ip->apikey ) {
+		if ( ip->key[33] != '\0' )
+			ERR(goto done);
+
+		INIT(HurdLib, String, apikey, ERR(goto done));
+		if ( !apikey->add(apikey, (char *) ip->key) )
+			ERR(goto done);
+		fputs("\nUsing APIkey: ", stdout);
+		apikey->print(apikey);
+	}
+
 	INIT(HurdLib, String, output, ERR(goto done));
-	if ( !quoter->generate_report(quoter, quote, output, NULL) )
+	if ( !quoter->generate_report(quoter, quote, output, apikey) )
 		ERR(goto done);
 
 	fputs("\nAttestation report:\n", stdout);
@@ -233,6 +250,9 @@ _Bool test_attestation(char *qe_token, char *pce_token, char *epid_blob, \
 
  done:
 	WHACK(spid);
+	WHACK(quote);
+	WHACK(apikey);
+	WHACK(output);
 	WHACK(nonce);
 	WHACK(quoter);
 
