@@ -204,8 +204,20 @@ _Bool test_attestation(struct LocalTarget_ecall1 *ip)
 
 
 	INIT(NAAAIM, RandomBuffer, nonce, ERR(goto done));
+	if ( ip->nonce ) {
+		fputs("Setting IAS nonce.\n", stdout);
+		if ( !nonce->generate(nonce, 16) ) {
+			fputs("Unable to generate IAS nonce.\n", stderr);
+			goto done;
+		}
+		if ( !quoter->set_nonce(quoter, nonce->get_Buffer(nonce)) ) {
+			fputs("Unable to set IAS nonce.\n", stderr);
+			goto done;
+		}
+	}
+
 	if ( !nonce->generate(nonce, 16) ) {
-		fputs("Unable to generate nonce.\n", stderr);
+		fputs("Unable to generate quote nonce.\n", stderr);
 		goto done;
 	}
 

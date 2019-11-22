@@ -54,6 +54,7 @@ extern int main(int argc, char *argv[])
 
 {
 	_Bool debug	  = true,
+	      send_nonce  = false,
 	      development = false;
 
 	char *key	     = NULL,
@@ -106,10 +107,13 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "DTe:k:p:q:s:t:")) != EOF )
+	while ( (opt = getopt(argc, argv, "DNTe:k:p:q:s:t:")) != EOF )
 		switch ( opt ) {
 			case 'D':
 				development = true;
+				break;
+			case 'N':
+				send_nonce = true;
 				break;
 			case 'T':
 				mode = trusted;
@@ -178,6 +182,8 @@ extern int main(int argc, char *argv[])
 		       sizeof(struct LocalTarget_ecall1));
 
 		source_ecall1.development = development;
+		if ( send_nonce )
+			source_ecall1.nonce = true;
 
 		if ( key != NULL ) {
 			source_ecall1.apikey = true;
@@ -302,6 +308,21 @@ extern int main(int argc, char *argv[])
 		apikey->print(apikey);
 	}
 
+
+	/* Setup an IAS nonce if requested. */
+	if ( send_nonce ) {
+		if ( !nonce->generate(nonce, 16) ) {
+			fputs("Unable to generate IAS nonce.\n", stderr);
+			goto done;
+		}
+		if ( !quoter->set_nonce(quoter, nonce->get_Buffer(nonce)) ) {
+			fputs("Unable to set IAS nonce.\n", stderr);
+			goto done;
+		}
+	}
+
+
+	/* Generate and print report. */
 	if ( !quoter->generate_report(quoter, quote, output, apikey) )
 		ERR(goto done);
 

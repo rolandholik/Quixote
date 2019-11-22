@@ -188,6 +188,7 @@ static void srdequote_generate_report(struct SRDEquote_ocall *ocp)
 	_Bool retn = false;
 
 	Buffer quote = NULL,
+	       nonce = NULL,
 	       report_bufr = SRDEquote_buffers[ocp->instance];
 
 	String apikey = NULL,
@@ -205,6 +206,15 @@ static void srdequote_generate_report(struct SRDEquote_ocall *ocp)
 		if ( ocp->key[32] != '\0' )
 			ERR(goto done);
 		if ( !apikey->add(apikey, (char *) ocp->key) )
+			ERR(goto done);
+	}
+
+	if ( ocp->set_nonce ) {
+		INIT(HurdLib, Buffer, nonce, ERR(goto done));
+		if ( !nonce->add(nonce, ocp->ias_nonce, \
+				 sizeof(ocp->ias_nonce)) )
+			ERR(goto done);
+		if ( !quoter->set_nonce(quoter, nonce) )
 			ERR(goto done);
 	}
 
@@ -229,6 +239,7 @@ static void srdequote_generate_report(struct SRDEquote_ocall *ocp)
 	ocp->retn = retn;
 
 	WHACK(quote);
+	WHACK(nonce);
 	WHACK(apikey);
 	WHACK(output);
 

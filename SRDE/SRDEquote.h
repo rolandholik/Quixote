@@ -41,6 +41,7 @@ struct SRDEquote_ocall {
 	_Bool retn;
 	_Bool apikey;
 	_Bool development;
+	_Bool set_nonce;
 
 	enum SRDEquote_ocalls ocall;
 	unsigned int instance;
@@ -55,6 +56,7 @@ struct SRDEquote_ocall {
 	unsigned char spid[16];
 	unsigned char nonce[16];
 	unsigned char key[33];
+	unsigned char ias_nonce[16];
 
 	size_t bufr_size;
 	unsigned char *bufr;
@@ -97,6 +99,8 @@ struct NAAAIM_SRDEquote
 				 const String);
 	_Bool (*decode_report)(const SRDEquote, const String);
 	_Bool (*validate_report)(const SRDEquote, _Bool *);
+
+	_Bool (*set_nonce)(const SRDEquote, const Buffer);
 
 	struct SGX_targetinfo * (*get_qe_targetinfo)(const SRDEquote);
 	struct SRDE_quote * (*get_quoteinfo)(const SRDEquote);

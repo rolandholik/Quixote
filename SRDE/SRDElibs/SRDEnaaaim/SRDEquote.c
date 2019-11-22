@@ -368,6 +368,8 @@ struct NAAAIM_SRDEquote_State
 	String signature;
 	String certificate;
 
+	Buffer nonce;
+
 	enum SRDEquote_status status;
 
 	struct SRDE_quote quote;
@@ -728,6 +730,12 @@ static _Bool generate_report(CO(SRDEquote, this), CO(Buffer, quote), \
 		memcpy(ocall.key, apikey->get(apikey), apikey->size(apikey));
 	}
 
+	if ( S->nonce != NULL ) {
+		ocall.set_nonce = true;
+		memcpy(ocall.ias_nonce, S->nonce->get(S->nonce), \
+		       sizeof(ocall.ias_nonce));
+	}
+
 	ocall.development = S->development;
 
 	ocall.ocall	= SRDEquote_generate_report,
@@ -919,6 +927,10 @@ static _Bool _get_report(CO(String, field), CO(String, report))
  * This method parses the supplied input for a single JSON field.  It
  * is a subordinate helper function for the ->decode_report method.
  *
+ * \param noerr	A flag variable used to indicate that an error
+ *		condition should not be generated if there is
+ *		no field match.
+ *
  * \param field	The object containing the field to be parsed.
  *
  * \param rgx	The object which is to be used to create the
@@ -937,8 +949,8 @@ static _Bool _get_report(CO(String, field), CO(String, report))
  *		variable contains a legitimate value.
  */
 
-static _Bool _get_field(CO(String, field), CO(String, rgx), CO(char *, fd), \
-			CO(String, value))
+static _Bool _get_field(const _Bool noerr, CO(String, field), \
+			CO(String, rgx), CO(char *, fd), CO(String, value))
 
 {
 	_Bool retn       = false,
@@ -967,8 +979,11 @@ static _Bool _get_field(CO(String, field), CO(String, rgx), CO(char *, fd), \
 		ERR(goto done);
 	have_regex = true;
 
-	if ( regexec(&regex, field->get(field), 2, regmatch, 0) != REG_OK )
+	if ( regexec(&regex, field->get(field), 2, regmatch, 0) != REG_OK ) {
+		if ( noerr )
+			goto done;
 		ERR(goto done);
+	}
 
 	len = regmatch[1].rm_eo - regmatch[1].rm_so;
 	if ( len > field->size(field) )
@@ -1239,15 +1254,27 @@ static _Bool decode_report(CO(SRDEquote, this), CO(String, report))
 
 	/* Extract the report fields. */
 	INIT(HurdLib, String, S->id, ERR(goto done));
-	if ( !_get_field(S->report, fregex, "id", S->id) )
+	if ( !_get_field(field, S->report, fregex, "id", S->id) )
 		ERR(goto done);
 
 	INIT(HurdLib, String, S->timestamp, ERR(goto done));
-	if ( !_get_field(S->report, fregex, "timestamp", S->timestamp) )
+	if ( !_get_field(false, S->report, fregex, "timestamp", S->timestamp) )
 		ERR(goto done);
 
 	INIT(HurdLib, String, field, ERR(goto done));
-	if ( !_get_field(S->report, fregex, "isvEnclaveQuoteStatus", field) )
+	if ( _get_field(true, S->report, fregex, "nonce", field) ) {
+		if ( S->nonce == NULL ) {
+			INIT(HurdLib, Buffer, S->nonce, ERR(goto done));
+		}
+		else
+			S->nonce->reset(S->nonce);
+		if ( !S->nonce->add_hexstring(S->nonce, field->get(field)) )
+			ERR(goto done);
+		field->reset(field);
+	}
+
+	if ( !_get_field(false, S->report, fregex, "isvEnclaveQuoteStatus", \
+			 field) )
 		ERR(goto done);
 
 	for (S->status= 0; Quote_status[S->status] != NULL; ++S->status) {
@@ -1259,7 +1286,8 @@ static _Bool decode_report(CO(SRDEquote, this), CO(String, report))
 
 	/* Decode the quote body. */
 	field->reset(field);
-	if ( !_get_field(S->report, fregex, "isvEnclaveQuoteBody", field) )
+	if ( !_get_field(false, S->report, fregex, "isvEnclaveQuoteBody", \
+			 field) )
 		ERR(goto done);
 
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
@@ -1276,8 +1304,8 @@ static _Bool decode_report(CO(SRDEquote, this), CO(String, report))
 	     S->status == SRDEquote_status_GROUP_REVOKED ||     \
 	     S->status == SRDEquote_status_CONFIGURATION_NEEDED ) {
 		field->reset(field);
-		if ( !_get_field(S->report, fregex, "platformInfoBlob", \
-				 field) )
+		if ( !_get_field(false, S->report, fregex, \
+				 "platformInfoBlob", field) )
 			ERR(goto done);
 
 		bufr->reset(bufr);
@@ -1299,6 +1327,7 @@ static _Bool decode_report(CO(SRDEquote, this), CO(String, report))
 		memcpy(&S->platform_info, bufr->get(bufr), \
 		       sizeof(struct platform_info));
 	}
+
 	retn = true;
 
 
@@ -1420,6 +1449,64 @@ static _Bool validate_report(CO(SRDEquote, this), _Bool *status)
 	WHACK(key);
 
 	return true;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method specifies the nonce value that should be included with
+ * the attestation quote request sent to the athentication services.
+ * The nonce is an optional value that can be included in the
+ * report in order to indicate the 'liveness' of the report.  It is
+ * typically used when a client is requesting an attestation report
+ * and desires to verify that the report is not being replayed.
+ *
+ * \param this		A pointer to the object which is to have its
+ *			report validated.
+ *
+ * \param nonce		The object containing the nonce that is to
+ *			be added to the object.
+ *
+ * \return	A boolean value is returned to indicate the
+ *		status of setting of the nonce.  A false value indicates
+ *		an error occurred and an assumption cannot be made
+ *	        that the object has a valid nonce.  A true value indicates
+ *		the nonce was successfully set.
+ */
+
+static _Bool set_nonce(CO(SRDEquote, this), CO(Buffer, nonce))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Validate object state and arguements. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( nonce == NULL )
+		ERR(goto done);
+	if ( nonce->poisoned(nonce) )
+		ERR(goto done);
+	if ( nonce->size(nonce) > 16 )
+		ERR(goto done);
+
+
+	/* Create the state specific nonce object and set it. */
+	INIT(HurdLib, Buffer, S->nonce, ERR(goto done));
+	if ( !S->nonce->add_Buffer(S->nonce, nonce) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
 }
 
 
@@ -1582,6 +1669,11 @@ static void dump_report(CO(SRDEquote, this))
 	fputs("Timestamp: ", stdout);
 	S->timestamp->print(S->timestamp);
 
+	if ( S->nonce != NULL ) {
+		fputs("Nonce:     ", stdout);
+		S->nonce->print(S->nonce);
+	}
+
 	fprintf(stdout, "Status:    %s\n", Quote_status[S->status]);
 
 
@@ -1725,6 +1817,8 @@ static void whack(CO(SRDEquote, this))
 	WHACK(S->signature);
 	WHACK(S->certificate);
 
+	WHACK(S->nonce);
+
 	S->root->whack(S->root, this, S);
 	return;
 }
@@ -1783,6 +1877,8 @@ extern SRDEquote NAAAIM_SRDEquote_Init(void)
 
 	this->get_qe_targetinfo = get_qe_targetinfo;
 	this->get_quoteinfo	= get_quoteinfo;
+
+	this->set_nonce = set_nonce;
 
 	this->development = development;
 	this->dump_report = dump_report;
