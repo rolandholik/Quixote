@@ -20,9 +20,9 @@ CSRC = Duct.c OTEDKS.c Curve25519.c IPC.c SoftwareStatus.c Ivy.c IDmgr.c    \
 	RandomBuffer.c AES256_cbc.c IDtoken.c X509cert.c Prompt.c	    \
 	AES128_cmac.c
 
-TESTS = Duct_test OTEDKS_test Curve25519_test IPC_test PossumPipe_test	     \
-	RSAkey_test LocalDuct_test X509cert_test Prompt_tes AES128_cmac_test \
-	#SmartCard_test
+TESTS = Duct_test OTEDKS_test Curve25519_test IPC_test PossumPipe_test	\
+	RSAkey_test LocalDuct_test X509cert_test Prompt_test		\
+	AES128_cmac_test #SmartCard_test
 
 CC = musl-gcc
 
