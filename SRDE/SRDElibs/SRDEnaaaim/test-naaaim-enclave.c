@@ -29,6 +29,7 @@
 #include "SEALEDblob.h"
 #include "X509cert.h"
 #include "Prompt.h"
+#include "AES128_cmac.h"
 
 
 static uint8_t Key[1675] = {
@@ -729,6 +730,33 @@ static uint8_t Signature[256] = {
 	0xf1, 0x49, 0x07, 0xbd, 0x5c, 0xa8, 0xf4, 0x12, \
 	0x82, 0x24, 0x0a, 0xe2, 0x2d, 0x14, 0xf1, 0x7b, \
 	0x51, 0xeb, 0xd7, 0xe6, 0xd2, 0x35, 0x9c, 0xa5  \
+};
+
+
+/**
+ * AES128_cmac key for test vector.
+ */
+const static uint8_t CMAC_key[] = {
+	0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, \
+	0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c 	\
+};
+
+
+/**
+ * AES128_cmac message for test vector.
+ */
+const static uint8_t CMAC_message[] = {
+	0x6b, 0xc1, 0xbe, 0xe2, 0x2e, 0x40, 0x9f, 0x96, \
+	0xe9, 0x3d, 0x7e, 0x11, 0x73, 0x93, 0x17, 0x2a  \
+};
+
+
+/**
+ * Expected MAC value for AES128_cmac test.
+ */
+const static uint8_t CMAC_mac[] = {
+	0x07, 0x0a, 0x16, 0xb4, 0x6b, 0x4d, 0x41, 0x44, \
+	0xf7, 0x9b, 0xdd, 0x9d, 0xd0, 0x4a, 0x28, 0x7c
 };
 
 
@@ -1451,6 +1479,47 @@ void test_ten()
 }
 
 
+void test_eleven()
+
+{
+	Buffer bufr = NULL;
+
+	AES128_cmac cmac = NULL;
+
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	if ( !bufr->add(bufr, CMAC_key, sizeof(CMAC_key)) )
+		ERR(goto done);
+
+	INIT(NAAAIM, AES128_cmac, cmac, ERR(goto done));
+	if ( !cmac->set_key(cmac, bufr) )
+		ERR(goto done);
+	if ( !cmac->add(cmac, CMAC_message, sizeof(CMAC_message)) )
+		ERR(goto done);
+	if ( !cmac->compute(cmac) )
+		ERR(goto done);
+
+	bufr->reset(bufr);
+	if ( !bufr->add_Buffer(bufr, cmac->get_Buffer(cmac)) )
+		ERR(goto done);
+
+	fputs("CMAC: ", stdout);
+	bufr->print(bufr);
+
+	bufr->reset(bufr);
+	bufr->add(bufr, CMAC_mac, sizeof(CMAC_mac));
+	fputs("Expected: ", stdout);
+	bufr->print(bufr);
+
+
+ done:
+	WHACK(bufr);
+	WHACK(cmac);
+
+	return;
+}
+
+
 void test_passphrase(void)
 
 {
@@ -1526,6 +1595,9 @@ void test_naaaim(unsigned int test)
 			break;
 		case 10:
 			test_ten();
+			break;
+		case 11:
+			test_eleven();
 			break;
 		case 100:
 			test_passphrase();
