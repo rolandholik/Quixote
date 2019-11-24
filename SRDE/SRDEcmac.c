@@ -1,8 +1,8 @@
 /** \file
  * This file contains the implementation of an object which is used to
  * implement the AES128-CMAC algorithm used to generate message
- * authentication signatures.  It currently uses the Intel cryptography
- * library until an OpenSSL implementation can be developed.
+ * authentication signatures.  It currently serves as a wrapper
+ * around the AES128_cmac object.
  */
 
 /**************************************************************************
@@ -30,6 +30,7 @@
 #include <Buffer.h>
 
 #include "NAAAIM.h"
+#include "AES128_cmac.h"
 #include "SRDEcmac.h"
 
 
@@ -62,96 +63,6 @@ struct NAAAIM_SRDEcmac_State
 	_Bool poisoned;
 };
 
-
-/**
- * External supplemental function.
- *
- * This function supplies functionality which normally is
- * provided by te SGX standard C library.  It is needed to
- * support the ECC routines.
- *
- * The function implements a 'safe' memory clearing routine.
- */
-#if 0
-static void * (* const volatile __memset_vp)(void *, int, size_t)
-    = (memset);
-
-
-int memset_s(void *s, size_t smax, int c, size_t n)
-
-{
-    int err = 0;
-
-    if (s == NULL) {
-        err = EINVAL;
-        goto out;
-    }
-    if (smax > SIZE_MAX) {
-        err = E2BIG;
-        goto out;
-    }
-    if (n > SIZE_MAX) {
-        err = E2BIG;
-        n = smax;
-    }
-    if (n > smax) {
-        err = EOVERFLOW;
-        n = smax;
-    }
-
-    /* Calling through a volatile pointer should never be optimised away. */
-    (*__memset_vp)(s, c, n);
-
-    out:
-    if (err == 0)
-        return 0;
-    else {
-        errno = err;
-        /* XXX call runtime-constraint handler */
-        return err;
-    }
-}
-
-
-/**
- * External supplemental function.
- *
- * This function supplies functionality which normally is
- * provided by te SGX standard C library.  It is needed to
- * support the ECC routines.
- *
- * This function requests the provisioning of random numbers.
- */
-
-int sgx_read_rand(unsigned char *out, size_t cnt)
-
-{
-	_Bool retn = SGX_ERROR_INVALID_PARAMETER;
-
-	Buffer bufr = NULL;
-
-	RandomBuffer rnd = NULL;
-
-
-	INIT(NAAAIM, RandomBuffer, rnd, ERR(goto done));
-	if ( !rnd->generate(rnd, cnt) )
-		ERR(goto done);
-
-	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	if ( (bufr = rnd->get_Buffer(rnd)) == NULL )
-		ERR(goto done);
-
-	memcpy(out, bufr->get(bufr), cnt);
-	retn = 0;
-
-
- done:
-	WHACK(rnd);
-	WHACK(bufr);
-
-	return retn;
-}
-#endif
 
 /**
  * Internal private method.
@@ -197,11 +108,7 @@ static _Bool compute(CO(SRDEcmac, this), CO(Buffer, key), CO(Buffer, msg), \
 
 	_Bool retn = false;
 
-	sgx_cmac_128bit_tag_t output;
-
-	sgx_cmac_128bit_key_t lkey;
-
-	sgx_status_t status;
+	AES128_cmac cmac = NULL;
 
 
 	/* Object status verification. */
@@ -209,15 +116,16 @@ static _Bool compute(CO(SRDEcmac, this), CO(Buffer, key), CO(Buffer, msg), \
 		ERR(goto done);
 
 
-	/* Verify the signature. */
-	memcpy(lkey, key->get(key), sizeof(lkey));
-	status = sgx_rijndael128_cmac_msg((const sgx_cmac_128bit_key_t *)   \
-					  &lkey, (uint8_t *) msg->get(msg), \
-					  msg->size(msg), &output);
-	if ( status != SGX_SUCCESS )
+	/* Generate the signature. */
+	INIT(NAAAIM, AES128_cmac, cmac, ERR(goto done));
+	if ( !cmac->set_key(cmac, key) )
+		ERR(goto done);
+	if ( !cmac->add(cmac, msg->get(msg), msg->size(msg)) )
+		ERR(goto done);
+	if ( !cmac->compute(cmac) )
 		ERR(goto done);
 
-	if ( !mac->add(mac, output, sizeof(output)) )
+	if ( !mac->add_Buffer(mac, cmac->get_Buffer(cmac)) )
 		ERR(goto done);
 	retn = true;
 
@@ -225,6 +133,8 @@ static _Bool compute(CO(SRDEcmac, this), CO(Buffer, key), CO(Buffer, msg), \
  done:
 	if ( !retn )
 		S->poisoned = true;
+
+	WHACK(cmac);
 
 	return retn;
 }

@@ -46,3 +46,5 @@ Version 0.9:
 	* Implement mode 2 authentication support for PossumPipe.
 
 	* Support APIkey based development and production reports.
+
+	* Implement OpenSSL based AES128-CMAC object.
