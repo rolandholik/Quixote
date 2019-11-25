@@ -7,7 +7,7 @@
 
 /* Number of enclave interfaces. */
 #define ECALL_NUMBER 1
-#define OCALL_NUMBER 1
+#define OCALL_NUMBER 6
 
 
 #include <errno.h>
@@ -91,5 +91,10 @@ SGX_EXTERNC const struct {
 	OCALL_NUMBER,
 	{
 		{0},
+		{0},
+		{0},
+		{0},
+		{0},
+		{0}
 	}
 };

@@ -127,6 +127,8 @@ _Bool get_report(unsigned int mode, struct SGX_targetinfo *target, \
 	WHACK(bufr);
 	WHACK(key);
 
+	WHACK(SharedKey);
+
 	return true;
 }
 

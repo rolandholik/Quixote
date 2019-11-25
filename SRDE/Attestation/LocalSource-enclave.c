@@ -173,5 +173,7 @@ _Bool verify_report(unsigned int mode, struct SGX_targetinfo *target, \
 	WHACK(mac);
 	WHACK(dh);
 
+	WHACK(SharedKey);
+
 	return retn;
 }

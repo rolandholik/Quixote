@@ -144,7 +144,7 @@ ldscript:
 tools: ${TOOLS}
 
 test-local-target: test-local-target.o ${LIBRARY_DEPENDS}
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 test-local-target.o: test-local-target.c
 	${CC} ${CFLAGS} -c $< -o $@;

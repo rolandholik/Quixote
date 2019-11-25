@@ -25,106 +25,14 @@
 
 #include <NAAAIM.h>
 
-#include "SRDE.h"
-#include "SRDEenclave.h"
+#include <SRDE.h>
+#include <SRDEenclave.h>
+#include <SRDEocall.h>
+#include <SRDEfusion-ocall.h>
+#include <SRDEnaaaim-ocall.h>
 
 #include "LocalSource-interface.h"
 #include "LocalTarget-interface.h"
-
-
-/** OCALL interface definition. */
-struct SRDEfusion_ocall0_interface {
-	char* str;
-} SRDEfusion_ocall0;
-
-int ocall0_handler(struct SRDEfusion_ocall0_interface *interface)
-
-{
-	fprintf(stdout, "%s", interface->str);
-	return 0;
-}
-
-static const struct OCALL_api ocall_table = {
-	1, {ocall0_handler}
-};
-
-
-/**
- * Static public function.
- *
- * This function opens and initializes an enclave whose name and
- * token are specified.
- *
- * \param enclave	The object which will be used to manage the
- *			enclave.
- *
- * \param device	A pointer to a null-terminated character buffer
- *			containing the name of the SGX device used to
- *			issue the control commands to the kernel
- *			driver.
- *
- * \param name		A pointer to a null-terminated character buffer
- *			containing the name of the shared object
- *			file containing the enclave image.
- *
- * \param token		A pointer to a null-terminated character buffer
- *			containing the name of the file containing
- *			the initialization token.
- *
- * \param debug		A boolean value used to indicate whether or
- *			not the debug attribute is to be set on
- *			the enclave.
- *
- * \return	If an error is encountered while initializing the
- *		enclave a false value is returned.  A true value indicates
- *		the enclave has been loaded and initialized.
- */
-
-static _Bool open_enclave(CO(SRDEenclave, enclave), CO(char *, device), \
-			  CO(char *, name), CO(char *, token),		\
-			  const _Bool debug)
-
-{
-	_Bool retn = false;
-
-	struct SGX_einittoken *einit;
-
-	Buffer bufr = NULL;
-
-	File token_file = NULL;
-
-
-	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	INIT(HurdLib, File, token_file, ERR(goto done));
-
-	token_file->open_ro(token_file, token);
-	if ( !token_file->slurp(token_file, bufr) )
-		ERR(goto done);
-	einit = (void *) bufr->get(bufr);
-
-
-	/* Load and initialize the enclave. */
-	if ( !enclave->open_enclave(enclave, device, name, debug) )
-		ERR(goto done);
-
-	if ( !enclave->create_enclave(enclave) )
-		ERR(goto done);
-
-	if ( !enclave->load_enclave(enclave) )
-		ERR(goto done);
-
-	if ( !enclave->init_enclave(enclave, einit) )
-		ERR(goto done);
-
-	retn = true;
-
-
- done:
-	WHACK(bufr);
-	WHACK(token_file);
-
-	return retn;
-}
 
 
 /* Program entry point. */
@@ -135,13 +43,14 @@ extern int main(int argc, char *argv[])
 
 	char *source_token   = NULL,
 	     *target_token   = NULL,
-	     *sgx_device     = "/dev/isgx",
 	     *source_enclave = "LocalSource.signed.so",
 	     *target_enclave = "LocalTarget.signed.so";
 
 	int opt,
 	    rc,
 	    retn = 1;
+
+	struct OCALL_api *table;
 
 	struct SGX_targetinfo targetinfo;
 
@@ -156,6 +65,8 @@ extern int main(int argc, char *argv[])
 	SRDEenclave source = NULL,
 		    target = NULL;
 
+	SRDEocall ocall = NULL;
+
 	Buffer bufr = NULL;
 
 
@@ -164,9 +75,6 @@ extern int main(int argc, char *argv[])
 		switch ( opt ) {
 			case 'd':
 				debug = true;
-				break;
-			case 'n':
-				sgx_device = optarg;
 				break;
 			case 's':
 				source_token = optarg;
@@ -190,13 +98,26 @@ extern int main(int argc, char *argv[])
 
 	/* Load and initialize the source and target enclaves. */
 	INIT(NAAAIM, SRDEenclave, source, ERR(goto done));
-	if ( !open_enclave(source, sgx_device, source_enclave, source_token, \
-			   debug) )
+	if ( !source->setup(source, source_enclave, source_token, debug) )
 		ERR(goto done);
 
 	INIT(NAAAIM, SRDEenclave, target, ERR(goto done));
-	if ( !open_enclave(target, sgx_device, target_enclave, target_token, \
-			   debug) )
+	if ( !target->setup(target, target_enclave, target_token, debug) )
+		ERR(goto done);
+
+
+	/* Setup the exception handler. */
+	if ( !srde_configure_exception() )
+		ERR(goto done);
+
+
+	/* Setup OCALL table. */
+	INIT(NAAAIM, SRDEocall, ocall, ERR(goto done));
+
+	ocall->add_table(ocall, SRDEfusion_ocall_table);
+	ocall->add_table(ocall, SRDEnaaaim_ocall_table);
+
+	if ( !ocall->get_table(ocall, &table) )
 		ERR(goto done);
 
 
@@ -206,8 +127,7 @@ extern int main(int argc, char *argv[])
 	source_ecall0.mode   = 1;
 	source_ecall0.target = &targetinfo;
 	source_ecall0.report = &report;
-	if ( !source->boot_slot(source, 0, &ocall_table, &source_ecall0, \
-				&rc) ) {
+	if ( !source->boot_slot(source, 0, table, &source_ecall0, &rc) ) {
 		fprintf(stderr, "Enclave return error: %d\n", rc);
 		ERR(goto done);
 	}
@@ -219,8 +139,7 @@ extern int main(int argc, char *argv[])
 	target_ecall0.mode   = 1;
 	target_ecall0.target = &targetinfo;
 	target_ecall0.report = &report;
-	if ( !target->boot_slot(target, 0, &ocall_table, &target_ecall0, \
-				&rc) ) {
+	if ( !target->boot_slot(target, 0, table, &target_ecall0, &rc) ) {
 		fprintf(stderr, "Enclave return error: %d\n", rc);
 		ERR(goto done);
 	}
@@ -281,8 +200,7 @@ extern int main(int argc, char *argv[])
 	source_ecall0.mode   = 2;
 	source_ecall0.target = &targetinfo;
 	source_ecall0.report = &report;
-	if ( !source->boot_slot(source, 0, &ocall_table, &source_ecall0, \
-				&rc) ) {
+	if ( !source->boot_slot(source, 0, table, &source_ecall0, &rc) ) {
 		fprintf(stderr, "Enclave return error: %d\n", rc);
 		ERR(goto done);
 	}
@@ -296,8 +214,7 @@ extern int main(int argc, char *argv[])
 	target_ecall0.mode   = 2;
 	target_ecall0.target = &targetinfo;
 	target_ecall0.report = &report;
-	if ( !target->boot_slot(target, 0, &ocall_table, &target_ecall0, \
-				&rc) ) {
+	if ( !target->boot_slot(target, 0, table, &target_ecall0, &rc) ) {
 		fprintf(stderr, "Enclave return error: %d\n", rc);
 		ERR(goto done);
 	}
@@ -308,9 +225,10 @@ extern int main(int argc, char *argv[])
 
 
  done:
-	WHACK(bufr);
 	WHACK(source);
 	WHACK(target);
+	WHACK(ocall);
+	WHACK(bufr);
 
 	return retn;
 
