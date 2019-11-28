@@ -11,14 +11,14 @@ INSTPATH       = ${DESTDIR}/opt/IDfusion
 INSTALLENCLAVE = test-naaaim.signed.so test-Duct.signed.so \
 	test-Possum.signed.so
 INSTINCLUDE    = IDtoken.h NAAAIM.h PossumPacket.h PossumPipe.h \
-	RandomBuffer.h SEALkey.h SEALEDblob.h
+	RandomBuffer.h SEALkey.h SEALEDblob.h Report.h
 
 CSRC   = test-naaaim.c
 ENCSRC = test-naaaim-enclave.c test-naaaim-interface.c
 LIBSRC = SHA256.c RandomBuffer.c Curve25519.c SHA256_hmac.c AES256_cbc.c  \
 	Duct.c SRDEquote.c Base64.c IDtoken.c PossumPacket.c PossumPipe.c \
 	SoftwareStatus.c OTEDKS.c IDmgr.c Ivy.c RSAkey.c SEALkey.c	  \
-	SEALEDblob.c X509cert.c Prompt.c AES128_cmac.c ssl-ocall.c
+	SEALEDblob.c X509cert.c Prompt.c AES128_cmac.c Report.c ssl-ocall.c
 ASRC   = rdrand.s
 
 DUCTSRC	   = test-Duct-enclave.c test-Duct-interface.c
@@ -284,3 +284,4 @@ OTEDKS.o: ${NAAAIMDIR}/OTEDKS.h ${NAAAIMDIR}/IDmgr.h ${NAAAIMDIR}/Ivy.h
 IDmgr.o: IDtoken.h ${NAAAIMDIR}/IDmgr.h
 Ivy.o: IDtoken.h ${NAAAIMDIR}/Ivy.h
 SEALEDblob.o: NAAAIM.h SEALEDblob.h SEALkey.h
+Report.o: NAAAIM.h Report.h

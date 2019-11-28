@@ -86,3 +86,4 @@
 #define NAAAIM_X509cert_OBJID		49
 #define NAAAIM_Prompt_OBJID		50
 #define NAAAIM_AES128_cmac_OBJID	51
+#define NAAAIM_Report_OBJID		52

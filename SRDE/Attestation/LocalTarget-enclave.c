@@ -21,6 +21,7 @@
 #include <RandomBuffer.h>
 #include <Curve25519.h>
 #include <SRDEquote.h>
+#include <Report.h>
 
 #include "LocalTarget-interface.h"
 
@@ -51,62 +52,44 @@ _Bool get_report(unsigned int mode, struct SGX_targetinfo *target, \
 		 struct SGX_report *report)
 
 {
-	char report_data[64] __attribute__((aligned(128)));
-
-	int rc;
-
-	uint8_t macbuffer[16],
-		keydata[16] __attribute__((aligned(128)));
-
-	struct SGX_keyrequest keyrequest;
+	_Bool status;
 
 	Buffer b,
 	       bufr = NULL,
 	       key  = NULL;
 
+	Report rpt = NULL;
+
 
 	if ( (mode == 1) || (mode == 3) ) {
+		INIT(NAAAIM, Report, rpt, ERR(goto done));
 		INIT(NAAAIM, Curve25519, SharedKey, goto done);
 
-		memset(report, '\0', sizeof(struct SGX_report));
-
-		memset(report_data, '\0', sizeof(report_data));
 		if ( !SharedKey->generate(SharedKey) )
 			ERR(goto done);
 		b = SharedKey->get_public(SharedKey);
-		memcpy(report_data, b->get(b), b->size(b));
 
-		enclu_ereport(target, report, report_data);
+		if ( !rpt->generate_report(rpt, target, b, report) )
+			ERR(goto done);
+		if ( !rpt->get_targetinfo(rpt, target) )
+			ERR(goto done);
 
 		if ( mode == 3 )
 			WHACK(SharedKey);
+
+		WHACK(rpt);
 		return true;
 	}
 
 	/* Mode 2 - verify remote key and generate shared secret. */
-	/* Request the report key. */
-	memset(keydata, '\0', sizeof(keydata));
-	memset(&keyrequest, '\0', sizeof(struct SGX_keyrequest));
-
-	keyrequest.keyname = SRDE_KEYSELECT_REPORT;
-	memcpy(keyrequest.keyid, report->keyid, sizeof(keyrequest.keyid));
-
-
-	/* Get report key and verify. */
-	if ( (rc = enclu_egetkey(&keyrequest, keydata)) != 0 ) {
-		fprintf(stdout, "EGETKEY return: %d\n", rc);
-		goto done;
-	}
-
-	rc = sgx_rijndael128_cmac_msg(&keydata, (uint8_t *) report,  \
-				      sizeof(struct SGX_reportbody), \
-				      macbuffer);
-	memset(keydata, '\0', sizeof(keydata));
-	if ( rc != SGX_SUCCESS )
-		goto done;
-
-	if ( memcmp(report->mac, macbuffer, sizeof(report->mac)) != 0 )
+	INIT(NAAAIM, Report, rpt, ERR(goto done));
+	if ( !rpt->validate_report(rpt, report, &status) )
 		ERR(goto done);
+
+	if ( status )
+		fputs("\nSource report verified.\n", stdout);
+	else
+		fputs("\nSource report not verified.\n", stdout);
 
 
 	/*
@@ -126,6 +109,7 @@ _Bool get_report(unsigned int mode, struct SGX_targetinfo *target, \
  done:
 	WHACK(bufr);
 	WHACK(key);
+	WHACK(rpt);
 
 	WHACK(SharedKey);
 
