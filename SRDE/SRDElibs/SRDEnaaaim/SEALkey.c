@@ -52,6 +52,7 @@
 #include "NAAAIM.h"
 #include "RandomBuffer.h"
 #include "SHA256.h"
+#include "Report.h"
 #include "SEALkey.h"
 
 
@@ -181,17 +182,12 @@ _Bool _shroud_key(CO(SEALkey_State, S), CO(Buffer, key))
 	uint8_t lp;
 
 	uint8_t __attribute__((aligned(128))) keydata[16];
-
 	unsigned char *p1,
 		      *p2;
 
-	char __attribute__((aligned(128))) report_data[64];
-
-	struct SGX_report __attribute__((aligned(512))) report;
-
-	struct SGX_targetinfo __attribute__((aligned(512))) target;
-
 	struct SGX_keyrequest __attribute__((aligned(512))) keyrequest;
+
+	struct SGX_report report;
 
 	Buffer rbp,
 	       bufr = NULL;
@@ -199,6 +195,8 @@ _Bool _shroud_key(CO(SEALkey_State, S), CO(Buffer, key))
 	RandomBuffer randbufr = NULL;
 
 	Sha256 sha256 = NULL;
+
+	Report rpt = NULL;
 
 
 	/* Verify we are working with a valid key. */
@@ -211,10 +209,9 @@ _Bool _shroud_key(CO(SEALkey_State, S), CO(Buffer, key))
 
 
 	/* Request a self report to get the measurement. */
-	memset(&target, '\0', sizeof(struct SGX_targetinfo));
-	memset(&report, '\0', sizeof(struct SGX_report));
-	memset(report_data, '\0', sizeof(report_data));
-	enclu_ereport(&target, &report, report_data);
+	INIT(NAAAIM, Report, rpt, ERR(goto done));
+	if ( !rpt->get_report(rpt, &report) )
+		ERR(goto done);
 
 	if ( !(report.body.attributes.flags  & 0x0000000000000001ULL) || \
 	     !(report.body.attributes.flags  & 0x0000000000000002ULL) )
@@ -289,6 +286,7 @@ _Bool _shroud_key(CO(SEALkey_State, S), CO(Buffer, key))
 	WHACK(bufr);
 	WHACK(randbufr);
 	WHACK(sha256);
+	WHACK(rpt);
 
 	return retn;
 }
@@ -328,11 +326,7 @@ _Bool _generate_iv_key(CO(SEALkey_State, S), int type)
 
 	uint8_t __attribute__((aligned(128))) keydata[16];
 
-	char __attribute__((aligned(128))) report_data[64];
-
-	struct SGX_report __attribute__((aligned(512))) report;
-
-	struct SGX_targetinfo __attribute__((aligned(512))) target;
+	struct SGX_report report;
 
 	struct SGX_keyrequest __attribute__((aligned(512))) keyrequest;
 
@@ -343,12 +337,13 @@ _Bool _generate_iv_key(CO(SEALkey_State, S), int type)
 
 	Sha256 sha256 = NULL;
 
+	Report rpt = NULL;
+
 
 	/* Request a self report to get the measurement. */
-	memset(&target, '\0', sizeof(struct SGX_targetinfo));
-	memset(&report, '\0', sizeof(struct SGX_report));
-	memset(report_data, '\0', sizeof(report_data));
-	enclu_ereport(&target, &report, report_data);
+	INIT(NAAAIM, Report, rpt, ERR(goto done));
+	if ( !rpt->get_report(rpt, &report) )
+		ERR(goto done);
 
 	if ( !(report.body.attributes.flags  & 0x0000000000000001ULL) || \
 	     !(report.body.attributes.flags  & 0x0000000000000002ULL) )
