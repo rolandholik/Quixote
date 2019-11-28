@@ -31,6 +31,7 @@ struct NAAAIM_Report
 				 _Bool *status);
 
 	_Bool (*get_targetinfo)(const Report, struct SGX_targetinfo *);
+	_Bool (*get_report)(const Report, struct SGX_report *);
 
 	void (*whack)(const Report);
 

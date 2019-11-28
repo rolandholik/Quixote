@@ -314,6 +314,66 @@ static _Bool get_targetinfo(CO(Report, this), struct SGX_targetinfo *tp)
 /**
  * External public method.
  *
+ * This method implements the generation of a 'self-report' for the
+ * enclave that invokes it.  This provides the enclave with the
+ * ability to determine its identity characteristics.
+ *
+ * \param this	A pointer to the object which is to generate the
+ *		self report.
+ *
+ * \param rp	A pointer to the structure that will be populated
+ *		with the enclave identity information.
+ *
+ * \return	A boolean value is used to indicate the status of
+ *		the generation of the self-report.  A false value
+ *		indicates an error was encountered and no assumption
+ *		can be made regarding information in the structure
+ *		that the pointer was supplied to.  A true value
+ *		indicates that the structure contains valid enclave
+ *		identify information.
+ */
+
+static _Bool get_report(CO(Report, this), struct SGX_report *rp)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	struct SGX_targetinfo target;
+
+	struct SGX_report report;
+
+
+	/* Validate object. */
+	if ( S->poisoned )
+		ERR(goto done);
+
+
+	/* Generate target information for the caller. */
+	if ( !this->get_targetinfo(this, &target) )
+		ERR(goto done);
+
+
+	/* Generate report on self generated target information. */
+	if ( !this->generate_report(this, &target, NULL, &report) )
+		ERR(goto done);
+
+	*rp  = report;
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a destructor for a Report object.
  *
  * \param this	A pointer to the object which is to be destroyed.
@@ -373,6 +433,7 @@ extern Report NAAAIM_Report_Init(void)
 	this->validate_report = validate_report;
 
 	this->get_targetinfo = get_targetinfo;
+	this->get_report     = get_report;
 
 	return this;
 }
