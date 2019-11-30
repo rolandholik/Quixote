@@ -179,6 +179,75 @@ static void _init_state(CO(SRDEpipe_State, S)) {
 /**
  * External public method.
  *
+ * This method implements the initialization and setup of the enclave
+ * that will be communicated with.
+ *
+ * \param this		A pointer to the object which is to have an
+ *			enclave associated with it.
+ *
+ * \param name		A pointer to a null terminated buffer containing
+ *			the pathname of the enclave to open.
+ *
+ * \param slot		The slot number of the enclave that will implement
+ *			the pipe endpoint.
+ *
+ * \param token		A pointer to a null terminated buffer containing
+ *			the pathname of the launch token to be used
+ *			for initializing the enclave.
+ *
+ * \param debug		A flag to indicate whether or not the enclave
+ *			is to be initialized in debug or production mode.
+ *
+ * \return		A false value is returned if an error is
+ *			encountered while setting the enclave up.  The
+ *			object is poisoned and is not available for
+ *			additional processing.  If the setup was successful
+ *			a true value is returned to the caller.
+ */
+
+static _Bool setup(CO(SRDEpipe, this), CO(char *, name), const int slot, \
+		   CO(char *, token), const _Bool debug)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	struct SRDEpipe_ocall ocall;
+
+
+	/* Setup OCALL structure. */
+	memset(&ocall, '\0', sizeof(struct SRDEpipe_ocall));
+
+	ocall.debug = debug;
+
+	if ( (strlen(name) + 1) > sizeof(ocall.enclave) )
+		ERR(goto done);
+	memcpy(ocall.enclave, name, strlen(name));
+
+	if ( (strlen(token) + 1) > sizeof(ocall.token) )
+		ERR(goto done);
+	memcpy(ocall.token, token, strlen(token));
+
+	ocall.ocall    = SRDEpipe_setup;
+	ocall.instance = S->instance;
+	if ( SRDEpipe_ocall(&ocall) != 0 )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a destructor for a Duct object.
  *
  * \param this	A pointer to the object which is to be destroyed.
@@ -246,15 +315,14 @@ extern SRDEpipe NAAAIM_SRDEpipe_Init(void)
 	/* Initialize the untrusted object. */
 	memset(&ocall, '\0', sizeof(struct SRDEpipe_ocall));
 	ocall.ocall = SRDEpipe_init_object;
-	fputs("Initializing SRDEpipe.\n", stdout);
-	if ( SRDEpipe_ocall(&ocall) != 0 ) {
-		fputs("Failed OCALL: %d\n", stdout);
+	if ( SRDEpipe_ocall(&ocall) != 0 )
 		goto err;
-	}
 	this->state->instance = ocall.instance;
 
 	/* Method initialization. */
-	this->whack		= whack;
+	this->setup = setup;
+
+	this->whack = whack;
 
 	return this;
 

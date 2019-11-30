@@ -162,7 +162,11 @@ _Bool test_pipe(struct LocalSource_ecall1 *ep)
 
 	SRDEpipe pipe = NULL;
 
+
 	INIT(NAAAIM, SRDEpipe, pipe, ERR(goto done));
+	if ( !pipe->setup(pipe, "LocalTarget.signed.so", 2, "target.token", \
+			  true) )
+		ERR(goto done);
 
 	retn = true;
 

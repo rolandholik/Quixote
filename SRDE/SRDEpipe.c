@@ -16,11 +16,14 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 #include <Origin.h>
 #include <HurdLib.h>
 
 #include "NAAAIM.h"
+#include "SRDE.h"
+#include "SRDEenclave.h"
 #include "SRDEpipe.h"
 
 
@@ -52,6 +55,12 @@ struct NAAAIM_SRDEpipe_State
 
 	/* Object status. */
 	_Bool poisoned;
+
+	/* ECALL slot number to communicate with. */
+	int slot;
+
+	/* Enclave to be managed. */
+	SRDEenclave enclave;
 };
 
 
@@ -80,6 +89,67 @@ static void _init_state(const SRDEpipe_State const S)
 /**
  * External public method.
  *
+ * This method implements the initialization and setup of the enclave
+ * that will be communicated with.
+ *
+ * \param this		A pointer to the object which is to have an
+ *			enclave associated with it.
+ *
+ * \param name		A pointer to a null terminated buffer containing
+ *			the pathname of the enclave to open.
+ *
+ * \param slot		The slot number of the enclave that will implement
+ *			the pipe endpoint.
+ *
+ * \param token		A pointer to a null terminated buffer containing
+ *			the pathname of the launch token to be used
+ *			for initializing the enclave.
+ *
+ * \param debug		A flag to indicate whether or not the enclave
+ *			is to be initialized in debug or production mode.
+ *
+ * \return		A false value is returned if an error is
+ *			encountered in setting up the enclave.  A true
+ *			value is returned to indicate that the enclave
+ *			setup was successful and available for use.
+ */
+
+static _Bool setup(CO(SRDEpipe, this), CO(char *, name), const int slot, \
+		   CO(char *, token), const _Bool debug)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+
+
+	/* Set the slot number and initialize the enclave. */
+	S->slot = slot;
+
+	INIT(NAAAIM, SRDEenclave, S->enclave, ERR(goto done));
+	if ( !S->enclave->setup(S->enclave, name, token, debug) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a destructor for an SRDEpipe object.
  *
  * \param this	A pointer to the object which is to be destroyed.
@@ -90,6 +160,8 @@ static void whack(CO(SRDEpipe, this))
 {
 	STATE(S);
 
+
+	WHACK(S->enclave);
 
 	S->root->whack(S->root, this, S);
 	return;
@@ -133,6 +205,8 @@ extern SRDEpipe NAAAIM_SRDEpipe_Init(void)
 	/* Initialize aggregate objects. */
 
 	/* Method initialization. */
+	this->setup = setup;
+
 	this->whack = whack;
 
 	return this;

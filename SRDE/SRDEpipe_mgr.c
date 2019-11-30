@@ -86,6 +86,41 @@ static void srdepipe_init_object(struct SRDEpipe_ocall *ocp)
 /**
  * Internal private function.
  *
+ * This function implements the ->setup method of the SRDEpipe object.
+ *
+ * \param ocp	A pointer to the structure which is marshalling the
+ *		data into and out of the OCALL.
+ *
+ * \return	No return value is defined.
+ */
+
+static void srdepipe_setup(struct SRDEpipe_ocall *ocp)
+
+{
+	_Bool retn = false;
+
+	unsigned int instance;
+
+	SRDEpipe pipe = SRDE_pipes[ocp->instance];
+
+
+	if ( !pipe->setup(pipe, ocp->enclave, ocp->slot, ocp->token, \
+			  ocp->debug) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	ocp->retn = retn;
+
+	return;
+}
+
+
+/**
+ * Internal private function.
+ *
  * This function manages the destruction of an SRDEquote object which
  * has been previously initialized.
  *
@@ -149,6 +184,9 @@ int SRDEpipe_mgr(struct SRDEpipe_ocall *ocp)
 			break;
 
 
+		case SRDEpipe_setup:
+			srdepipe_setup(ocp);
+			break;
 		case SRDEpipe_whack:
 			srdepipe_whack(ocp);
 			break;
