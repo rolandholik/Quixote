@@ -6,14 +6,15 @@
  **************************************************************************/
 
 /* Number of enclave interfaces. */
-#define ECALL_NUMBER 1
-#define OCALL_NUMBER 6
+#define ECALL_NUMBER 2
+#define OCALL_NUMBER SRDENAAAIM_MAX_OCALL+1
 
 
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #include <sgx_trts.h>
 #include <sgx_edger8r.h>
@@ -21,6 +22,8 @@
 #include <HurdLib.h>
 
 #include "../SRDE.h"
+#include <SRDEfusion-ocall.h>
+#include <SRDEnaaaim-ocall.h>
 #include "LocalSource-interface.h"
 
 
@@ -35,9 +38,25 @@
 } while (0)
 
 
+static _Bool SGXidf_untrusted_region(void *ptr, size_t size)
+
+{
+	_Bool retn = false;
+
+	if ( ptr == NULL )
+		goto done;
+	if ( sgx_is_within_enclave(ptr, size) )
+		goto done;
+	retn = true;
+ done:
+	return retn;
+}
+
+
 /* Prototype definitions for enclave functions. */
 extern _Bool verify_report(unsigned int, struct SGX_targetinfo *, \
 			   struct SGX_report *);
+extern _Bool test_pipe(struct LocalSource_ecall1 *);
 
 
 /* ECALL 0 interface function. */
@@ -71,6 +90,37 @@ static sgx_status_t sgx_verify_report(void *args)
 }
 
 
+/* ECALL 1 interface function. */
+static sgx_status_t sgx_test_pipe(void *ifp)
+
+{
+	sgx_status_t retn = SGX_ERROR_INVALID_PARAMETER;
+
+	struct LocalSource_ecall1 *ip,
+				  ecall1;
+
+
+	memset(&ecall1, '\0', sizeof(struct LocalSource_ecall1));
+
+	if ( !SGXidf_untrusted_region(ifp, sizeof(struct LocalSource_ecall1)) )
+		goto done;
+	ip = (struct LocalSource_ecall1 *) ifp;
+
+	__builtin_ia32_lfence();
+
+
+	/* Call the trusted function. */
+	ip->retn = test_pipe(&ecall1);
+	retn = SGX_SUCCESS;
+
+
+ done:
+	memset(&ecall1, '\0', sizeof(struct LocalSource_ecall1));
+
+	return retn;
+}
+
+
 /* ECALL interface table. */
 SGX_EXTERNC const struct {
 	size_t nr_ecall;
@@ -78,7 +128,8 @@ SGX_EXTERNC const struct {
 } g_ecall_table = {
 	ECALL_NUMBER,
 	{
-		{(void*)(uintptr_t)sgx_verify_report, 0}
+		{(void*)(uintptr_t)sgx_verify_report, 0},
+		{(void *) sgx_test_pipe, 0}
 	}
 };
 
@@ -90,11 +141,12 @@ SGX_EXTERNC const struct {
 } g_dyn_entry_table = {
 	OCALL_NUMBER,
 	{
-		{0},
-		{0},
-		{0},
-		{0},
-		{0},
-		{0}
+		{0, 0},
+		{0, 0},
+		{0, 0},
+		{0, 0},
+		{0, 0},
+		{0, 0},
+		{0, 0}
 	}
 };

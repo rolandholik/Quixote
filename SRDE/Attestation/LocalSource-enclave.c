@@ -18,6 +18,7 @@
 
 #include <SRDE.h>
 #include <SRDEfusion.h>
+#include <SRDEpipe.h>
 
 #include <Report.h>
 
@@ -137,6 +138,37 @@ _Bool verify_report(unsigned int mode, struct SGX_targetinfo *target, \
 	WHACK(report);
 
 	WHACK(SharedKey);
+
+	return retn;
+}
+
+
+/**
+ * External ECALL 1.
+ *
+ * This method implements testing of an SRDEpipe connection to a
+ * target enclave.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		testing of the SRDEpipe succeeded.  A false value
+ *		indicates the test failed.  A true value indicates
+ *		the test was successful.
+ */
+
+_Bool test_pipe(struct LocalSource_ecall1 *ep)
+
+{
+	_Bool retn = false;
+
+	SRDEpipe pipe = NULL;
+
+	INIT(NAAAIM, SRDEpipe, pipe, ERR(goto done));
+
+	retn = true;
+
+
+ done:
+	WHACK(pipe);
 
 	return retn;
 }

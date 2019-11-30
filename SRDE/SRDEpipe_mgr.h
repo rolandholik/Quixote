@@ -1,5 +1,6 @@
 /** \file
- * This file contains interface definitions for the LocalTarget enclave.
+ * This file contains header definitions for the SRDEpipe enclave
+ * object manager.
  */
 
 /**************************************************************************
@@ -9,15 +10,4 @@
  * the source tree for copyright and licensing information.
  **************************************************************************/
 
-
-/* ECALL interface definitions. */
-struct LocalSource_ecall0_interface {
-	_Bool retn;
-	unsigned int mode;
-	struct SGX_targetinfo *target;
-	struct SGX_report *report;
-};
-
-struct LocalSource_ecall1 {
-	_Bool retn;
-};
+extern int SRDEpipe_mgr(struct SRDEpipe_ocall *);

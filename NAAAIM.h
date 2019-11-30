@@ -99,3 +99,4 @@
 #define NAAAIM_SRDEocall_OBJID		61
 #define NAAAIM_X509cert_OBJID		62
 #define NAAAIM_Prompt_OBJID		63
+#define NAAAIM_SRDEpipe_OBJID		64

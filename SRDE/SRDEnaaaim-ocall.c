@@ -31,6 +31,8 @@
 #include "SRDEocall.h"
 #include "SRDEquote.h"
 #include "SRDEquote_mgr.h"
+#include "SRDEpipe.h"
+#include "SRDEpipe_mgr.h"
 #include "SRDEnaaaim-ocall.h"
 
 
@@ -175,11 +177,12 @@ int SRDEnaaaim_ocall3(struct SRDEnaaaim_ocall3_interface *ifp)
 /**
  * Null terminated table of SRDEnaaaim ocall pointers.
  */
-const void *SRDEnaaaim_ocall_table[5] = {
+const void *SRDEnaaaim_ocall_table[6] = {
 	SRDEnaaaim_ocall0,
 	Duct_mgr,
 	SRDEquote_mgr,
 	SRDEnaaaim_ocall3,
+	SRDEpipe_mgr,
 	NULL
 };
 

@@ -35,6 +35,73 @@
 #include "LocalTarget-interface.h"
 
 
+/**
+ * Private function
+ *
+ * This function encapsulates the functionality needed to test
+ * SRDEpipe communications between the source and target enclave.
+ *
+ * \param token		A pointer to the null-terminated buffer
+ *			containing the launch token for the source
+ *			enclave.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		SRDEpipe testing succeeded.  A false value
+ *		indicates testing failed while a true value indicates
+ *		it was successful.
+ */
+
+_Bool test_pipe(const char *token)
+
+{
+	_Bool retn = false;
+
+	char *enclave = "LocalSource.signed.so";
+
+	int rc;
+
+	struct LocalSource_ecall1 ecall1;
+
+	struct OCALL_api *table;
+
+	SRDEenclave source = NULL;
+
+	SRDEocall ocall = NULL;
+
+
+	/* Initialize the source enclave. */
+	INIT(NAAAIM, SRDEenclave, source, ERR(goto done));
+	if ( !source->setup(source, enclave, token, true) )
+		ERR(goto done);
+
+
+	/* Setup OCALL table. */
+	INIT(NAAAIM, SRDEocall, ocall, ERR(goto done));
+
+	ocall->add_table(ocall, SRDEfusion_ocall_table);
+	ocall->add_table(ocall, SRDEnaaaim_ocall_table);
+
+	if ( !ocall->get_table(ocall, &table) )
+		ERR(goto done);
+
+
+	/* Invoke the testing ECALL. */
+	if ( !source->boot_slot(source, 1, table, &ecall1, &rc) ) {
+		fprintf(stderr, "Enclave return error: %d\n", rc);
+		ERR(goto done);
+	}
+	if ( !ecall1.retn )
+		ERR(goto done);
+
+
+ done:
+	WHACK(source);
+	WHACK(ocall);
+
+	return retn;
+}
+
+
 /* Program entry point. */
 extern int main(int argc, char *argv[])
 
@@ -49,6 +116,11 @@ extern int main(int argc, char *argv[])
 	int opt,
 	    rc,
 	    retn = 1;
+
+	enum {
+		standard,
+		pipe
+	} mode = standard;
 
 	struct OCALL_api *table;
 
@@ -71,8 +143,12 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "dn:s:t:")) != EOF )
+	while ( (opt = getopt(argc, argv, "Pdn:s:t:")) != EOF )
 		switch ( opt ) {
+			case 'P':
+				mode = pipe;
+				break;
+
 			case 'd':
 				debug = true;
 				break;
@@ -83,6 +159,13 @@ extern int main(int argc, char *argv[])
 				target_token = optarg;
 				break;
 		}
+
+
+	/* Run in pipe test mode. */
+	if ( mode == pipe ) {
+		test_pipe(source_token);
+		goto done;
+	}
 
 
 	/* Load the target enclave. */

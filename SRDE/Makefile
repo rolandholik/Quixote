@@ -14,7 +14,7 @@ INSTALLSCRIPT = provision-epid provision-tokens provision-verifier
 INSTINCLUDE   = PCEenclave.h PVEenclave.h QEenclave.h SRDEaesgcm.h SRDEcmac.h \
 	SRDEecdsa.h SRDEepid.h SRDEloader.h SRDEmessage.h SRDEmetadata.h      \
 	SRDEquote.h SRDErsa.h SRDEsigstruct.h SRDE.h SRDEenclave.h	      \
-	SRDEocall.h SRDEfusion-ocall.h SRDEnaaaim-ocall.h
+	SRDEocall.h SRDEfusion-ocall.h SRDEnaaaim-ocall.h SRDEpipe.h
 
 SUBDIRS	    = SRDElibs Attestation ISOidentity Sample
 DEV_SUBDIRS = SRDElibs Sample
@@ -23,7 +23,7 @@ CSRC = SRDEmetadata.c SRDEloader.c SRDEenclave.c SRDEsigstruct.c PVEenclave.c \
 	SRDEmessage.c SRDEecdsa.c PCEenclave.c SRDEcmac.c SRDEaesgcm.c	      \
 	SRDErsa.c  QEenclave.c SRDEepid.c SRDEquote.c SRDEquote_mgr.c	      \
 	SRDEocall.c SRDEfusion-ocall.c SRDEnaaaim-ocall.c srde-exception.c    \
-	srde-ocall.c
+	srde-ocall.c SRDEpipe.c SRDEpipe_mgr.c
 
 ASRC = srde-boot.s
 
