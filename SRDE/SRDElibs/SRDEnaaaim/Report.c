@@ -121,13 +121,14 @@ static _Bool generate_report(CO(Report, this), struct SGX_targetinfo *tp, \
 
 
 	/* Populate the report_data field if data is supplied. */
-	if ( data == NULL )
-		memset(report_data, '\0', sizeof(report_data));
-	else {
-		if ( (data->size(data) == 0) || (data->size(data) > 64) )
+	memset(report_data, '\0', sizeof(report_data));
+
+	if ( data != NULL ) {
+		if ( (data->size(data) == 0) || \
+		     (data->size(data) > sizeof(report_data)) )
 			ERR(goto done);
 
-		memcpy(&report_data, data->get(data), sizeof(report_data));
+		memcpy(&report_data, data->get(data), data->size(data));
 	}
 
 
