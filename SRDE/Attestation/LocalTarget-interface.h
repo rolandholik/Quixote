@@ -11,8 +11,8 @@
 
 
 /* Number of enclave interfaces. */
-#define ECALL_NUMBER 2
-#define OCALL_NUMBER 6
+#define ECALL_NUMBER 3
+#define OCALL_NUMBER SRDENAAAIM_MAX_OCALL+1
 
 
 /* ECALL interface definitions. */

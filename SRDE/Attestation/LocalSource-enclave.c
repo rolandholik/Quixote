@@ -168,6 +168,9 @@ _Bool test_pipe(struct LocalSource_ecall1 *ep)
 			  true) )
 		ERR(goto done);
 
+	if ( !pipe->connect(pipe) )
+		ERR(goto done);
+
 	retn = true;
 
 

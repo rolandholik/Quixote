@@ -99,13 +99,45 @@ static void srdepipe_setup(struct SRDEpipe_ocall *ocp)
 {
 	_Bool retn = false;
 
-	unsigned int instance;
-
 	SRDEpipe pipe = SRDE_pipes[ocp->instance];
 
 
 	if ( !pipe->setup(pipe, ocp->enclave, ocp->slot, ocp->token, \
 			  ocp->debug) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	ocp->retn = retn;
+
+	return;
+}
+
+
+/**
+ * Internal private function.
+ *
+ * This function implements invocation of the ->bind method of the
+ * SRDEpipe object on behalf of a ->connect method call from an
+ * SRDEpipe object running in enclave context.
+ *
+ * \param ocp	A pointer to the structure which is marshalling the
+ *		data into and out of the OCALL.
+ *
+ * \return	No return value is defined.
+ */
+
+static void srdepipe_bind(struct SRDEpipe_ocall *ocp)
+
+{
+	_Bool retn = false;
+
+	SRDEpipe pipe = SRDE_pipes[ocp->instance];
+
+
+	if ( !pipe->bind(pipe, &ocp->target, &ocp->report) )
 		ERR(goto done);
 
 	retn = true;
@@ -186,6 +218,9 @@ int SRDEpipe_mgr(struct SRDEpipe_ocall *ocp)
 
 		case SRDEpipe_setup:
 			srdepipe_setup(ocp);
+			break;
+		case SRDEpipe_connect:
+			srdepipe_bind(ocp);
 			break;
 		case SRDEpipe_whack:
 			srdepipe_whack(ocp);

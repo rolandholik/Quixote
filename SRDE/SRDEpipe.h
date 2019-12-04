@@ -22,6 +22,7 @@ enum SRDEpipe_ocalls {
 	SRDEpipe_init_object,
 
 	SRDEpipe_setup,
+	SRDEpipe_connect,
 	SRDEpipe_whack,
 
 	SRDEpipe_END
@@ -42,6 +43,21 @@ struct SRDEpipe_ocall {
 	int slot;
 	char enclave[128];
 	char token[128];
+
+	struct SGX_targetinfo target;
+	struct SGX_report report;
+};
+
+
+/**
+ * Structure which marshalls the data for the ECALL into the target
+ * enclave.
+ */
+struct SRDEpipe_ecall {
+	_Bool retn;
+
+	struct SGX_targetinfo target;
+	struct SGX_report report;
 };
 
 
@@ -58,7 +74,14 @@ struct NAAAIM_SRDEpipe
 	/* External methods. */
 	_Bool (*setup)(const SRDEpipe, const char *, const int slot, \
 		       const char *, const _Bool);
+	_Bool (*bind)(const SRDEpipe, struct SGX_targetinfo *, \
+		   struct SGX_report *);
 
+	_Bool (*connect)(const SRDEpipe);
+	_Bool (*accept)(const SRDEpipe, struct SGX_targetinfo *, \
+			struct SGX_report *);
+
+	_Bool (*connected)(const SRDEpipe);
 	void (*whack)(const SRDEpipe);
 
 	/* Private state. */

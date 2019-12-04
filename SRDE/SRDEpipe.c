@@ -17,14 +17,19 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 
 #include <Origin.h>
 #include <HurdLib.h>
+#include <Buffer.h>
 
 #include "NAAAIM.h"
 #include "SRDE.h"
 #include "SRDEenclave.h"
+#include "SRDEocall.h"
 #include "SRDEpipe.h"
+#include "SRDEfusion-ocall.h"
+#include "SRDEnaaaim-ocall.h"
 
 
 /* Object state extraction macro. */
@@ -61,6 +66,11 @@ struct NAAAIM_SRDEpipe_State
 
 	/* Enclave to be managed. */
 	SRDEenclave enclave;
+
+	/* Ocall table for target enclave. */
+	SRDEocall ocall;
+
+	struct OCALL_api *table;
 };
 
 
@@ -81,6 +91,11 @@ static void _init_state(const SRDEpipe_State const S)
 	S->objid = NAAAIM_SRDEpipe_OBJID;
 
 	S->poisoned = false;
+
+	S->enclave = NULL;
+
+	S->ocall = NULL;
+	S->table = NULL;
 
 	return;
 }
@@ -135,6 +150,16 @@ static _Bool setup(CO(SRDEpipe, this), CO(char *, name), const int slot, \
 	if ( !S->enclave->setup(S->enclave, name, token, debug) )
 		ERR(goto done);
 
+
+	/* Setup the OCALL table. */
+	INIT(NAAAIM, SRDEocall, S->ocall, ERR(goto done));
+
+	S->ocall->add_table(S->ocall, SRDEfusion_ocall_table);
+	S->ocall->add_table(S->ocall, SRDEnaaaim_ocall_table);
+
+	if ( !S->ocall->get_table(S->ocall, &S->table) )
+		ERR(goto done);
+
 	retn = true;
 
 
@@ -142,8 +167,137 @@ static _Bool setup(CO(SRDEpipe, this), CO(char *, name), const int slot, \
 	if ( !retn )
 		S->poisoned = true;
 
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements establishing the connection with the
+ * communications endpoint via ECALL's from standard userspace.  This
+ * method is used by the ->connect method in enclave context to
+ * mediate the exchange of attesttsion information
+ *
+ * \param this		A pointer to the object which is to implement
+ *			the connection.
+ *
+ * \param target	A pointer to the structure containing target
+ *			information that an attestation report is to
+ *			be generated against.
+ *
+ * \param report	A pointer to the structuring containing a local
+ *			attestation report.
+ *
+ * \return		A false value is returned if an error is
+ *			encountered in setting up the connection.  A
+ *			true value is returned to indicate that the
+ *			connection has been established and the
+ *			security context is available for use.
+ */
+
+static _Bool bind(CO(SRDEpipe, this), struct SGX_targetinfo *target, \
+		  struct SGX_report *report)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	int rc;
+
+	struct SRDEpipe_ecall ecall;
+
+
+	/* Call the enclave slot to get target/report. */
+	memset(&ecall, '\0', sizeof(struct SRDEpipe_ecall));
+	ecall.target = *target;
+	ecall.report = *report;
+
+	if ( !S->enclave->boot_slot(S->enclave, S->slot, S->table, &ecall, \
+				    &rc) )
+		ERR(goto done);
+
+	*target = ecall.target;
+	*report = ecall.report;
+	retn	= true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
 
 	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method is an API placeholder for the implementation of the
+ * same method in enclave context that drives the creation of the
+ * security context between the two endpoints.
+ *
+ * \param this	A pointer to the object which is to implement the
+ *		connection.
+ *
+ * \return	A boolean value is universally returned in order to
+ *		indicate that this method should not be invoked from
+ *		standard userspace.
+ */
+
+static _Bool connect(CO(SRDEpipe, this))
+
+{
+	return false;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method is an API placeholder for the implementation of the
+ * same method in enclave context that accepts a connection from
+ * an initiating enclave endpoint.
+ *
+ * \param this		A pointer to the object which is to implement the
+ *			connection.
+ *
+ * \param target	A pointer to an enclave target information structure.
+ *			This parameter is unused.
+ *
+ * \param report	A pointer to an enclave report information structure.
+ *			This parameter is unused.
+ *
+ * \return	A boolean value is universally returned in order to
+ *		indicate that this method should not be invoked from
+ *		standard userspace.
+ */
+
+static _Bool accept(CO(SRDEpipe, this), struct SGX_targetinfo *target, \
+		    struct SGX_report *report)
+
+{
+	return false;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method is a non-functional placeholder method for the
+ * corresponding method in the trusted implementation of the object.
+ *
+ * \param this	A pointer to the object whose connection state is to
+ *		be interrogated.
+ *
+ * \return	A false value is universally returned.
+ */
+
+static _Bool connected(CO(SRDEpipe, this))
+
+{
+	return false;
 }
 
 
@@ -162,6 +316,7 @@ static void whack(CO(SRDEpipe, this))
 
 
 	WHACK(S->enclave);
+	WHACK(S->ocall);
 
 	S->root->whack(S->root, this, S);
 	return;
@@ -206,8 +361,13 @@ extern SRDEpipe NAAAIM_SRDEpipe_Init(void)
 
 	/* Method initialization. */
 	this->setup = setup;
+	this->bind    = bind;
 
-	this->whack = whack;
+	this->connect = connect;
+	this->accept  = accept;
+
+	this->connected = connected;
+	this->whack	= whack;
 
 	return this;
 }

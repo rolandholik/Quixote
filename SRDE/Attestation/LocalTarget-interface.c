@@ -16,7 +16,11 @@
 
 #include <HurdLib.h>
 
-#include "../SRDE.h"
+#include <SRDE.h>
+#include <SRDEfusion-ocall.h>
+#include <SRDEnaaaim-ocall.h>
+#include <SRDEpipe.h>
+
 #include "LocalTarget-interface.h"
 
 
@@ -35,6 +39,7 @@
 extern _Bool get_report(unsigned int, struct SGX_targetinfo *, \
 			struct SGX_report *);
 extern _Bool test_attestation(struct LocalTarget_ecall1 *);
+extern _Bool test_pipe(struct SRDEpipe_ecall *);
 
 
 static _Bool SGXidf_untrusted_region(void *ptr, size_t size)
@@ -172,6 +177,41 @@ static sgx_status_t sgx_test_attestation(void *ifp)
 }
 
 
+static sgx_status_t sgx_test_pipe(void *ifp)
+
+{
+	sgx_status_t status = SGX_ERROR_INVALID_PARAMETER;
+
+	struct SRDEpipe_ecall *ip,
+			      *ep,
+			      ecall2;
+
+
+	/* Verify interface structure pointer. */
+	if ( !SGXidf_untrusted_region(ifp, sizeof(struct SRDEpipe_ecall)) )
+		goto done;
+	ip = (struct SRDEpipe_ecall *) ifp;
+	ep = &ecall2;
+	*ep = *ip;
+
+	__builtin_ia32_lfence();
+
+
+	/* Call trusted function. */
+	ip->retn = test_pipe(ep);
+	if ( ip->retn ) {
+		status = SGX_SUCCESS;
+		*ip = *ep;
+	}
+
+
+ done:
+	memset(ep, '\0', sizeof(struct SRDEpipe_ecall));
+
+	return status;
+}
+
+
 /* ECALL interface table. */
 SGX_EXTERNC const struct {
 	size_t nr_ecall;
@@ -180,7 +220,8 @@ SGX_EXTERNC const struct {
 	ECALL_NUMBER,
 	{
 		{(void*)(uintptr_t)sgx_get_report, 0},
-		{(void*)(uintptr_t)sgx_test_attestation, 0}
+		{(void*)(uintptr_t)sgx_test_attestation, 0},
+		{(void *) sgx_test_pipe, 0}
 	}
 };
 
@@ -192,11 +233,12 @@ SGX_EXTERNC const struct {
 } g_dyn_entry_table = {
 	OCALL_NUMBER,
 	{
-		{0, 0},
-		{0, 0},
-		{0, 0},
-		{0, 0},
-		{0, 0},
-		{0, 0}
+		{0, 0, 0},
+		{0, 0, 0},
+		{0, 0, 0},
+		{0, 0, 0},
+		{0, 0, 0},
+		{0, 0, 0},
+		{0, 0, 0}
 	}
 };

@@ -22,7 +22,10 @@
 #include <Curve25519.h>
 #include <SRDEquote.h>
 #include <Report.h>
+#include <SRDEpipe.h>
 
+#include <SRDEfusion-ocall.h>
+#include <SRDEnaaaim-ocall.h>
 #include "LocalTarget-interface.h"
 
 
@@ -263,4 +266,50 @@ _Bool test_attestation(struct LocalTarget_ecall1 *ip)
 	WHACK(quoter);
 
 	return true;
+}
+
+
+/**
+ * External ECALL 2.
+ *
+ * This method implements testing of an SRDEpipe connection to a
+ * target enclave.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		testing of the SRDEpipe succeeded.  A false value
+ *		indicates the test failed.  A true value indicates
+ *		the test was successful.
+ */
+
+_Bool test_pipe(struct SRDEpipe_ecall *ep)
+
+{
+	_Bool retn = false;
+
+	static SRDEpipe pipe = NULL;
+
+
+	if ( pipe == NULL ) {
+		INIT(NAAAIM, SRDEpipe, pipe, ERR(goto done));
+
+		if ( !pipe->accept(pipe, &ep->target, &ep->report) )
+			ERR(goto done);
+
+		retn = true;
+		goto done;
+	}
+
+	if ( !pipe->connected(pipe) ) {
+		if ( !pipe->accept(pipe, &ep->target, &ep->report) )
+			ERR(goto done);
+
+		retn = true;
+		goto done;
+	}
+
+	retn = true;
+
+
+ done:
+	return retn;
 }

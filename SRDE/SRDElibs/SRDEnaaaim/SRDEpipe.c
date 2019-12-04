@@ -23,10 +23,13 @@
 #include <Buffer.h>
 #include <String.h>
 
+#include <SRDE.h>
 #include <SRDEfusion-ocall.h>
 #include <SRDEnaaaim-ocall.h>
 
 #include "NAAAIM.h"
+#include "Curve25519.h"
+#include "Report.h"
 #include "SRDEpipe.h"
 
 
@@ -83,6 +86,22 @@ struct NAAAIM_SRDEpipe_State
 
 	/* Object status. */
 	_Bool poisoned;
+
+	/* Connect status. */
+	enum {
+		SRDEpipe_state_init,
+		SRDEpipe_state_wait,
+		SRDEpipe_state_connected
+	} state;
+
+	/* Elliptic curve object. */
+	Curve25519 dhkey;
+
+	/* Initialization vector. */
+	Buffer iv;
+
+	/* Shared key. */
+	Buffer key;
 };
 
 
@@ -170,7 +189,13 @@ static void _init_state(CO(SRDEpipe_State, S)) {
 	S->objid = NAAAIM_Duct_OBJID;
 
 
-	S->poisoned	= false;
+	S->poisoned = false;
+	S->state    = SRDEpipe_state_init;
+
+	S->dhkey = NULL;
+
+	S->iv  = NULL;
+	S->key = NULL;
 
 	return;
 }
@@ -220,6 +245,7 @@ static _Bool setup(CO(SRDEpipe, this), CO(char *, name), const int slot, \
 	memset(&ocall, '\0', sizeof(struct SRDEpipe_ocall));
 
 	ocall.debug = debug;
+	ocall.slot  = slot;
 
 	if ( (strlen(name) + 1) > sizeof(ocall.enclave) )
 		ERR(goto done);
@@ -248,6 +274,272 @@ static _Bool setup(CO(SRDEpipe, this), CO(char *, name), const int slot, \
 /**
  * External public method.
  *
+ * This method is an API placeholder for the method that is implemented
+ * in standard userspace to issue the ECALL's needed to setup the
+ * security context between two enclaves that are to implement a
+ * communications conduit.
+ *
+ * \param this		A pointer to the object which is to implement
+ *			the connection.
+ *
+ * \param target	A pointer to the structure containing target
+ *			information that an attestation report is to
+ *			be generated against.
+ *
+ * \param report	A pointer to the structuring containing a local
+ *			attestation report.
+ *
+ * \return		A false value is universally returned in order
+ *			to prevent this method from being invoked from
+ *			enclave context.
+ */
+
+static _Bool bind(CO(SRDEpipe, this), struct SGX_targetinfo *target, \
+		  struct SGX_report *report)
+
+{
+	return false;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method drives the creation of a security context with another
+ * enclave that has been previously created and initialized with the
+ * ->setup method.
+ *
+ * \param this	A pointer to the object which is to implement the
+ *		connection.
+ *
+ * \return	A boolean value is returned to indication the status
+ *		of the connection setup.  A false value indicates the
+ *		establishment of the communications context has been
+ *		failed and the object is poisoned from subsequent use.
+ *		A true value indicates that a communications context
+ *		has been established between the two enclaves.
+ */
+
+static _Bool connect(CO(SRDEpipe, this))
+
+{
+	STATE(S);
+
+	_Bool status,
+	      retn = false;
+
+	struct SRDEpipe_ocall ocall;
+
+	Buffer bufr = NULL;
+
+	Report rpt = NULL;
+
+
+	/* Setup OCALL structure. */
+	memset(&ocall, '\0', sizeof(struct SRDEpipe_ocall));
+
+	ocall.ocall    = SRDEpipe_connect;
+	ocall.instance = S->instance;
+
+
+	/* Generate target information for remote endpoint. */
+	INIT(NAAAIM, Report, rpt, ERR(goto done));
+	if ( !rpt->get_targetinfo(rpt, &ocall.target) )
+		ERR(goto done);
+
+
+	/* Invoke OCALL to get report from remote endpoint. */
+	if ( SRDEpipe_ocall(&ocall) != 0 )
+		ERR(goto done);
+
+
+	/* Validate remote report and generate report for endpoint. */
+	if ( !rpt->validate_report(rpt, &ocall.report, &status) )
+		ERR(goto done);
+	if ( !status )
+		ERR(goto done);
+
+	fputs("Validated target endpoint.\n", stdout);
+
+
+	/* Generate shared key and counter-report. */
+	INIT(NAAAIM, Curve25519, S->dhkey, ERR(goto done));
+	if ( !S->dhkey->generate(S->dhkey) )
+		ERR(goto done);
+
+	INIT(HurdLib, Buffer, S->key, ERR(goto done));
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+
+	if ( !bufr->add(bufr, ocall.report.body.reportdata, 32) )
+		ERR(goto done);
+	if ( !S->dhkey->compute(S->dhkey, bufr, S->key) )
+		ERR(goto done);
+
+	fputs("\nShared key:\n", stdout);
+	S->key->print(S->key);
+
+	if ( !rpt->generate_report(rpt, &ocall.target,		   \
+				   S->dhkey->get_public(S->dhkey), \
+				   &ocall.report) )
+			ERR(goto done);
+
+
+	/* Invoke OCALL to get report from remote endpoint. */
+	if ( SRDEpipe_ocall(&ocall) != 0 )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	WHACK(bufr);
+	WHACK(rpt);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method handles the client side of creating a security context
+ * from an enclave that is invoking the ->connect method.
+ *
+ * \param this		A pointer to the object which is to implement
+ *			acceptance of a connection.
+ *
+ * \param target	A pointer to a target structure that contains
+ *			a target that a report is to be generated
+ *			against.  This structure will be populated
+ *			with a report for the executing enclave upon
+ *			initial connection acceptance.
+ *
+ * \param report	A pointer to a report structure that will
+ *			be populated with a report of the executing
+ *			enclave or alternately the report from the
+ *			enclave initiating the connection.
+ *
+ * \return	A boolean value is returned to indication the status
+ *		of the connection setup.  A false value indicates the
+ *		establishment of the communications context has failed
+ *		and the object is poisoned from subsequent use. A true
+ *		value indicates that a communications context has been
+ *		established between the two enclaves.
+ */
+
+static _Bool accept(CO(SRDEpipe, this), struct SGX_targetinfo *target, \
+		    struct SGX_report *report)
+
+{
+	STATE(S);
+
+	_Bool status,
+	      retn = false;
+
+	Buffer bufr = NULL;
+
+	Report rpt = NULL;
+
+
+	INIT(NAAAIM, Report, rpt, ERR(goto done));
+
+	/* Initial endpoint. */
+	if ( S->dhkey == NULL ) {
+		INIT(NAAAIM, Curve25519, S->dhkey, ERR(goto done));
+		if ( !S->dhkey->generate(S->dhkey) )
+			ERR(goto done);
+
+		if ( !rpt->generate_report(rpt, target,			   \
+					   S->dhkey->get_public(S->dhkey), \
+					   report) )
+			ERR(goto done);
+		if ( !rpt->get_targetinfo(rpt, target) )
+			ERR(goto done);
+
+		retn	 = true;
+		S->state = SRDEpipe_state_wait;
+		goto done;
+	}
+
+
+	/* Validate counter party report. */
+	if ( S->state != SRDEpipe_state_wait )
+		ERR(goto done);
+
+	if ( !rpt->validate_report(rpt, report, &status) )
+		ERR(goto done);
+
+	if ( status )
+		fputs("\nSource report verified.\n", stdout);
+	else {
+		fputs("\nSource report not verified.\n", stdout);
+		ERR(goto done);
+	}
+
+
+	/* Generate the shared key. */
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	if ( !bufr->add(bufr, report->body.reportdata, 32) )
+		ERR(goto done);
+
+	INIT(HurdLib, Buffer, S->key, ERR(goto done));
+	if ( !S->dhkey->compute(S->dhkey, bufr, S->key) )
+		ERR(goto done);
+
+	fputs("\nShared key:\n", stdout);
+	S->key->print(S->key);
+
+	S->state = SRDEpipe_state_connected;
+	retn     = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	WHACK(rpt);
+	WHACK(bufr);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method returns the current connection state of the pipe.  It
+ * is designed to provide a method for the remote endpoint to determine
+ * if a second ->accept call is to be made to complete the connection.
+ *
+ * \param this	A pointer to the object whose connection state is to
+ *		be interrogated.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the object is connected and has a valid security context.
+ *		A false value indicates the object is not connected while
+ *		a true value means a security context has been established
+ *		and the pipe is available for communications.
+ */
+
+static _Bool connected(CO(SRDEpipe, this))
+
+{
+	STATE(S);
+
+
+	if ( S->state == SRDEpipe_state_connected )
+		return true;
+	else
+		return false;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a destructor for a Duct object.
  *
  * \param this	A pointer to the object which is to be destroyed.
@@ -269,6 +561,11 @@ static void whack(CO(SRDEpipe, this))
 
 
 	/* Destroy resources. */
+	WHACK(S->dhkey);
+
+	WHACK(S->iv);
+	WHACK(S->key);
+
 	S->root->whack(S->root, this, S);
 	return;
 }
@@ -321,8 +618,13 @@ extern SRDEpipe NAAAIM_SRDEpipe_Init(void)
 
 	/* Method initialization. */
 	this->setup = setup;
+	this->bind    = bind;
 
-	this->whack = whack;
+	this->connect = connect;
+	this->accept  = accept;
+
+	this->connected = connected;
+	this->whack	= whack;
 
 	return this;
 
