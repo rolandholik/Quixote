@@ -28,6 +28,7 @@
 #include <SRDEnaaaim-ocall.h>
 
 #include "NAAAIM.h"
+#include "SHA256.h"
 #include "Curve25519.h"
 #include "Report.h"
 #include "SRDEpipe.h"
@@ -98,7 +99,7 @@ struct NAAAIM_SRDEpipe_State
 	Curve25519 dhkey;
 
 	/* Initialization vector. */
-	Buffer iv;
+	Sha256 iv;
 
 	/* Shared key. */
 	Buffer key;
@@ -330,7 +331,8 @@ static _Bool connect(CO(SRDEpipe, this))
 
 	struct SRDEpipe_ocall ocall;
 
-	Buffer bufr = NULL;
+	Buffer b,
+	       bufr = NULL;
 
 	Report rpt = NULL;
 
@@ -375,14 +377,29 @@ static _Bool connect(CO(SRDEpipe, this))
 	if ( !S->dhkey->compute(S->dhkey, bufr, S->key) )
 		ERR(goto done);
 
-	fputs("\nShared key:\n", stdout);
-	S->key->print(S->key);
-
 	if ( !rpt->generate_report(rpt, &ocall.target,		   \
 				   S->dhkey->get_public(S->dhkey), \
 				   &ocall.report) )
 			ERR(goto done);
 
+
+	/* Generate the encryption key and initialization vector seed. */
+	INIT(NAAAIM, Sha256, S->iv, ERR(goto done));
+	S->iv->add(S->iv, S->key);
+	if ( !S->iv->compute(S->iv) )
+		ERR(goto done);
+	b = S->iv->get_Buffer(S->iv);
+
+	S->key->reset(S->key);
+	if ( !S->key->add_Buffer(S->key, b) )
+		ERR(goto done);
+
+	fputs("\nShared key:\n", stdout);
+	S->key->print(S->key);
+
+	S->iv->rehash(S->iv, 100);
+	fputs("\nIV: \n", stdout);
+	b->print(b);
 
 	/* Invoke OCALL to get report from remote endpoint. */
 	if ( SRDEpipe_ocall(&ocall) != 0 )
@@ -439,7 +456,8 @@ static _Bool accept(CO(SRDEpipe, this), struct SGX_targetinfo *target, \
 	_Bool status,
 	      retn = false;
 
-	Buffer bufr = NULL;
+	Buffer b,
+	       bufr = NULL;
 
 	Report rpt = NULL;
 
@@ -456,6 +474,7 @@ static _Bool accept(CO(SRDEpipe, this), struct SGX_targetinfo *target, \
 					   S->dhkey->get_public(S->dhkey), \
 					   report) )
 			ERR(goto done);
+
 		if ( !rpt->get_targetinfo(rpt, target) )
 			ERR(goto done);
 
@@ -489,8 +508,24 @@ static _Bool accept(CO(SRDEpipe, this), struct SGX_targetinfo *target, \
 	if ( !S->dhkey->compute(S->dhkey, bufr, S->key) )
 		ERR(goto done);
 
+
+	/* Generate the encryption key and initialization vector seed. */
+	INIT(NAAAIM, Sha256, S->iv, ERR(goto done));
+	S->iv->add(S->iv, S->key);
+	if ( !S->iv->compute(S->iv) )
+		ERR(goto done);
+	b = S->iv->get_Buffer(S->iv);
+
+	S->key->reset(S->key);
+	if ( !S->key->add_Buffer(S->key, b) )
+		ERR(goto done);
+
 	fputs("\nShared key:\n", stdout);
 	S->key->print(S->key);
+
+	S->iv->rehash(S->iv, 100);
+	fputs("\nIV: \n", stdout);
+	b->print(b);
 
 	S->state = SRDEpipe_state_connected;
 	retn     = true;
