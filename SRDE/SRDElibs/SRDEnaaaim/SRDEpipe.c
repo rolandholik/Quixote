@@ -29,6 +29,7 @@
 
 #include "NAAAIM.h"
 #include "SHA256.h"
+#include "SHA256_hmac.h"
 #include "Curve25519.h"
 #include "Report.h"
 #include "SRDEpipe.h"
@@ -94,6 +95,9 @@ struct NAAAIM_SRDEpipe_State
 		SRDEpipe_state_wait,
 		SRDEpipe_state_connected
 	} state;
+
+	/* Initiator target definition for connection acknowledgement. */
+	struct SGX_targetinfo target;
 
 	/* Elliptic curve object. */
 	Curve25519 dhkey;
@@ -336,6 +340,8 @@ static _Bool connect(CO(SRDEpipe, this))
 
 	Report rpt = NULL;
 
+	SHA256_hmac hmac = NULL;
+
 
 	/* Setup OCALL structure. */
 	memset(&ocall, '\0', sizeof(struct SRDEpipe_ocall));
@@ -401,10 +407,39 @@ static _Bool connect(CO(SRDEpipe, this))
 	fputs("\nIV: \n", stdout);
 	b->print(b);
 
-	/* Invoke OCALL to get report from remote endpoint. */
+
+	/* Invoke OCALL to send report to remote endpoint. */
 	if ( SRDEpipe_ocall(&ocall) != 0 )
 		ERR(goto done);
 
+
+	/* Verify acknowledgement. */
+	if ( (hmac = NAAAIM_SHA256_hmac_Init(S->key)) == NULL )
+		ERR(goto done);
+	hmac->add_Buffer(hmac, S->iv->get_Buffer(S->iv));
+	if ( !hmac->compute(hmac) )
+		ERR(goto done);
+	b = hmac->get_Buffer(hmac);
+
+	if ( !rpt->validate_report(rpt, &ocall.report, &status) )
+		ERR(goto done);
+	if ( !status )
+		ERR(goto done);
+
+	bufr->reset(bufr);
+	if ( !bufr->add(bufr, ocall.report.body.reportdata, 32) )
+		ERR(goto done);
+
+	fputs("\nComputed acknowledgement:\n", stdout);
+	b->print(b);
+	fputs("Report acknowledgement:\n", stdout);
+	bufr->print(bufr);
+
+	if ( !bufr->equal(bufr, b) )
+		ERR(goto done);
+	fputs("Acknowledgement verified.\n", stdout);
+
+	S->iv->rehash(S->iv, 1);
 	retn = true;
 
 
@@ -414,6 +449,7 @@ static _Bool connect(CO(SRDEpipe, this))
 
 	WHACK(bufr);
 	WHACK(rpt);
+	WHACK(hmac);
 
 	return retn;
 }
@@ -461,6 +497,8 @@ static _Bool accept(CO(SRDEpipe, this), struct SGX_targetinfo *target, \
 
 	Report rpt = NULL;
 
+	SHA256_hmac hmac = NULL;
+
 
 	INIT(NAAAIM, Report, rpt, ERR(goto done));
 
@@ -475,6 +513,7 @@ static _Bool accept(CO(SRDEpipe, this), struct SGX_targetinfo *target, \
 					   report) )
 			ERR(goto done);
 
+		S->target = *target;
 		if ( !rpt->get_targetinfo(rpt, target) )
 			ERR(goto done);
 
@@ -527,6 +566,19 @@ static _Bool accept(CO(SRDEpipe, this), struct SGX_targetinfo *target, \
 	fputs("\nIV: \n", stdout);
 	b->print(b);
 
+
+	/* Generate acknowledgement report. */
+	if ( (hmac = NAAAIM_SHA256_hmac_Init(S->key)) == NULL )
+		ERR(goto done);
+	hmac->add_Buffer(hmac, S->iv->get_Buffer(S->iv));
+	if ( !hmac->compute(hmac) )
+		ERR(goto done);
+
+	if ( !rpt->generate_report(rpt, &S->target, hmac->get_Buffer(hmac), \
+				   report) )
+		ERR(goto done);
+
+	S->iv->rehash(S->iv, 1);
 	S->state = SRDEpipe_state_connected;
 	retn     = true;
 
@@ -537,6 +589,7 @@ static _Bool accept(CO(SRDEpipe, this), struct SGX_targetinfo *target, \
 
 	WHACK(rpt);
 	WHACK(bufr);
+	WHACK(hmac);
 
 	return retn;
 }
