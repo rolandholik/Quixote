@@ -276,9 +276,16 @@ static _Bool setup(CO(SRDEpipe, this), CO(char *, name), const int slot, \
 	struct SRDEpipe_ocall ocall;
 
 
+	/* Initialize the untrusted object. */
+	memset(&ocall, '\0', sizeof(struct SRDEpipe_ocall));
+	ocall.ocall = SRDEpipe_init_object;
+	if ( SRDEpipe_ocall(&ocall) != 0 )
+		ERR(goto done);
+	this->state->instance = ocall.instance;
+
+
 	/* Setup OCALL structure. */
 	memset(&ocall, '\0', sizeof(struct SRDEpipe_ocall));
-
 	ocall.debug = debug;
 	ocall.slot  = slot;
 
@@ -375,7 +382,6 @@ static _Bool connect(CO(SRDEpipe, this))
 
 	/* Setup OCALL structure. */
 	memset(&ocall, '\0', sizeof(struct SRDEpipe_ocall));
-
 	ocall.ocall    = SRDEpipe_connect;
 	ocall.instance = S->instance;
 
@@ -1229,8 +1235,6 @@ extern SRDEpipe NAAAIM_SRDEpipe_Init(void)
 
 	struct HurdLib_Origin_Retn retn;
 
-	struct SRDEpipe_ocall ocall;
-
 
 	/* Get the root object. */
 	root = HurdLib_Origin_Init();
@@ -1249,13 +1253,6 @@ extern SRDEpipe NAAAIM_SRDEpipe_Init(void)
 	/* Initialize object state. */
 	_init_state(this->state);
 
-	/* Initialize the untrusted object. */
-	memset(&ocall, '\0', sizeof(struct SRDEpipe_ocall));
-	ocall.ocall = SRDEpipe_init_object;
-	if ( SRDEpipe_ocall(&ocall) != 0 )
-		goto err;
-	this->state->instance = ocall.instance;
-
 	/* Method initialization. */
 	this->setup = setup;
 	this->bind    = bind;
@@ -1271,9 +1268,4 @@ extern SRDEpipe NAAAIM_SRDEpipe_Init(void)
 	this->whack	= whack;
 
 	return this;
-
-
- err:
-	root->whack(root, this, this->state);
-	return NULL;
 }
