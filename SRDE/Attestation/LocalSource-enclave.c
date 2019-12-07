@@ -160,6 +160,10 @@ _Bool test_pipe(struct LocalSource_ecall1 *ep)
 {
 	_Bool retn = false;
 
+	char *msg = "This is a message\n";
+
+	Buffer bufr = NULL;
+
 	SRDEpipe pipe = NULL;
 
 
@@ -171,11 +175,19 @@ _Bool test_pipe(struct LocalSource_ecall1 *ep)
 	if ( !pipe->connect(pipe) )
 		ERR(goto done);
 
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	if ( !bufr->add(bufr, (void *) msg, strlen(msg) + 1) )
+		ERR(goto done);
+
+	if ( !pipe->send_packet(pipe, SRDEpipe_data, bufr) )
+		ERR(goto done);
+
 	retn = true;
 
 
  done:
 	WHACK(pipe);
+	WHACK(bufr);
 
 	return retn;
 }

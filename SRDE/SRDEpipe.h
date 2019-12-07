@@ -23,10 +23,21 @@ enum SRDEpipe_ocalls {
 
 	SRDEpipe_setup,
 	SRDEpipe_connect,
+	SRDEpipe_send_packet,
 	SRDEpipe_whack,
 
 	SRDEpipe_END
 };
+
+
+/**
+ * Enumerated definitions for SRDEpipe packet types.
+ */
+typedef enum {
+	SRDEpipe_failure,
+	SRDEpipe_data,
+	SRDEpipe_eop
+} SRDEpipe_type;
 
 
 /**
@@ -46,6 +57,11 @@ struct SRDEpipe_ocall {
 
 	struct SGX_targetinfo target;
 	struct SGX_report report;
+
+	size_t bufr_size;
+	uint8_t *bufr;
+
+	uint8_t arena[];
 };
 
 
@@ -58,6 +74,10 @@ struct SRDEpipe_ecall {
 
 	struct SGX_targetinfo target;
 	struct SGX_report report;
+
+	size_t needed;
+	size_t bufr_size;
+	uint8_t *bufr;
 };
 
 
@@ -80,6 +100,10 @@ struct NAAAIM_SRDEpipe
 	_Bool (*connect)(const SRDEpipe);
 	_Bool (*accept)(const SRDEpipe, struct SGX_targetinfo *, \
 			struct SGX_report *);
+
+	_Bool (*send_packet)(const SRDEpipe, const SRDEpipe_type type, \
+			     const Buffer);
+	SRDEpipe_type (*receive_packet)(const SRDEpipe, const Buffer);
 
 	_Bool (*connected)(const SRDEpipe);
 	void (*whack)(const SRDEpipe);

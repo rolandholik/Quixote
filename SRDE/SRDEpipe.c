@@ -71,6 +71,9 @@ struct NAAAIM_SRDEpipe_State
 	SRDEocall ocall;
 
 	struct OCALL_api *table;
+
+	/* Buffer for packet I/O. */
+	Buffer packet;
 };
 
 
@@ -96,6 +99,8 @@ static void _init_state(const SRDEpipe_State const S)
 
 	S->ocall = NULL;
 	S->table = NULL;
+
+	S->packet = NULL;
 
 	return;
 }
@@ -285,6 +290,87 @@ static _Bool accept(CO(SRDEpipe, this), struct SGX_targetinfo *target, \
 /**
  * External public method.
  *
+ * This method implements sending a packet to the target enclave
+ * via an ECALL.
+ *
+ * \param this		A pointer to the object which is to initiate
+ *			the send.
+ *
+ * \param type		This type value is ignored in the standard
+ *			implementation of the object.
+ *
+ * \param packet	The object containing the packet data to
+ *			be conveyed to the enclave.
+ *
+ * \return		A boolean value is returned to indicate the
+ *			status of packet transmission.  A false value
+ *			indicates an error occured during
+ *			transmission.  A true value indicates the
+ *			packet was successfully transmitted.
+ */
+
+static _Bool send_packet(CO(SRDEpipe, this), const SRDEpipe_type type, \
+			 CO(Buffer, bufr))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	int rc;
+
+	struct SRDEpipe_ecall ecall;
+
+
+	/* Call the enclave slot to get target/report. */
+	memset(&ecall, '\0', sizeof(struct SRDEpipe_ecall));
+	ecall.bufr	= bufr->get(bufr);
+	ecall.bufr_size = bufr->size(bufr);
+
+	if ( !S->enclave->boot_slot(S->enclave, S->slot, S->table, &ecall, \
+				    &rc) )
+		ERR(goto done);
+
+	retn	= true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method is an API placeholder for the implementation of the
+ * same method in enclave context that receives a packet from
+ * an initiating enclave endpoint.
+ *
+ * \param this		A pointer to the object which is to implement the
+ *			connection.
+ *
+ * \param target	A pointer to an enclave target information structure.
+ *			This parameter is unused.
+ *
+ * \param report	A pointer to an enclave report information structure.
+ *			This parameter is unused.
+ *
+ * \return	An SRDEpipe_failure return code is universally returned.
+ */
+
+static SRDEpipe_type receive_packet(CO(SRDEpipe, this), CO(Buffer, bufr))
+
+{
+	return SRDEpipe_failure;
+}
+
+
+/**
+ * External public method.
+ *
  * This method is a non-functional placeholder method for the
  * corresponding method in the trusted implementation of the object.
  *
@@ -317,6 +403,7 @@ static void whack(CO(SRDEpipe, this))
 
 	WHACK(S->enclave);
 	WHACK(S->ocall);
+	WHACK(S->packet);
 
 	S->root->whack(S->root, this, S);
 	return;
@@ -365,6 +452,9 @@ extern SRDEpipe NAAAIM_SRDEpipe_Init(void)
 
 	this->connect = connect;
 	this->accept  = accept;
+
+	this->send_packet    = send_packet;
+	this->receive_packet = receive_packet;
 
 	this->connected = connected;
 	this->whack	= whack;

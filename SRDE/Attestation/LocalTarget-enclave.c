@@ -286,6 +286,10 @@ _Bool test_pipe(struct SRDEpipe_ecall *ep)
 {
 	_Bool retn = false;
 
+	SRDEpipe_type type;
+
+	Buffer packet = NULL;
+
 	static SRDEpipe pipe = NULL;
 
 
@@ -307,9 +311,24 @@ _Bool test_pipe(struct SRDEpipe_ecall *ep)
 		goto done;
 	}
 
+	/* Decode packet. */
+	INIT(HurdLib, Buffer, packet, ERR(goto done));
+	if ( !packet->add(packet, ep->bufr, ep->bufr_size) )
+		ERR(goto done);
+	fprintf(stdout, "\n[%s:%s] Received packet:\n", __FILE__, __func__);
+	packet->hprint(packet);
+
+	if ( (type = pipe->receive_packet(pipe, packet)) == SRDEpipe_failure )
+		ERR(goto done);
+
+	fprintf(stdout, "Packet type: %d\nContents:\n", type);
+	packet->hprint(packet);
+
 	retn = true;
 
 
  done:
+	WHACK(packet);
+
 	return retn;
 }

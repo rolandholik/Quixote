@@ -11,12 +11,23 @@
  * the source tree for copyright and licensing information.
  **************************************************************************/
 
+/* Local defines. */
+#define IV_SIZE 16
+#define CHECKSUM_SIZE 32
+#if 0
+#define ENCRYPTION_BLOCKSIZE 16
+#endif
+
+
 /* Include files. */
 #include <stdint.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <unistd.h>
 #include <string.h>
+
+#include <openssl/asn1.h>
+#include <openssl/asn1t.h>
 
 #include <Origin.h>
 #include <HurdLib.h>
@@ -31,6 +42,7 @@
 #include "SHA256.h"
 #include "SHA256_hmac.h"
 #include "Curve25519.h"
+#include "AES256_cbc.h"
 #include "Report.h"
 #include "SRDEpipe.h"
 
@@ -39,26 +51,23 @@
 #define STATE(var) CO(SRDEpipe_State, var) = this->state
 
 
-
 /*
  * The Intel SDK version of this function is being used until the
  * loader initialization issue is addressed.
  */
-#if 0
-static _Bool SGXidf_trusted_region(void *ptr, size_t size)
+static _Bool SRDEfusion_untrusted_region(void *ptr, size_t size)
 
 {
 	_Bool retn = false;
 
 	if ( ptr == NULL )
 		goto done;
-	if ( sgx_is_outside_enclave(ptr, size) )
+	if ( sgx_is_within_enclave(ptr, size) )
 		goto done;
 	retn = true;
  done:
 	return retn;
 }
-#endif
 
 
 /* Verify library/object header file inclusions. */
@@ -111,6 +120,23 @@ struct NAAAIM_SRDEpipe_State
 
 
 /**
+ * The following definitions define the ASN1 encoding sequence for
+ * the DER encoding of the packet which is transmitted over the wire.
+ */
+typedef struct {
+	ASN1_INTEGER *type;
+	ASN1_OCTET_STRING *payload;
+} SRDEpipe_packet;
+
+ASN1_SEQUENCE(SRDEpipe_packet) = {
+	ASN1_SIMPLE(SRDEpipe_packet, type,    ASN1_INTEGER),
+	ASN1_SIMPLE(SRDEpipe_packet, payload, ASN1_OCTET_STRING),
+} ASN1_SEQUENCE_END(SRDEpipe_packet)
+
+IMPLEMENT_ASN1_FUNCTIONS(SRDEpipe_packet)
+
+
+/**
  * Internal private function.
  *
  * This method is responsible for marshalling arguements and generating
@@ -140,6 +166,12 @@ static int SRDEpipe_ocall(struct SRDEpipe_ocall *ocall)
 
 
 	/* Verify arguements and set size of arena. */
+	if ( ocall->ocall == SRDEpipe_send_packet ) {
+		if ( SRDEfusion_untrusted_region(ocall->bufr, \
+						 ocall->bufr_size) )
+			goto done;
+		arena_size += ocall->bufr_size;
+	}
 
 	/* Allocate and initialize the outbound method structure. */
 	if ( (ocp = sgx_ocalloc(arena_size)) == NULL )
@@ -150,12 +182,10 @@ static int SRDEpipe_ocall(struct SRDEpipe_ocall *ocall)
 
 
 	/* Setup arena and pointers to it. */
-#if 0
-	if ( ocall->ocall == Duct_send_buffer ) {
-		memcpy(ocp->arena, ocall->bufr, ocall->size);
+	if ( ocall->ocall == SRDEpipe_send_packet ) {
+		memcpy(ocp->arena, ocall->bufr, ocall->bufr_size);
 		ocp->bufr = ocp->arena;
 	}
-#endif
 
 
 	/* Call the SRDEpipe manager. */
@@ -596,6 +626,481 @@ static _Bool accept(CO(SRDEpipe, this), struct SGX_targetinfo *target, \
 
 
 /**
+ * Internal private method.
+ *
+ * This method implements the encryption of the ASN1 encoded packet
+ * to be sent to the remote enclave.
+ *
+ * \param S		A pointer to the object state of the object
+ *			requesting encryption.
+ *
+ * \param bufr		The object containing the packet payload.  The
+ *			contents of the object is replaced with the
+ *			encrypted payload.
+ *
+ * \return		A boolean value is returned to indicate the
+ *			status of packet encryption.  A false value
+ *			indicates an error occured during
+ *			encryption. A true value indicates the
+ *			packet was successfully encrypted.
+ */
+
+static _Bool _encrypt_packet(CO(SRDEpipe_State, S), CO(Buffer, payload))
+
+{
+	_Bool retn = false;
+
+	Buffer b,
+	       iv;
+
+	AES256_cbc cipher = NULL;
+
+
+	/* Verify arguement status. */
+	if ( payload == NULL )
+		ERR(goto done);
+	if ( payload->poisoned(payload) )
+		ERR(goto done);
+
+
+	/* Extract the initialization vector from the first shared secret. */
+	INIT(HurdLib, Buffer, iv, goto done);
+	b = S->iv->get_Buffer(S->iv);
+	if ( !iv->add(iv, b->get(b), IV_SIZE) )
+		ERR(goto done);
+
+
+	/* Encrypt the packet. */
+	if ( (cipher = NAAAIM_AES256_cbc_Init_encrypt(S->key, iv)) == NULL )
+		ERR(goto done);
+	if ( cipher->encrypt(cipher, payload) == NULL )
+		ERR(goto done);
+
+	payload->reset(payload);
+	if ( !payload->add_Buffer(payload, cipher->get_Buffer(cipher)) )
+		ERR(goto done);
+
+	retn = true;
+
+
+done:
+	WHACK(iv);
+	WHACK(cipher);
+
+	return retn;
+}
+
+
+/**
+ * Internal private method.
+ *
+ * This method implements the computation of the HMAC checksum over
+ * the supplied payload.
+ *
+ * \param S		A pointer to the object state of the object
+ *			requesting checksum computation.
+ *
+ * \param bufr		The object containing the payload on which the
+ *			checksum is to be computed.
+ *
+ * \param chksum	The object which will contain the checksum.
+ *
+ * \return		A boolean value is returned to indicate the
+ *			status of the checksum generation.  A false value
+ *			indicates an error occured during computation
+ *			of the checksum.  A true value indicates the
+ *			computation was successful and the output
+ *			buffer contains a valid checksum.
+ */
+
+static _Bool _compute_checksum(CO(SRDEpipe_State, S), CO(Buffer, payload), \
+			       CO(Buffer, chksum))
+
+{
+	_Bool retn = false;
+
+	unsigned char *p;
+
+	Buffer b   = S->iv->get_Buffer(S->iv),
+	       key = NULL;
+
+	SHA256_hmac hmac = NULL;
+
+
+	/* Verify arguement status. */
+	if ( payload == NULL  )
+		ERR(goto done);
+	if ( payload->poisoned(payload) )
+		ERR(goto done);
+	if ( chksum == NULL )
+		ERR(goto done);
+	if ( chksum->poisoned(chksum) )
+		ERR(goto done);
+
+
+	/* Generate the key for the checksum. */
+	INIT(HurdLib, Buffer, key, goto done);
+	p = b->get(b) + IV_SIZE;
+	if ( !key->add(key, p, b->size(b) - IV_SIZE) )
+		ERR(goto done);
+
+
+	/* Compute the checksum over the packet payload with the key. */
+	if ( (hmac = NAAAIM_SHA256_hmac_Init(key)) == NULL )
+		ERR(goto done);
+	hmac->add_Buffer(hmac, payload);
+	if ( !hmac->compute(hmac) )
+		ERR(goto done);
+
+	if ( !chksum->add_Buffer(chksum, hmac->get_Buffer(hmac)) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	WHACK(key);
+	WHACK(hmac);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements sending a packet to the remote endpoint.
+ * The supplied packet information is ASN1 encoded and the resulting
+ * ASN1 data structure is encrypted and an HMAC trailing checksum
+ * is added.  The resulting data structure is forwarded to the
+ * endpoing through an OCALL.
+ *
+ * \param this		A pointer to the object which is to initiate
+ *			the send.
+ *
+ * \param type		The type of packet to be sent.
+ *
+ * \param packet	The object containing the raw data to be
+ *			transmitted if the packet type requires data.
+ *
+ * \return		A boolean value is returned to indicate the
+ *			status of packet transmission.  A false value
+ *			indicates an error occured during
+ *			transmission.  A true value indicates the
+ *			packet was successfully transmitted.
+ */
+
+static _Bool send_packet(CO(SRDEpipe, this), const SRDEpipe_type type, \
+			 CO(Buffer, bufr))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+        unsigned char *asn = NULL;
+
+        unsigned char **p = &asn;
+
+	int asn_size;
+
+	struct SRDEpipe_ocall ocall;
+
+	SRDEpipe_packet *packet = NULL;
+
+	Buffer chksum = NULL;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( bufr == NULL )
+		ERR(goto done);
+	if ( bufr->poisoned(bufr) )
+		ERR(goto done);
+
+
+	/* ASN1 encode the packet. */
+	if ( (packet = SRDEpipe_packet_new()) == NULL )
+		ERR(goto done);
+	if ( ASN1_INTEGER_set(packet->type, type) != 1 )
+		ERR(goto done);
+	if ( ASN1_OCTET_STRING_set(packet->payload, bufr->get(bufr), \
+				   bufr->size(bufr)) != 1 )
+		ERR(goto done);
+
+        asn_size = i2d_SRDEpipe_packet(packet, p);
+        if ( asn_size < 0 )
+                ERR(goto done);
+
+	bufr->reset(bufr);
+	if ( !bufr->add(bufr, asn, asn_size) )
+		ERR(goto done);
+
+
+	/* Encrypt and checksum the data. */
+	INIT(HurdLib, Buffer, chksum, goto done);
+	if ( !_encrypt_packet(S, bufr) )
+		ERR(goto done);
+
+	if ( !_compute_checksum(S, bufr, chksum) )
+		ERR(goto done);
+	bufr->add_Buffer(bufr, chksum);
+
+	if ( !S->iv->rehash(S->iv, 1) )
+		ERR(goto done);
+
+	/* Send the packet buffer. */
+	memset(&ocall, '\0', sizeof(struct SRDEpipe_ocall));
+	ocall.ocall	= SRDEpipe_send_packet;
+	ocall.instance	= S->instance;
+	ocall.bufr_size = bufr->size(bufr);
+	ocall.bufr	= bufr->get(bufr);
+
+	if ( SRDEpipe_ocall(&ocall) != 0 )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	WHACK(chksum);
+
+	if ( !retn )
+		S->poisoned = true;
+	if ( packet != NULL )
+		SRDEpipe_packet_free(packet);
+	if ( asn != NULL )
+		OPENSSL_free(asn);
+
+	return retn;
+}
+
+
+/**
+ * Internal private method.
+ *
+ * This method implements the verification of the checksum in the
+ * supplied payload.
+ *
+ * \param S		A pointer to the object state of the object
+ *			requesting checksum verification.
+ *
+ * \param debug		A flag used to indicated whether or not
+ *			debugging is enabled in the communications
+ *			object.
+ *
+ * \param packet	The object containing the payload containing
+ *			the checksum to be verified.
+ *
+ * \return		A boolean value is returned to indicate the
+ *			status of the checksum verification.  A false
+ *			value indicates an error occured during verification
+ *			of the checksum.  A true value indicates the
+ *			computation was successful and the payload was
+ *			verfified as valid.
+ */
+
+static _Bool _verify_checksum(CO(SRDEpipe_State, S), CO(Buffer, packet))
+
+{
+	_Bool retn = false;
+
+	size_t payload;
+
+	Buffer computed = NULL,
+	       incoming = NULL;
+
+
+	/* Verify arguement status. */
+	if ( packet == NULL )
+		ERR(goto done);
+	if ( packet->poisoned(packet) )
+		ERR(goto done);
+
+
+	/* Extract the incoming checksum. */
+	INIT(HurdLib, Buffer, incoming, goto done);
+	payload = packet->size(packet) - CHECKSUM_SIZE;
+	if ( !incoming->add(incoming, packet->get(packet) + payload, \
+			    CHECKSUM_SIZE) )
+		ERR(goto done);
+	packet->shrink(packet, CHECKSUM_SIZE);
+
+
+	/* Compute the checksum over the packet body. */
+	INIT(HurdLib, Buffer, computed, goto done);
+	if ( !_compute_checksum(S, packet, computed) )
+		ERR(goto done);
+	if ( !incoming->equal(incoming, computed) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	WHACK(computed);
+	WHACK(incoming);
+
+	return retn;
+}
+
+
+/**
+ * Internal private method.
+ *
+ * This method implements the generation of the initialization vector
+ * and key for the supplied packet payload for the remote host.  This
+ * vector and key are then used to decrypt the packet.
+ *
+ * \param S		A pointer to the object state of the object
+ *			requesting decryption.
+ *
+ * \param bufr		The object containing the encrypted packet
+ *			payload.  The contents of the object is
+ *			replaced with the encrypted payload.
+ *
+ * \return		A boolean value is returned to indicate the
+ *			status of payload decryption.  A false value
+ *			indicates an error occured during
+ *			decryption. A true value indicates the
+ *			packet was successfully encrypted and the
+ *			contents of the result object is valid.
+ */
+
+static _Bool _decrypt_packet(CO(SRDEpipe_State, S), CO(Buffer, payload))
+
+{
+	_Bool retn = false;
+
+	Buffer iv = NULL;
+
+	AES256_cbc cipher = NULL;
+
+
+	/* Verify object status and arguement status. */
+	if ( payload == NULL )
+		ERR(goto done);
+	if ( payload->poisoned(payload) )
+		ERR(goto done);
+
+
+	/* Extract the initialization vector. */
+	INIT(HurdLib, Buffer, iv, goto done);
+	if ( !iv->add(iv, S->iv->get(S->iv), IV_SIZE) )
+		ERR(goto done);
+
+
+	/* Decrypt the packet. */
+	if ( (cipher = NAAAIM_AES256_cbc_Init_decrypt(S->key, iv)) == NULL )
+		ERR(goto done);
+	if ( cipher->decrypt(cipher, payload) == NULL )
+		ERR(goto done);
+
+	payload->reset(payload);
+	if ( !payload->add_Buffer(payload, cipher->get_Buffer(cipher)) )
+		ERR(goto done);
+
+	retn = true;
+
+
+done:
+	WHACK(iv);
+	WHACK(cipher);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements the reception and decoding of a packet from
+ * an enclave endpoint.  The raw packet is decrypted and authenticated
+ * with the trailing checksum.  The ASN1 data structure is decoded and
+ * loaded into the supplied buffer.
+ *
+ * \param this	A pointer to the object which is to initiate
+ *		the send.
+ *
+ * \param bufr	On entry to the function this object contains the
+ *		packet that was received.  This object is loaded with
+ *		the authenticated and decrypted contents of the packet.
+ *
+ * \return	An enumerated type is returned to indicate the status
+ *		and type of the payload.  If an internal error occurs
+ *		this is reflected with a SRDEpipe_failure code.
+ */
+
+static SRDEpipe_type receive_packet(CO(SRDEpipe, this), CO(Buffer, bufr))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	SRDEpipe_type status,
+		      remote_retn;
+
+        unsigned char *asn = NULL;
+
+        unsigned const char *p = asn;
+
+	int asn_size;
+
+	SRDEpipe_packet *packet = NULL;
+
+
+	/* Verify object status and arguements. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( bufr == NULL )
+		ERR(goto done);
+	if ( bufr->poisoned(bufr) )
+		ERR(goto done);
+
+
+	/* Decrypt the payload. */
+	if ( !_verify_checksum(S, bufr) )
+		ERR(goto done);
+	if ( !_decrypt_packet(S, bufr) )
+		ERR(goto done);
+	if ( !S->iv->rehash(S->iv, 1) )
+		ERR(goto done);
+
+
+	/* Decode the packet. */
+	p = bufr->get(bufr);
+	asn_size = bufr->size(bufr);
+        if ( !d2i_SRDEpipe_packet(&packet, &p, asn_size) )
+                ERR(goto done);
+
+	remote_retn = ASN1_INTEGER_get(packet->type);
+
+	bufr->reset(bufr);
+	if ( !bufr->add(bufr, ASN1_STRING_get0_data(packet->payload), \
+			ASN1_STRING_length(packet->payload)) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	if ( retn )
+		status = remote_retn;
+	else {
+		S->poisoned = true;
+		status = SRDEpipe_failure;
+	}
+
+	if ( packet != NULL )
+		SRDEpipe_packet_free(packet);
+
+	return status;
+}
+
+
+/**
  * External public method.
  *
  * This method returns the current connection state of the pipe.  It
@@ -710,6 +1215,9 @@ extern SRDEpipe NAAAIM_SRDEpipe_Init(void)
 
 	this->connect = connect;
 	this->accept  = accept;
+
+	this->send_packet    = send_packet;
+	this->receive_packet = receive_packet;
 
 	this->connected = connected;
 	this->whack	= whack;

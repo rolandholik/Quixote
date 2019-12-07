@@ -15,6 +15,7 @@
 #include <sgx_edger8r.h>
 
 #include <HurdLib.h>
+#include <Buffer.h>
 
 #include <SRDE.h>
 #include <SRDEfusion-ocall.h>
@@ -192,12 +193,26 @@ static sgx_status_t sgx_test_pipe(void *ifp)
 		goto done;
 	ip = (struct SRDEpipe_ecall *) ifp;
 	ep = &ecall2;
-	*ep = *ip;
 
-	__builtin_ia32_lfence();
+	memset(ep, '\0', sizeof(struct SRDEpipe_ecall));
+	ep->target    = ip->target;
+	ep->report    = ip->report;
+	ep->bufr_size = ip->bufr_size;
+
+
+	/* Verify buffer an allocate buffer. */
+	if ( ep->bufr_size != 0 ) {
+		if ( !SGXidf_untrusted_region(ip->bufr, ep->bufr_size) )
+			goto done;
+		if ( (ep->bufr = malloc(ep->bufr_size)) == NULL )
+			goto done;
+		memcpy(ep->bufr, ip->bufr, ep->bufr_size);
+	}
 
 
 	/* Call trusted function. */
+	__builtin_ia32_lfence();
+
 	ip->retn = test_pipe(ep);
 	if ( ip->retn ) {
 		status = SGX_SUCCESS;
@@ -206,6 +221,10 @@ static sgx_status_t sgx_test_pipe(void *ifp)
 
 
  done:
+	if ( ep->bufr != NULL )
+		memset(ep->bufr, '\0', ep->bufr_size);
+	free(ep->bufr);
+
 	memset(ep, '\0', sizeof(struct SRDEpipe_ecall));
 
 	return status;

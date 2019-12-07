@@ -153,6 +153,48 @@ static void srdepipe_bind(struct SRDEpipe_ocall *ocp)
 /**
  * Internal private function.
  *
+ * This function implements invocation of the ->send_packet method of
+ * the SRDEpipe object on behalf of a ->send_packet method call from
+ * an SRDEpipe object running in enclave context.
+ *
+ * \param ocp	A pointer to the structure which is marshalling the
+ *		data into and out of the OCALL.
+ *
+ * \return	No return value is defined.
+ */
+
+static void srdepipe_send_packet(struct SRDEpipe_ocall *ocp)
+
+{
+	_Bool retn = false;
+
+	SRDEpipe pipe = SRDE_pipes[ocp->instance];
+
+	Buffer bufr = NULL;
+
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	if ( !bufr->add(bufr, ocp->bufr, ocp->bufr_size) )
+		ERR(goto done);
+
+	if ( !pipe->send_packet(pipe, 0, bufr) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	ocp->retn = retn;
+
+	WHACK(bufr);
+
+	return;
+}
+
+
+/**
+ * Internal private function.
+ *
  * This function manages the destruction of an SRDEquote object which
  * has been previously initialized.
  *
@@ -221,6 +263,9 @@ int SRDEpipe_mgr(struct SRDEpipe_ocall *ocp)
 			break;
 		case SRDEpipe_connect:
 			srdepipe_bind(ocp);
+			break;
+		case SRDEpipe_send_packet:
+			srdepipe_send_packet(ocp);
 			break;
 		case SRDEpipe_whack:
 			srdepipe_whack(ocp);
