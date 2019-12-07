@@ -303,6 +303,8 @@ _Bool test_pipe(struct SRDEpipe_ecall *ep)
 		goto done;
 	}
 
+
+	/* Handle second stage of connection. */
 	if ( !pipe->connected(pipe) ) {
 		if ( !pipe->accept(pipe, &ep->target, &ep->report) )
 			ERR(goto done);
@@ -311,17 +313,23 @@ _Bool test_pipe(struct SRDEpipe_ecall *ep)
 		goto done;
 	}
 
-	/* Decode packet. */
+
+	/* Connection is established - handle packet processing. */
 	INIT(HurdLib, Buffer, packet, ERR(goto done));
 	if ( !packet->add(packet, ep->bufr, ep->bufr_size) )
 		ERR(goto done);
-	fprintf(stdout, "\n[%s:%s] Received packet:\n", __FILE__, __func__);
-	packet->hprint(packet);
 
 	if ( (type = pipe->receive_packet(pipe, packet)) == SRDEpipe_failure )
 		ERR(goto done);
 
-	fprintf(stdout, "Packet type: %d\nContents:\n", type);
+	if ( type == SRDEpipe_eop ) {
+		fputs("\nReceived EOP.\n", stdout);
+		retn = true;
+		WHACK(pipe);
+		goto done;
+	}
+
+	fprintf(stdout, "\nPacket type: %d\nContents:\n", type);
 	packet->hprint(packet);
 
 	retn = true;

@@ -182,6 +182,9 @@ _Bool test_pipe(struct LocalSource_ecall1 *ep)
 	if ( !pipe->send_packet(pipe, SRDEpipe_data, bufr) )
 		ERR(goto done);
 
+	if ( !pipe->close(pipe) )
+		ERR(goto done);
+
 	retn = true;
 
 

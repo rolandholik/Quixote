@@ -374,6 +374,25 @@ static SRDEpipe_type receive_packet(CO(SRDEpipe, this), CO(Buffer, bufr))
  * This method is a non-functional placeholder method for the
  * corresponding method in the trusted implementation of the object.
  *
+ * \param this	A pointer to the object that would be initiating a
+ *		pipe close event.
+ *
+ * \return	A false value is universally returned.
+ */
+
+static _Bool close(CO(SRDEpipe, this))
+
+{
+	return false;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method is a non-functional placeholder method for the
+ * corresponding method in the trusted implementation of the object.
+ *
  * \param this	A pointer to the object whose connection state is to
  *		be interrogated.
  *
@@ -448,7 +467,7 @@ extern SRDEpipe NAAAIM_SRDEpipe_Init(void)
 
 	/* Method initialization. */
 	this->setup = setup;
-	this->bind    = bind;
+	this->bind  = bind;
 
 	this->connect = connect;
 	this->accept  = accept;
@@ -456,6 +475,7 @@ extern SRDEpipe NAAAIM_SRDEpipe_Init(void)
 	this->send_packet    = send_packet;
 	this->receive_packet = receive_packet;
 
+	this->close	= close;
 	this->connected = connected;
 	this->whack	= whack;
 

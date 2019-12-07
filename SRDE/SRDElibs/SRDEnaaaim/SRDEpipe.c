@@ -470,6 +470,7 @@ static _Bool connect(CO(SRDEpipe, this))
 	fputs("Acknowledgement verified.\n", stdout);
 
 	S->iv->rehash(S->iv, 1);
+	S->state = SRDEpipe_state_connected;
 	retn = true;
 
 
@@ -1103,6 +1104,61 @@ static SRDEpipe_type receive_packet(CO(SRDEpipe, this), CO(Buffer, bufr))
 /**
  * External public method.
  *
+ * This method implements closing of the connection to the target
+ * enclave.
+ *
+ * \param this	A pointer to the object that is initiating the close
+ *		event.
+ *
+ * \return	A false value is returned if an error is encountered
+ *		while transmitting the packet with the close request.
+ *		In this event the state of the remote object cannot
+ *		be assumed.  A true value indicates the remote
+ *		connection was successfully closed.
+ */
+
+static _Bool close(CO(SRDEpipe, this))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	Buffer bufr = NULL;
+
+	struct SRDEpipe_ocall ocall;
+
+
+	/* Send the close signal to the remote enclave. */
+	if ( S->state == SRDEpipe_state_connected ) {
+		INIT(HurdLib, Buffer, bufr, ERR(goto done));
+		if ( !this->send_packet(this, SRDEpipe_eop, bufr) )
+			ERR(goto done);
+	}
+
+
+	/* Release the implementation object. */
+	memset(&ocall, '\0', sizeof(struct SRDEpipe_ocall));
+	ocall.ocall    = SRDEpipe_whack;
+	ocall.instance = S->instance;
+	SRDEpipe_ocall(&ocall);
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	WHACK(bufr);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method returns the current connection state of the pipe.  It
  * is designed to provide a method for the remote endpoint to determine
  * if a second ->accept call is to be made to complete the connection.
@@ -1142,15 +1198,6 @@ static void whack(CO(SRDEpipe, this))
 
 {
 	STATE(S);
-
-	struct SRDEpipe_ocall ocall;
-
-
-	/* Release implementation object. */
-	memset(&ocall, '\0', sizeof(struct SRDEpipe_ocall));
-	ocall.ocall    = SRDEpipe_whack;
-	ocall.instance = S->instance;
-	SRDEpipe_ocall(&ocall);
 
 
 	/* Destroy resources. */
@@ -1219,6 +1266,7 @@ extern SRDEpipe NAAAIM_SRDEpipe_Init(void)
 	this->send_packet    = send_packet;
 	this->receive_packet = receive_packet;
 
+	this->close	= close;
 	this->connected = connected;
 	this->whack	= whack;
 

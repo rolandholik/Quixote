@@ -105,6 +105,7 @@ struct NAAAIM_SRDEpipe
 			     const Buffer);
 	SRDEpipe_type (*receive_packet)(const SRDEpipe, const Buffer);
 
+	_Bool (*close)(const SRDEpipe);
 	_Bool (*connected)(const SRDEpipe);
 	void (*whack)(const SRDEpipe);
 
