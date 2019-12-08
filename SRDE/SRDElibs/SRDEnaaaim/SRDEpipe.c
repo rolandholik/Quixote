@@ -98,6 +98,9 @@ struct NAAAIM_SRDEpipe_State
 	/* Object status. */
 	_Bool poisoned;
 
+	/* Object debug status. */
+	_Bool debug;
+
 	/* Endpoint type. */
 	_Bool initiator;
 
@@ -231,6 +234,7 @@ static void _init_state(CO(SRDEpipe_State, S)) {
 
 
 	S->poisoned  = false;
+	S->debug     = false;
 	S->state     = SRDEpipe_state_init;
 	S->initiator = false;
 
@@ -410,7 +414,8 @@ static _Bool connect(CO(SRDEpipe, this))
 	if ( !status )
 		ERR(goto done);
 
-	fputs("Validated target endpoint.\n", stdout);
+	if ( S->debug )
+		fputs("Validated target endpoint.\n", stdout);
 
 
 	/* Generate shared key and counter-report. */
@@ -443,12 +448,16 @@ static _Bool connect(CO(SRDEpipe, this))
 	if ( !S->key->add_Buffer(S->key, b) )
 		ERR(goto done);
 
-	fputs("\nShared key:\n", stdout);
-	S->key->print(S->key);
+	if ( S->debug ) {
+		fputs("\nShared key:\n", stdout);
+		S->key->print(S->key);
+	}
 
 	S->iv->rehash(S->iv, 100);
-	fputs("\nIV: \n", stdout);
-	b->print(b);
+	if ( S->debug ) {
+		fputs("\nIV: \n", stdout);
+		b->print(b);
+	}
 
 
 	/* Invoke OCALL to send report to remote endpoint. */
@@ -473,14 +482,17 @@ static _Bool connect(CO(SRDEpipe, this))
 	if ( !bufr->add(bufr, ocall.report.body.reportdata, 32) )
 		ERR(goto done);
 
-	fputs("\nComputed acknowledgement:\n", stdout);
-	b->print(b);
-	fputs("Report acknowledgement:\n", stdout);
-	bufr->print(bufr);
+	if ( S->debug ) {
+		fputs("\nComputed acknowledgement:\n", stdout);
+		b->print(b);
+		fputs("Report acknowledgement:\n", stdout);
+		bufr->print(bufr);
+	}
 
 	if ( !bufr->equal(bufr, b) )
 		ERR(goto done);
-	fputs("Acknowledgement verified.\n", stdout);
+	if ( S->debug )
+		fputs("Acknowledgement verified.\n", stdout);
 
 	S->iv->rehash(S->iv, 1);
 	S->state     = SRDEpipe_state_connected;
@@ -575,11 +587,13 @@ static _Bool accept(CO(SRDEpipe, this), struct SGX_targetinfo *target, \
 	if ( !rpt->validate_report(rpt, report, &status) )
 		ERR(goto done);
 
-	if ( status )
-		fputs("\nSource report verified.\n", stdout);
-	else {
-		fputs("\nSource report not verified.\n", stdout);
-		ERR(goto done);
+	if ( S->debug ) {
+		if ( status )
+			fputs("\nSource report verified.\n", stdout);
+		else {
+			fputs("\nSource report not verified.\n", stdout);
+			ERR(goto done);
+		}
 	}
 
 
@@ -604,12 +618,16 @@ static _Bool accept(CO(SRDEpipe, this), struct SGX_targetinfo *target, \
 	if ( !S->key->add_Buffer(S->key, b) )
 		ERR(goto done);
 
-	fputs("\nShared key:\n", stdout);
-	S->key->print(S->key);
+	if ( S->debug ) {
+		fputs("\nShared key:\n", stdout);
+		S->key->print(S->key);
+	}
 
 	S->iv->rehash(S->iv, 100);
-	fputs("\nIV: \n", stdout);
-	b->print(b);
+	if ( S->debug ) {
+		fputs("\nIV: \n", stdout);
+		b->print(b);
+	}
 
 
 	/* Generate acknowledgement report. */

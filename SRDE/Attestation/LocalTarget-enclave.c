@@ -331,6 +331,9 @@ _Bool test_pipe(struct SRDEpipe_ecall *ep)
 	if ( !packet->add(packet, ep->bufr, ep->bufr_size) )
 		ERR(goto done);
 
+	fputs("\nTarget received packet:\n", stdout);
+	packet->hprint(packet);
+
 	if ( (type = pipe->receive_packet(pipe, packet)) == SRDEpipe_failure )
 		ERR(goto done);
 
@@ -341,7 +344,7 @@ _Bool test_pipe(struct SRDEpipe_ecall *ep)
 		goto done;
 	}
 
-	fprintf(stdout, "\nTarget packet type: %d\nContents:\n", type);
+	fputs("\nTarget packet contents:\n", stdout);
 	packet->hprint(packet);
 
 
@@ -349,7 +352,7 @@ _Bool test_pipe(struct SRDEpipe_ecall *ep)
 	if ( !packet->add(packet, (void *) msg, strlen(msg) + 1) )
 		ERR(goto done);
 
-	fputs("\nTarget sending return message.\n", stdout);
+	fputs("\nTarget sending return message:\n", stdout);
 	packet->hprint(packet);
 
 	if ( !pipe->send_packet(pipe, SRDEpipe_data, packet) )
