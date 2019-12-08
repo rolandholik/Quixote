@@ -331,7 +331,21 @@ static _Bool send_packet(CO(SRDEpipe, this), const SRDEpipe_type type, \
 				    &rc) )
 		ERR(goto done);
 
-	retn	= true;
+	bufr->reset(bufr);
+	if ( ecall.needed > 0 ) {
+		while ( ecall.needed-- )
+			bufr->add(bufr, (void *) "\0", 1);
+		if ( bufr->poisoned(bufr) )
+			ERR(goto done);
+
+		ecall.bufr	= bufr->get(bufr);
+		ecall.bufr_size = bufr->size(bufr);
+		if ( !S->enclave->boot_slot(S->enclave, S->slot, S->table, \
+					    &ecall, &rc) )
+			ERR(goto done);
+	}
+
+	retn = true;
 
 
  done:

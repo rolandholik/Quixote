@@ -182,6 +182,17 @@ _Bool test_pipe(struct LocalSource_ecall1 *ep)
 	if ( !pipe->send_packet(pipe, SRDEpipe_data, bufr) )
 		ERR(goto done);
 
+
+	/* Check for and print return packet. */
+	if ( bufr->size(bufr) > 0 ) {
+		if ( !pipe->receive_packet(pipe, bufr) )
+			ERR(goto done);
+		fputs("\nClient have return packet:\n", stdout);
+		bufr->hprint(bufr);
+	}
+
+
+	/* Terminate the connection. */
 	if ( !pipe->close(pipe) )
 		ERR(goto done);
 

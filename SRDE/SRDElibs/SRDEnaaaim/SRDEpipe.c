@@ -98,6 +98,9 @@ struct NAAAIM_SRDEpipe_State
 	/* Object status. */
 	_Bool poisoned;
 
+	/* Endpoint type. */
+	_Bool initiator;
+
 	/* Connect status. */
 	enum {
 		SRDEpipe_state_init,
@@ -191,7 +194,10 @@ static int SRDEpipe_ocall(struct SRDEpipe_ocall *ocall)
 	/* Call the SRDEpipe manager. */
 	if ( (status = sgx_ocall(SRDENAAAIM_OCALL4, ocp)) == 0 ) {
 		retn = true;
-		*ocall = *ocp;
+		ocall->target	 = ocp->target;
+		ocall->report	 = ocp->report;
+		ocall->bufr	 = ocp->bufr;
+		ocall->bufr_size = ocp->bufr_size;
 	}
 
 
@@ -224,8 +230,9 @@ static void _init_state(CO(SRDEpipe_State, S)) {
 	S->objid = NAAAIM_Duct_OBJID;
 
 
-	S->poisoned = false;
-	S->state    = SRDEpipe_state_init;
+	S->poisoned  = false;
+	S->state     = SRDEpipe_state_init;
+	S->initiator = false;
 
 	S->dhkey = NULL;
 
@@ -476,7 +483,8 @@ static _Bool connect(CO(SRDEpipe, this))
 	fputs("Acknowledgement verified.\n", stdout);
 
 	S->iv->rehash(S->iv, 1);
-	S->state = SRDEpipe_state_connected;
+	S->state     = SRDEpipe_state_connected;
+	S->initiator = true;
 	retn = true;
 
 
@@ -616,8 +624,8 @@ static _Bool accept(CO(SRDEpipe, this), struct SGX_targetinfo *target, \
 		ERR(goto done);
 
 	S->iv->rehash(S->iv, 1);
-	S->state = SRDEpipe_state_connected;
-	retn     = true;
+	S->state  = SRDEpipe_state_connected;
+	retn	  = true;
 
 
  done:
@@ -857,6 +865,14 @@ static _Bool send_packet(CO(SRDEpipe, this), const SRDEpipe_type type, \
 	if ( !S->iv->rehash(S->iv, 1) )
 		ERR(goto done);
 
+
+	/* We are done if this is the caller. */
+	if ( !S->initiator ) {
+		retn = true;
+		goto done;
+	}
+
+
 	/* Send the packet buffer. */
 	memset(&ocall, '\0', sizeof(struct SRDEpipe_ocall));
 	ocall.ocall	= SRDEpipe_send_packet;
@@ -866,6 +882,12 @@ static _Bool send_packet(CO(SRDEpipe, this), const SRDEpipe_type type, \
 
 	if ( SRDEpipe_ocall(&ocall) != 0 )
 		ERR(goto done);
+
+	bufr->reset(bufr);
+	if ( ocall.bufr_size > 0 ) {
+		if ( !bufr->add(bufr, ocall.bufr, ocall.bufr_size) )
+			ERR(goto done);
+	}
 
 	retn = true;
 
@@ -1136,8 +1158,13 @@ static _Bool close(CO(SRDEpipe, this))
 
 
 	/* Send the close signal to the remote enclave. */
+
 	if ( S->state == SRDEpipe_state_connected ) {
 		INIT(HurdLib, Buffer, bufr, ERR(goto done));
+		memset(&ocall, '\0', sizeof(struct SRDEpipe_ocall));
+
+		ocall.ocall    = SRDEpipe_data;
+		ocall.instance = S->instance;
 		if ( !this->send_packet(this, SRDEpipe_eop, bufr) )
 			ERR(goto done);
 	}
@@ -1255,7 +1282,7 @@ extern SRDEpipe NAAAIM_SRDEpipe_Init(void)
 
 	/* Method initialization. */
 	this->setup = setup;
-	this->bind    = bind;
+	this->bind  = bind;
 
 	this->connect = connect;
 	this->accept  = accept;

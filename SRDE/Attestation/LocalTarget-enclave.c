@@ -286,12 +286,23 @@ _Bool test_pipe(struct SRDEpipe_ecall *ep)
 {
 	_Bool retn = false;
 
+	char *msg = "This is a return message.\n";
+
 	SRDEpipe_type type;
 
-	Buffer packet = NULL;
+	static Buffer packet = NULL;
 
 	static SRDEpipe pipe = NULL;
 
+
+	if ( packet != NULL ) {
+		if ( ep->bufr_size != packet->size(packet) )
+			ERR(goto done);
+		memcpy(ep->bufr, packet->get(packet), packet->size(packet));
+
+		WHACK(packet);
+		return true;
+	}
 
 	if ( pipe == NULL ) {
 		INIT(NAAAIM, SRDEpipe, pipe, ERR(goto done));
@@ -315,7 +326,8 @@ _Bool test_pipe(struct SRDEpipe_ecall *ep)
 
 
 	/* Connection is established - handle packet processing. */
-	INIT(HurdLib, Buffer, packet, ERR(goto done));
+	if ( packet == NULL )
+		INIT(HurdLib, Buffer, packet, ERR(goto done));
 	if ( !packet->add(packet, ep->bufr, ep->bufr_size) )
 		ERR(goto done);
 
@@ -323,19 +335,37 @@ _Bool test_pipe(struct SRDEpipe_ecall *ep)
 		ERR(goto done);
 
 	if ( type == SRDEpipe_eop ) {
-		fputs("\nReceived EOP.\n", stdout);
+		fputs("\nTarget received EOP.\n", stdout);
 		retn = true;
 		WHACK(pipe);
 		goto done;
 	}
 
-	fprintf(stdout, "\nPacket type: %d\nContents:\n", type);
+	fprintf(stdout, "\nTarget packet type: %d\nContents:\n", type);
 	packet->hprint(packet);
+
+
+	/* Send return packet message. */
+	if ( !packet->add(packet, (void *) msg, strlen(msg) + 1) )
+		ERR(goto done);
+
+	fputs("\nTarget sending return message.\n", stdout);
+	packet->hprint(packet);
+
+	if ( !pipe->send_packet(pipe, SRDEpipe_data, packet) )
+		ERR(goto done);
+
+	if ( packet->size(packet) > ep->bufr_size ) {
+		ep->needed = packet->size(packet);
+		ep->bufr_size = 0;
+		return true;
+	}
 
 	retn = true;
 
 
  done:
+	ep->bufr_size = 0;
 	WHACK(packet);
 
 	return retn;

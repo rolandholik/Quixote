@@ -216,7 +216,12 @@ static sgx_status_t sgx_test_pipe(void *ifp)
 	ip->retn = test_pipe(ep);
 	if ( ip->retn ) {
 		status = SGX_SUCCESS;
-		*ip = *ep;
+		ip->target    = ep->target;
+		ip->report    = ep->report;
+		ip->needed    = ep->needed;
+		ip->bufr_size = ep->bufr_size;
+		if ( ep->bufr_size > 0 )
+			memcpy(ip->bufr, ep->bufr, ep->bufr_size);
 	}
 
 
