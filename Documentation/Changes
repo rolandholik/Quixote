@@ -48,3 +48,7 @@ Version 0.9:
 	* Support APIkey based development and production reports.
 
 	* Implement OpenSSL based AES128-CMAC object.
+
+	* Implement Report object to generate local attestation reports.
+
+	* Implement SRDEpipe object for enclave to enclave communications.
