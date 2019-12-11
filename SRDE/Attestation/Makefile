@@ -13,9 +13,12 @@ INSTALLENCLAVE = LocalTarget.signed.so
 CSRC   = test-local-enclave.c test-remote-enclave.c
 ENCSRC1 = LocalTarget-enclave.c LocalTarget-interface.c
 ENCSRC2 = LocalSource-enclave.c LocalSource-interface.c
+ENCSRC3 = Attestation-enclave.c Attestation-interface.c
+ENCSRC4 = Provisioner-enclave.c Provisioner-interface.c
 
-TOOLS	   = test-local-target test-remote-target
-INSTALLBIN = test-remote-target
+TOOLS = test-local-target test-remote-target srde-provisioner \
+	srde-attestation
+INSTALLBIN = test-remote-target srde-attestation
 
 ENCLAVE_CC = gcc
 
@@ -104,6 +107,8 @@ LIBS		= ${RDKLIB} ${ELFLIB} ${NAAAIMLIB} ${HURDLIB}
 COBJS	= ${CSRC:.c=.o}
 ENCOBJS1 = ${ENCSRC1:.c=.o}
 ENCOBJS2 = ${ENCSRC2:.c=.o}
+ENCOBJS3 = ${ENCSRC3:.c=.o}
+ENCOBJS4 = ${ENCSRC4:.c=.o}
 
 
 #
@@ -115,7 +120,8 @@ ENCOBJS2 = ${ENCSRC2:.c=.o}
 # Targets
 all: ${LIBRARY} enclave tools
 
-enclave: ldscript LocalTarget.signed.so LocalSource.signed.so
+enclave: ldscript LocalTarget.signed.so LocalSource.signed.so \
+	Attestation.signed.so Provisioner.signed.so
 
 LocalTarget.signed.so: LocalTarget.so
 	$(SGX_SIGNER) sign -key ${SGXKEY} -enclave $< -out $@ \
@@ -129,6 +135,20 @@ LocalSource.signed.so: LocalSource.so
 	-config LocalTarget-enclave.xml;
 
 LocalSource.so: ${ENCOBJS2}
+	${ENCLAVE_CC} -o $@ $^ ${ENCLAVE_LDFLAGS}
+
+Attestation.signed.so: Attestation.so
+	$(SGX_SIGNER) sign -key ${SGXKEY} -enclave $< -out $@ \
+	-config Attestation-enclave.xml;
+
+Attestation.so: ${ENCOBJS3}
+	${ENCLAVE_CC} -o $@ $^ ${ENCLAVE_LDFLAGS}
+
+Provisioner.signed.so: Provisioner.so
+	$(SGX_SIGNER) sign -key ${SGXKEY} -enclave $< -out $@ \
+	-config Provisioner-enclave.xml;
+
+Provisioner.so: ${ENCOBJS4}
 	${ENCLAVE_CC} -o $@ $^ ${ENCLAVE_LDFLAGS}
 
 ldscript:
@@ -155,6 +175,18 @@ test-remote-target: test-remote-target.o ${LIBRARY_DEPENDS}
 test-remote-target.o: test-remote-target.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
+srde-provisioner: srde-provisioner.o ${LIBRARY_DEPENDS}
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS} ${SSL_CRYPTO};
+
+srde-provisioner.o: srde-provisioner.c
+	${CC} ${CFLAGS} -c $< -o $@;
+
+srde-attestation: srde-attestation.o ${LIBRARY_DEPENDS}
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS} ${SSL_CRYPTO};
+
+srde-attestation.o: srde-attestation.c
+	${CC} ${CFLAGS} -c $< -o $@;
+
 install-bin:
 	[ -d ${INSTPATH}/bin ] || mkdir -p ${INSTPATH}/bin;
 	install -s ${INSTALLBIN} ${INSTPATH}/bin;
@@ -166,8 +198,12 @@ clean:
 	rm -f ${TOOLS};
 	rm -f LocalTarget.so LocalTarget.signed.so;
 	rm -f LocalSource.so LocalSource.signed.so;
+	rm -f Attestation.so Attestation.signed.so;
+	rm -f Provisioner.so Provisioner.signed.so;
 
 
 # Source dependencies.
 LocalTarget-enclave.o: LocalTarget-interface.h
 LocalTarget-interface.o: LocalTarget-interface.h
+Attestation-enclave.o: Attestation-interface.h
+Attestation-interface.o: Attestation-interface.h
