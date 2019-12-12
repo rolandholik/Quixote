@@ -6,8 +6,11 @@
  **************************************************************************/
 
 #include <stdio.h>
-#include <string.h>
 #include <stdarg.h>
+#include <stdbool.h>
+#include <string.h>
+
+#include <sys/types.h>
 
 #include <sgx_tcrypto.h>
 
@@ -16,6 +19,7 @@
 #include "HurdLib.h"
 #include "Buffer.h"
 #include "String.h"
+#include "File.h"
 
 
 static void test_one(void)
@@ -109,6 +113,60 @@ static void test_three(void)
 	return;
 }
 
+static void test_four(void)
+
+{
+	char *msg = "Test file output.\n";
+
+	Buffer bufr = NULL;
+
+	File file = NULL;
+
+
+	fputs("Test number: 4\n", stdout);
+
+	fputs("Initializing file.\n", stdout);
+	INIT(HurdLib, File, file, ERR(goto done));
+
+	fputs("Testing file read-write open.\n", stdout);
+	if ( !file->open_rw(file, "test.file") ) {
+		fputs("Error opening file.\n", stdout);
+		goto done;
+	}
+
+	fputs("Testing file write.\n", stdout);
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	if ( !bufr->add(bufr, (void *) msg, strlen(msg)+1) )
+		ERR(goto done);
+	file->write_Buffer(file, bufr);
+
+	fputs("Closing file.\n", stdout);
+	WHACK(file);
+
+	fputs("\nTesting file read-only open.\n", stdout);
+	INIT(HurdLib, File, file, ERR(goto done));
+	if ( !file->open_ro(file, "test.file") ) {
+		fputs("Error opening file.\n", stdout);
+		goto done;
+	}
+
+	fputs("\nTesting file slurp.\n", stdout);
+	bufr->reset(bufr);
+	if ( !file->slurp(file, bufr) ) {
+		fputs("Error slurping file.\n", stdout);
+		goto done;
+	}
+	bufr->hprint(bufr);
+
+
+ done:
+	WHACK(bufr);
+	WHACK(file);
+
+	return;
+}
+
+
 static void test_lost_object(void)
 
 {
@@ -135,6 +193,9 @@ void test_fusion(int test)
 			break;
 		case 3:
 			test_three();
+			break;
+		case 4:
+			test_four();
 			break;
 		case 100:
 			test_lost_object();

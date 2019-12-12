@@ -52,3 +52,5 @@ Version 0.9:
 	* Implement Report object to generate local attestation reports.
 
 	* Implement SRDEpipe object for enclave to enclave communications.
+
+	* Initial implementation of enclave File object.

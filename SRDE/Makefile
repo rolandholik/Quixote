@@ -23,7 +23,7 @@ CSRC = SRDEmetadata.c SRDEloader.c SRDEenclave.c SRDEsigstruct.c PVEenclave.c \
 	SRDEmessage.c SRDEecdsa.c PCEenclave.c SRDEcmac.c SRDEaesgcm.c	      \
 	SRDErsa.c  QEenclave.c SRDEepid.c SRDEquote.c SRDEquote_mgr.c	      \
 	SRDEocall.c SRDEfusion-ocall.c SRDEnaaaim-ocall.c srde-exception.c    \
-	srde-ocall.c SRDEpipe.c SRDEpipe_mgr.c
+	srde-ocall.c SRDEpipe.c SRDEpipe_mgr.c SRDEfile_mgr.c
 
 ASRC = srde-boot.s
 

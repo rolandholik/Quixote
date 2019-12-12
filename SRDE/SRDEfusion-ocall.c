@@ -24,6 +24,7 @@
 
 #include "SRDE.h"
 #include "SRDEocall.h"
+#include "SRDEfile_mgr.h"
 #include "SRDEfusion-ocall.h"
 
 
@@ -93,8 +94,9 @@ static int SRDEfusion_ocall1(struct SRDEfusion_ocall1_interface *ifp)
 /**
  * Null terminated table of SRDEfusion ocall pointers.
  */
-const void *SRDEfusion_ocall_table[3] = {
+const void *SRDEfusion_ocall_table[4] = {
 	SRDEfusion_ocall0,
 	SRDEfusion_ocall1,
+	SRDEfile_mgr,
 	NULL
 };

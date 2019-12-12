@@ -11,11 +11,12 @@ INSTPATH       = ${DESTDIR}/opt/IDfusion
 INSTALLENCLAVE = test-fusion.signed.so
 INSTINCLUDE    = Buffer.h Fibsequence.h HurdLib.h Origin.h SRDEfusion.h	   \
 	String.h alltypes.h features.h fusion-shim.h reg-support.h regex.h \
+	File.h
 
 CSRC   = test-fusion.c
 ENCSRC = test-fusion-enclave.c test-fusion-interface.c
 LIBSRC = fusion-shim.c fusion-time.c regcomp.c regexec.c regerror.c tre-mem.c \
-	reg-support.c inet.c Origin.c Fibsequence.c Buffer.c String.c
+	reg-support.c inet.c Origin.c Fibsequence.c Buffer.c String.c File.c
 ASRC   = enclu_ereport.s enclu_egetkey.s
 
 LIBNAME = SRDEfusion
@@ -115,8 +116,8 @@ test-fusion.signed.so: test-fusion.so
 	${SGX_SIGNER} sign -key ${SGXKEY} -enclave $< -out $@ \
 		-config test-fusion-enclave.xml;
 
-test-fusion.so: ${ENCOBJS}
-	${ENCLAVE_CC} -o $@ $^ ${ENCLAVE_LDFLAGS};
+test-fusion.so: ${ENCOBJS} ${LIBRARY}
+	${ENCLAVE_CC} -o $@ ${ENCOBJS} ${ENCLAVE_LDFLAGS};
 
 ldscript:
 	echo "{"			>  ldscript;
@@ -175,3 +176,4 @@ fusion-shim.o: fusion-shim.h
 Origin.o: HurdLib.h Origin.h
 Fibsequence.o: HurdLib.h Origin.h Fibsequence.h
 Buffer.o: HurdLib.h Origin.h Fibsequence.h Buffer.h
+File.o: HurdLib.h Origin.h Buffer.h String.h File.h

@@ -15,12 +15,14 @@
 
 #include <sgx_edger8r.h>
 
+#include <SRDEfusion-ocall.h>
+
 #define SGX_CAST(type, item) ((type)(item))
 
 
 /* Number of enclave interfaces. */
-#define ECALL_NUMBER 3
-#define OCALL_NUMBER 2
+#define ECALL_NUMBER 1
+#define OCALL_NUMBER SRDEFUSION_MAX_OCALL+1
 
 
 /* ECALL interface definitions. */

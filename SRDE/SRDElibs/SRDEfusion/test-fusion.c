@@ -12,7 +12,7 @@
 
 
 /* Number of tests. */
-#define NUMBER_OF_TESTS 3
+#define NUMBER_OF_TESTS 4
 
 /* Name of program and associated enclave. */
 #define PGM "test-fusion"

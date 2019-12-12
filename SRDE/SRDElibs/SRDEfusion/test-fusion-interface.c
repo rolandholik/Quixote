@@ -62,6 +62,7 @@ const struct {
 	OCALL_NUMBER,
 	{
 		{0},
+		{0},
 		{0}
 	}
 };
