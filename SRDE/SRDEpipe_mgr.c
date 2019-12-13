@@ -190,6 +190,7 @@ static void srdepipe_send_packet(struct SRDEpipe_ocall *ocp)
 	if ( !pipe->send_packet(pipe, 0, bufr) )
 		ERR(goto done);
 
+	ocp->bufr_size = 0;
 	if ( bufr->size(bufr) > 0 ) {
 		ocp->bufr      = bufr->get(bufr);
 		ocp->bufr_size = bufr->size(bufr);
