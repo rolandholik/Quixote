@@ -225,13 +225,11 @@ static void srdefile_write_Buffer(struct File_ocall *ocp)
 	File file = SRDE_files[ocp->instance];
 
 
-	bufr->reset(bufr);
-
-	if ( !file->slurp(file, bufr) )
+	if ( !bufr->add(bufr, ocp->bufr, ocp->bufr_size) )
 		ERR(goto done);
 
-	ocp->bufr      = bufr->get(bufr);
-	ocp->bufr_size = bufr->size(bufr);
+	if ( !file->write_Buffer(file, bufr) )
+		ERR(goto done);
 
 	retn = true;
 
