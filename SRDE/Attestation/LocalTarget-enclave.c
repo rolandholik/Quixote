@@ -363,6 +363,13 @@ _Bool test_pipe(struct SRDEpipe_ecall *ep)
 		ep->bufr_size = 0;
 		return true;
 	}
+	else {
+		packet->hprint(packet);
+		memset(ep->bufr, '\0', ep->bufr_size);
+		memcpy(ep->bufr, packet->get(packet), packet->size(packet));
+		ep->bufr_size = packet->size(packet);
+		return true;
+	}
 
 	retn = true;
 

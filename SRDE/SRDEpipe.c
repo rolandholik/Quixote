@@ -319,29 +319,43 @@ static _Bool send_packet(CO(SRDEpipe, this), const SRDEpipe_type type, \
 
 	int rc;
 
+	Buffer lbufr = NULL;
+
 	struct SRDEpipe_ecall ecall;
+
+
+	/* Clone the input buffer in order to support resizing. */
+	INIT(HurdLib, Buffer, lbufr, ERR(goto done));
+	if ( !lbufr->add_Buffer(lbufr, bufr) )
+		ERR(goto done);
 
 
 	/* Call the enclave slot to get target/report. */
 	memset(&ecall, '\0', sizeof(struct SRDEpipe_ecall));
-	ecall.bufr	= bufr->get(bufr);
-	ecall.bufr_size = bufr->size(bufr);
+	ecall.bufr	= lbufr->get(lbufr);
+	ecall.bufr_size = lbufr->size(lbufr);
 
 	if ( !S->enclave->boot_slot(S->enclave, S->slot, S->table, &ecall, \
 				    &rc) )
 		ERR(goto done);
 
-	bufr->reset(bufr);
 	if ( ecall.needed > 0 ) {
+		lbufr->reset(lbufr);
 		while ( ecall.needed-- )
-			bufr->add(bufr, (void *) "\0", 1);
-		if ( bufr->poisoned(bufr) )
+			lbufr->add(lbufr, (void *) "\0", 1);
+		if ( lbufr->poisoned(lbufr) )
 			ERR(goto done);
 
-		ecall.bufr	= bufr->get(bufr);
-		ecall.bufr_size = bufr->size(bufr);
+		ecall.bufr	= lbufr->get(lbufr);
+		ecall.bufr_size = lbufr->size(lbufr);
 		if ( !S->enclave->boot_slot(S->enclave, S->slot, S->table, \
 					    &ecall, &rc) )
+			ERR(goto done);
+	}
+
+	bufr->reset(bufr);
+	if ( ecall.bufr_size > 0 ){
+		if ( !bufr->add(bufr, lbufr->get(lbufr), ecall.bufr_size) )
 			ERR(goto done);
 	}
 
@@ -351,6 +365,8 @@ static _Bool send_packet(CO(SRDEpipe, this), const SRDEpipe_type type, \
  done:
 	if ( !retn )
 		S->poisoned = true;
+
+	WHACK(lbufr);
 
 	return retn;
 }

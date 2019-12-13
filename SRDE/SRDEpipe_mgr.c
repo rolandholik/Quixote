@@ -227,7 +227,8 @@ static void srdepipe_whack(struct SRDEpipe_ocall *ocp)
 	bufr->whack(bufr);
 	pipe->whack(pipe);
 
-	SRDE_pipes[ocp->instance] = NULL;
+	SRDE_pipes[ocp->instance]   = NULL;
+	SRDE_buffers[ocp->instance] = NULL;
 
 	return;
 }

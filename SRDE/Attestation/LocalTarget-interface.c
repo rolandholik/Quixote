@@ -181,7 +181,7 @@ static sgx_status_t sgx_test_attestation(void *ifp)
 static sgx_status_t sgx_test_pipe(void *ifp)
 
 {
-	sgx_status_t status = SGX_ERROR_INVALID_PARAMETER;
+	sgx_status_t retn = SGX_ERROR_INVALID_PARAMETER;
 
 	struct SRDEpipe_ecall *ip,
 			      *ep,
@@ -199,23 +199,23 @@ static sgx_status_t sgx_test_pipe(void *ifp)
 	ep->report    = ip->report;
 	ep->bufr_size = ip->bufr_size;
 
-
-	/* Verify buffer an allocate buffer. */
-	if ( ep->bufr_size != 0 ) {
+	/* Clone buffer to enclave context. */
+	if ( ep->bufr_size > 0 ) {
 		if ( !SGXidf_untrusted_region(ip->bufr, ep->bufr_size) )
 			goto done;
-		if ( (ep->bufr = malloc(ep->bufr_size)) == NULL )
+		if ( (ep->bufr = malloc(ep->bufr_size)) == NULL ) {
+			retn = SGX_ERROR_OUT_OF_MEMORY;
 			goto done;
+		}
 		memcpy(ep->bufr, ip->bufr, ep->bufr_size);
 	}
-
 
 	/* Call trusted function. */
 	__builtin_ia32_lfence();
 
 	ip->retn = test_pipe(ep);
 	if ( ip->retn ) {
-		status = SGX_SUCCESS;
+		retn = SGX_SUCCESS;
 		ip->target    = ep->target;
 		ip->report    = ep->report;
 		ip->needed    = ep->needed;
@@ -232,7 +232,7 @@ static sgx_status_t sgx_test_pipe(void *ifp)
 
 	memset(ep, '\0', sizeof(struct SRDEpipe_ecall));
 
-	return status;
+	return retn;
 }
 
 
