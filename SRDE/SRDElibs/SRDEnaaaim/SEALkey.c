@@ -421,6 +421,7 @@ _Bool _generate_iv_key(CO(SEALkey_State, S), int type)
 	WHACK(bufr);
 	WHACK(randbufr);
 	WHACK(sha256);
+	WHACK(rpt);
 
 	return retn;
 }
