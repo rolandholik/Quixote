@@ -17,6 +17,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <sys/types.h>
+
 #include <HurdLib.h>
 #include <Buffer.h>
 #include <String.h>

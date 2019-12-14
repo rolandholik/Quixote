@@ -18,6 +18,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include <sys/types.h>
+
 #include <HurdLib.h>
 
 #include <NAAAIM.h>
