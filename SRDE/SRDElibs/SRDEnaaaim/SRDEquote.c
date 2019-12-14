@@ -346,14 +346,14 @@ struct NAAAIM_SRDEquote_State
 	/* Object identifier. */
 	uint32_t objid;
 
-	/* Untrusted instance. */
-	unsigned int instance;
-
 	/* Object status. */
 	_Bool poisoned;
 
 	/* Flag to indicate that development mode is in effect. */
 	_Bool development;
+
+	/* Untrusted instance. */
+	unsigned int instance;
 
 	/* Quoting enclave target information. */
 	struct SGX_targetinfo qe_target_info;
@@ -513,19 +513,22 @@ static void _init_state(CO(SRDEquote_State, S)) {
 	S->libid = NAAAIM_LIBID;
 	S->objid = NAAAIM_SRDEquote_OBJID;
 
-	S->poisoned = false;
+	S->poisoned    = false;
+	S->development = false;
+
 	S->instance = 0;
 
-	S->report    = NULL;
+	memset(&S->qe_target_info, '\0', sizeof(struct SGX_targetinfo));
 
-	S->version   = NULL;
-	S->id	     = NULL;
-	S->timestamp = NULL;
+	S->report	= NULL;
+	S->version	= NULL;
+	S->id		= NULL;
+	S->timestamp	= NULL;
+	S->signature	= NULL;
+	S->certificate	= NULL;
+	S->nonce	= NULL;
 
-	S->signature   = NULL;
-	S->certificate = NULL;
-
-	S->status    = SRDEquote_status_UNDEFINED;
+	S->status = SRDEquote_status_UNDEFINED;
 
 	memset(&S->quote, '\0', sizeof(struct SRDE_quote));
 	memset(&S->platform_info, '\0', sizeof(struct platform_info));
