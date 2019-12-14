@@ -207,6 +207,54 @@ static void srdefile_slurp(struct File_ocall *ocp)
 /**
  * Internal private function.
  *
+ * This function implements invocation of the ->read_String method of
+ * the File object on behalf of the same method call from a File
+ * object running in enclave context.
+ *
+ * \param ocp	A pointer to the structure which is marshalling the
+ *		data into and out of the OCALL.
+ *
+ * \return	No return value is defined.
+ */
+
+static void srdefile_read_String(struct File_ocall *ocp)
+
+{
+	_Bool retn = false;
+
+	Buffer bufr = SRDE_buffers[ocp->instance];
+
+	File file = SRDE_files[ocp->instance];
+
+	String str = NULL;
+
+
+	INIT(HurdLib, String, str, ERR(goto done))
+	if ( !file->read_String(file, str) )
+		ERR(goto done);
+
+	bufr->reset(bufr);
+	if ( !bufr->add(bufr, (void *) str->get(str), str->size(str) + 1) )
+		ERR(goto done);
+
+	ocp->bufr      = bufr->get(bufr);
+	ocp->bufr_size = bufr->size(bufr);
+
+	retn = true;
+
+
+ done:
+	ocp->retn = retn;
+
+	WHACK(str);
+
+	return;
+}
+
+
+/**
+ * Internal private function.
+ *
  * This function implements invocation of the ->slurp method of
  * the File object on behalf of the same method call from a File
  * object running in enclave context.
@@ -328,6 +376,7 @@ int SRDEfile_mgr(struct File_ocall *ocp)
 			srdefile_slurp(ocp);
 			break;
 		case File_read_String:
+			srdefile_read_String(ocp);
 			break;
 		case File_write_Buffer:
 			srdefile_write_Buffer(ocp);

@@ -171,7 +171,8 @@ static int File_ocall(struct File_ocall *ocall)
 	if ( (status = sgx_ocall(SRDEFUSION_OCALL2, ocp)) == 0 ) {
 		retn = true;
 
-		if ( ocall->ocall == File_slurp ) {
+		if ( (ocall->ocall == File_slurp) ||
+		     (ocall->ocall == File_read_String) ) {
 			ocall->bufr	 = ocp->bufr;
 			ocall->bufr_size = ocp->bufr_size;
 		}
@@ -430,7 +431,35 @@ static _Bool slurp(CO(File, this), CO(Buffer, bufr))
 static _Bool read_String(CO(File, this), CO(String, str))
 
 {
-	return false;
+	STATE(S);
+
+	_Bool retn = false;
+
+	struct File_ocall ocall;
+
+
+	/* Setup OCALL structure. */
+	memset(&ocall, '\0', sizeof(struct File_ocall));
+
+	ocall.ocall    = File_read_String;
+	ocall.instance = S->instance;
+
+	if ( File_ocall(&ocall) != 0 )
+		ERR(goto done);
+
+	if ( ocall.bufr[ocall.bufr_size - 1] != '\0' )
+		ERR(goto done);
+	if ( !str->add(str, (char *) ocall.bufr) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
 }
 
 
