@@ -18,7 +18,12 @@
  **************************************************************************/
 
 /* Local defines. */
+#if defined(ENCLAVE_DIR)
 #define PROVISIONER_HOST "acpv.idfusion.net"
+#else
+#define PROVISIONER_HOST "localhost"
+#endif
+
 #define PROVISIONER_PORT 12902
 #define CREDENTIAL_FILE  "/var/lib/IDfusion/data/attestation.bin"
 
@@ -208,13 +213,6 @@ _Bool provision_credentials(struct Attestation_ecall0 *ep)
 		ERR(goto done);
 
 
-	fputs("\nSPID:   ", stdout);
-	spid->print(spid);
-
-	fputs("APIkey: ", stdout);
-	apikey->print(apikey);
-
-
 	/* Save the keys. */
 	INIT(NAAAIM, SEALEDblob, creds, ERR(goto done));
 	if ( !creds->add_Buffer(creds, spid) )
@@ -225,15 +223,12 @@ _Bool provision_credentials(struct Attestation_ecall0 *ep)
 		ERR(goto done);
 
 	INIT(HurdLib, File, file, ERR(goto done));
-	if ( !file->open_rw(file, "cred.blob") )
+	if ( !file->open_rw(file, CREDENTIAL_FILE) )
 		ERR(goto done);
 
 	apikey->reset(apikey);
 	if ( !creds->get_Buffer(creds, apikey) )
 		ERR(goto done);
-
-	fputs("Writing creds:\n", stdout);
-	apikey->hprint(apikey);
 
 	if ( !file->write_Buffer(file, apikey) )
 		ERR(goto done);

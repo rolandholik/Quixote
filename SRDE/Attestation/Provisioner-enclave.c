@@ -32,9 +32,12 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <sys/types.h>
+
 #include <HurdLib.h>
 #include <Buffer.h>
 #include <String.h>
+#include <File.h>
 
 #include <SRDE.h>
 #include <SRDEfusion.h>
@@ -184,8 +187,6 @@ _Bool provisioner(struct Provisioner_ecall1 *ep)
 
 	uint64_t attributes;
 
-	char *spidstr = "00000000000000000000000000000000";
-
 	PossumPipe pipe = NULL;
 
 	Buffer spid	   = NULL,
@@ -193,14 +194,30 @@ _Bool provisioner(struct Provisioner_ecall1 *ep)
 	       signer	   = NULL,
 	       measurement = NULL;
 
+	String spidstr = NULL;
+
+	File file = NULL;
+
 
 	/* Initialize the time. */
 	Current_Time = ep->current_time;
 
-	/* Use a local SPID for the connection. */
-	INIT(HurdLib, Buffer, spid, ERR(goto done));
-	if ( !spid->add_hexstring(spid, spidstr) )
+
+	/* Load a local SPID to authenticate the PossumPipe connection. */
+	INIT(HurdLib, File, file, ERR(goto done));
+	if ( !file->open_ro(file, "/opt/IDfusion/etc/spid.txt") )
 		ERR(goto done);
+
+	INIT(HurdLib, String, spidstr, ERR(goto done));
+	if ( !file->read_String(file, spidstr) )
+		ERR(goto done);
+
+	INIT(HurdLib, Buffer, spid, ERR(goto done));
+	if ( !spid->add_hexstring(spid, spidstr->get(spidstr)) )
+		ERR(goto done);
+
+	WHACK(file);
+	WHACK(spidstr);
 
 
 	/* Start the server listening. */
