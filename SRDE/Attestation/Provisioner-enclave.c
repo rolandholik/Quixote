@@ -184,9 +184,12 @@ _Bool provisioner(struct Provisioner_ecall1 *ep)
 
 	uint64_t attributes;
 
+	char *spidstr = "00000000000000000000000000000000";
+
 	PossumPipe pipe = NULL;
 
 	Buffer spid	   = NULL,
+	       key	   = NULL,
 	       signer	   = NULL,
 	       measurement = NULL;
 
@@ -194,14 +197,14 @@ _Bool provisioner(struct Provisioner_ecall1 *ep)
 	/* Initialize the time. */
 	Current_Time = ep->current_time;
 
-	/* Convert the SPID value into binary form. */
+	/* Use a local SPID for the connection. */
 	INIT(HurdLib, Buffer, spid, ERR(goto done));
-	if ( !spid->add_hexstring(spid, ep->spid) )
+	if ( !spid->add_hexstring(spid, spidstr) )
 		ERR(goto done);
 
 
 	/* Start the server listening. */
-	fputs("Starting provisioning server.\n", stdout);
+	fputs("Starting provisioning listener.\n", stdout);
 
 	INIT(NAAAIM, PossumPipe, pipe, ERR(goto done));
 	if ( !pipe->init_server(pipe, NULL, PORT, false) )
@@ -233,6 +236,19 @@ _Bool provisioner(struct Provisioner_ecall1 *ep)
 	fprintf(stdout, "Attributes:\n\t%lu\n", attributes);
 	fprintf(stdout, "Software:\n\t%u/%u\n", vendor, svn);
 
+	INIT(HurdLib, Buffer, key, ERR(goto done));
+
+	if ( !key->add(key, (void *) ep->spid, strlen(ep->spid)) )
+		ERR(goto done);
+	if ( !pipe->send_packet(pipe, PossumPipe_data, key) )
+		ERR(goto done);
+
+	key->reset(key);
+	if ( !key->add(key, (void *) ep->apikey, strlen(ep->apikey)) )
+		ERR(goto done);
+	if ( !pipe->send_packet(pipe, PossumPipe_data, key) )
+		ERR(goto done);
+
 	retn = true;
 
 
@@ -242,6 +258,7 @@ _Bool provisioner(struct Provisioner_ecall1 *ep)
 
 	WHACK(pipe);
 	WHACK(spid);
+	WHACK(key);
 	WHACK(signer);
 	WHACK(measurement);
 

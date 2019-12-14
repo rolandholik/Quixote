@@ -272,8 +272,8 @@ _Bool test_attestation(struct LocalTarget_ecall1 *ip)
 /**
  * External ECALL 2.
  *
- * This method implements testing of an SRDEpipe connection to a
- * target enclave.
+ * This method implements testing of the target endpoint of an
+ * SRDEpipe communications conduit.
  *
  * \return	A boolean value is used to indicate whether or not
  *		testing of the SRDEpipe succeeded.  A false value
@@ -377,6 +377,119 @@ _Bool test_pipe(struct SRDEpipe_ecall *ep)
  done:
 	ep->bufr_size = 0;
 	WHACK(packet);
+
+	return retn;
+}
+
+
+/**
+ * External ECALL 3.
+ *
+ * This method implements testing of the remote attestation service
+ * provider enclave.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		testing of the service succeeded.  A false value
+ *		indicates the test failed.  A true value indicates
+ *		the test was successful.
+ */
+
+_Bool test_attestation_service(struct LocalTarget_ecall3 *ep)
+
+{
+	_Bool retn = false;
+
+	unsigned int cmd;
+
+	struct SGX_targetinfo target;
+
+	struct SGX_report report;
+
+	Buffer packet = NULL;
+
+	String output = NULL;
+
+	SRDEpipe pipe = NULL;
+
+	Report rpt = NULL;
+
+	SRDEquote quoter = NULL;
+
+
+	INIT(NAAAIM, SRDEpipe, pipe, ERR(goto done));
+	if ( !pipe->setup(pipe, "Attestation.signed.so", 1, \
+			  "Attestation.token", true) )
+		ERR(goto done);
+
+	if ( !pipe->connect(pipe) )
+		ERR(goto done);
+
+
+	/* Send an enclave report. */
+	INIT(HurdLib, Buffer, packet, ERR(goto done));
+
+
+	/* Request QE target information. */
+	cmd = 1;
+	if ( !packet->add(packet, (void *) &cmd, sizeof(unsigned int)) )
+		ERR(goto done);
+	if ( !pipe->send_packet(pipe, SRDEpipe_data, packet) )
+		ERR(goto done);
+
+	if ( !pipe->receive_packet(pipe, packet) )
+		ERR(goto done);
+	if ( packet->size(packet) == 0 )
+		ERR(goto done);
+
+
+	/* Generate enclave report and return it. */
+	INIT(NAAAIM, Report, rpt, ERR(goto done));
+	memcpy(&target, packet->get(packet), sizeof(struct SGX_targetinfo));
+	if ( !rpt->generate_report(rpt, &target, NULL, &report) )
+		ERR(goto done);
+
+	cmd = 2;
+	packet->reset(packet);
+
+	if ( !packet->add(packet, (void *) &cmd, sizeof(unsigned int)) )
+		ERR(goto done);
+	if ( !packet->add(packet, (void *) &report, sizeof(report)) )\
+		ERR(goto done);
+
+	if ( !pipe->send_packet(pipe, SRDEpipe_data, packet) )
+		ERR(goto done);
+
+
+	/* Process the report. */
+	if ( !pipe->receive_packet(pipe, packet) )
+		ERR(goto done);
+	if ( packet->size(packet) == 0 )
+		ERR(goto done);
+
+	INIT(HurdLib, String, output, ERR(goto done));
+	if ( !output->add(output, (char *) packet->get(packet)) )
+		ERR(goto done);
+
+	INIT(NAAAIM, SRDEquote, quoter, ERR(goto done));
+	if ( !quoter->decode_report(quoter, output) )
+		ERR(goto done);
+
+	quoter->dump_report(quoter);
+
+
+	/* Terminate the connection. */
+	if ( !pipe->close(pipe) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	WHACK(packet);
+	WHACK(output);
+	WHACK(pipe);
+	WHACK(rpt);
+	WHACK(quoter);
 
 	return retn;
 }

@@ -10,11 +10,6 @@
  **************************************************************************/
 
 
-/* Number of enclave interfaces. */
-#define ECALL_NUMBER 3
-#define OCALL_NUMBER SRDENAAAIM_MAX_OCALL+1
-
-
 /* ECALL interface definitions. */
 struct LocalTarget_ecall0_interface {
 	_Bool retn;
@@ -43,4 +38,9 @@ struct LocalTarget_ecall1 {
 	char *spid;
 
 	char key[33];
+};
+
+
+struct LocalTarget_ecall3 {
+	_Bool retn;
 };

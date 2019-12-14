@@ -40,7 +40,78 @@
 #include <SRDEfusion-ocall.h>
 #include <SRDEnaaaim-ocall.h>
 
+#include "LocalSource-interface.h"
+#include "LocalTarget-interface.h"
 #include "Attestation-interface.h"
+
+
+/**
+ * Private function
+ *
+ * This function implements the test mode which requests a remote
+ * report of the LocalSource unit test enclave.
+ *
+ * \param token		A pointer to the null-terminated buffer
+ *			containing the launch token for the unit
+ *			test enclave.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the unit testing succeeded.  A false value
+ *		indicates testing failed while a true value indicates
+ *		it was successful.
+ */
+
+_Bool test_mode(const char *token)
+
+{
+	_Bool retn = false;
+
+	char *enclave = "LocalTarget.signed.so";
+
+	int rc;
+
+	struct LocalTarget_ecall3 ecall;
+
+	struct OCALL_api *table;
+
+	SRDEenclave source = NULL;
+
+	SRDEocall ocall = NULL;
+
+
+	/* Initialize the source enclave. */
+	INIT(NAAAIM, SRDEenclave, source, ERR(goto done));
+	if ( !source->setup(source, enclave, token, true) )
+		ERR(goto done);
+
+
+	/* Setup OCALL table. */
+	INIT(NAAAIM, SRDEocall, ocall, ERR(goto done));
+
+	ocall->add_table(ocall, SRDEfusion_ocall_table);
+	ocall->add_table(ocall, SRDEnaaaim_ocall_table);
+
+	if ( !ocall->get_table(ocall, &table) )
+		ERR(goto done);
+
+
+	/* Invoke the attestation testing ECALL. */
+	fputs("srde-attestation: Testing remote attestation.\n", stdout);
+
+	if ( !source->boot_slot(source, 3, table, &ecall, &rc) ) {
+		fprintf(stderr, "Enclave return error: %d\n", rc);
+		ERR(goto done);
+	}
+	if ( !ecall.retn )
+		ERR(goto done);
+
+
+ done:
+	WHACK(source);
+	WHACK(ocall);
+
+	return retn;
+}
 
 
 /* Program entry point. */
@@ -59,7 +130,8 @@ extern int main(int argc, char *argv[])
 
 	enum {
 		none,
-		provision
+		provision,
+		test
 	} mode = none;
 
 	struct OCALL_api *ocall_table;
@@ -76,10 +148,13 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "Pk:t:")) != EOF )
+	while ( (opt = getopt(argc, argv, "PTk:t:")) != EOF )
 		switch ( opt ) {
 			case 'P':
 				mode = provision;
+				break;
+			case 'T':
+				mode = test;
 				break;
 
 			case 'k':
@@ -97,14 +172,21 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
-	if ( key == NULL ) {
+	if ( (mode == provision) && (key == NULL) ) {
 		fputs("No authentication key specified.\n", stderr);
 		goto done;
 	}
 
 
+	/* Execute test mode. */
+	if ( mode == test ) {
+		if ( test_mode(token) )
+			retn = 0;
+		goto done;
+	}
+
+
 	/* Initialize the provisioning enclave. */
-	fprintf(stdout, "Enclave: %s, Token: %s\n", enclave_name, token);
 	INIT(NAAAIM, SRDEenclave, enclave, ERR(goto done));
 	if ( !enclave->setup(enclave, enclave_name, token, debug_enclave) )
 		ERR(goto done);

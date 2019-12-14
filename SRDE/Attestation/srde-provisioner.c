@@ -135,11 +135,14 @@ extern int main(int argc, char *argv[])
 
 
 	/* Load the private keys. */
+	fputs("srde-provisioner: Starting credential provisioner.\n", stdout);
+	fputs("Loading authenticating keys:\n", stdout);
+
 	INIT(HurdLib, File, keyfile, ERR(goto done));
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 
 	for (lp= 0; lp < key_cnt; ++lp) {
-		fprintf(stdout, "Loading key: %s\n", public_keys[lp]);
+		fprintf(stdout, "\tLoading: %s\n", public_keys[lp]);
 		if ( !keyfile->open_ro(keyfile, public_keys[lp]) )
 			ERR(goto done);
 		if ( !keyfile->slurp(keyfile, bufr) )

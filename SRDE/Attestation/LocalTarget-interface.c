@@ -5,6 +5,14 @@
  * the source tree for copyright and licensing information.
  **************************************************************************/
 
+/* Local defines. */
+
+/* Number of enclave interfaces. */
+#define ECALL_NUMBER 4
+#define OCALL_NUMBER SRDENAAAIM_MAX_OCALL+1
+
+
+/* Include files. */
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
@@ -41,6 +49,7 @@ extern _Bool get_report(unsigned int, struct SGX_targetinfo *, \
 			struct SGX_report *);
 extern _Bool test_attestation(struct LocalTarget_ecall1 *);
 extern _Bool test_pipe(struct SRDEpipe_ecall *);
+extern _Bool test_attestation_service(struct LocalTarget_ecall3 *);
 
 
 static _Bool SGXidf_untrusted_region(void *ptr, size_t size)
@@ -236,6 +245,37 @@ static sgx_status_t sgx_test_pipe(void *ifp)
 }
 
 
+/* ECALL 3 interface function. */
+static sgx_status_t sgx_test_attestation_service(void *ifp)
+
+{
+	sgx_status_t retn = SGX_ERROR_INVALID_PARAMETER;
+
+	struct LocalTarget_ecall3 *ip,
+				  ecall;
+
+
+	memset(&ecall, '\0', sizeof(struct LocalTarget_ecall3));
+
+	if ( !SGXidf_untrusted_region(ifp, sizeof(struct LocalTarget_ecall3)) )
+		goto done;
+	ip = (struct LocalTarget_ecall3 *) ifp;
+
+	__builtin_ia32_lfence();
+
+
+	/* Call the trusted function. */
+	ip->retn = test_attestation_service(&ecall);
+	retn = SGX_SUCCESS;
+
+
+ done:
+	memset(&ecall, '\0', sizeof(struct LocalTarget_ecall3));
+
+	return retn;
+}
+
+
 /* ECALL interface table. */
 SGX_EXTERNC const struct {
 	size_t nr_ecall;
@@ -245,7 +285,8 @@ SGX_EXTERNC const struct {
 	{
 		{(void*)(uintptr_t)sgx_get_report, 0},
 		{(void*)(uintptr_t)sgx_test_attestation, 0},
-		{(void *) sgx_test_pipe, 0}
+		{(void *) sgx_test_pipe, 0},
+		{(void *) sgx_test_attestation_service, 0}
 	}
 };
 
@@ -257,12 +298,12 @@ SGX_EXTERNC const struct {
 } g_dyn_entry_table = {
 	OCALL_NUMBER,
 	{
-		{0, 0, 0},
-		{0, 0, 0},
-		{0, 0, 0},
-		{0, 0, 0},
-		{0, 0, 0},
-		{0, 0, 0},
-		{0, 0, 0}
+		{0, 0, 0, 0},
+		{0, 0, 0, 0},
+		{0, 0, 0, 0},
+		{0, 0, 0, 0},
+		{0, 0, 0, 0},
+		{0, 0, 0, 0},
+		{0, 0, 0, 0}
 	}
 };

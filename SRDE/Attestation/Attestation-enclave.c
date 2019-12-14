@@ -18,8 +18,13 @@
  **************************************************************************/
 
 /* Local defines. */
-#define PROVISIONER_HOST "localhost"
+#define PROVISIONER_HOST "acpv.idfusion.net"
 #define PROVISIONER_PORT 12902
+#define CREDENTIAL_FILE  "/var/lib/IDfusion/data/attestation.bin"
+
+#define QE_TOKEN	"/var/lib/IDfusion/tokens/libsgx_qe.token"
+#define PCE_TOKEN	"/var/lib/IDfusion/tokens/libsgx_pce.token"
+#define EPID		"/var/lib/IDfusion/data/EPID.bin"
 
 
 /* Include files. */
@@ -27,13 +32,16 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include <sys/types.h>
 
 #include <HurdLib.h>
 #include <Buffer.h>
 #include <String.h>
+#include <File.h>
 
 #include <SRDE.h>
 #include <SRDEfusion.h>
+#include <File.h>
 
 #include <NAAAIM.h>
 #include <RandomBuffer.h>
@@ -43,6 +51,7 @@
 #include <Report.h>
 #include <SRDEpipe.h>
 #include <PossumPipe.h>
+#include <SEALEDblob.h>
 
 #include <SRDEfusion-ocall.h>
 #include <SRDEnaaaim-ocall.h>
@@ -132,10 +141,16 @@ _Bool provision_credentials(struct Attestation_ecall0 *ep)
 
 	PossumPipe pipe = NULL;
 
-	Buffer signer	   = NULL,
+	Buffer spid	   = NULL,
+	       apikey	   = NULL,
+	       signer	   = NULL,
 	       measurement = NULL;
 
 	RSAkey key = NULL;
+
+	SEALEDblob creds = NULL;
+
+	File file = NULL;
 
 
 	/* Initialize the time. */
@@ -183,17 +198,226 @@ _Bool provision_credentials(struct Attestation_ecall0 *ep)
 	fprintf(stdout, "Software:\n\t%u/%u\n", vendor, svn);
 
 
-	/* Run client mode test. */
+	/* Read the SPID and APIkey values. */
+	INIT(HurdLib, Buffer, spid, ERR(goto done));
+	INIT(HurdLib, Buffer, apikey, ERR(goto done));
+
+	if ( !pipe->receive_packet(pipe, spid) )
+		ERR(goto done);
+	if ( !pipe->receive_packet(pipe, apikey) )
+		ERR(goto done);
+
+
+	fputs("\nSPID:   ", stdout);
+	spid->print(spid);
+
+	fputs("APIkey: ", stdout);
+	apikey->print(apikey);
+
+
+	/* Save the keys. */
+	INIT(NAAAIM, SEALEDblob, creds, ERR(goto done));
+	if ( !creds->add_Buffer(creds, spid) )
+		ERR(goto done);
+	if ( !creds->add_Buffer(creds, apikey) )
+		ERR(goto done);
+	if ( !creds->seal(creds) )
+		ERR(goto done);
+
+	INIT(HurdLib, File, file, ERR(goto done));
+	if ( !file->open_rw(file, "cred.blob") )
+		ERR(goto done);
+
+	apikey->reset(apikey);
+	if ( !creds->get_Buffer(creds, apikey) )
+		ERR(goto done);
+
+	fputs("Writing creds:\n", stdout);
+	apikey->hprint(apikey);
+
+	if ( !file->write_Buffer(file, apikey) )
+		ERR(goto done);
 
 
  done:
+	WHACK(spid);
+	WHACK(apikey);
 	WHACK(pipe);
 	WHACK(signer);
 	WHACK(measurement);
 	WHACK(key);
+	WHACK(creds);
+	WHACK(file);
 
 	return retn ? 0 : 1;
 
+}
+
+
+/**
+ * Private function
+ *
+ * This function fetches the quoting enclave target information for
+ * the attesting client.
+ *
+ * \param		The SRDEquote object that is being used to
+ *			implement the report generation.
+
+ * \param packet	A pointer to the object that will be used
+ *			to return information to the client.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the generation of the target information succeeded.  A
+ *		false value indicates testing failed while a true value
+ *		indicates it was successful.
+ */
+
+_Bool _get_qe_targetinfo(CO(SRDEquote, quoter), CO(Buffer, packet))
+
+{
+	_Bool retn = false;
+
+	struct SGX_targetinfo *tp;
+
+
+	/* Initial the quoting object and obtain QE target information. */
+	if ( !quoter->init(quoter, QE_TOKEN, PCE_TOKEN, EPID) )
+		ERR(goto done);
+
+	tp = quoter->get_qe_targetinfo(quoter);
+
+	packet->reset(packet);
+	if ( !packet->add(packet, (void *) tp, sizeof(struct SGX_targetinfo)) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * Private function
+ *
+ * This function implements generation of the quote for the enclave
+ * that has initiated the request for attestation.  That quote is
+ * then used to generate a request for a remote attestation report
+ * on that enclave
+ *
+ * \param quoter	The SRDEquote object being used to manage
+ *			generation of the quote and report.
+ *
+ * \param packet	A pointer to the object containing the target
+ *			report and in which the attestation report
+ *			will be returned.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the generation fo the report succeeded.  A false value
+ *		indicates testing failed while a true value indicates
+ *		the output object contains a valid report.
+ */
+
+_Bool _request_report(CO(SRDEquote, quoter), CO(Buffer, packet))
+
+{
+	_Bool retn = false;
+
+	uint8_t *bp;
+
+	char keystr[33];
+
+	struct SGX_report report;
+
+	Buffer spid   = NULL,
+	       creds  = NULL,
+	       quote  = NULL;
+
+	String spidkey = NULL,
+	       apikey  = NULL,
+	       ias     = NULL;
+
+	File file = NULL;
+
+	SEALEDblob credblob = NULL;
+
+	RandomBuffer nonce = NULL;
+
+
+	/* Unseal the attestation credentials. */
+	INIT(HurdLib, Buffer, creds, ERR(goto done));
+	INIT(HurdLib, File, file, ERR(goto done));
+	if ( !file->open_ro(file, CREDENTIAL_FILE) )
+		ERR(goto done);
+	if ( !file->slurp(file, creds) )
+		ERR(goto done);
+
+	INIT(NAAAIM, SEALEDblob, credblob, ERR(goto done));
+	if ( !credblob->add_Buffer(credblob, creds) )
+		ERR(goto done);
+	if ( !credblob->unseal(credblob) )
+		ERR(goto done);
+
+	creds->reset(creds);
+	if ( !credblob->get_Buffer(credblob, creds) )
+		ERR(goto done);
+
+	INIT(HurdLib, String, spidkey, ERR(goto done));
+	memset(keystr, '\0', sizeof(keystr));
+	memcpy(keystr, creds->get(creds), creds->size(creds) / 2);
+	if ( !spidkey->add(spidkey, keystr) )
+		ERR(goto done);
+
+	INIT(HurdLib, String, apikey, ERR(goto done));
+	memcpy(keystr, creds->get(creds) + spidkey->size(spidkey), \
+	       creds->size(creds) / 2);
+	if ( !apikey->add(apikey, keystr) )
+		ERR(goto done);
+
+
+	/* Generate quote. */
+	INIT(NAAAIM, RandomBuffer, nonce, ERR(goto done));
+	if ( !nonce->generate(nonce, 16) )
+		ERR(goto done);
+
+	bp = packet->get(packet) + sizeof(unsigned int);
+	memcpy(&report, bp, sizeof(struct SGX_report));
+
+	INIT(HurdLib, Buffer, spid, ERR(goto done));
+	if ( !spid->add_hexstring(spid, spidkey->get(spidkey)) )
+		ERR(goto done);
+
+	INIT(HurdLib, Buffer, quote, ERR(goto done));
+	if ( !quoter->generate_quote(quoter, &report, spid, \
+				     nonce->get_Buffer(nonce), quote) )
+		ERR(goto done);
+
+
+	/* Generate attestation report. */
+	INIT(HurdLib, String, ias, ERR(goto done));
+	if ( !quoter->generate_report(quoter, quote, ias, apikey) )
+		ERR(goto done);
+
+	packet->reset(packet);
+	if ( !packet->add(packet, (void *) ias->get(ias), ias->size(ias) + 1) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	WHACK(spid);
+	WHACK(creds);
+	WHACK(quote);
+	WHACK(spidkey);
+	WHACK(apikey);
+	WHACK(ias);
+	WHACK(file);
+	WHACK(credblob);
+	WHACK(nonce);
+
+	return retn;
 }
 
 
@@ -217,11 +441,20 @@ _Bool generate_report(struct SRDEpipe_ecall *ep)
 {
 	_Bool retn = false;
 
+	unsigned int *sp;
+
 	SRDEpipe_type type;
+
+	static enum {
+		waiting,
+		send_report
+	} request_state = waiting;
 
 	static Buffer packet = NULL;
 
 	static SRDEpipe pipe = NULL;
+
+	static SRDEquote quoter = NULL;
 
 
 	if ( packet != NULL ) {
@@ -257,6 +490,7 @@ _Bool generate_report(struct SRDEpipe_ecall *ep)
 	/* Connection is established - handle packet processing. */
 	if ( packet == NULL )
 		INIT(HurdLib, Buffer, packet, ERR(goto done));
+
 	if ( !packet->add(packet, ep->bufr, ep->bufr_size) )
 		ERR(goto done);
 
@@ -264,30 +498,52 @@ _Bool generate_report(struct SRDEpipe_ecall *ep)
 		ERR(goto done);
 
 	if ( type == SRDEpipe_eop ) {
-		retn = true;
+		WHACK(packet);
 		WHACK(pipe);
+
+		retn = true;
 		goto done;
 	}
 
-	fputs("\nTarget packet contents:\n", stdout);
-	packet->hprint(packet);
+
+	/* Handle incoming packet. */
+	sp = (unsigned int *) packet->get(packet);
+
+	switch ( request_state ) {
+		case waiting:
+			if ( *sp != 1 )
+				ERR(goto done);
+
+			INIT(NAAAIM, SRDEquote, quoter, ERR(goto done));
+			if ( !_get_qe_targetinfo(quoter, packet) )
+				ERR(goto done);
+
+			request_state = send_report;
+			break;
+
+		case send_report:
+			if ( *sp != 2 )
+				ERR(goto done);
+			if ( !_request_report(quoter, packet) )
+				ERR(goto done);
+			WHACK(quoter);
+			break;
+	}
 
 
-	/* Send return packet message. */
-#if 0
-	if ( !packet->add(packet, (void *) msg, strlen(msg) + 1) )
-		ERR(goto done);
-#endif
-
-	fputs("\nTarget sending return message:\n", stdout);
-	packet->hprint(packet);
-
+	/* Return packet. */
 	if ( !pipe->send_packet(pipe, SRDEpipe_data, packet) )
 		ERR(goto done);
-
 	if ( packet->size(packet) > ep->bufr_size ) {
 		ep->needed = packet->size(packet);
 		ep->bufr_size = 0;
+		return true;
+	}
+	else {
+		memset(ep->bufr, '\0', ep->bufr_size);
+		memcpy(ep->bufr, packet->get(packet), packet->size(packet));
+		ep->bufr_size = packet->size(packet);
+		WHACK(packet);
 		return true;
 	}
 
@@ -296,7 +552,6 @@ _Bool generate_report(struct SRDEpipe_ecall *ep)
 
  done:
 	ep->bufr_size = 0;
-	WHACK(packet);
 
 	return retn;
 }

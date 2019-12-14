@@ -10,6 +10,13 @@
  * the source tree for copyright and licensing information.
  **************************************************************************/
 
+/* Local defines. */
+/* Number of enclave interfaces. */
+#define ECALL_NUMBER 2
+#define OCALL_NUMBER SRDENAAAIM_MAX_OCALL+1
+
+
+/* Include files. */
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
@@ -103,7 +110,7 @@ static sgx_status_t iface0_provision_credentials(void *ifp)
 static sgx_status_t iface1_generate_report(void *ifp)
 
 {
-	sgx_status_t status = SGX_ERROR_INVALID_PARAMETER;
+	sgx_status_t retn = SGX_ERROR_INVALID_PARAMETER;
 
 	struct SRDEpipe_ecall *ip,
 			      *ep,
@@ -115,20 +122,47 @@ static sgx_status_t iface1_generate_report(void *ifp)
 		goto done;
 	ip = (struct SRDEpipe_ecall *) ifp;
 	ep = &ecall;
-	memset(&ecall, '\0', sizeof(struct SRDEpipe_ecall));
+
+	memset(ep, '\0', sizeof(struct SRDEpipe_ecall));
+	ep->target    = ip->target;
+	ep->report    = ip->report;
+	ep->bufr_size = ip->bufr_size;
+
+	/* Clone buffer to enclave context. */
+	if ( ep->bufr_size > 0 ) {
+		if ( !SGXidf_untrusted_region(ip->bufr, ep->bufr_size) )
+			goto done;
+		if ( (ep->bufr = malloc(ep->bufr_size)) == NULL ) {
+			retn = SGX_ERROR_OUT_OF_MEMORY;
+			goto done;
+		}
+		memcpy(ep->bufr, ip->bufr, ep->bufr_size);
+	}
 
 	__builtin_ia32_lfence();
 
 
 	/* Call trusted function. */
 	ip->retn = generate_report(ep);
-	status = SGX_SUCCESS;
+	if ( ip->retn ) {
+		retn = SGX_SUCCESS;
+		ip->target    = ep->target;
+		ip->report    = ep->report;
+		ip->needed    = ep->needed;
+		ip->bufr_size = ep->bufr_size;
+		if ( ep->bufr_size > 0 )
+			memcpy(ip->bufr, ep->bufr, ep->bufr_size);
+	}
 
 
  done:
+	if ( ep->bufr != NULL )
+		memset(ep->bufr, '\0', ep->bufr_size);
+	free(ep->bufr);
+
 	memset(ep, '\0', sizeof(struct SRDEpipe_ecall));
 
-	return status;
+	return retn;
 }
 
 
