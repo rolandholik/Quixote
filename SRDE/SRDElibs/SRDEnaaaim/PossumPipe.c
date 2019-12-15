@@ -3418,6 +3418,10 @@ static void reset(CO(PossumPipe, this))
 	STATE(S);
 
 
+	/* Reset the quoting object. */
+	WHACK(S->remote);
+
+
 	/* Clear the security state information. */
 	if ( S->nonce != NULL )
 		S->nonce->reset(S->nonce);
