@@ -163,6 +163,73 @@ _Bool register_keys(struct Provisioner_ecall0 *ep)
 
 
 /**
+ * Private function.
+ *
+ * The following function is a wrapper function for one invocation of
+ * a credential provisioning session.  It verifies the identity of
+ * the requesting enclave and if it matches one of the approved identity
+ * characteristics a copy of the SPID and APIkey are returned.
+ *
+ * \param pipe		The communications object being used for the
+ *			connection.
+ *
+ * \param spid		The object containing the service provisioning
+ *			identity to be returned.
+ *
+ * \param apikey	The object containing the APIkey that is to
+ *			be returned.
+ *
+ * \return		No return value is currently defined.
+ */
+
+static void _process_request(CO(PossumPipe, pipe), CO(Buffer, spid), \
+			     CO(Buffer, apikey))
+
+{
+	uint16_t vendor,
+		 svn;
+
+	uint64_t attributes;
+
+	Buffer key	   = NULL,
+	       signer	   = NULL,
+	       measurement = NULL;
+
+
+	/* Verify client connection. */
+	INIT(HurdLib, Buffer, signer, ERR(goto done));
+	INIT(HurdLib, Buffer, measurement, ERR(goto done));
+
+	if ( !pipe->get_connection(pipe, &attributes, signer, measurement, \
+				   &vendor, &svn) )
+		ERR(goto done);
+
+	fputs("\nHave connection.\n", stdout);
+	fputs("Signer:\n\t", stdout);
+	signer->print(signer);
+	fputs("Measurement:\n\t", stdout);
+	measurement->print(measurement);
+	fprintf(stdout, "Attributes:\n\t%lu\n", attributes);
+	fprintf(stdout, "Software:\n\t%u/%u\n", vendor, svn);
+
+	INIT(HurdLib, Buffer, key, ERR(goto done));
+
+	if ( !pipe->send_packet(pipe, PossumPipe_data, spid) )
+		ERR(goto done);
+	if ( !pipe->send_packet(pipe, PossumPipe_data, apikey) )
+		ERR(goto done);
+
+
+ done:
+	WHACK(key);
+	WHACK(signer);
+	WHACK(measurement);
+
+	return;
+}
+
+
+/**
  * ECALL 1.
  *
  * This method implements the loading of public keys that verify clients
@@ -182,17 +249,11 @@ _Bool provisioner(struct Provisioner_ecall1 *ep)
 {
 	_Bool retn = false;
 
-	uint16_t vendor,
-		 svn;
-
-	uint64_t attributes;
-
 	PossumPipe pipe = NULL;
 
-	Buffer spid	   = NULL,
-	       key	   = NULL,
-	       signer	   = NULL,
-	       measurement = NULL;
+	Buffer pipespid = NULL,
+	       spid	= NULL,
+	       apikey	= NULL;
 
 	String spidstr = NULL;
 
@@ -212,61 +273,47 @@ _Bool provisioner(struct Provisioner_ecall1 *ep)
 	if ( !file->read_String(file, spidstr) )
 		ERR(goto done);
 
-	INIT(HurdLib, Buffer, spid, ERR(goto done));
-	if ( !spid->add_hexstring(spid, spidstr->get(spidstr)) )
+	INIT(HurdLib, Buffer, pipespid, ERR(goto done));
+	if ( !pipespid->add_hexstring(pipespid, spidstr->get(spidstr)) )
 		ERR(goto done);
 
 	WHACK(file);
 	WHACK(spidstr);
 
 
+	/* Convert the SPID's to buffer object. */
+	INIT(HurdLib, Buffer, spid, ERR(goto done));
+	if ( !spid->add(spid, (void *) ep->spid, strlen(ep->spid)) )
+		ERR(goto done);
+
+	INIT(HurdLib, Buffer, apikey, ERR(goto done));
+	if ( !apikey->add(apikey, (void *) ep->apikey, strlen(ep->apikey)) )
+		ERR(goto done);
+
+
 	/* Start the server listening. */
-	fputs("Starting provisioning listener.\n", stdout);
+	fputs("\nStarting provisioning listener.\n", stdout);
 
 	INIT(NAAAIM, PossumPipe, pipe, ERR(goto done));
 	if ( !pipe->init_server(pipe, NULL, PORT, false) )
 		ERR(goto done);
 
-	if ( !pipe->accept_connection(pipe) ) {
-		fputs("Error accepting connection.\n", stderr);
-		ERR(goto done);
+	while ( 1 ) {
+		fputs("\nWaiting for connection.\n", stdout);
+		if ( !pipe->accept_connection(pipe) ) {
+			fputs("Error accepting connection.\n", stderr);
+			ERR(goto done);
+		}
+		fputs("Have connection, setting up context.\n", stdout);
+		if ( !pipe->start_host_mode2(pipe, pipespid) ) {
+			fputs("\tUnable to start connection.\n", stdout);
+			pipe->reset(pipe);
+			continue;
+		}
+
+		_process_request(pipe, spid, apikey);
+		pipe->reset(pipe);
 	}
-
-	if ( !pipe->start_host_mode2(pipe, spid) ) {
-		fputs("Error receiving data.\n", stderr);
-		goto done;
-	}
-
-	/* Display remote connection parameters. */
-	INIT(HurdLib, Buffer, signer, ERR(goto done));
-	INIT(HurdLib, Buffer, measurement, ERR(goto done));
-
-	if ( !pipe->get_connection(pipe, &attributes, signer, measurement, \
-				   &vendor, &svn) )
-		ERR(goto done);
-
-	fputs("\nHave connection.\n", stdout);
-	fputs("Signer:\n\t", stdout);
-	signer->print(signer);
-	fputs("Measurement:\n\t", stdout);
-	measurement->print(measurement);
-	fprintf(stdout, "Attributes:\n\t%lu\n", attributes);
-	fprintf(stdout, "Software:\n\t%u/%u\n", vendor, svn);
-
-	INIT(HurdLib, Buffer, key, ERR(goto done));
-
-	if ( !key->add(key, (void *) ep->spid, strlen(ep->spid)) )
-		ERR(goto done);
-	if ( !pipe->send_packet(pipe, PossumPipe_data, key) )
-		ERR(goto done);
-
-	key->reset(key);
-	if ( !key->add(key, (void *) ep->apikey, strlen(ep->apikey)) )
-		ERR(goto done);
-	if ( !pipe->send_packet(pipe, PossumPipe_data, key) )
-		ERR(goto done);
-
-	retn = true;
 
 
  done:
@@ -274,10 +321,9 @@ _Bool provisioner(struct Provisioner_ecall1 *ep)
 	WHACK(Verifiers);
 
 	WHACK(pipe);
+	WHACK(pipespid);
 	WHACK(spid);
-	WHACK(key);
-	WHACK(signer);
-	WHACK(measurement);
+	WHACK(apikey);
 
 	return retn;
 }
