@@ -576,3 +576,43 @@ struct SRDE_quote {
 	uint32_t signature_len;
 	uint8_t signature[];
 } __attribute__((packed));
+
+
+/**
+ * The following structure is used to define endpoint connection
+ * parameters that will be enforced by utilities which verify either
+ * local or remote attestations.
+ */
+
+struct SRDEendpoint {
+	_Bool accept;
+	uint8_t mask;
+	uint64_t attributes;
+	uint16_t isv_id;
+	uint16_t isv_svn;
+	uint8_t *mrsigner;
+	uint8_t *mrenclave;
+};
+
+
+/*
+ * The following bitfields define the endpoint entities that will
+ * be tested.
+ */
+#define SRDEendpoint_attribute	0x1
+#define SRDEendpoint_vendor	0x2
+#define SRDEendpoint_svn	0x4
+#define SRDEendpoint_mrsigner	0x8
+#define SRDEendpoint_mrenclave	0x10
+#define SRDEendpoint_all	0x1F
+
+
+/*
+ * The following bitfields define the status of the endpoint
+ * verification.
+ */
+#define SRDEendpoint_bad_attribute	0x1
+#define SRDEendpoint_bad_vendor		0x2
+#define SRDEendpoint_bad_svn		0x4
+#define SRDEendpoint_bad_mrsigner	0x8
+#define SRDEendpoint_bad_mrenclave	0x10
