@@ -46,6 +46,7 @@
 
 #include <NAAAIM.h>
 #include <RSAkey.h>
+#include <SHA256.h>
 #include <PossumPipe.h>
 
 #include "Provisioner-interface.h"
@@ -164,9 +165,12 @@ _Bool register_keys(struct Provisioner_ecall0 *ep)
 {
 	_Bool retn = false;
 
-	Buffer bufr = NULL;
+	Buffer b,
+	       bufr = NULL;
 
 	RSAkey key = NULL;
+
+	Sha256 sha256 = NULL;
 
 
 	/* Load the RSAkey object. */
@@ -177,6 +181,22 @@ _Bool register_keys(struct Provisioner_ecall0 *ep)
 	INIT(NAAAIM, RSAkey, key, ERR(goto done));
 	if ( !key->load_public(key, bufr) )
 		ERR(goto done);
+
+
+	/* Generate a fingerprint of the identity. */
+	bufr->reset(bufr);
+	if ( !key->get_modulus(key, bufr) )
+		ERR(goto done);
+
+	INIT(NAAAIM, Sha256, sha256, ERR(goto done));
+	if ( !sha256->add(sha256, bufr) )
+		ERR(goto done);
+	if ( !sha256->compute(sha256) )
+		ERR(goto done);
+
+	fputs("\tID:  ", stdout);
+	b = sha256->get_Buffer(sha256);
+	b->print(b);
 
 
 	/* Initialize and add the key object. */
@@ -195,6 +215,7 @@ _Bool register_keys(struct Provisioner_ecall0 *ep)
 		WHACK(key);
 
 	WHACK(bufr);
+	WHACK(sha256);
 
 	return retn;
 }
@@ -328,7 +349,12 @@ static void _process_request(CO(PossumPipe, pipe), CO(Buffer, spid), \
 {
 	uint8_t status;
 
-	Buffer bufr = NULL;
+	RSAkey key;
+
+	Buffer b,
+	       bufr = NULL;
+
+	Sha256 sha256 = NULL;
 
 
 	/* Verify client connection. */
@@ -344,8 +370,25 @@ static void _process_request(CO(PossumPipe, pipe), CO(Buffer, spid), \
 	}
 
 
-	/* Send the identifier for key generation. */
+	/* Output the client identity. */
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	key = pipe->get_client(pipe);
+	if ( !key->get_modulus(key, bufr) )
+		ERR(goto done);
+
+	INIT(NAAAIM, Sha256, sha256, ERR(goto done));
+	if ( !sha256->add(sha256, bufr) )
+		ERR(goto done);
+	if ( !sha256->compute(sha256) )
+		ERR(goto done);
+	b = sha256->get_Buffer(sha256);
+
+	fputs("Client:   ", stdout);
+	b->print(b);
+
+
+	/* Send the identifier for key generation. */
+	bufr->reset(bufr);
 	if ( !bufr->add(bufr, Keyid, sizeof(Keyid)) )
 		ERR(goto done);
 	if ( !pipe->send_packet(pipe, PossumPipe_data, bufr) )
@@ -377,6 +420,7 @@ static void _process_request(CO(PossumPipe, pipe), CO(Buffer, spid), \
 
  done:
 	WHACK(bufr);
+	WHACK(sha256);
 
 	return;
 }
