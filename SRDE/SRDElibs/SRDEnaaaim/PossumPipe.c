@@ -147,6 +147,9 @@ struct NAAAIM_PossumPipe_State
 
 	/* Nonce used to derive local software measurement. */
 	uint8_t software_nonce[32];
+
+	/* Mode specific client identity. */
+	void *client_identity;
 };
 
 
@@ -234,6 +237,8 @@ static void _init_state(CO(PossumPipe_State,S))
 
 	S->software = NULL;
 	memset(S->software_nonce, '\0', sizeof(S->software_nonce));
+
+	S->client_identity = NULL;
 
 	return;
 }
@@ -2495,6 +2500,7 @@ static _Bool start_host_mode2(CO(PossumPipe, this), CO(Buffer, spid))
 		S->error = PossumPipe_error_no_identity;
 		goto done;
 	}
+	S->client_identity = identity;
 
 
 	/* Verify and decode packet. */
@@ -3252,6 +3258,33 @@ static _Bool start_client_mode2(CO(PossumPipe, this), CO(RSAkey, id))
 /**
  * External public method.
  *
+ * This method implements a method for obtaining the identity of the
+ * client that initiated the security context.  It is connection mode
+ * specific and at the current time only mode 2 connection identifiers
+ * are supported.  In the case of a mode 2 connection the client
+ * identity is a pointer to the RSAkey object that authenticates the
+ * client.
+ *
+ * \param this		The communications object whose connection
+ *			endpoint identity is to be queried.
+ *
+ * \return	A void pointer to the identity object that negotiated
+ *		the security context.  The default initialize value
+ *		is a NULL pointer.
+ */
+
+static void * get_client(CO(PossumPipe, this))
+
+{
+	STATE(S);
+
+	return S->client_identity;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a method for obtaining the status of the remote
  * enclave that the object is connected to.
  *
@@ -3437,6 +3470,9 @@ static void reset(CO(PossumPipe, this))
 	if ( S->software != NULL )
 		S->software->reset(S->software);
 
+	/* Reset the client identity. */
+	S->client_identity = NULL;
+
 	/* Close the underlying communications object. */
 	S->duct->reset(S->duct);
 
@@ -3530,6 +3566,7 @@ extern PossumPipe NAAAIM_PossumPipe_Init(void)
 	this->start_host_mode2	 = start_host_mode2;
 	this->start_client_mode2 = start_client_mode2;
 
+	this->get_client	 = get_client;
 	this->get_connection	 = get_connection;
 	this->display_connection = display_connection;
 
