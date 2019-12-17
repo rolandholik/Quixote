@@ -230,12 +230,7 @@ static void _init_state(CO(PossumPipe_State,S))
 	S->debug    = false;
 
 	S->remote = NULL;
-	S->nonce  = NULL;
 
-	S->sent	    = NULL;
-	S->received = NULL;
-
-	S->software = NULL;
 	memset(S->software_nonce, '\0', sizeof(S->software_nonce));
 
 	S->client_identity = NULL;
@@ -285,7 +280,6 @@ static _Bool _setup_nonce(CO(PossumPipe_State, S))
 
 
 	/* Initialize the nonce generator. */
-	INIT(NAAAIM, Sha256, S->nonce, goto done);
 	if ( !rb->generate(rb, 2 * ENCRYPTION_BLOCKSIZE) )
 		ERR(goto done);
 	S->nonce->add(S->nonce, rb->get_Buffer(rb));
@@ -2200,7 +2194,6 @@ static _Bool start_host_mode(CO(PossumPipe, this), CO(Buffer, spid))
 
 	/* Setup the network port. */
 	INIT(HurdLib, Buffer, netbufr, goto done);
-	INIT(HurdLib, Buffer, S->software, goto done);
 
 	/* Wait for a packet to arrive. */
 	if ( S->debug )
@@ -2375,7 +2368,6 @@ static _Bool start_host_mode(CO(PossumPipe, this), CO(Buffer, spid))
 		S->shared2->print(S->shared2);
 	}
 
-	INIT(NAAAIM, Sha256, S->sent, goto done);
 	S->sent->add(S->sent, S->shared1->get_Buffer(S->shared1));
 	S->sent->add(S->sent, S->shared2->get_Buffer(S->shared2));
 	if ( !S->sent->compute(S->sent) )
@@ -2385,7 +2377,6 @@ static _Bool start_host_mode(CO(PossumPipe, this), CO(Buffer, spid))
 		S->sent->print(S->sent);
 	}
 
-	INIT(NAAAIM, Sha256, S->received, goto done);
 	S->received->add(S->received, S->shared2->get_Buffer(S->shared2));
 	S->received->add(S->received, S->shared1->get_Buffer(S->shared1));
 	if ( !S->received->compute(S->received) )
@@ -2474,7 +2465,6 @@ static _Bool start_host_mode2(CO(PossumPipe, this), CO(Buffer, spid))
 
 
 	/* Configure default mode2 software status. */
-	INIT(HurdLib, Buffer, S->software, ERR(goto done));
 	if ( !S->software->add(S->software, mode2_status, \
 			       sizeof(mode2_status)) )
 		ERR(goto done);
@@ -2623,7 +2613,6 @@ static _Bool start_host_mode2(CO(PossumPipe, this), CO(Buffer, spid))
 		S->shared2->print(S->shared2);
 	}
 
-	INIT(NAAAIM, Sha256, S->sent, goto done);
 	S->sent->add(S->sent, S->shared1->get_Buffer(S->shared1));
 	S->sent->add(S->sent, S->shared2->get_Buffer(S->shared2));
 	if ( !S->sent->compute(S->sent) )
@@ -2633,7 +2622,6 @@ static _Bool start_host_mode2(CO(PossumPipe, this), CO(Buffer, spid))
 		S->sent->print(S->sent);
 	}
 
-	INIT(NAAAIM, Sha256, S->received, goto done);
 	S->received->add(S->received, S->shared2->get_Buffer(S->shared2));
 	S->received->add(S->received, S->shared1->get_Buffer(S->shared1));
 	if ( !S->received->compute(S->received) )
@@ -2913,7 +2901,6 @@ static _Bool start_client_mode(CO(PossumPipe, this), CO(Buffer, spid))
 	     ERR(goto done);
 #endif
 
-	INIT(HurdLib, Buffer, S->software, goto done);
 	if ( (b = ivy->get_element(ivy, Ivy_software)) == NULL )
 		ERR(goto done);
 	S->software->add_Buffer(S->software, b);
@@ -2982,7 +2969,6 @@ static _Bool start_client_mode(CO(PossumPipe, this), CO(Buffer, spid))
 		S->shared2->print(S->shared2);
 	}
 
-	INIT(NAAAIM, Sha256, S->sent, goto done);
 	S->sent->add(S->sent, S->shared2->get_Buffer(S->shared2));
 	S->sent->add(S->sent, S->shared1->get_Buffer(S->shared1));
 	if ( !S->sent->compute(S->sent) )
@@ -2992,7 +2978,6 @@ static _Bool start_client_mode(CO(PossumPipe, this), CO(Buffer, spid))
 		S->sent->print(S->sent);
 	}
 
-	INIT(NAAAIM, Sha256, S->received, goto done);
 	S->received->add(S->received, S->shared1->get_Buffer(S->shared1));
 	S->received->add(S->received, S->shared2->get_Buffer(S->shared2));
 	if ( !S->received->compute(S->received) )
@@ -3136,7 +3121,6 @@ static _Bool start_client_mode2(CO(PossumPipe, this), CO(RSAkey, id))
 	}
 
 	/* Set the host configuration personality. */
-	INIT(HurdLib, Buffer, S->software, goto done);
 	if ( !S->software->add(S->software, mode2_status, \
 			       sizeof(mode2_status)) )
 		ERR(goto done);
@@ -3214,7 +3198,6 @@ static _Bool start_client_mode2(CO(PossumPipe, this), CO(RSAkey, id))
 		S->shared2->print(S->shared2);
 	}
 
-	INIT(NAAAIM, Sha256, S->sent, goto done);
 	S->sent->add(S->sent, S->shared2->get_Buffer(S->shared2));
 	S->sent->add(S->sent, S->shared1->get_Buffer(S->shared1));
 	if ( !S->sent->compute(S->sent) )
@@ -3224,7 +3207,6 @@ static _Bool start_client_mode2(CO(PossumPipe, this), CO(RSAkey, id))
 		S->sent->print(S->sent);
 	}
 
-	INIT(NAAAIM, Sha256, S->received, goto done);
 	S->received->add(S->received, S->shared1->get_Buffer(S->shared1));
 	S->received->add(S->received, S->shared2->get_Buffer(S->shared2));
 	if ( !S->received->compute(S->received) )
@@ -3544,9 +3526,13 @@ extern PossumPipe NAAAIM_PossumPipe_Init(void)
 	this->state->root = root;
 
 	/* Initialize aggregate objects. */
-	INIT(NAAAIM, Duct,   this->state->duct,	   goto fail);
-	INIT(NAAAIM, Sha256, this->state->shared1, goto fail);
-	INIT(NAAAIM, Sha256, this->state->shared2, goto fail);
+	INIT(NAAAIM, Duct,   this->state->duct,	     goto fail);
+	INIT(NAAAIM, Sha256, this->state->nonce,     goto fail);
+	INIT(NAAAIM, Sha256, this->state->shared1,   goto fail);
+	INIT(NAAAIM, Sha256, this->state->shared2,   goto fail);
+	INIT(NAAAIM, Sha256, this->state->sent,	     goto fail);
+	INIT(NAAAIM, Sha256, this->state->received,  goto fail);
+	INIT(HurdLib, Buffer, this->state->software, goto fail);
 
 	/* Initialize object state. */
 	_init_state(this->state);
