@@ -73,6 +73,17 @@ static time_t Current_Time;
 
 
 /**
+ * Key identifier for identity key.
+ */
+const uint8_t Keyid[32] = {
+	0xe5, 0x2a, 0x82, 0xc9, 0x8b, 0x3a, 0xb3, 0x49, \
+	0x52, 0x18, 0x22, 0x0d, 0xd0, 0x08, 0x58, 0x51, \
+	0x65, 0xb7, 0xed, 0xfb, 0x9e, 0x25, 0x41, 0xaa, \
+	0xac, 0xf1, 0xc3, 0xd8, 0xcd, 0x6f, 0x3d, 0x85
+};
+
+
+/**
  * MRSIGNER value for IDfusion debug key.
  */
 const uint8_t idf_debug_key[32] = {
@@ -249,7 +260,6 @@ static _Bool _verify_endpoint(CO(PossumPipe, pipe), uint8_t *status)
 	*status = 0;
 
 	for (lp= 0; lp < cnt; ++ep, ++lp) {
-		fprintf(stdout, "Using mask: %02x\n", ep->mask);
 		if ( ep->mask & SRDEendpoint_attribute ) {
 			if ( attributes != ep->attributes )
 				*status |= SRDEendpoint_bad_attribute;
@@ -318,6 +328,8 @@ static void _process_request(CO(PossumPipe, pipe), CO(Buffer, spid), \
 {
 	uint8_t status;
 
+	Buffer bufr = NULL;
+
 
 	/* Verify client connection. */
 	fputs("Verifying endpoint.\n", stdout);
@@ -332,15 +344,40 @@ static void _process_request(CO(PossumPipe, pipe), CO(Buffer, spid), \
 	}
 
 
-	/* Return the SPID and APIkey. */
-	fputs("Processing request.\n", stdout);
-	if ( !pipe->send_packet(pipe, PossumPipe_data, spid) )
+	/* Send the identifier for key generation. */
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	if ( !bufr->add(bufr, Keyid, sizeof(Keyid)) )
 		ERR(goto done);
-	if ( !pipe->send_packet(pipe, PossumPipe_data, apikey) )
+	if ( !pipe->send_packet(pipe, PossumPipe_data, bufr) )
+		ERR(goto done);
+
+
+	/* Wait for the static identity key. */
+	bufr->reset(bufr);
+	if ( !pipe->receive_packet(pipe, bufr) )
+		ERR(goto done);
+
+	fputs("Endpoint: ", stdout);
+	bufr->print(bufr);
+
+
+	/* Return the SPID and APIkey. */
+	bufr->reset(bufr);
+	if ( !bufr->add_Buffer(bufr, spid) )
+		ERR(goto done);
+	if ( !pipe->send_packet(pipe, PossumPipe_data, bufr) )
+		ERR(goto done);
+
+	bufr->reset(bufr);
+	if ( !bufr->add_Buffer(bufr, apikey) )
+		ERR(goto done);
+	if ( !pipe->send_packet(pipe, PossumPipe_data, bufr) )
 		ERR(goto done);
 
 
  done:
+	WHACK(bufr);
+
 	return;
 }
 

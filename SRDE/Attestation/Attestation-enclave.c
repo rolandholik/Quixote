@@ -56,6 +56,7 @@
 #include <Report.h>
 #include <SRDEpipe.h>
 #include <PossumPipe.h>
+#include <SEALkey.h>
 #include <SEALEDblob.h>
 
 #include <SRDEfusion-ocall.h>
@@ -153,6 +154,8 @@ _Bool provision_credentials(struct Attestation_ecall0 *ep)
 
 	RSAkey key = NULL;
 
+	SEALkey idkey = NULL;
+
 	SEALEDblob creds = NULL;
 
 	File file = NULL;
@@ -203,10 +206,31 @@ _Bool provision_credentials(struct Attestation_ecall0 *ep)
 	fprintf(stdout, "Software:\n\t%u/%u\n", vendor, svn);
 
 
-	/* Read the SPID and APIkey values. */
+	/* Read the keyid from the caller. */
 	INIT(HurdLib, Buffer, spid, ERR(goto done));
 	INIT(HurdLib, Buffer, apikey, ERR(goto done));
 
+	if ( !pipe->receive_packet(pipe, apikey) )
+		ERR(goto done);
+
+
+	/* Generate and send the enclave identity. */
+	INIT(NAAAIM, SEALkey, idkey, ERR(goto done));
+	if ( !idkey->generate_static_key(idkey, SRDE_KEYPOLICY_SIGNER, \
+					 apikey) )
+		ERR(goto done);
+
+	apikey->reset(apikey);
+	if ( !idkey->get_iv_key(idkey, spid, apikey) )
+		ERR(goto done);
+
+	if ( !pipe->send_packet(pipe, PossumPipe_data, apikey) )
+		ERR(goto done);
+
+
+	/* Receive the SPID and APIkey. */
+	spid->reset(spid);
+	apikey->reset(apikey);
 	if ( !pipe->receive_packet(pipe, spid) )
 		ERR(goto done);
 	if ( !pipe->receive_packet(pipe, apikey) )
@@ -241,6 +265,7 @@ _Bool provision_credentials(struct Attestation_ecall0 *ep)
 	WHACK(signer);
 	WHACK(measurement);
 	WHACK(key);
+	WHACK(idkey);
 	WHACK(creds);
 	WHACK(file);
 
