@@ -262,6 +262,36 @@ static _Bool connect(CO(SRDEpipe, this))
  * External public method.
  *
  * This method is an API placeholder for the implementation of the
+ * same method in enclave context that verifies the identity of the
+ * endpoing that is establishing the connection.
+ *
+ * \param this		A pointer to the object which is to implement the
+ *			connection.
+ *
+ * \param endpoints	The object containing the array of endpoint
+ *			descriptors that the connection is to be validated
+ *			against.
+ *
+ * \param status	A pointer to a boolean value that will be updated
+ *			with whether or not a security context should
+ *			be created for the endpoint.
+ *
+ * \return	A boolean value is universally returned in order to
+ *		indicate that this method should not be invoked from
+ *		standard userspace.
+ */
+
+static _Bool verify(CO(SRDEpipe, this), CO(Buffer, endpoints), _Bool status)
+
+{
+	return false;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method is an API placeholder for the implementation of the
  * same method in enclave context that accepts a connection from
  * an initiating enclave endpoint.
  *
@@ -501,6 +531,7 @@ extern SRDEpipe NAAAIM_SRDEpipe_Init(void)
 
 	this->connect = connect;
 	this->accept  = accept;
+	this->verify  = verify;
 
 	this->send_packet    = send_packet;
 	this->receive_packet = receive_packet;

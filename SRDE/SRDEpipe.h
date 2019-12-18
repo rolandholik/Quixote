@@ -100,6 +100,7 @@ struct NAAAIM_SRDEpipe
 	_Bool (*connect)(const SRDEpipe);
 	_Bool (*accept)(const SRDEpipe, struct SGX_targetinfo *, \
 			struct SGX_report *);
+	_Bool (*verify)(const SRDEpipe, const Buffer, _Bool *);
 
 	_Bool (*send_packet)(const SRDEpipe, const SRDEpipe_type type, \
 			     const Buffer);

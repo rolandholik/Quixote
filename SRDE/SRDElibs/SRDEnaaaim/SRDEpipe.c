@@ -114,6 +114,9 @@ struct NAAAIM_SRDEpipe_State
 	/* Initiator target definition for connection acknowledgement. */
 	struct SGX_targetinfo target;
 
+	/* Identity information for communications counter-party. */
+	struct SGX_reportbody report;
+
 	/* Elliptic curve object. */
 	Curve25519 dhkey;
 
@@ -475,7 +478,9 @@ static _Bool connect(CO(SRDEpipe, this))
 
 	if ( !rpt->validate_report(rpt, &ocall.report, &status) )
 		ERR(goto done);
-	if ( !status )
+	if ( status )
+		S->report = ocall.report.body;
+	else
 		ERR(goto done);
 
 	bufr->reset(bufr);
@@ -586,14 +591,14 @@ static _Bool accept(CO(SRDEpipe, this), struct SGX_targetinfo *target, \
 
 	if ( !rpt->validate_report(rpt, report, &status) )
 		ERR(goto done);
-
-	if ( S->debug ) {
-		if ( status )
+	if ( status ) {
+		S->report = report->body;
+		if ( S->debug )
 			fputs("\nSource report verified.\n", stdout);
-		else {
+	} else {
+		if ( S->debug )
 			fputs("\nSource report not verified.\n", stdout);
-			ERR(goto done);
-		}
+		ERR(goto done);
 	}
 
 
@@ -653,6 +658,103 @@ static _Bool accept(CO(SRDEpipe, this), struct SGX_targetinfo *target, \
 	WHACK(rpt);
 	WHACK(bufr);
 	WHACK(hmac);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method validates that the established connection is consistent
+ * with the specified identity constraints.
+ *
+ * \param this		A pointer to the object which is to implement the
+ *			connection.
+ *
+ * \param endpoints	The object containing the array of endpoint
+ *			descriptors that the connection is to be validated
+ *			against.
+ *
+ * \param status	A pointer to a boolean value that will be updated
+ *			with whether or not a security context should
+ *			be created for the endpoint.
+ *
+ * \return	A boolean value is returned to indicate
+ *		indicate that this method should not be invoked from
+ *		standard userspace.
+ */
+
+static _Bool verify(CO(SRDEpipe, this), CO(Buffer, endpoints), _Bool *status)
+
+{
+	STATE(S);
+
+	_Bool failed,
+	      retn = false;
+
+	unsigned int cnt;
+
+	struct SRDEendpoint *ep;
+
+
+	/* Verify object and arguement status. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( endpoints == NULL )
+		ERR(goto done);
+	if ( endpoints->poisoned(endpoints) )
+		ERR(goto done);
+	if ( (endpoints->size(endpoints) % sizeof(struct SRDEendpoint)) != 0 )
+		ERR(goto done);
+
+
+	/* Loop over and verify the defined endpoints. */
+	ep 	= (struct SRDEendpoint *) endpoints->get(endpoints);
+	cnt	= endpoints->size(endpoints) / sizeof(struct SRDEendpoint);
+	*status = false;
+
+	while ( cnt-- ) {
+		failed = false;
+
+		if ( ep->mask & SRDEendpoint_attribute ) {
+			if ( S->report.attributes.flags != ep->attributes )
+				failed = true;
+		}
+		if ( ep->mask & SRDEendpoint_vendor ) {
+			if ( S->report.isvprodid != ep->isv_id )
+				failed = true;
+		}
+		if ( ep->mask & SRDEendpoint_svn ) {
+			if ( S->report.isvsvn < ep->isv_svn )
+				failed = true;
+		}
+
+		if ( ep->mask & SRDEendpoint_mrsigner ) {
+			if ( memcmp(S->report.mrsigner, ep->mrsigner, \
+				    sizeof(S->report.mrsigner) != 0) )
+				failed = true;
+		}
+
+		if ( ep->mask & SRDEendpoint_mrenclave ) {
+			if ( memcmp(S->report.mr_enclave.m, ep->mrsigner, \
+				    sizeof(S->report.mr_enclave.m) != 0) )
+				failed = true;
+		}
+
+		if ( !failed ) {
+			*status = true;
+			retn	= true;
+			goto done;
+		}
+	}
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
 
 	return retn;
 }
@@ -1304,6 +1406,7 @@ extern SRDEpipe NAAAIM_SRDEpipe_Init(void)
 
 	this->connect = connect;
 	this->accept  = accept;
+	this->verify  = verify;
 
 	this->send_packet    = send_packet;
 	this->receive_packet = receive_packet;
