@@ -8,7 +8,7 @@
 
 # Variable declarations.
 INSTPATH       = ${DESTDIR}/opt/IDfusion
-INSTALLENCLAVE = LocalTarget.signed.so
+INSTALLENCLAVE = LocalTarget.signed.so Attestation.signed.source
 
 ifdef SRDE_PRODUCTION
 TYPE = -DSRDE_PRODUCTION
@@ -22,7 +22,7 @@ ENCSRC4 = Provisioner-enclave.c Provisioner-interface.c
 
 TOOLS = test-local-target test-remote-target srde-provisioner \
 	srde-attestation
-INSTALLBIN = test-remote-target srde-attestation
+INSTALLBIN = srde-attestation
 
 ENCLAVE_CC = gcc
 
