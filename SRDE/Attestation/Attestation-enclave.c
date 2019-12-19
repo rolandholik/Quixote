@@ -178,19 +178,14 @@ time_t time(time_t *timeptr)
 _Bool provision_credentials(struct Attestation_ecall0 *ep)
 
 {
-	_Bool retn = false;
-
-	uint16_t vendor,
-		 svn;
-
-	uint64_t attributes;
+	_Bool status,
+	      retn = false;
 
 	PossumPipe pipe = NULL;
 
 	Buffer spid	   = NULL,
 	       apikey	   = NULL,
-	       signer	   = NULL,
-	       measurement = NULL;
+	       signer	   = NULL;
 
 	RSAkey key = NULL;
 
@@ -210,13 +205,14 @@ _Bool provision_credentials(struct Attestation_ecall0 *ep)
 	if ( !signer->add(signer, ep->key, ep->key_size) )
 		ERR(goto done);
 
+	fputs("\nLoading private key.\n", stdout);
 	INIT(NAAAIM, RSAkey, key, ERR(goto done));
 	if ( !key->load_private(key, signer) )
 		ERR(goto done);
 
 
 	/* Start client mode. */
-	fputs("Attestation client connecting.\n", stdout);
+	fputs("\nConnecting to provisioning server.\n", stdout);
 	INIT(NAAAIM, PossumPipe, pipe, ERR(goto done));
 
 	if ( !pipe->init_client(pipe, PROVISIONER_HOST, PROVISIONER_PORT) ) {
@@ -229,21 +225,15 @@ _Bool provision_credentials(struct Attestation_ecall0 *ep)
 	}
 
 
-	/* Display remote connection parameters. */
-	INIT(HurdLib, Buffer, measurement, ERR(goto done));
-
+	/* Verify remote connection. */
 	signer->reset(signer);
-	if ( !pipe->get_connection(pipe, &attributes, signer, measurement, \
-				   &vendor, &svn) )
+	if ( !signer->add(signer, (void *) Provisioner, sizeof(Provisioner)) )
 		ERR(goto done);
-
-	fputs("\nHave connection.\n", stdout);
-	fputs("Signer:\n\t", stdout);
-	signer->print(signer);
-	fputs("Measurement:\n\t", stdout);
-	measurement->print(measurement);
-	fprintf(stdout, "Attributes:\n\t%lu\n", attributes);
-	fprintf(stdout, "Software:\n\t%u/%u\n", vendor, svn);
+	if ( !pipe->verify(pipe, signer, &status) )
+		ERR(goto done);
+	if ( !status )
+		ERR(goto done);
+	fputs("\nVerified provisioning server.\n", stdout);
 
 
 	/* Read the keyid from the caller. */
@@ -297,13 +287,14 @@ _Bool provision_credentials(struct Attestation_ecall0 *ep)
 	if ( !file->write_Buffer(file, apikey) )
 		ERR(goto done);
 
+	fputs("\nProvisioned credentials.\n", stdout);
+
 
  done:
 	WHACK(spid);
 	WHACK(apikey);
 	WHACK(pipe);
 	WHACK(signer);
-	WHACK(measurement);
 	WHACK(key);
 	WHACK(idkey);
 	WHACK(creds);

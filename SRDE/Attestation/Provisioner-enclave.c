@@ -85,17 +85,6 @@ const uint8_t Keyid[32] = {
 
 
 /**
- * MRSIGNER value for IDfusion debug key.
- */
-const uint8_t idf_debug_key[32] = {
-	0x83, 0xd7, 0x19, 0xe7, 0x7d, 0xea, 0xca, 0x14, \
-	0x70, 0xf6, 0xba, 0xf6, 0x2a, 0x4d, 0x77, 0x43, \
-	0x03, 0xc8, 0x99, 0xdb, 0x69, 0x02, 0x0f, 0x9c, \
-	0x70, 0xee, 0x1d, 0xfc, 0x08, 0xc7, 0xce, 0x9e
-};
-
-
-/**
  * Array of allowed endpoints.
  */
 const struct SRDEendpoint Endpoints[1] = {
@@ -105,7 +94,7 @@ const struct SRDEendpoint Endpoints[1] = {
 		.attributes  = 7,
 		.isv_id	     = 0x11,
 		.isv_svn     = 0,
-		.mrsigner    = (uint8_t *) idf_debug_key,
+		.mrsigner    = (uint8_t *) IDfusion_debug_key,
 		.mrenclave   = NULL
 	}
 };
@@ -224,108 +213,6 @@ _Bool register_keys(struct Provisioner_ecall0 *ep)
 /**
  * Private function.
  *
- * The following function implements verification of the connecting
- * endpoint.
- *
- * \param pipe		The communications object being used for the
- *			connection.
- *
- * \param status	A pointer to the boolean value that will be set
- *			to the status of whether or not endpoint
- *			verification succeeded.
- *
- * \return		A boolean value is returned to indicate the
- *			status of conducting the endpoint verification.
- *			A false value indicates there was a procedural
- *			error in conducting the verification.  In this
- *			case the value placed in the status output
- *			variable will be indeterminate.  A true value
- *			indicates that the status variable can be used
- *			to determine whether or not the endpoint should
- *			be trusted.
- */
-
-static _Bool _verify_endpoint(CO(PossumPipe, pipe), uint8_t *status)
-
-{
-	_Bool retn = false;
-
-	unsigned int lp,
-		     cnt = sizeof(Endpoints)/sizeof(struct SRDEendpoint);
-
-	uint16_t isv_id,
-		 isv_svn;
-
-	uint64_t attributes;
-
-	struct SRDEendpoint *ep;
-
-	Buffer chk	   = NULL,
-	       mrsigner	   = NULL,
-	       mrenclave   = NULL;
-
-
-	/* Get connection parameters. */
-	INIT(HurdLib, Buffer, mrsigner, ERR(goto done));
-	INIT(HurdLib, Buffer, mrenclave, ERR(goto done));
-
-	if ( !pipe->get_connection(pipe, &attributes, mrsigner, mrenclave, \
-				   &isv_id, &isv_svn) )
-		ERR(goto done);
-
-
-	/* Verify against each endpoint. */
-	INIT(HurdLib, Buffer, chk, ERR(goto done));
-
-	ep	= (struct SRDEendpoint *) Endpoints;
-	*status = 0;
-
-	for (lp= 0; lp < cnt; ++ep, ++lp) {
-		if ( ep->mask & SRDEendpoint_attribute ) {
-			if ( attributes != ep->attributes )
-				*status |= SRDEendpoint_bad_attribute;
-		}
-		if ( ep->mask & SRDEendpoint_vendor ) {
-			if ( isv_id != ep->isv_id )
-				*status |= SRDEendpoint_bad_vendor;
-		}
-		if ( ep->mask & SRDEendpoint_svn ) {
-			if ( isv_svn < ep->isv_svn )
-				*status |= SRDEendpoint_bad_svn;
-		}
-
-		if ( ep->mask & SRDEendpoint_mrsigner ) {
-			if ( !chk->add(chk, ep->mrsigner, SGX_HASH_SIZE) )
-				ERR(goto done);
-			if ( !chk->equal(chk, mrsigner) )
-				*status |= SRDEendpoint_bad_mrsigner;
-		}
-
-		if ( ep->mask & SRDEendpoint_mrenclave ) {
-			if ( !chk->add(chk, ep->mrenclave, SGX_HASH_SIZE) )
-				ERR(goto done);
-			if ( !chk->equal(chk, mrenclave) )
-				*status |= SRDEendpoint_bad_mrenclave;
-		}
-
-		chk->reset(chk);
-	}
-
-	retn = true;
-
-
- done:
-	WHACK(chk);
-	WHACK(mrsigner);
-	WHACK(mrenclave);
-
-	return retn;
-}
-
-
-/**
- * Private function.
- *
  * The following function is a wrapper function for one invocation of
  * a credential provisioning session.  It verifies the identity of
  * the requesting enclave and if it matches one of the approved identity
@@ -347,7 +234,7 @@ static void _process_request(CO(PossumPipe, pipe), CO(Buffer, spid), \
 			     CO(Buffer, apikey))
 
 {
-	uint8_t status;
+	_Bool status;
 
 	RSAkey key;
 
@@ -359,19 +246,21 @@ static void _process_request(CO(PossumPipe, pipe), CO(Buffer, spid), \
 
 	/* Verify client connection. */
 	fputs("Verifying endpoint.\n", stdout);
-	if ( !_verify_endpoint(pipe, &status) ) {
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	if ( !bufr->add(bufr, (void *) Endpoints, sizeof(Endpoints)) )
+		ERR(goto done);
+	if ( !pipe->verify(pipe, bufr, &status) ) {
 		fputs("Error verifying endpoint.\n", stdout);
 		goto done;
 	}
-
-	if ( status != 0 ) {
+	if ( !status ) {
 		fprintf(stdout, "Invalid endpoint, status=%01x.\n", status);
 		goto done;
 	}
 
 
 	/* Output the client identity. */
-	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	bufr->reset(bufr);
 	key = pipe->get_client(pipe);
 	if ( !key->get_modulus(key, bufr) )
 		ERR(goto done);
