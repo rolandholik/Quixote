@@ -281,7 +281,7 @@ static _Bool connect(CO(SRDEpipe, this))
  *		standard userspace.
  */
 
-static _Bool verify(CO(SRDEpipe, this), CO(Buffer, endpoints), _Bool status)
+static _Bool verify(CO(SRDEpipe, this), CO(Buffer, endpoints), _Bool *status)
 
 {
 	return false;
