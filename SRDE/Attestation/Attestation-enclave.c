@@ -86,6 +86,46 @@ static time_t Current_Time;
 
 
 /**
+ * Allowed Provisioner endpoints.
+ */
+const static struct SRDEendpoint Provisioner[] = {
+	{
+		.mask	     = SRDEendpoint_all & ~SRDEendpoint_mrenclave,
+		.accept	     = true,
+		.attributes  = 7,
+		.isv_id	     = 0x10,
+		.isv_svn     = 0,
+		.mrsigner    = (uint8_t *) IDfusion_debug_key,
+	},
+	{
+		.mask	     = SRDEendpoint_all & ~SRDEendpoint_mrenclave,
+		.accept	     = true,
+		.attributes  = 5,
+		.isv_id	     = 0x10,
+		.isv_svn     = 0,
+		.mrsigner    = (uint8_t *) IDfusion_production_key,
+	}
+};
+
+
+/**
+ * Allowed endpoints from attestation clients.
+ */
+const static struct SRDEendpoint Attestation_clients[] = {
+	{
+		.mask	     = SRDEendpoint_attribute,
+		.accept	     = true,
+		.attributes  = 7,
+	},
+	{
+		.mask	     = SRDEendpoint_attribute,
+		.accept	     = true,
+		.attributes  = 5,
+	},
+};
+
+
+/**
  * Global function.
  *
  * The following function implements a function for returning something
@@ -459,7 +499,8 @@ _Bool _request_report(CO(SRDEquote, quoter), CO(Buffer, packet))
 _Bool generate_report(struct SRDEpipe_ecall *ep)
 
 {
-	_Bool retn = false;
+	_Bool status,
+	      retn = false;
 
 	unsigned int *sp;
 
@@ -469,6 +510,8 @@ _Bool generate_report(struct SRDEpipe_ecall *ep)
 		waiting,
 		send_report
 	} request_state = waiting;
+
+	Buffer endpoint = NULL;
 
 	static Buffer packet = NULL;
 
@@ -500,6 +543,15 @@ _Bool generate_report(struct SRDEpipe_ecall *ep)
 	/* Handle second stage of connection. */
 	if ( !pipe->connected(pipe) ) {
 		if ( !pipe->accept(pipe, &ep->target, &ep->report) )
+			ERR(goto done);
+
+		INIT(HurdLib, Buffer, endpoint, ERR(goto done));
+		if ( !endpoint->add(endpoint, (void *) Attestation_clients, \
+				  sizeof(Attestation_clients)) )
+			ERR(goto done);
+		if ( !pipe->verify(pipe, endpoint, &status) )
+			ERR(goto done);
+		if ( !status )
 			ERR(goto done);
 
 		retn = true;
@@ -572,6 +624,8 @@ _Bool generate_report(struct SRDEpipe_ecall *ep)
 
  done:
 	ep->bufr_size = 0;
+
+	WHACK(endpoint);
 
 	return retn;
 }

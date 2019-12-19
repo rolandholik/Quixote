@@ -40,6 +40,30 @@ static Curve25519 SharedKey = NULL;
 
 
 /**
+ * Allowed endpoints for Attestation enclave.
+ */
+const static struct SRDEendpoint Attestation_enclave[] = {
+	{
+		.mask	     = SRDEendpoint_all & ~SRDEendpoint_mrenclave,
+		.accept	     = true,
+		.attributes  = 7,
+		.isv_id	     = 0x11,
+		.isv_svn     = 0,
+		.mrsigner    = (uint8_t *) IDfusion_debug_key,
+	},
+	{
+		.mask	     = SRDEendpoint_all & ~SRDEendpoint_mrenclave,
+		.accept	     = true,
+		.attributes  = 5,
+		.isv_id	     = 0x11,
+		.isv_svn     = 0,
+		.mrsigner    = (uint8_t *) IDfusion_production_key,
+	}
+};
+
+
+
+/**
  * External ECALL 0.
  *
  * This method implements the generation of a REPORTDATA structure
@@ -397,7 +421,9 @@ _Bool test_pipe(struct SRDEpipe_ecall *ep)
 _Bool test_attestation_service(struct LocalTarget_ecall3 *ep)
 
 {
-	_Bool retn = false;
+	_Bool status,
+	      connected = false,
+	      retn	= false;
 
 	unsigned int cmd;
 
@@ -423,10 +449,24 @@ _Bool test_attestation_service(struct LocalTarget_ecall3 *ep)
 
 	if ( !pipe->connect(pipe) )
 		ERR(goto done);
+	connected = true;
 
 
-	/* Send an enclave report. */
+	/* Verify the attestation enclave. */
 	INIT(HurdLib, Buffer, packet, ERR(goto done));
+	if ( !packet->add(packet, (void *) Attestation_enclave, \
+			  sizeof(Attestation_enclave)) )
+		ERR(goto done);
+	if ( !pipe->verify(pipe, packet, &status) )
+		ERR(goto done);
+	if ( !status ) {
+		fputs("\nCannot verify attestation enclave.\n", stdout);
+		ERR(goto done);
+	}
+	else
+		fputs("\nHave valid connection to attestation enclave.\n", \
+		      stdout);
+	packet->reset(packet);
 
 
 	/* Request QE target information. */
@@ -474,17 +514,16 @@ _Bool test_attestation_service(struct LocalTarget_ecall3 *ep)
 	if ( !quoter->decode_report(quoter, output) )
 		ERR(goto done);
 
+	fputs("\nIAS report on test enclave:\n\n", stdout);
 	quoter->dump_report(quoter);
-
-
-	/* Terminate the connection. */
-	if ( !pipe->close(pipe) )
-		ERR(goto done);
 
 	retn = true;
 
 
  done:
+	if ( connected )
+		pipe->close(pipe);
+
 	WHACK(packet);
 	WHACK(output);
 	WHACK(pipe);
