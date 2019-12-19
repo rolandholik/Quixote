@@ -3240,6 +3240,112 @@ static _Bool start_client_mode2(CO(PossumPipe, this), CO(RSAkey, id))
 /**
  * External public method.
  *
+ * This method validates that the established connection is consistent
+ * with the specified identity constraints.
+ *
+ * \param this		A pointer to the object which is to implement the
+ *			connection.
+ *
+ * \param endpoints	The object containing the array of endpoint
+ *			descriptors that the connection is to be validated
+ *			against.
+ *
+ * \param status	A pointer to a boolean value that will be updated
+ *			with whether or not a security context should
+ *			be created for the endpoint.
+ *
+ * \return	A boolean value is returned to indicate
+ *		indicate that this method should not be invoked from
+ *		standard userspace.
+ */
+
+static _Bool verify(CO(PossumPipe, this), CO(Buffer, endpoints), _Bool *status)
+
+{
+	STATE(S);
+
+	_Bool failed,
+	      retn = false;
+
+	unsigned int cnt;
+
+	struct SGX_reportbody *bp;
+
+	struct SRDEendpoint *ep;
+
+	struct SRDE_quote *quote;
+
+
+	/* Verify object and arguement status. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( endpoints == NULL )
+		ERR(goto done);
+	if ( endpoints->poisoned(endpoints) )
+		ERR(goto done);
+	if ( (endpoints->size(endpoints) % sizeof(struct SRDEendpoint)) != 0 )
+		ERR(goto done);
+
+
+	/* Generate pointer to report body. */
+	quote = S->remote->get_quoteinfo(S->remote);
+	bp = &quote->report_body;
+
+
+	/* Loop over and verify the defined endpoints. */
+	ep 	= (struct SRDEendpoint *) endpoints->get(endpoints);
+	cnt	= endpoints->size(endpoints) / sizeof(struct SRDEendpoint);
+	*status = false;
+
+	while ( cnt-- ) {
+		failed = false;
+
+		if ( ep->mask & SRDEendpoint_attribute ) {
+			if ( bp->attributes.flags != ep->attributes )
+				failed = true;
+		}
+		if ( ep->mask & SRDEendpoint_vendor ) {
+			if ( bp->isvprodid != ep->isv_id )
+				failed = true;
+		}
+		if ( ep->mask & SRDEendpoint_svn ) {
+			if ( bp->isvsvn < ep->isv_svn )
+				failed = true;
+		}
+
+		if ( ep->mask & SRDEendpoint_mrsigner ) {
+			if ( memcmp(bp->mrsigner, ep->mrsigner, \
+				    sizeof(bp->mrsigner) != 0) )
+				failed = true;
+		}
+
+		if ( ep->mask & SRDEendpoint_mrenclave ) {
+			if ( memcmp(bp->mr_enclave.m, ep->mrsigner, \
+				    sizeof(bp->mr_enclave.m) != 0) )
+				failed = true;
+		}
+
+		if ( !failed ) {
+			*status = true;
+			retn	= true;
+			goto done;
+		}
+	}
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a method for obtaining the identity of the
  * client that initiated the security context.  It is connection mode
  * specific and at the current time only mode 2 connection identifiers
@@ -3552,6 +3658,7 @@ extern PossumPipe NAAAIM_PossumPipe_Init(void)
 	this->start_host_mode2	 = start_host_mode2;
 	this->start_client_mode2 = start_client_mode2;
 
+	this->verify		 = verify;
 	this->get_client	 = get_client;
 	this->get_connection	 = get_connection;
 	this->display_connection = display_connection;
