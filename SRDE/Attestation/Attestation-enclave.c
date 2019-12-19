@@ -18,7 +18,7 @@
  **************************************************************************/
 
 /* Local defines. */
-#if defined(ENCLAVE_DIR)
+#if defined(SRDE_PRODUCTION)
 #define PROVISIONER_HOST "acpv.idfusion.net"
 #else
 #define PROVISIONER_HOST "localhost"

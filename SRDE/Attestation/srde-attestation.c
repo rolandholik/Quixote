@@ -11,10 +11,7 @@
  **************************************************************************/
 
 /* Local defines. */
-#if defined(ENCLAVE_DIR)
-#define ENCLAVE_DIR	"/opt/IDfusion/lib/enclaves"
-#endif
-#define ENCLAVE		"Attestation.signed.so"
+#define PGM "srde-attestation"
 
 
 /* Include files. */
@@ -51,22 +48,19 @@
  * This function implements the test mode which requests a remote
  * report of the LocalSource unit test enclave.
  *
- * \param token		A pointer to the null-terminated buffer
- *			containing the launch token for the unit
- *			test enclave.
- *
  * \return	A boolean value is used to indicate whether or not
  *		the unit testing succeeded.  A false value
  *		indicates testing failed while a true value indicates
  *		it was successful.
  */
 
-_Bool test_mode(const char *token)
+_Bool test_mode(void)
 
 {
 	_Bool retn = false;
 
-	char *enclave = "LocalTarget.signed.so";
+	char *token   = TOKEN_LOCN("LocalTarget.token"),
+	     *enclave = ENCLAVE_LOCN("LocalTarget.signed.so");
 
 	int rc;
 
@@ -81,7 +75,7 @@ _Bool test_mode(const char *token)
 
 	/* Initialize the source enclave. */
 	INIT(NAAAIM, SRDEenclave, source, ERR(goto done));
-	if ( !source->setup(source, enclave, token, true) )
+	if ( !source->setup(source, enclave, token, ENCLAVE_DEBUG) )
 		ERR(goto done);
 
 
@@ -96,7 +90,7 @@ _Bool test_mode(const char *token)
 
 
 	/* Invoke the attestation testing ECALL. */
-	fputs("srde-attestation: Testing remote attestation.\n", stdout);
+	fprintf(stdout, "%s: Testing remote attestation.\n", PGM);
 
 	if ( !source->boot_slot(source, 3, table, &ecall, &rc) ) {
 		fprintf(stderr, "Enclave return error: %d\n", rc);
@@ -118,11 +112,9 @@ _Bool test_mode(const char *token)
 extern int main(int argc, char *argv[])
 
 {
-	_Bool debug_enclave = true;
-
 	char *key	   = NULL,
-	     *token	   = SGX_TOKEN_DIRECTORY"/Attestation.token",
-	     *enclave_name = ENCLAVE_NAME;
+	     *token	   = TOKEN_LOCN("Attestation.token"),
+	     *enclave_name = ENCLAVE_LOCN("Attestation.signed.so");
 
 	int opt,
 	    rc,
@@ -172,23 +164,26 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
-	if ( (mode == provision) && (key == NULL) ) {
-		fputs("No authentication key specified.\n", stderr);
-		goto done;
-	}
-
 
 	/* Execute test mode. */
 	if ( mode == test ) {
-		if ( test_mode(token) )
+		if ( test_mode() )
 			retn = 0;
 		goto done;
 	}
 
 
-	/* Initialize the provisioning enclave. */
+	/* Execute provisioning mode. */
+	if ( (mode == provision) && (key == NULL) ) {
+		fputs("No provisioning authentication key.\n", stderr);
+		goto done;
+	}
+	fprintf(stdout, "%s: Provisioning attestation credentials.\n", PGM);
+
+
+	/* Setup attestation enclave. */
 	INIT(NAAAIM, SRDEenclave, enclave, ERR(goto done));
-	if ( !enclave->setup(enclave, enclave_name, token, debug_enclave) )
+	if ( !enclave->setup(enclave, enclave_name, token, ENCLAVE_DEBUG) )
 		ERR(goto done);
 
 
@@ -207,7 +202,7 @@ extern int main(int argc, char *argv[])
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 
 	if ( !keyfile->open_ro(keyfile, key) )
-			ERR(goto done);
+		ERR(goto done);
 	if ( !keyfile->slurp(keyfile, bufr) )
 		ERR(goto done);
 

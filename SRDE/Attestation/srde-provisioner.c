@@ -11,13 +11,6 @@
  * the source tree for copyright and licensing information.
  **************************************************************************/
 
-/* Local defines. */
-#if defined(ENCLAVE_DIR)
-#define ENCLAVE_DIR	"/opt/IDfusion/lib/enclaves"
-#endif
-#define ENCLAVE		"Provisioner.signed.so"
-
-
 /* Include files. */
 #include <stdio.h>
 #include <stdbool.h>
@@ -48,12 +41,10 @@
 extern int main(int argc, char *argv[])
 
 {
-	_Bool debug_enclave = true;
-
 	char *spid	   = NULL,
 	     *apikey	   = NULL,
-	     *token	   = SGX_TOKEN_DIRECTORY"/Provisioner.token",
-	     *enclave_name = ENCLAVE_NAME;
+	     *token	   = TOKEN_LOCN("Provisioner.token"),
+	     *enclave_name = ENCLAVE_LOCN("Provisioner.signed.so");
 
 	int opt,
 	    rc,
@@ -120,7 +111,7 @@ extern int main(int argc, char *argv[])
 
 	/* Initialize the provisioning enclave. */
 	INIT(NAAAIM, SRDEenclave, enclave, ERR(goto done));
-	if ( !enclave->setup(enclave, enclave_name, token, debug_enclave) )
+	if ( !enclave->setup(enclave, enclave_name, token, ENCLAVE_DEBUG) )
 		ERR(goto done);
 
 

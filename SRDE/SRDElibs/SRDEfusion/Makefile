@@ -65,8 +65,8 @@ endif
 
 CFLAGS = -Wall -O2 -fpic -fomit-frame-pointer -march=core2 -I ../.. \
 	-I ../../.. -I ../../../HurdLib
-ifdef ENCLAVE_DIR
-CFLAGS += -DENCLAVE_DIR=\"${ENCLAVE_DIR}\"
+ifdef SRDE_PRODUCTION
+CFLAGS += -DSRDE_PRODUCTION
 endif
 
 

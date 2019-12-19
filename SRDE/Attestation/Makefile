@@ -10,6 +10,10 @@
 INSTPATH       = ${DESTDIR}/opt/IDfusion
 INSTALLENCLAVE = LocalTarget.signed.so
 
+ifdef SRDE_PRODUCTION
+TYPE = -DSRDE_PRODUCTION
+endif
+
 CSRC   = test-local-enclave.c test-remote-enclave.c
 ENCSRC1 = LocalTarget-enclave.c LocalTarget-interface.c
 ENCSRC2 = LocalSource-enclave.c LocalSource-interface.c
@@ -31,8 +35,8 @@ SGX_INCLUDE = -I . -I $(SGX_SDK)/include -I $(SGX_SDK)/include/tlibc \
 	-I $(SGX_SDK)/include/stlport -I .. -I ../../ISOidentity     \
 	-I ../SRDElibs/SRDEfusion -I ../SRDElibs/SRDEnaaaim -I../../lib
 
-ENCLAVE_CFLAGS = -Wall -nostdinc -fvisibility=hidden -fpie -fstack-protector \
-	$(SGX_INCLUDE) -fno-builtin
+ENCLAVE_CFLAGS = ${TYPE} -Wall -nostdinc -fvisibility=hidden -fpie \
+	-fstack-protector $(SGX_INCLUDE) -fno-builtin ${TYPE}
 
 SGX_LIBRARY_PATH = $(SGX_SDK)/lib64
 SSL_LIBRARY_PATH = ${SGX_SSL}/lib64
@@ -60,11 +64,8 @@ ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles   \
 
 CC = musl-gcc
 
-CFLAGS = -Wall -O2 -fomit-frame-pointer -march=core2 -I .. -I ../.. \
+CFLAGS = ${TYPE} -Wall -O2 -fomit-frame-pointer -march=core2 -I .. -I ../.. \
 	-I ../../HurdLib -I ../../ISOidentity -I ../../lib
-ifdef ENCLAVE_DIR
-CFLAGS += -DENCLAVE_DIR=\"${ENCLAVE_DIR}\"
-endif
 
 LDFLAGS = -g
 ifneq (${CC}, musl-gcc)

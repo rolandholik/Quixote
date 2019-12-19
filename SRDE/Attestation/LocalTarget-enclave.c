@@ -443,8 +443,8 @@ _Bool test_attestation_service(struct LocalTarget_ecall3 *ep)
 
 
 	INIT(NAAAIM, SRDEpipe, pipe, ERR(goto done));
-	if ( !pipe->setup(pipe, "Attestation.signed.so", 1, \
-			  "Attestation.token", true) )
+	if ( !pipe->setup(pipe, ENCLAVE_LOCN("Attestation.signed.so"), 1, \
+			  TOKEN_LOCN("Attestation.token"), ENCLAVE_DEBUG) )
 		ERR(goto done);
 
 	if ( !pipe->connect(pipe) )

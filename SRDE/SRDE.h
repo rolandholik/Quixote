@@ -28,11 +28,18 @@
 #define SPID_FILENAME	    "/opt/IDfusion/etc/spid.txt"
 #define SGX_TOKEN_DIRECTORY "/var/lib/IDfusion/tokens"
 
-#if defined(ENCLAVE_DIR)
-#define ENCLAVE_NAME ENCLAVE_DIR"/"ENCLAVE
+#if defined(SRDE_PRODUCTION)
+#define ENCLAVE_DIR	"/opt/IDfusion/lib/enclaves"
+#define TOKEN_DIR	"/var/lib/IDfusion/tokens"
+#define ENCLAVE_DEBUG	false
 #else
-#define ENCLAVE_NAME ENCLAVE
+#define ENCLAVE_DIR	"."
+#define TOKEN_DIR	"."
+#define ENCLAVE_DEBUG	true
 #endif
+#define ENCLAVE_LOCN(enclave)	ENCLAVE_DIR"/"enclave
+#define TOKEN_LOCN(token)	TOKEN_DIR"/"token
+#define ENCLAVE_NAME		ENCLAVE_LOCN(ENCLAVE)
 
 
 /**
