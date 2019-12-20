@@ -85,9 +85,19 @@ const uint8_t Keyid[32] = {
 
 
 /**
- * Array of allowed endpoints.
+ * Array of allowed attestation client endpoints.
  */
-const struct SRDEendpoint Endpoints[1] = {
+const struct SRDEendpoint Endpoints[] = {
+	{
+		.mask	     = SRDEendpoint_all & ~SRDEendpoint_mrenclave,
+		.accept	     = true,
+		.attributes  = 5,
+		.isv_id	     = 0x11,
+		.isv_svn     = 0,
+		.mrsigner    = (uint8_t *) IDfusion_production_key,
+		.mrenclave   = NULL
+	},
+#if !defined(SRDE_PRODUCTION)
 	{
 		.mask	     = SRDEendpoint_all & ~SRDEendpoint_mrenclave,
 		.accept	     = true,
@@ -97,6 +107,7 @@ const struct SRDEendpoint Endpoints[1] = {
 		.mrsigner    = (uint8_t *) IDfusion_debug_key,
 		.mrenclave   = NULL
 	}
+#endif
 };
 
 

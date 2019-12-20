@@ -92,19 +92,21 @@ const static struct SRDEendpoint Provisioner[] = {
 	{
 		.mask	     = SRDEendpoint_all & ~SRDEendpoint_mrenclave,
 		.accept	     = true,
+		.attributes  = 5,
+		.isv_id	     = 0x10,
+		.isv_svn     = 0,
+		.mrsigner    = (uint8_t *) IDfusion_production_key,
+	},
+#if !defined(SRDE_PRODUCTION)
+	{
+		.mask	     = SRDEendpoint_all & ~SRDEendpoint_mrenclave,
+		.accept	     = true,
 		.attributes  = 7,
 		.isv_id	     = 0x10,
 		.isv_svn     = 0,
 		.mrsigner    = (uint8_t *) IDfusion_debug_key,
 	},
-	{
-		.mask	     = SRDEendpoint_all & ~SRDEendpoint_mrenclave,
-		.accept	     = true,
-		.attributes  = 5,
-		.isv_id	     = 0x10,
-		.isv_svn     = 0,
-		.mrsigner    = (uint8_t *) IDfusion_production_key,
-	}
+#endif
 };
 
 
