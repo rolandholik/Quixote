@@ -23,7 +23,8 @@ ENCSRC4 = Provisioner-enclave.c Provisioner-interface.c
 
 TOOLS = test-local-target test-remote-target srde-provisioner \
 	srde-attestation
-INSTALLBIN = srde-attestation
+INSTALLBIN  = srde-attestation
+INSTALLSBIN = srde-provisioner
 
 ENCLAVE_CC = gcc
 
@@ -192,6 +193,8 @@ srde-attestation.o: srde-attestation.c
 install-bin:
 	[ -d ${INSTPATH}/bin ] || mkdir -p ${INSTPATH}/bin;
 	install -s ${INSTALLBIN} ${INSTPATH}/bin;
+	[ -d ${INSTPATH}/sbin ] || mkdir -p ${INSTPATH}/sbin;
+	install -s ${INSTALLSBIN} ${INSTPATH}/sbin;
 	[ -d ${INSTPATH}/lib/enclaves ] || mkdir -p ${INSTPATH}/lib/enclaves;
 	install ${INSTALLENCLAVE} ${INSTPATH}/lib/enclaves;
 
