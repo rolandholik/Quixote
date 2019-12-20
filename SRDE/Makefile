@@ -254,6 +254,7 @@ install-bin:
 	install -s ${INSTALLBIN} ${INSTPATH}/bin;
 	install ${INSTALLSCRIPT} ${INSTPATH}/bin;
 	${MAKE} -C SRDElibs $@;
+	${MAKE} -C Attestation $@;
 
 install-dev:
 	[ -d ${INSTPATH}/include ] || mkdir -p ${INSTPATH}/include;

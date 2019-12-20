@@ -8,7 +8,8 @@
 
 # Variable declarations.
 INSTPATH       = ${DESTDIR}/opt/IDfusion
-INSTALLENCLAVE = LocalTarget.signed.so Attestation.signed.source
+INSTALLENCLAVE = LocalTarget.signed.so Attestation.signed.so \
+	Provisioner.signed.so
 
 ifdef SRDE_PRODUCTION
 TYPE = -DSRDE_PRODUCTION
