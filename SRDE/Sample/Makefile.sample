@@ -30,9 +30,10 @@ SIGNER	= ${SDK}/bin/sgx_sign
 SIGNKEY = signing-key.pem
 
 ENCLAVE_CC = gcc
-ENCLAVE_INCLUDE = -I ${CINCLUDE}/SRDEfusion -I ${CINCLUDE}/SRDEnaaaim	\
-	-I ${CINCLUDE}/NAAAIM -I ${SDK_INCLUDE} -I ${SDK_INCLUDE}/tlibc	\
-	-I ${SDK_INCLUDE}/stlport
+ENCLAVE_INCLUDE = -I ${CINCLUDE}/SRDEfusion -I ${CINCLUDE}/SRDEnaaaim	   \
+	-I ${CINCLUDE}/NAAAIM -I ${CINCLUDE}/SRDEruntime -I ${SDK_INCLUDE} \
+	-I ${SDK_INCLUDE}/tlibc	-I ${SDK_INCLUDE}/stlport		   \
+	-I ${CINCLUDE}/SRDEruntime
 ENCLAVE_CFLAGS = -Wall -nostdinc -fvisibility=hidden -fpie -fstack-protector \
 	-fno-builtin ${ENCLAVE_INCLUDE}
 
@@ -80,7 +81,7 @@ NAAAIM_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles   \
 	-Wl,--no-whole-archive						     \
 	-Wl,--start-group						     \
 	-lsgx_tstdc -l${SDK_CRYPTO_LIB} -l${SDK_SERVICE_LIBRARY}	     \
-	-l${SRDENAAAIMLIB} -lsgx_tsgxssl_crypto -lsgx_tcxx		     \
+	-l${SRDENAAAIMLIB} -lsgx_tsgxssl_crypto				     \
 	-l${SRDEFUSIONLIB}						     \
 	-Wl,--end-group							     \
 	-Wl,-Bstatic -Wl,-Bsymbolic -Wl,--no-undefined			     \
