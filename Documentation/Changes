@@ -54,3 +54,7 @@ Version 0.9:
 	* Implement SRDEpipe object for enclave to enclave communications.
 
 	* Initial implementation of enclave File object.
+
+	* Implement remote attestation service provider infratructure.
+
+	* Implement standardized enclave endpoint verification.
