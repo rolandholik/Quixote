@@ -213,8 +213,7 @@ _Bool _shroud_key(CO(SEALkey_State, S), CO(Buffer, key))
 	if ( !rpt->get_report(rpt, &report) )
 		ERR(goto done);
 
-	if ( !(report.body.attributes.flags  & 0x0000000000000001ULL) || \
-	     !(report.body.attributes.flags  & 0x0000000000000002ULL) )
+	if ( !(report.body.attributes.flags & 0x0000000000000001ULL) )
 		ERR(goto done);
 
 
@@ -345,8 +344,7 @@ _Bool _generate_iv_key(CO(SEALkey_State, S), int type)
 	if ( !rpt->get_report(rpt, &report) )
 		ERR(goto done);
 
-	if ( !(report.body.attributes.flags  & 0x0000000000000001ULL) || \
-	     !(report.body.attributes.flags  & 0x0000000000000002ULL) )
+	if ( !(report.body.attributes.flags & 0x0000000000000001ULL) )
 		ERR(goto done);
 
 
