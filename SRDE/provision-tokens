@@ -48,7 +48,12 @@ for Enclave_Path in $Enclave_Dir/*
 do
 	Enclave=`basename "$Enclave_Path" .signed.so`;
 	Token="$Token_Dir/$Enclave.token";
-	srde-gen-token -e "$Enclave_Path" -o $Token;
+	if [ "$Enclave" = "Attestation" -o \
+	     "$Enclave" = "Provisioner" ]; then
+		srde-gen-token -p -e "$Enclave_Path" -o $Token;
+	else
+		srde-gen-token -e "$Enclave_Path" -o $Token;
+	fi;
 	echo "Generated: $Token";
 done;
 
