@@ -3330,6 +3330,8 @@ static _Bool verify(CO(PossumPipe, this), CO(Buffer, endpoints), _Bool *status)
 			retn	= true;
 			goto done;
 		}
+
+		++ep;
 	}
 
 	retn = true;
