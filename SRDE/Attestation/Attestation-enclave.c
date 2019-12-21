@@ -25,7 +25,7 @@
 #endif
 
 #define PROVISIONER_PORT 12902
-#define CREDENTIAL_FILE  "/var/lib/IDfusion/data/attestation.bin"
+#define CREDENTIAL_FILE  "/var/lib/IDfusion/data/Attestation.bin"
 
 #define QE_TOKEN	"/var/lib/IDfusion/tokens/libsgx_qe.token"
 #define PCE_TOKEN	"/var/lib/IDfusion/tokens/libsgx_pce.token"
