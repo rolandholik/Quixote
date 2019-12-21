@@ -23,6 +23,7 @@
 #include <SRDEquote.h>
 #include <Report.h>
 #include <SRDEpipe.h>
+#include <Attestation.h>
 
 #include <SRDEfusion-ocall.h>
 #include <SRDEnaaaim-ocall.h>
@@ -37,30 +38,6 @@ sgx_status_t sgx_rijndael128_cmac_msg(uint8_t (*)[16], uint8_t *, size_t, \
  * The elliptic curve object which will be used.
  */
 static Curve25519 SharedKey = NULL;
-
-
-/**
- * Allowed endpoints for Attestation enclave.
- */
-const static struct SRDEendpoint Attestation_enclave[] = {
-	{
-		.mask	     = SRDEendpoint_all & ~SRDEendpoint_mrenclave,
-		.accept	     = true,
-		.attributes  = 7,
-		.isv_id	     = 0x11,
-		.isv_svn     = 0,
-		.mrsigner    = (uint8_t *) IDfusion_debug_key,
-	},
-	{
-		.mask	     = SRDEendpoint_all & ~SRDEendpoint_mrenclave,
-		.accept	     = true,
-		.attributes  = 5,
-		.isv_id	     = 0x11,
-		.isv_svn     = 0,
-		.mrsigner    = (uint8_t *) IDfusion_production_key,
-	}
-};
-
 
 
 /**
@@ -421,114 +398,34 @@ _Bool test_pipe(struct SRDEpipe_ecall *ep)
 _Bool test_attestation_service(struct LocalTarget_ecall3 *ep)
 
 {
-	_Bool status,
-	      connected = false,
-	      retn	= false;
+	_Bool retn = false;
 
-	unsigned int cmd;
+	String report = NULL;
 
-	struct SGX_targetinfo target;
+	SRDEquote quote = NULL;
 
-	struct SGX_report report;
-
-	Buffer packet = NULL;
-
-	String output = NULL;
-
-	SRDEpipe pipe = NULL;
-
-	Report rpt = NULL;
-
-	SRDEquote quoter = NULL;
+	Attestation attest = NULL;
 
 
-	INIT(NAAAIM, SRDEpipe, pipe, ERR(goto done));
-	if ( !pipe->setup(pipe, ENCLAVE_LOCN("Attestation.signed.so"), 1, \
-			  TOKEN_LOCN("Attestation.token"), ENCLAVE_DEBUG) )
+	INIT(HurdLib, String, report, ERR(goto done));
+	INIT(NAAAIM, Attestation, attest, ERR(goto done));
+	if ( !attest->generate(attest, report) )
 		ERR(goto done);
 
-	if ( !pipe->connect(pipe) )
-		ERR(goto done);
-	connected = true;
-
-
-	/* Verify the attestation enclave. */
-	INIT(HurdLib, Buffer, packet, ERR(goto done));
-	if ( !packet->add(packet, (void *) Attestation_enclave, \
-			  sizeof(Attestation_enclave)) )
-		ERR(goto done);
-	if ( !pipe->verify(pipe, packet, &status) )
-		ERR(goto done);
-	if ( !status ) {
-		fputs("\nCannot verify attestation enclave.\n", stdout);
-		ERR(goto done);
-	}
-	else
-		fputs("\nHave valid connection to attestation enclave.\n", \
-		      stdout);
-	packet->reset(packet);
-
-
-	/* Request QE target information. */
-	cmd = 1;
-	if ( !packet->add(packet, (void *) &cmd, sizeof(unsigned int)) )
-		ERR(goto done);
-	if ( !pipe->send_packet(pipe, SRDEpipe_data, packet) )
-		ERR(goto done);
-
-	if ( !pipe->receive_packet(pipe, packet) )
-		ERR(goto done);
-	if ( packet->size(packet) == 0 )
-		ERR(goto done);
-
-
-	/* Generate enclave report and return it. */
-	INIT(NAAAIM, Report, rpt, ERR(goto done));
-	memcpy(&target, packet->get(packet), sizeof(struct SGX_targetinfo));
-	if ( !rpt->generate_report(rpt, &target, NULL, &report) )
-		ERR(goto done);
-
-	cmd = 2;
-	packet->reset(packet);
-
-	if ( !packet->add(packet, (void *) &cmd, sizeof(unsigned int)) )
-		ERR(goto done);
-	if ( !packet->add(packet, (void *) &report, sizeof(report)) )\
-		ERR(goto done);
-
-	if ( !pipe->send_packet(pipe, SRDEpipe_data, packet) )
-		ERR(goto done);
-
-
-	/* Process the report. */
-	if ( !pipe->receive_packet(pipe, packet) )
-		ERR(goto done);
-	if ( packet->size(packet) == 0 )
-		ERR(goto done);
-
-	INIT(HurdLib, String, output, ERR(goto done));
-	if ( !output->add(output, (char *) packet->get(packet)) )
-		ERR(goto done);
-
-	INIT(NAAAIM, SRDEquote, quoter, ERR(goto done));
-	if ( !quoter->decode_report(quoter, output) )
+	INIT(NAAAIM, SRDEquote, quote, ERR(goto done));
+	if ( !quote->decode_report(quote, report) )
 		ERR(goto done);
 
 	fputs("\nIAS report on test enclave:\n\n", stdout);
-	quoter->dump_report(quoter);
+	quote->dump_report(quote);
 
 	retn = true;
 
 
  done:
-	if ( connected )
-		pipe->close(pipe);
-
-	WHACK(packet);
-	WHACK(output);
-	WHACK(pipe);
-	WHACK(rpt);
-	WHACK(quoter);
+	WHACK(report);
+	WHACK(quote);
+	WHACK(attest);
 
 	return retn;
 }

@@ -88,3 +88,4 @@
 #define NAAAIM_AES128_cmac_OBJID	51
 #define NAAAIM_Report_OBJID		52
 #define NAAAIM_SRDEpipe_OBJID		53
+#define NAAAIM_Attestation_OBJID	54
