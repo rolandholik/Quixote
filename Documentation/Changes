@@ -55,6 +55,6 @@ Version 0.9:
 
 	* Initial implementation of enclave File object.
 
-	* Implement remote attestation service provider infratructure.
+	* Implement remote attestation service provider infrastructure.
 
 	* Implement standardized enclave endpoint verification.
