@@ -379,6 +379,8 @@ _Bool _request_report(CO(SRDEquote, quoter), CO(Buffer, packet))
 
 	uint8_t *bp;
 
+	size_t nonce_size;
+
 	char keystr[33];
 
 	struct SGX_report report;
@@ -445,6 +447,22 @@ _Bool _request_report(CO(SRDEquote, quoter), CO(Buffer, packet))
 	if ( !quoter->generate_quote(quoter, &report, spid, \
 				     nonce->get_Buffer(nonce), quote) )
 		ERR(goto done);
+
+
+	/* Add report nonce if one has been provided. */
+	nonce_size = packet->size(packet) - sizeof(unsigned int) - \
+		sizeof(struct SGX_report);
+	if ( nonce_size > 0 ) {
+		if ( nonce_size > 16 )
+			ERR(goto done);
+
+		bp += sizeof(struct SGX_report);
+		spid->reset(spid);
+		if ( !spid->add(spid, bp, nonce_size) )
+			ERR(goto done);
+		if ( !quoter->set_nonce(quoter, spid) )
+			ERR(goto done);
+	}
 
 
 	/* Generate attestation report. */

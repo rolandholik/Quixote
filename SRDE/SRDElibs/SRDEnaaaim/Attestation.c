@@ -126,6 +126,16 @@ static void _init_state(CO(Attestation_State, S))
  * \param this		A pointer to the object that is to generate
  *			the attestation report.
  *
+ * \param nonce		A nonce value up to 128 bits in length that
+ *			will be included as a freshness verifier in
+ *			attestation report.  If this parameter is
+ *			NULL a nonce is not included.
+ *
+ * \param reportdata	An object containing report data, up to 64
+ *			bytes in length that will be included in the
+ *			enclave report.  If this value is NULL no
+ *			data will be included in the report.
+ *
  * \param output	A pointer to the object that will be loaded
  *			with the ASCII representation of the report.
  *
@@ -139,7 +149,8 @@ static void _init_state(CO(Attestation_State, S))
  *			attestation as to the state of the enclave.
  */
 
-static _Bool generate(CO(Attestation, this), CO(String, output))
+static _Bool generate(CO(Attestation, this), CO(Buffer, nonce), \
+		      CO(Buffer, reportdata), CO(String, output))
 
 {
 	_Bool status,
@@ -157,6 +168,13 @@ static _Bool generate(CO(Attestation, this), CO(String, output))
 	SRDEpipe pipe = NULL;
 
 	Report rpt = NULL;
+
+
+	/* Verify arguement status. */
+	if ( (nonce != NULL) && (nonce->size(nonce) > 16) )
+		ERR(goto done);
+	if ( (reportdata != NULL) && (reportdata->size(reportdata) > 64) )
+		ERR(goto done);
 
 
 	INIT(NAAAIM, SRDEpipe, pipe, ERR(goto done));
@@ -198,7 +216,7 @@ static _Bool generate(CO(Attestation, this), CO(String, output))
 	/* Generate enclave report and return it. */
 	INIT(NAAAIM, Report, rpt, ERR(goto done));
 	memcpy(&target, packet->get(packet), sizeof(struct SGX_targetinfo));
-	if ( !rpt->generate_report(rpt, &target, NULL, &report) )
+	if ( !rpt->generate_report(rpt, &target, reportdata, &report) )
 		ERR(goto done);
 
 	cmd = 2;
@@ -208,6 +226,11 @@ static _Bool generate(CO(Attestation, this), CO(String, output))
 		ERR(goto done);
 	if ( !packet->add(packet, (void *) &report, sizeof(report)) )\
 		ERR(goto done);
+	if ( nonce != NULL ) {
+		if ( !packet->add(packet, nonce->get(nonce), \
+				  nonce->size(nonce)) )
+			ERR(goto done);
+	}
 
 	if ( !pipe->send_packet(pipe, SRDEpipe_data, packet) )
 		ERR(goto done);

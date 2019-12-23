@@ -400,17 +400,43 @@ _Bool test_attestation_service(struct LocalTarget_ecall3 *ep)
 {
 	_Bool retn = false;
 
+	Buffer b,
+	       bufr = NULL;
+
 	String report = NULL;
+
+	RandomBuffer nonce = NULL;
 
 	SRDEquote quote = NULL;
 
 	Attestation attest = NULL;
 
 
+	/* Generate report nonce and random report data. */
+	INIT(NAAAIM, RandomBuffer, nonce, ERR(goto done));
+	if ( !nonce->generate(nonce, 8) )
+		ERR(goto done);
+	b = nonce->get_Buffer(nonce);
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	if ( !bufr->add_Buffer(bufr, b) )
+		ERR(goto done);
+
+	if ( !nonce->generate(nonce, 32) )
+		ERR(goto done);
+
+	fputs("\nReport nonce: ", stdout);
+	bufr->print(bufr);
+	fputs("Report data:  ", stdout);
+	b->print(b);
+
+
+	/* Request the attestation report. */
 	INIT(HurdLib, String, report, ERR(goto done));
 	INIT(NAAAIM, Attestation, attest, ERR(goto done));
-	if ( !attest->generate(attest, report) )
+	if ( !attest->generate(attest, bufr, b, report) )
 		ERR(goto done);
+
 
 	INIT(NAAAIM, SRDEquote, quote, ERR(goto done));
 	if ( !quote->decode_report(quote, report) )
@@ -423,7 +449,9 @@ _Bool test_attestation_service(struct LocalTarget_ecall3 *ep)
 
 
  done:
+	WHACK(bufr);
 	WHACK(report);
+	WHACK(nonce);
 	WHACK(quote);
 	WHACK(attest);
 

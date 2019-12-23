@@ -26,7 +26,8 @@ typedef struct NAAAIM_Attestation_State * Attestation_State;
 struct NAAAIM_Attestation
 {
 	/* External methods. */
-	_Bool (*generate)(const Attestation, const String);
+	_Bool (*generate)(const Attestation, const Buffer, const Buffer, \
+			  const String);
 
 	void (*whack)(const Attestation);
 
