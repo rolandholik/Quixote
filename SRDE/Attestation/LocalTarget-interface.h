@@ -24,6 +24,7 @@ struct LocalTarget_ecall1 {
 	_Bool apikey;
 	_Bool development;
 	_Bool nonce;
+	_Bool full_report;
 
 	size_t qe_token_size;
 	char *qe_token;

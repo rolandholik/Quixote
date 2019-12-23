@@ -105,6 +105,8 @@ struct NAAAIM_SRDEquote
 
 	struct SGX_targetinfo * (*get_qe_targetinfo)(const SRDEquote);
 	struct SRDE_quote * (*get_quoteinfo)(const SRDEquote);
+	_Bool (*get_report)(const SRDEquote, const String, const String, \
+			    const String);
 
 	void (*development)(const SRDEquote, const _Bool mode);
 	void (*dump_report)(const SRDEquote);

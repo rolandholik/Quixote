@@ -119,6 +119,7 @@ static sgx_status_t sgx_test_attestation(void *ifp)
 	ep->apikey	   = ip->apikey;
 	ep->development	   = ip->development;
 	ep->nonce	   = ip->nonce;
+	ep->full_report	   = ip->full_report;
 
 	ep->qe_token_size  = ip->qe_token_size;
 	ep->pce_token_size = ip->pce_token_size;

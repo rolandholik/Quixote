@@ -49,13 +49,84 @@
 #include "LocalTarget-interface.h"
 
 
+/**
+ * Private function.
+ *
+ * This method is responsible for outputing the report elements if a
+ * full report is noted requested.
+ *
+ * \param quoter	The object that was used to generate the
+ *			report.
+ *
+ * \return		No return value is defined.
+ */
+
+static void print_elements(const SRDEquote quoter)
+
+{
+	_Bool status = false,
+	      retn   = false;
+
+	String certificate = NULL,
+	       signature   = NULL,
+	       report	   = NULL;
+
+
+	INIT(HurdLib, String, certificate, ERR(goto done));
+	INIT(HurdLib, String, signature, ERR(goto done));
+	INIT(HurdLib, String, report, ERR(goto done));
+
+
+	/* Verify report. */
+	if ( !quoter->validate_report(quoter, &status) )
+		ERR(goto done);
+
+	if ( status )
+		fputs("Valid report.\n\n", stdout);
+	else {
+		fputs("Invalid report.\n", stdout);
+		retn = true;
+		goto done;
+	}
+
+
+	/* Extract and output report elements. */
+	if ( !quoter->get_report(quoter, certificate, signature, report) )
+		ERR(goto done);
+
+	fputs("Certificate:\n", stdout);
+	certificate->print(certificate);
+
+	fputs("Signature:\n", stdout);
+	signature->print(signature);
+
+	fputs("\nReport:\n", stdout);
+	report->print(report);
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		fputs("Error generating report elements.\n", stderr);
+
+	WHACK(certificate);
+	WHACK(signature);
+	WHACK(report);
+
+	return;
+}
+
+
+
 /* Program entry point. */
 extern int main(int argc, char *argv[])
 
 {
 	_Bool debug	  = true,
 	      send_nonce  = false,
-	      development = false;
+	      development = false,
+	      full_report = false;
 
 	char *key	     = NULL,
 	     *epid_blob	     = "/var/lib/IDfusion/data/EPID.bin",
@@ -107,7 +178,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "DNTe:k:p:q:s:t:")) != EOF )
+	while ( (opt = getopt(argc, argv, "DNTfe:k:p:q:s:t:")) != EOF )
 		switch ( opt ) {
 			case 'D':
 				development = true;
@@ -118,6 +189,10 @@ extern int main(int argc, char *argv[])
 			case 'T':
 				mode = trusted;
 				break;
+			case 'f':
+				full_report = true;
+				break;
+
 			case 'e':
 				epid_blob = optarg;
 				break;
@@ -182,6 +257,8 @@ extern int main(int argc, char *argv[])
 		       sizeof(struct LocalTarget_ecall1));
 
 		source_ecall1.development = development;
+		source_ecall1.full_report = full_report;
+
 		if ( send_nonce )
 			source_ecall1.nonce = true;
 
@@ -289,9 +366,11 @@ extern int main(int argc, char *argv[])
 				     nonce->get_Buffer(nonce), quote) )
 		ERR(goto done);
 
-	fputs("\nBinary quote:\n", stdout);
-	quote->hprint(quote);
-	fputs("\n", stdout);
+	if ( full_report ) {
+		fputs("\nBinary quote:\n", stdout);
+		quote->hprint(quote);
+		fputs("\n", stdout);
+	}
 
 
 	/* Request a report on the quote. */
@@ -326,15 +405,24 @@ extern int main(int argc, char *argv[])
 	if ( !quoter->generate_report(quoter, quote, output, apikey) )
 		ERR(goto done);
 
-	fputs("\nAttestation report:\n", stdout);
-	output->print(output);
+	if ( full_report ) {
+		fputs("\nAttestation report:\n", stdout);
+		output->print(output);
+	}
 
 
 	/* Decode response values. */
 	fputc('\n', stdout);
 	if ( !quoter->decode_report(quoter, output) )
 		ERR(goto done);
-	quoter->dump_report(quoter);
+
+
+	/* Output report elements. */
+	if ( full_report )
+		quoter->dump_report(quoter);
+	else
+		print_elements(quoter);
+
 
 	retn = 0;
 

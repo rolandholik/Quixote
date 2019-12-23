@@ -122,6 +122,75 @@ _Bool get_report(unsigned int mode, struct SGX_targetinfo *target, \
 
 
 /**
+ * Internal private function.
+ *
+ * This method is responsible for outputing the report elements if a
+ * full report is noted requested.
+ *
+ * \param quoter	The object that was used to generate the
+ *			report.
+ *
+ * \return		No return value is defined.
+ */
+
+static void _print_elements(const SRDEquote quoter)
+
+{
+	_Bool status = false,
+	      retn   = false;
+
+	String certificate = NULL,
+	       signature   = NULL,
+	       report	   = NULL;
+
+
+	INIT(HurdLib, String, certificate, ERR(goto done));
+	INIT(HurdLib, String, signature, ERR(goto done));
+	INIT(HurdLib, String, report, ERR(goto done));
+
+
+	/* Verify report. */
+	if ( !quoter->validate_report(quoter, &status) )
+		ERR(goto done);
+
+	if ( status )
+		fputs("Valid report.\n\n", stdout);
+	else {
+		fputs("Invalid report.\n", stdout);
+		retn = true;
+		goto done;
+	}
+
+
+	/* Extract and output report elements. */
+	if ( !quoter->get_report(quoter, certificate, signature, report) )
+		ERR(goto done);
+
+	fputs("Certificate:\n", stdout);
+	certificate->print(certificate);
+
+	fputs("Signature:\n", stdout);
+	signature->print(signature);
+
+	fputs("\nReport:\n", stdout);
+	report->print(report);
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		fputs("Error generating report elements.\n", stderr);
+
+	WHACK(certificate);
+	WHACK(signature);
+	WHACK(report);
+
+	return;
+}
+
+
+/**
  * External ECALL 1.
  *
  * This method implements the generation of a remote attestion quote
@@ -225,8 +294,10 @@ _Bool test_attestation(struct LocalTarget_ecall1 *ip)
 				     nonce->get_Buffer(nonce), quote) )
 		ERR(goto done);
 
-	fputs("\nBinary quote:\n", stdout);
-	quote->hprint(quote);
+	if ( ip->full_report ) {
+		fputs("\nBinary quote:\n", stdout);
+		quote->hprint(quote);
+	}
 
 
 	/* Generate the verifying report. */
@@ -245,15 +316,21 @@ _Bool test_attestation(struct LocalTarget_ecall1 *ip)
 	if ( !quoter->generate_report(quoter, quote, output, apikey) )
 		ERR(goto done);
 
-	fputs("\nAttestation report:\n", stdout);
-	output->print(output);
+	if ( ip->full_report ) {
+		fputs("\nAttestation report:\n", stdout);
+		output->print(output);
+	}
 
 
 	/* Decode response values. */
 	fputc('\n', stdout);
 	if ( !quoter->decode_report(quoter, output) )
 		ERR(goto done);
-	quoter->dump_report(quoter);
+
+	if ( ip->full_report )
+		quoter->dump_report(quoter);
+	else
+		_print_elements(quoter);
 
 
  done:

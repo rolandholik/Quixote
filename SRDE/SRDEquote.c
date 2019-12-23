@@ -1530,6 +1530,87 @@ static struct SRDE_quote * get_quoteinfo(CO(SRDEquote, this))
 /**
  * External public method.
  *
+ * This method implements an accessor method for returning the three
+ * primary elements of an Intel remote attestation report.  These
+ * elements are the certificate that authenticates the report, the
+ * signature over the report authenticated by that certificate and
+ * finally the report itself.
+ *
+ * \param this		A pointer to the object whose quote status is
+ *			to be returned.
+ *
+ * \param certificate	The object that will be loaded with the
+ *			authenticating certificate.
+ *
+ * \param signature	The object that will be loaded with the report
+ *			signature.
+ *
+ * \param report	The object that will be loaded with the report
+ *			itself.
+ *
+ * \return		A boolean value is returned to indicate the
+ *			status of the report elements being returned.
+ *			A false value indicates there was an
+ *			operational problem with retrieving the report
+ *			elements.  In this case no assumptions can be
+ *			made about any of the output objects.  A true
+ *			value indicates that retrieval of the
+ *			information was successful and the contents of
+ *			the output objects can be respected.
+ */
+
+static _Bool get_report(CO(SRDEquote, this), CO(String, certificate), \
+			CO(String, signature), CO(String, report))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	String s;
+
+
+	/* Verify object status and arguement state. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( S->status == SRDEquote_status_UNDEFINED )
+		ERR(goto done);
+
+	if ( certificate->poisoned(certificate) )
+		ERR(goto done);
+	if ( signature->poisoned(signature) )
+		ERR(goto done);
+	if ( report->poisoned(report) )
+		ERR(goto done);
+
+
+	/* Load the output objects. */
+	s = S->certificate;
+	if ( !certificate->add(certificate, s->get(s)) )
+		ERR(goto done);
+
+	s = S->signature;
+	if ( !signature->add(signature, s->get(s)) )
+		ERR(goto done);
+
+	s = S->report;
+	if ( !report->add(report, s->get(s)) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements setting whether or not the development version
  * of the IAS service should be used.
  *
@@ -1802,6 +1883,7 @@ extern SRDEquote NAAAIM_SRDEquote_Init(void)
 
 	this->get_qe_targetinfo = get_qe_targetinfo;
 	this->get_quoteinfo	= get_quoteinfo;
+	this->get_report	= get_report;
 
 	this->set_nonce	= set_nonce;
 
