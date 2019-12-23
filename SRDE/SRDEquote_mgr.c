@@ -209,10 +209,9 @@ static void srdequote_generate_report(struct SRDEquote_ocall *ocp)
 			ERR(goto done);
 	}
 
-	if ( ocp->set_nonce ) {
+	if ( ocp->ias_nonce_size > 0 ) {
 		INIT(HurdLib, Buffer, nonce, ERR(goto done));
-		if ( !nonce->add(nonce, ocp->ias_nonce, \
-				 sizeof(ocp->ias_nonce)) )
+		if ( !nonce->add(nonce, ocp->ias_nonce, ocp->ias_nonce_size) )
 			ERR(goto done);
 		if ( !quoter->set_nonce(quoter, nonce) )
 			ERR(goto done);

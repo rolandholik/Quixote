@@ -734,9 +734,9 @@ static _Bool generate_report(CO(SRDEquote, this), CO(Buffer, quote), \
 	}
 
 	if ( S->nonce != NULL ) {
-		ocall.set_nonce = true;
+		ocall.ias_nonce_size = S->nonce->size(S->nonce);
 		memcpy(ocall.ias_nonce, S->nonce->get(S->nonce), \
-		       sizeof(ocall.ias_nonce));
+		       S->nonce->size(S->nonce));
 	}
 
 	ocall.development = S->development;

@@ -41,7 +41,6 @@ struct SRDEquote_ocall {
 	_Bool retn;
 	_Bool apikey;
 	_Bool development;
-	_Bool set_nonce;
 
 	enum SRDEquote_ocalls ocall;
 	unsigned int instance;
@@ -56,6 +55,8 @@ struct SRDEquote_ocall {
 	unsigned char spid[16];
 	unsigned char nonce[16];
 	unsigned char key[33];
+
+	size_t ias_nonce_size;
 	unsigned char ias_nonce[16];
 
 	size_t bufr_size;
