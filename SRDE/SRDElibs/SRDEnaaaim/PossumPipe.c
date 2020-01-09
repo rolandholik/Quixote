@@ -1147,6 +1147,7 @@ static _Bool find_client2(CO(Buffer, packet), RSAkey *id)
 		}
 
 		++keyp;
+		idf->reset(idf);
 		bufr->reset(bufr);
 	}
 
