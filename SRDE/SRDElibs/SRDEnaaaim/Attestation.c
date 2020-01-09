@@ -53,8 +53,8 @@
  * since this will largely be a production service used even by
  * development enclavess.
  */
-#define ATTESTATION_ENCLAVE "/opt/IDfusion/lib/enclaves/Attestation.signed.so"
-#define ATTESTATION_TOKEN   SGX_TOKEN_DIRECTORY"/Attestation.token"
+#define ATTESTATION_ENCLAVE ENCLAVE_LOCN("Attestation.signed.so")
+#define ATTESTATION_TOKEN   TOKEN_LOCN("Attestation.token")
 
 
 /** Attestation private state information. */
@@ -179,7 +179,7 @@ static _Bool generate(CO(Attestation, this), CO(Buffer, nonce), \
 
 	INIT(NAAAIM, SRDEpipe, pipe, ERR(goto done));
 	if ( !pipe->setup(pipe, ATTESTATION_ENCLAVE, 1, ATTESTATION_TOKEN, \
-			  false) )
+			  ENCLAVE_DEBUG) )
 		ERR(goto done);
 
 	if ( !pipe->connect(pipe) )
