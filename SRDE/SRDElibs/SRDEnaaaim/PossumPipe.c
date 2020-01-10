@@ -2489,6 +2489,8 @@ static _Bool start_host_mode2(CO(PossumPipe, this), CO(Buffer, spid))
 	/* Lookup the client identity. */
 	if ( !find_client2(netbufr, &identity) ) {
 		S->error = PossumPipe_error_no_identity;
+		netbufr->reset(netbufr);
+		duct->send_Buffer(duct, netbufr);
 		goto done;
 	}
 	S->client_identity = identity;
