@@ -60,3 +60,6 @@ Version 0.9:
 	* Implement remote attestation service provider infrastructure.
 
 	* Implement standardized enclave endpoint verification.
+
+Version 1.0:
+	* Update to version 2.7.1 of Intel libraries and enclave.
