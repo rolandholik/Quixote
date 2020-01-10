@@ -403,7 +403,12 @@ _Bool provisioner(struct Provisioner_ecall1 *ep)
 		}
 		fputs("Have connection, setting up context.\n", stdout);
 		if ( !pipe->start_host_mode2(pipe, pipespid) ) {
-			fputs("\tUnable to start connection.\n", stdout);
+			if ( pipe->get_error(pipe) == \
+			     PossumPipe_error_no_identity )
+				fputs("\tInvalid client identity.\n", stdout);
+			else
+				fputs("\tUnable to start connection\n", \
+				      stdout);
 			pipe->reset(pipe);
 			continue;
 		}
