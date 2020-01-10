@@ -527,6 +527,10 @@ static _Bool receive_Buffer(CO(Duct, this), CO(Buffer, bf))
 		ERR(goto done);
 	if ( !ocall.retn )
 		ERR(goto done);
+	if ( ocall.size == 0 ) {
+		S->eof = true;
+		goto done;
+	}
 
 	if ( !bf->add(bf, ocall.bufr, ocall.size) )
 		ERR(goto done);
