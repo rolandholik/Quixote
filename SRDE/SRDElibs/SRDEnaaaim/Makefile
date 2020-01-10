@@ -13,6 +13,10 @@ INSTALLENCLAVE = test-naaaim.signed.so test-Duct.signed.so \
 INSTINCLUDE    = IDtoken.h NAAAIM.h PossumPacket.h PossumPipe.h \
 	RandomBuffer.h SEALkey.h SEALEDblob.h Report.h Attestation.h
 
+ifdef SRDE_PRODUCTION
+TYPE = -DSRDE_PRODUCTION
+endif
+
 CSRC   = test-naaaim.c
 ENCSRC = test-naaaim-enclave.c test-naaaim-interface.c
 LIBSRC = SHA256.c RandomBuffer.c Curve25519.c SHA256_hmac.c AES256_cbc.c   \
@@ -41,7 +45,7 @@ SGX_INCLUDE = -I . -I ${SGX_SDK}/include -I ${SGX_SDK}/include/tlibc \
 	-I ../.. -I ${SGX_SSL}/include
 
 ENCLAVE_CFLAGS = -Wall -nostdinc -fvisibility=hidden -fpie -fstack-protector \
-	${SGX_INCLUDE} -fno-builtin
+	${SGX_INCLUDE} -fno-builtin ${TYPE}
 
 SGX_LIBRARY_PATH = ${SGX_SDK}/lib64
 SSL_LIBRARY_PATH = ${SGX_SSL}/lib64
@@ -77,10 +81,7 @@ TOOLS += ${C++TOOLS}
 endif
 
 CFLAGS = -Wall -O2 -fpic -fomit-frame-pointer -march=core2 -I ../.. \
-	-I ../../.. -I ../../../HurdLib 
-ifdef SRDE_PRODUCTION
-CFLAGS += -DSRDE_PRODUCTION
-endif
+	-I ../../.. -I ../../../HurdLib ${TYPE}
 
 LDFLAGS = ${STATIC} -g
 ifneq (${CC}, musl-gcc)

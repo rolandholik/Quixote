@@ -13,6 +13,10 @@ INSTINCLUDE    = Buffer.h Fibsequence.h HurdLib.h Origin.h SRDEfusion.h	   \
 	String.h alltypes.h features.h fusion-shim.h reg-support.h regex.h \
 	File.h
 
+ifdef SRDE_PRODUCTION
+TYPE = -DSRDE_PRODUCTION
+endif
+
 CSRC   = test-fusion.c
 ENCSRC = test-fusion-enclave.c test-fusion-interface.c
 LIBSRC = fusion-shim.c fusion-time.c regcomp.c regexec.c regerror.c tre-mem.c \
@@ -32,7 +36,7 @@ SGX_INCLUDE = -I . -I ../.. -I ${SGX_SDK}/include -I ${SGX_SDK}/include/tlibc \
 	-I ${SGX_SDK}/include/stlport
 
 ENCLAVE_CFLAGS = -Wall -nostdinc -fvisibility=hidden -fpie -fstack-protector \
-	${SGX_INCLUDE} -fno-builtin
+	${SGX_INCLUDE} -fno-builtin ${TYPE}
 
 SGX_LIBRARY_PATH = ${SGX_SDK}/lib64
 
@@ -64,11 +68,7 @@ TOOLS += test-fusion-c++
 endif
 
 CFLAGS = -Wall -O2 -fpic -fomit-frame-pointer -march=core2 -I ../.. \
-	-I ../../.. -I ../../../HurdLib
-ifdef SRDE_PRODUCTION
-CFLAGS += -DSRDE_PRODUCTION
-endif
-
+	-I ../../.. -I ../../../HurdLib ${TYPE}
 
 LDFLAGS = ${STATIC} -g -L ../../../lib
 ifneq (${CC}, musl-gcc)

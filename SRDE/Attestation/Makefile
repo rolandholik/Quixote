@@ -37,8 +37,8 @@ SGX_INCLUDE = -I . -I $(SGX_SDK)/include -I $(SGX_SDK)/include/tlibc \
 	-I $(SGX_SDK)/include/stlport -I .. -I ../../ISOidentity     \
 	-I ../SRDElibs/SRDEfusion -I ../SRDElibs/SRDEnaaaim -I../../lib
 
-ENCLAVE_CFLAGS = ${TYPE} -Wall -nostdinc -fvisibility=hidden -fpie \
-	-fstack-protector $(SGX_INCLUDE) -fno-builtin ${TYPE}
+ENCLAVE_CFLAGS = -Wall -nostdinc -fvisibility=hidden -fpie -fstack-protector \
+	$(SGX_INCLUDE) -fno-builtin ${TYPE}
 
 SGX_LIBRARY_PATH = $(SGX_SDK)/lib64
 SSL_LIBRARY_PATH = ${SGX_SSL}/lib64
@@ -66,8 +66,8 @@ ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles   \
 
 CC = musl-gcc
 
-CFLAGS = ${TYPE} -Wall -O2 -fomit-frame-pointer -march=core2 -I .. -I ../.. \
-	-I ../../HurdLib -I ../../ISOidentity -I ../../lib
+CFLAGS = -Wall -O2 -fomit-frame-pointer -march=core2 -I .. -I ../.. \
+	-I ../../HurdLib -I ../../ISOidentity -I ../../lib ${TYPE}
 
 LDFLAGS = -g
 ifneq (${CC}, musl-gcc)

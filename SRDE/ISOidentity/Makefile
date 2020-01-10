@@ -9,6 +9,10 @@
 INSTPATH       = ${DESTDIR}/opt/IDfusion
 INSTALLENCLAVE = ISOidentity.signed.so ISOmanager.signed.so
 
+ifdef SRDE_PRODUCTION
+TYPE = -DSRDE_PRODUCTION
+endif
+
 CSRC   = test-ISOidentity-enclave.c ISOenclave.c ISOmanager.c
 ENCSRC = ISOidentity-enclave.c ISOidentity-interface.c ISOidentity-manager.c \
 	ContourPoint.c Actor.c Subject.c ExchangeEvent.c ISOidentity.c
@@ -31,7 +35,7 @@ SGX_INCLUDE = -I $(SGX_SDK)/include -I $(SGX_SDK)/include/tlibc		 \
 	-I ..
 
 ENCLAVE_CFLAGS = -Wall -nostdinc -fvisibility=hidden -fpie -fstack-protector \
-	$(SGX_INCLUDE) -fno-builtin
+	$(SGX_INCLUDE) -fno-builtin ${TYPE}
 
 SGX_LIBRARY_PATH = ${SGX_SDK}/lib64
 SSL_LIBRARY_PATH = ${SGX_SSL}/lib64
@@ -60,7 +64,7 @@ ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles   \
 CC = musl-gcc
 
 CFLAGS = -Wall -O2 -fomit-frame-pointer -march=core2 -I .. -I ../.. \
-	-I ../../HurdLib -I ../../ISOidentity -I ../../lib
+	-I ../../HurdLib -I ../../ISOidentity -I ../../lib ${TYPE}
 
 LDFLAGS = -g
 
