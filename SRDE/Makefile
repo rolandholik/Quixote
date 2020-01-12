@@ -11,6 +11,8 @@ INSTPATH      = ${DESTDIR}/opt/IDfusion
 INSTALLBIN    = srde-check srde-gen-token srde-gen-verifier srde-load \
 	srde-metadata srde-provision
 INSTALLSCRIPT = provision-epid provision-tokens provision-verifier
+
+INSTALLDEV    = srde-sign
 INSTINCLUDE   = PCEenclave.h PVEenclave.h QEenclave.h SRDEaesgcm.h SRDEcmac.h \
 	SRDEecdsa.h SRDEepid.h SRDEloader.h SRDEmessage.h SRDEmetadata.h      \
 	SRDEquote.h SRDErsa.h SRDEsigstruct.h SRDE.h SRDEenclave.h	      \
@@ -263,6 +265,8 @@ install-dev:
 	install -m 644 ${INSTINCLUDE} ${INSTPATH}/include/SRDEruntime;
 	[ -d ${INSTPATH}/lib ] || mkdir -p ${INSTPATH}/lib;
 	install -m 644 ${LIBRARY} ${INSTPATH}/lib;
+	[ -d ${INSTPATH}/bin ] || mkdir -p ${INSTPATH}/bin;
+	install -m 755 ${INSTALLDEV} ${INSTPATH}/bin;
 	set -e; for dir in ${DEV_SUBDIRS}; do ${MAKE} -C $$dir $@; done;
 
 tags:

@@ -127,29 +127,25 @@ enclave: ldscript LocalTarget.signed.so LocalSource.signed.so \
 	Attestation.signed.so Provisioner.signed.so
 
 LocalTarget.signed.so: LocalTarget.so
-	$(SGX_SIGNER) sign -key ${SGXKEY} -enclave $< -out $@ \
-		-config LocalTarget-enclave.xml;
+	$(SRDE_SIGN) -m LocalTarget-enclave.meta -k ${SGXKEY} -e $< -o $@;
 
 LocalTarget.so: ${ENCOBJS1}
 	${ENCLAVE_CC} -o $@ $^ ${ENCLAVE_LDFLAGS}
 
 LocalSource.signed.so: LocalSource.so
-	$(SGX_SIGNER) sign -key ${SGXKEY} -enclave $< -out $@ \
-	-config LocalTarget-enclave.xml;
+	$(SRDE_SIGN) -m LocalSource-enclave.meta -k ${SGXKEY} -e $< -o $@;
 
 LocalSource.so: ${ENCOBJS2}
 	${ENCLAVE_CC} -o $@ $^ ${ENCLAVE_LDFLAGS}
 
 Attestation.signed.so: Attestation.so
-	$(SGX_SIGNER) sign -key ${SGXKEY} -enclave $< -out $@ \
-	-config Attestation-enclave.xml;
+	$(SRDE_SIGN) -m Attestation-enclave.meta -k ${SGXKEY} -e $< -o $@;
 
 Attestation.so: ${ENCOBJS3}
 	${ENCLAVE_CC} -o $@ $^ ${ENCLAVE_LDFLAGS}
 
 Provisioner.signed.so: Provisioner.so
-	$(SGX_SIGNER) sign -key ${SGXKEY} -enclave $< -out $@ \
-	-config Provisioner-enclave.xml;
+	$(SRDE_SIGN) -m Provisioner-enclave.meta -k ${SGXKEY} -e $< -o $@;
 
 Provisioner.so: ${ENCOBJS4}
 	${ENCLAVE_CC} -o $@ $^ ${ENCLAVE_LDFLAGS}

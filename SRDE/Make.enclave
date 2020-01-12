@@ -17,3 +17,8 @@ SGX_SDK	    = /opt/intel/sgxsdk
 # The location of the default signing key and tool.
 SGXKEY ?= ${SGXDIR}/Signing-key.pem
 SGX_SIGNER = ${SGX_SDK}/bin/sgx_sign
+
+SRDE_SIGN = ${SGXDIR}/srde-sign
+ifdef SRDE_PRODUCTION
+SRDE_SIGN += -P
+endif
