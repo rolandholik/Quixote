@@ -1,5 +1,5 @@
 From 2d92c48097cd202c8e20adfceb7bd095622978a1 Mon Sep 17 00:00:00 2001
-From: "Dr. Greg Wettstein" <gw@idfusion.org>
+From: "Dr. Greg" <greg@enjellic.com>
 Date: Fri, 30 Dec 2016 12:41:20 -0600
 Subject: [PATCH 06/24] Implement iso-identity mapping support.
 

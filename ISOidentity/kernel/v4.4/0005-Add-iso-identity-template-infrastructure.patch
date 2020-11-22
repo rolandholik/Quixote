@@ -1,5 +1,5 @@
 From 860b0a9f2e4be4404d3286b3026527366d8117f1 Mon Sep 17 00:00:00 2001
-From: "Dr. Greg Wettstein" <gw@idfusion.org>
+From: "Dr. Greg" <greg@enjellic.com>
 Date: Fri, 30 Dec 2016 12:24:27 -0600
 Subject: [PATCH 05/24] Add iso-identity template infrastructure.
 

@@ -1,5 +1,5 @@
 From 2a7a0ae7e029330c4b5fd1b544692c7807663f2e Mon Sep 17 00:00:00 2001
-From: "Dr. Greg Wettstein" <gw@idfusion.org>
+From: "Dr. Greg" <greg@enjellic.com>
 Date: Fri, 30 Dec 2016 11:56:04 -0600
 Subject: [PATCH 03/24] Add ISO_IDENTITY_TDB policy.
 

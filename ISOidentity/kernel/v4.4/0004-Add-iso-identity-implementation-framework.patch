@@ -1,5 +1,5 @@
 From 3d85cc8e905d7632b502589a0c869de42ed532d1 Mon Sep 17 00:00:00 2001
-From: "Dr. Greg Wettstein" <gw@idfusion.org>
+From: "Dr. Greg" <greg@enjellic.com>
 Date: Fri, 30 Dec 2016 12:18:30 -0600
 Subject: [PATCH 04/24] Add iso-identity implementation framework.
 
@@ -179,7 +179,7 @@ index 000000000000..3058ec01e441
 + * Copyright (c) Enjellic Systems Development, LLC. All rights reserved.
 + *
 + * Authors:
-+ * Dr. Greg Wettstein <gw@idfusion.org>
++ * Dr. Greg <greg@enjellic.com>
 + *
 + * This program is free software; you can redistribute it and/or
 + * modify it under the terms of the GNU General Public License as

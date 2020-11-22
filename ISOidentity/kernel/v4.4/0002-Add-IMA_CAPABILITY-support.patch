@@ -1,5 +1,5 @@
 From b0bda71b539c0dddaba592e47d955644c4f26830 Mon Sep 17 00:00:00 2001
-From: "Dr. Greg Wettstein" <gw@idfusion.org>
+From: "Dr. Greg" <greg@enjellic.com>
 Date: Fri, 30 Dec 2016 11:51:30 -0600
 Subject: [PATCH 02/24] Add IMA_CAPABILITY support.
 
