@@ -99,10 +99,10 @@ index 000000000000..63acfc88b151
 +++ b/security/ai/ai.c
 @@ -0,0 +1,75 @@
 +/*
-+ * Copyright (C) 2017 IDfusion, LLC
++ * Copyright (c) 2020, Enjellic Systems Development, LLC. All rights reserved.
 + *
 + * Authors:
-+ * Dr. Greg Wettstein <gw@idfusion.org>
++ * Dr. Greg <greg@enjellic.com>
 + *
 + * This program is free software; you can redistribute it and/or
 + * modify it under the terms of the GNU General Public License as

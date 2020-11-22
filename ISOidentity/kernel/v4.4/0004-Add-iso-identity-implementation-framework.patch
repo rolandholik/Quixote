@@ -176,7 +176,7 @@ index 000000000000..3058ec01e441
 +++ b/security/integrity/ima/ima_identity.c
 @@ -0,0 +1,981 @@
 +/*
-+ * Copyright (C) 2015 IDfusion, LLC
++ * Copyright (c) Enjellic Systems Development, LLC. All rights reserved.
 + *
 + * Authors:
 + * Dr. Greg Wettstein <gw@idfusion.org>
