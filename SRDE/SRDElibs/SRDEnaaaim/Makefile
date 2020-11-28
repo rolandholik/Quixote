@@ -7,7 +7,7 @@
 
 
 # Variable declarations.
-INSTPATH       = ${DESTDIR}/opt/IDfusion
+INSTPATH       = ${DESTDIR}/opt/ESD
 INSTALLENCLAVE = test-naaaim.signed.so test-Duct.signed.so \
 	test-Possum.signed.so
 INSTINCLUDE    = IDtoken.h NAAAIM.h PossumPacket.h PossumPipe.h \

@@ -7,7 +7,7 @@
 
 
 # Variable declarations.
-INSTPATH = ${DESTDIR}/opt/IDfusion
+INSTPATH = ${DESTDIR}/opt/ESD
 TESTPATH = ${INSTPATH}/share/unit-tests
 
 FD = ../SRDElibs/SRDEfusion

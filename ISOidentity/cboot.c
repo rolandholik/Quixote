@@ -26,7 +26,7 @@
 
 /* Local defines. */
 #define ENCLAVE		"ISOidentity.signed.so"
-#define VERIFIERS	"/opt/IDfusion/etc/verifiers/ISOmanager/*.ivy"
+#define VERIFIERS	"/opt/ESD/etc/verifiers/ISOmanager/*.ivy"
 #define CANISTERS	"/var/run/Canisters"
 
 #define CLONE_BEHAVIOR 0x00001000
@@ -205,7 +205,7 @@ static inline int sys_set_bad_actor(pid_t pid, unsigned long flags)
  * If the identity verifier arguement is a NULL pointer this function
  * will attempt to load all verifiers from the following directory:
  *
- * /opt/IDfusion/etc/verifiers/ISOmanager
+ * /opt/ESD/etc/verifiers/ISOmanager
  *
  * \param enclave	The object representing the enclave that the
  *			identity verifiers were to be loaded into.
@@ -1519,7 +1519,7 @@ extern int main(int argc, char *argv[])
 	     *verifier	    = NULL,
 	     *map	    = NULL,
 	     *port	    = "11990",
-	     *id_token	    = "/opt/IDfusion/etc/host.idt",
+	     *id_token	    = "/opt/ESD/etc/host.idt",
 	     *spid_fname    = SPID_FILENAME,
 	     *token	    = SGX_TOKEN_DIRECTORY"/ISOidentity.token",
 	     *enclave_name  = ENCLAVE_NAME,

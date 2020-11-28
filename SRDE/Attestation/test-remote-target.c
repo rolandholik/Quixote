@@ -129,7 +129,7 @@ extern int main(int argc, char *argv[])
 	      full_report = false;
 
 	char *key	     = NULL,
-	     *epid_blob	     = "/var/lib/IDfusion/data/EPID.bin",
+	     *epid_blob	     = "/var/lib/ESD/data/EPID.bin",
 	     *quote_token    = SGX_TOKEN_DIRECTORY"/libsgx_qe.token",
 	     *pce_token	     = SGX_TOKEN_DIRECTORY"/libsgx_pce.token",
 	     *spid_fname     = SPID_FILENAME,

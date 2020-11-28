@@ -22,7 +22,7 @@
 declare Key="";
 
 # Variable to hold the destination for sealed EPID output.
-declare Output="/var/lib/IDfusion/data/EPID.bin";
+declare Output="/var/lib/ESD/data/EPID.bin";
 
 # Variable used to specify a request for verbose output.
 declare V="";

@@ -20,7 +20,7 @@
 /* Local defines. */
 #if defined(SRDE_PRODUCTION)
 #define PROVISIONER_HOST "acpv.idfusion.net"
-#define CREDENTIAL_FILE  "/var/lib/IDfusion/data/Attestation.bin"
+#define CREDENTIAL_FILE  "/var/lib/ESD/data/Attestation.bin"
 #else
 #define PROVISIONER_HOST "localhost"
 #define CREDENTIAL_FILE  "Attestation.bin"
@@ -28,9 +28,9 @@
 
 #define PROVISIONER_PORT 12902
 
-#define QE_TOKEN	"/var/lib/IDfusion/tokens/libsgx_qe.token"
-#define PCE_TOKEN	"/var/lib/IDfusion/tokens/libsgx_pce.token"
-#define EPID		"/var/lib/IDfusion/data/EPID.bin"
+#define QE_TOKEN	"/var/lib/ESD/tokens/libsgx_qe.token"
+#define PCE_TOKEN	"/var/lib/ESD/tokens/libsgx_pce.token"
+#define EPID		"/var/lib/ESD/data/EPID.bin"
 
 
 /* Include files. */

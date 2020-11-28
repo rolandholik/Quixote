@@ -13,7 +13,7 @@
 
 /* Local defines. */
 #define EPID_BLOB_SIZE	  2836
-#define DEFAULT_EPID_FILE "/var/lib/IDfusion/data/EPID.bin"
+#define DEFAULT_EPID_FILE "/var/lib/ESD/data/EPID.bin"
 
 
 /* Include files. */

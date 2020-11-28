@@ -6,7 +6,7 @@
 # **************************************************************************/
 
 # Variable declarations.
-INSTPATH       = ${DESTDIR}/opt/IDfusion
+INSTPATH       = ${DESTDIR}/opt/ESD
 
 CSRC = Actor.c Subject.c ExchangeEvent.c ISOidentity.c ContourPoint.c \
 	cboot.c cboot-mgr.c compute-aggregate.c
@@ -130,8 +130,8 @@ install-bin:
 	install -s ${INSTALLBIN} ${INSTPATH}/bin;
 	[ -d ${INSTPATH}/sbin ] || mkdir -p ${INSTPATH}/sbin;
 	install -s ${INSTALLSBIN} ${INSTPATH}/sbin;
-	[ -e /distrib/SRDE/opt/IDfusion/sbin/runc ] && \
-		install /distrib/SRDE/opt/IDfusion/sbin/runc ${INSTPATH}/sbin;
+	[ -e /distrib/SRDE/opt/ESD/sbin/runc ] && \
+		install /distrib/SRDE/opt/ESD/sbin/runc ${INSTPATH}/sbin;
 
 clean:
 	rm -f *.o *~ TAGS;

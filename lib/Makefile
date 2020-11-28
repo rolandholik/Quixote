@@ -7,7 +7,7 @@
 
 
 # Variable declarations.
-INSTPATH = ${DESTDIR}/opt/IDfusion
+INSTPATH = ${DESTDIR}/opt/ESD
 INSTINCLUDE = ../NAAAIM.h AES256_cbc.h Base64.h Curve25519.h Duct.h	\
 	Duct_mgr.h HTTP.h IDmgr.h IDtoken.h IPC.h Ivy.h LocalDuct.h	\
 	OTEDKS.h PossumPacket.h PossumPipe.h RSAkey.h RandomBuffer.h	\

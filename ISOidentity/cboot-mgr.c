@@ -17,7 +17,7 @@
 
 /* The location of the identity verifiers for the ISOidentity enclave. */
 #define ENCLAVE		"ISOmanager.signed.so"
-#define VERIFIERS	"/opt/IDfusion/etc/verifiers/ISOidentity/*.ivy"
+#define VERIFIERS	"/opt/ESD/etc/verifiers/ISOidentity/*.ivy"
 
 
 /* Include files. */
@@ -77,7 +77,7 @@
  * If the identity verifier arguement is a NULL pointer this function
  * will attempt to load all verifiers from the following directory:
  *
- * /opt/IDfusion/etc/verifiers/ISOidentity
+ * /opt/ESD/etc/verifiers/ISOidentity
  *
  * \param enclave	The object representing the enclave that the
  *			identity verifiers were to be loaded into.
@@ -506,7 +506,7 @@ extern int main(int argc, char *argv[])
 	     *canister	   = NULL,
 	     *verifier	   = NULL,
 	     *port	   = "11990",
-	     *id_token	   = "/opt/IDfusion/etc/host.idt",
+	     *id_token	   = "/opt/ESD/etc/host.idt",
 	     *spid_fname   = SPID_FILENAME,
 	     *token	   = SGX_TOKEN_DIRECTORY"/ISOmanager.token",
 	     *hostname	   = "localhost",

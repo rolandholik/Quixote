@@ -25,12 +25,12 @@
 
 #define SGX_HASH_SIZE 32
 
-#define SPID_FILENAME	    "/opt/IDfusion/etc/spid.txt"
-#define SGX_TOKEN_DIRECTORY "/var/lib/IDfusion/tokens"
+#define SPID_FILENAME	    "/opt/ESD/etc/spid.txt"
+#define SGX_TOKEN_DIRECTORY "/var/lib/ESD/tokens"
 
 #if defined(SRDE_PRODUCTION)
-#define ENCLAVE_DIR	"/opt/IDfusion/lib/enclaves"
-#define TOKEN_DIR	"/var/lib/IDfusion/tokens"
+#define ENCLAVE_DIR	"/opt/ESD/lib/enclaves"
+#define TOKEN_DIR	"/var/lib/ESD/tokens"
 #define ENCLAVE_DEBUG	false
 #else
 #define ENCLAVE_DIR	"."

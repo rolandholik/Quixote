@@ -7,7 +7,7 @@
 
 
 # Variable declarations.
-INSTPATH       = ${DESTDIR}/opt/IDfusion
+INSTPATH       = ${DESTDIR}/opt/ESD
 INSTALLENCLAVE = LocalTarget.signed.so Attestation.signed.so \
 	Provisioner.signed.so
 

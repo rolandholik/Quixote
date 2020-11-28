@@ -6,7 +6,7 @@
 # **************************************************************************/
 
 # Variable declarations.
-INSTPATH       = ${DESTDIR}/opt/IDfusion
+INSTPATH       = ${DESTDIR}/opt/ESD
 INSTALLENCLAVE = ISOidentity.signed.so ISOmanager.signed.so
 
 ifdef SRDE_PRODUCTION

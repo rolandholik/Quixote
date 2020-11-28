@@ -13,7 +13,7 @@
 #
 
 # Installation root.
-# declare -r Root="/opt/IDfusion";
+# declare -r Root="/opt/ESD";
 
 
 # Java defines.

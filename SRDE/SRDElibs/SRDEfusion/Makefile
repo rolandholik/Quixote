@@ -7,7 +7,7 @@
 
 
 # Variable declarations.
-INSTPATH       = ${DESTDIR}/opt/IDfusion
+INSTPATH       = ${DESTDIR}/opt/ESD
 INSTALLENCLAVE = test-fusion.signed.so
 INSTINCLUDE    = Buffer.h Fibsequence.h HurdLib.h Origin.h SRDEfusion.h	   \
 	String.h alltypes.h features.h fusion-shim.h reg-support.h regex.h \

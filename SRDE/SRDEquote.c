@@ -11,9 +11,9 @@
  **************************************************************************/
 
 /* Local defines. */
-#define CA_BUNDLE   "/opt/IDfusion/etc/ca-bundle.pem"
-#define PRIVATE_KEY "/opt/IDfusion/etc/ias-key.pem"
-#define PUBLIC_CERT "/opt/IDfusion/etc/ias-cert.pem"
+#define CA_BUNDLE   "/opt/ESD/etc/ca-bundle.pem"
+#define PRIVATE_KEY "/opt/ESD/etc/ias-key.pem"
+#define PUBLIC_CERT "/opt/ESD/etc/ias-cert.pem"
 
 #define IAS_URL		"https://as.sgx.trustedservices.intel.com:443/attestation/sgx/v3/report"
 

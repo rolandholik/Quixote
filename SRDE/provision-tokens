@@ -14,7 +14,7 @@
 
 
 # Enclave installation directory.
-declare -r Enclave_Dir="/opt/IDfusion/lib/enclaves";
+declare -r Enclave_Dir="/opt/ESD/lib/enclaves";
 declare -r Intel_Dir="/opt/intel/sgxpsw";
 
 # Intel supplied binary enclaves.
@@ -23,7 +23,7 @@ declare -r Intel_Enclaves="$Ipath/libsgx_qe.signed.so \
     $Ipath/libsgx_pce.signed.so $Ipath/libsgx_pve.signed.so";
 
 # Token installation directory.
-declare -r Token_Dir="/var/lib/IDfusion/tokens";
+declare -r Token_Dir="/var/lib/ESD/tokens";
 
 # Working variables.
 declare Token Enclave_Path Enclave;

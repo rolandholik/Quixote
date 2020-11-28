@@ -11,9 +11,9 @@ CSRC   = test-fusion.c
 FUSION_ENCSRC = test-fusion-enclave.c test-fusion-interface.c
 NAAAIM_ENCSRC = test-naaaim-enclave.c test-naaaim-interface.c
 
-CINCLUDE = ${DESTDIR}/opt/IDfusion/include
+CINCLUDE = ${DESTDIR}/opt/ESD/include
 
-LIBDIR	= ${DESTDIR}/opt/IDfusion/lib
+LIBDIR	= ${DESTDIR}/opt/ESD/lib
 LIBNAME = SRDEfusion
 
 SDK		 = /opt/intel/sgxsdk

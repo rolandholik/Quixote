@@ -6,7 +6,7 @@
 # **************************************************************************/
 
 # Variable declarations.
-INSTPATH = ${DESTDIR}/opt/IDfusion
+INSTPATH = ${DESTDIR}/opt/ESD
 HURDINC = HurdLib/Buffer.h HurdLib/Config.h HurdLib/Fibsequence.h \
 	HurdLib/File.h HurdLib/HurdLib.h HurdLib/Options.h	  \
 	HurdLib/Origin.h HurdLib/String.h

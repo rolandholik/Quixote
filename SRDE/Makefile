@@ -7,7 +7,7 @@
 
 
 # Variable declarations.
-INSTPATH      = ${DESTDIR}/opt/IDfusion
+INSTPATH      = ${DESTDIR}/opt/ESD
 INSTALLBIN    = srde-check srde-gen-token srde-gen-verifier srde-load \
 	srde-metadata srde-provision
 INSTALLSCRIPT = provision-epid provision-tokens provision-verifier
@@ -247,8 +247,8 @@ install-bin:
 		mkdir -p ${INSTPATH}/etc/verifiers/ISOidentity;
 	[ -d ${INSTPATH}/etc/verifiers/ISOmanager ] || \
 		mkdir ${INSTPATH}/etc/verifiers/ISOmanager;
-	[ -e /distrib/SRDE/opt/IDfusion/etc/ca-bundle.pem ] &&		    \
-		install -m 644 /distrib/SRDE/opt/IDfusion/etc/ca-bundle.pem \
+	[ -e /distrib/SRDE/opt/ESD/etc/ca-bundle.pem ] &&		    \
+		install -m 644 /distrib/SRDE/opt/ESD/etc/ca-bundle.pem \
 			${INSTPATH}/etc;
 	[ -d ${INSTPATH}/lib ] || mkdir -p ${INSTPATH}/lib;
 	[ -d ${INSTPATH}/lib ] || mkdir -p ${INSTPATH}/lib/enclaves;

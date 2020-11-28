@@ -363,7 +363,7 @@ _Bool provisioner(struct Provisioner_ecall1 *ep)
 
 	/* Load a local SPID to authenticate the PossumPipe connection. */
 	INIT(HurdLib, File, file, ERR(goto done));
-	if ( !file->open_ro(file, "/opt/IDfusion/etc/spid.txt") )
+	if ( !file->open_ro(file, "/opt/ESD/etc/spid.txt") )
 		ERR(goto done);
 
 	INIT(HurdLib, String, spidstr, ERR(goto done));
