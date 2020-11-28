@@ -44,7 +44,7 @@ CFLAGS = -Wall -O2 -fomit-frame-pointer -march=core2 ${C_INCLUDE}
 
 LDFLAGS = ${STATIC} -g -L ${LIBDIR}
 ifneq (${CC}, musl-gcc)
-LDFLAGS += -Wl,-rpath=/usr/local/IDfusion/lib -L /usr/local/IDfusion/lib
+LDFLAGS += -Wl,-rpath=/usr/local/ESD/lib -L /usr/local/ESD/lib
 endif
 
 ELFLIB	       = elf

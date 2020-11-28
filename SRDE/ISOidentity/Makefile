@@ -83,8 +83,8 @@ ifeq (${CC}, musl-gcc)
 SSL_INCLUDE = /usr/local/musl/include
 SSL_CRYPTO = -L /usr/local/musl/lib -lcrypto
 else
-SSL_INCLUDE = /usr/local/IDfusion/include
-SSL_CRYPTO = -Wl,-rpath=/usr/local/IDfusion/lib -L /usr/local/IDfusion/lib \
+SSL_INCLUDE = /usr/local/ESD/include
+SSL_CRYPTO = -Wl,-rpath=/usr/local/ESD/lib -L /usr/local/ESD/lib \
 	-lcrypto -ldl -lpthread
 endif
 

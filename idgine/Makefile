@@ -18,8 +18,8 @@ ifeq (${CC}, musl-gcc)
 SSL_INCLUDE = /usr/local/musl/include
 SSL_CRYPTO = -L /usr/local/musl/lib -lcrypto
 else
-SSL_INCLUDE = /usr/local/IDfusion/include
-SSL_CRYPTO = -L /usr/local/IDfusion/lib -lcrypto -ldl -lpthread
+SSL_INCLUDE = /usr/local/ESD/include
+SSL_CRYPTO = -L /usr/local/ESD/lib -lcrypto -ldl -lpthread
 endif
 
 
@@ -30,7 +30,7 @@ CFLAGS = -Wall ${CDEBUG}
 
 LDFLAGS = -g -L ../lib -L ../HurdLib
 ifneq (${CC}, musl-gcc)
-LDFLAGS += -lrt -Wl,-rpath=/usr/local/IDfusion/lib
+LDFLAGS += -lrt -Wl,-rpath=/usr/local/ESD/lib
 endif
 
 

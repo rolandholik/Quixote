@@ -39,10 +39,10 @@ SSL_INCLUDE = /usr/local/musl/include
 SSL_CRYPTO = -L /usr/local/musl/lib -lcrypto
 SC_INCLUDE = /usr/local/include/PCSC
 else
-SSL_INCLUDE = /usr/local/IDfusion/include
-SSL_CRYPTO = -Wl,-rpath=/usr/local/IDfusion/lib -L /usr/local/IDfusion/lib \
+SSL_INCLUDE = /usr/local/ESD/include
+SSL_CRYPTO = -Wl,-rpath=/usr/local/ESD/lib -L /usr/local/ESD/lib \
 	-lcrypto
-SC_INCLUDE = /usr/local/IDfusion/include/PCSC
+SC_INCLUDE = /usr/local/ESD/include/PCSC
 endif
 
 

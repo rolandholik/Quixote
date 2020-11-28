@@ -21,7 +21,7 @@ CC = musl-gcc
 ifeq (${CC}, musl-gcc)
 MUSL_INCLUDE = /usr/local/musl/include
 else
-MUSL_INCLUDE = /usr/local/IDfusion/include
+MUSL_INCLUDE = /usr/local/ESD/include
 endif
 
 #
@@ -32,9 +32,9 @@ SSL_INCLUDE = /usr/local/musl/include
 SSL_CRYPTO = -L /usr/local/musl/lib -lcrypto
 SSL_LIBRARY = -L /usr/local/musl/lib -lssl -lcrypto
 else
-SSL_INCLUDE = /usr/local/IDfusion/include
-SSL_CRYPTO = -L /usr/local/IDfusion/lib -lcrypto -ldl -lpthread
-SSL_LIBRARY = -L /usr/local/IDfusion/lib -lssl ${SSL_CRYPTO}
+SSL_INCLUDE = /usr/local/ESD/include
+SSL_CRYPTO = -L /usr/local/ESD/lib -lcrypto -ldl -lpthread
+SSL_LIBRARY = -L /usr/local/ESD/lib -lssl ${SSL_CRYPTO}
 endif
 
 # Location of smartcard library.
@@ -49,7 +49,7 @@ CFLAGS = -Wall ${CDEBUG}
 # LDFLAGS = -s -L/usr/local/krb5/lib 
 LDFLAGS = -g -L ../lib -L ../HurdLib
 ifneq (${CC}, musl-gcc)
-LDFLAGS += -lpthread -lrt -Wl,-rpath=/usr/local/IDfusion/lib
+LDFLAGS += -lpthread -lrt -Wl,-rpath=/usr/local/ESD/lib
 endif
 
 

@@ -71,7 +71,7 @@ CFLAGS = -Wall -O2 -fomit-frame-pointer -march=core2 -I .. -I ../.. \
 
 LDFLAGS = -g
 ifneq (${CC}, musl-gcc)
-LDFLAGS += -Wl,-rpath=/usr/local/IDfusion/lib -L /usr/local/IDfusion/lib
+LDFLAGS += -Wl,-rpath=/usr/local/ESD/lib -L /usr/local/ESD/lib
 endif
 
 ELFLIB = -lelf
@@ -89,8 +89,8 @@ ifeq (${CC}, musl-gcc)
 SSL_INCLUDE = /usr/local/musl/include
 SSL_CRYPTO = -L /usr/local/musl/lib -lcrypto
 else
-SSL_INCLUDE = /usr/local/IDfusion/include
-SSL_CRYPTO = -L /usr/local/IDfusion/lib -lcrypto -ldl -lpthread
+SSL_INCLUDE = /usr/local/ESD/include
+SSL_CRYPTO = -L /usr/local/ESD/lib -lcrypto -ldl -lpthread
 endif
 
 LIBRARY_DEPENDS = ${HURD_LIBRARY} ${NAAAIM_LIBRARY} ${RDK_LIBRARY}
