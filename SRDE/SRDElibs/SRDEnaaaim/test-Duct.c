@@ -12,7 +12,11 @@
 
 
 /* Definition of program and primary enclave. */
-#define PGM "test-Duct"
+#define PGM		"test-Duct"
+#define COPYRIGHT	"%s: Copyright (c) %s, %s. All rights reserved.\n"
+#define DATE		"2020"
+#define COMPANY		"Enjellic Systems Development, LLC"
+
 #define ENCLAVE PGM".signed.so"
 
 
@@ -93,9 +97,8 @@ extern int main(int argc, char *argv[])
 
 
 	/* Output header. */
-	fprintf(stdout, "%s: IDfusion Duct test utility.\n", PGM);
-	fprintf(stdout, "%s: (C)Copyright 2017, IDfusion, LLC. All rights "
-		"reserved.\n\n", PGM);
+	fprintf(stdout, "%s: SGX Duct test utility.\n", PGM);
+	fprintf(stdout, COPYRIGHT, PGM, DATE, COMPANY);
 
 
 	/* Parse and verify arguements. */

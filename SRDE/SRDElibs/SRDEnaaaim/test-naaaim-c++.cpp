@@ -15,7 +15,11 @@
 #define NUMBER_OF_TESTS 7
 
 /* Program and enclave name. */
-#define PGM "test-naaaim"
+#define PGM		"test-naaaim"
+#define COPYRIGHT	"%s: Copyright (c) %s, %s. All rights reserved.\n"
+#define DATE		"2020"
+#define COMPANY		"Enjellic Systems Development, LLC"
+
 #define ENCLAVE PGM".signed.so"
 
 
@@ -95,10 +99,9 @@ extern int main(int argc, char *argv[])
 
 
 	/* Output header. */
-	fprintf(stdout, "%s-c++: IDfusion TEE NAAAIM library unit test.\n", \
+	fprintf(stdout, "%s-c++: TEE NAAAIM library unit test.\n", \
 		PGM);
-	fprintf(stdout, "%s-c++: (C)Copyright 2019, IDfusion, LLC. All rights "
-		"reserved.\n\n", PGM);
+	fprintf(stdout, COPYRIGHT, PGM, DATE, COMPANY);
 
 
 	/* Parse and verify arguements. */
