@@ -12,7 +12,11 @@
 
 
 /* Local defines. */
-#define PGM	"test-remote-target"
+#define PGM	  "test-remote-target"
+#define COPYRIGHT "%s: Copyright (c) %s, %s. All rights reserved.\n"
+#define DATE	  "2020"
+#define COMPANY	  "Enjellic Systems Development, LLC"
+
 #define ENCLAVE "LocalTarget.signed.so"
 
 
@@ -216,7 +220,7 @@ extern int main(int argc, char *argv[])
 
 	/* Print banner. */
 	fprintf(stdout, "%s: Remote test utility.\n", PGM);
-	fprintf(stdout, "%s: (C)2018 IDfusion, LLC\n", PGM);
+	fprintf(stdout, COPYRIGHT, PGM, DATE, COMPANY);
 
 
 	/* Setup SPID key. */
