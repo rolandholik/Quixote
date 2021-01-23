@@ -96,7 +96,7 @@ const static struct SRDEendpoint Provisioner[] = {
 		.attributes  = 5,
 		.isv_id	     = 0x10,
 		.isv_svn     = 0,
-		.mrsigner    = (uint8_t *) IDfusion_production_key,
+		.mrsigner    = (uint8_t *) Production_key,
 	},
 #if !defined(SRDE_PRODUCTION)
 	{
@@ -105,7 +105,7 @@ const static struct SRDEendpoint Provisioner[] = {
 		.attributes  = 7,
 		.isv_id	     = 0x10,
 		.isv_svn     = 0,
-		.mrsigner    = (uint8_t *) IDfusion_debug_key,
+		.mrsigner    = (uint8_t *) Debug_key,
 	},
 #endif
 };

@@ -94,7 +94,7 @@ const struct SRDEendpoint Endpoints[] = {
 		.attributes  = 5,
 		.isv_id	     = 0x11,
 		.isv_svn     = 0,
-		.mrsigner    = (uint8_t *) IDfusion_production_key,
+		.mrsigner    = (uint8_t *) Production_key,
 		.mrenclave   = NULL
 	},
 #if !defined(SRDE_PRODUCTION)
@@ -104,7 +104,7 @@ const struct SRDEendpoint Endpoints[] = {
 		.attributes  = 7,
 		.isv_id	     = 0x11,
 		.isv_svn     = 0,
-		.mrsigner    = (uint8_t *) IDfusion_debug_key,
+		.mrsigner    = (uint8_t *) Debug_key,
 		.mrenclave   = NULL
 	}
 #endif

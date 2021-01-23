@@ -18,5 +18,5 @@ extern int enclu_egetkey(struct SGX_keyrequest *, uint8_t *);
 
 
 /* External definitions for IDfusion debug and production keys. */
-extern const uint8_t IDfusion_debug_key[32];
-extern const uint8_t IDfusion_production_key[32];
+extern const uint8_t Debug_key[32];
+extern const uint8_t Production_key[32];
