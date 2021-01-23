@@ -1,6 +1,6 @@
 /** \file
  * This file contains the implementation of an object which represents
- * a subject identity in the IDfusion iso-identity modeling system.
+ * a subject identity in the Turing event modeling system.
  * The purpose of this object is to consolidate all of the identity
  * characteristics of a subject node for the purposes of computing
  * its measured identity.

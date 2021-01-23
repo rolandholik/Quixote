@@ -1,7 +1,7 @@
 /** \file
  * This file contains the header and API definitions for an object
  * which is used to manage and manipulate a subject identity in the
- * IDfusion iso-identity behavioral modeling system.
+ * Turing event modeling system.
  */
 
 /**************************************************************************

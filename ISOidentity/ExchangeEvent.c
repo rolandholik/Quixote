@@ -1,6 +1,6 @@
 /** \file
  * This file contains the implementation of an object which manages
- * an information exchange event in the IDfusion iso-identity modeling
+ * an information exchange event in the Turing event modeling
  * architecture.
  */
 
