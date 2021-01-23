@@ -20,7 +20,7 @@ declare -r ESD_fifo="/var/lib/NAAAIM/query-client";
 
 #
 # This function implements mounting and reading of a USB based
-# IDfusion identity fob.
+# identity fob.
 #
 function load_identities() {
 

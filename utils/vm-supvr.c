@@ -368,7 +368,7 @@ extern int main(int argc, char *argv[])
 			fputs("\x1b\x5b\x48\x1b\x5b\x4a", stdout);
 			fputs("\x1b\x5b\x32\x3b\x35\x34\x48", stdout);
 			fputs("\x1b\x5b\x31\x6d", stdout);
-			fputs("DakTech/IDfusion\x1b\x5b\x33\x31\x6d " \
+			fputs("Enjellic\x1b\x5b\x33\x31\x6d " \
 			      "IDFSS", stdout);
 			fputs("\x1b\x5b\x30\x3b\x31\x30\x6d", stdout);
 			fputs("\n\nInsert key to activate: >", stdout);
