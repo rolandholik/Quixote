@@ -11,6 +11,11 @@
  **************************************************************************/
 
 /* Default aggregate value. */
+#define PGM		"test-ISOidentity"
+#define COPYRIGHT	"%s: Copyright (c) %s, %s. All rights reserved.\n"
+#define DATE		"2020"
+#define COMPANY		"Enjellic Systems Development, LLC"
+
 #define DEFAULT_AGGREGATE \
 	"0000000000000000000000000000000000000000000000000000000000000000"
 
@@ -145,10 +150,8 @@ extern int main(int argc, char *argv[])
 
 
 	/* Output header. */
-	fprintf(stdout, "%s: IDfusion ISOidentity model test harness.\n", \
-		"test-ISOidentity");
-	fprintf(stdout, "%s: (C)Copyright 2017, IDfusion, LLC. All rights "
-		"reserved.\n\n", "test-ISOidentity");
+	fprintf(stdout, "%s: Turing event test harness.\n", PGM);
+	fprintf(stdout, COPYRIGHT, PGM, DATE, COMPANY);
 	fflush(stdout);
 
 
