@@ -414,7 +414,7 @@ public class AImanager
 	public imageLogo() {
 
 	    try {
-		Image = javax.imageio.ImageIO.read(new java.io.File("idfusion-logo.jpeg"));
+		Image = javax.imageio.ImageIO.read(new java.io.File("logo.jpeg"));
 	    } catch (java.io.IOException ioe) {
 		System.err.println("Image I/O error: " + ioe);
 	    }

@@ -84,7 +84,7 @@ public class idclient
 	query_output.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
-        setTitle("IDfusion Identity Generator Client");
+        setTitle("Identity Generator Client");
 
         jButton1.setText("Generate Identity");
         jButton1.addActionListener(new java.awt.event.ActionListener() {
