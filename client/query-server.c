@@ -58,12 +58,12 @@ extern int main(int argc, char *argv[])
 
 	lcd->on(lcd);
 	lcd->clear(lcd);
-	lcd->center(lcd, 0, "IDfusion");
+	lcd->center(lcd, 0, "Enjellic");
 	lcd->center(lcd, 1, "NHIN Query Client");
 
 	while ( (card = NAAAIM_SmartCard_Init()) == NULL ) {
 		lcd->clear(lcd);
-		lcd->text(lcd, 0, 0, "IDfusion NHIN Client");
+		lcd->text(lcd, 0, 0, "Enjellic NHIN Client");
 		lcd->center(lcd, 1, "No reader.");
 		sleep(10);
 	}
