@@ -1,9 +1,8 @@
 /** \file
- * This file implements an object for manipulating IDfusion based
- * patient identity token.   The token is composed of two major
- * parts.  The first part is a user specific organizational identity with
- * the second portion being an RSA encrypted anonymized user identity
- * with a token specific key.
+ * This file implements an object for manipulating a patient identity
+ * identity token.   The token is composed of two major parts.  The first
+ * part is a user specific organizational identity with the second portion
+ * being an RSA encrypted anonymized user identity with a token specific key.
  */
 
 /**************************************************************************
