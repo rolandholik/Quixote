@@ -1,5 +1,5 @@
 /** \file
- * This file contains an implemenation of the IDfusion 'oneshot' SGX
+ * This file contains an implemenation of the a 'oneshot' SGX
  * invocation technology.  All of the infrastructure needed to implement
  * the test-ecall enclave is implemented in a single binary.
  *
@@ -17,7 +17,10 @@
 
 
 /* Definitions specific to this file. */
-#define PGM "srde-fandf"
+#define PGM		"srde-fandf"
+#define COPYRIGHT	"%s: Copyright (c) %s, %s. All rights reserved.\n"
+#define DATE		"2020"
+#define COMPANY		"Enjellic Systems Development, LLC"
 
 
 /* Include files. */
@@ -322,11 +325,13 @@ extern int main(int argc, char *argv[])
 
 
 	/* Output logo. */
-	fprintf(stdout, "%s: IDfusion SGX 'fire and forget' technology.\n", \
+	fprintf(stdout, "%s: TEE 'fire and forget' technology.\n", \
 		PGM);
-	fprintf(stdout, "%s: (C)Copyright 2017, IDfusion, LLC. All rights "
-		"reserved.\n\n", PGM);
-	fputs("Typed input will be echoed through the enclave.\n", stdout);
+	fprintf(stdout, COPYRIGHT, PGM, DATE, COMPANY);
+
+
+	/* Output instruction prompt. */
+	fputs("\nTyped input will be echoed through the enclave.\n", stdout);
 	fputs("Type 'quit' to terminate.\n\n", stdout);
 
 

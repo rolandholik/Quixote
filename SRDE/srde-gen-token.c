@@ -13,9 +13,13 @@
  **************************************************************************/
 
 /* Definitions local to this file. */
-#define PGM "srde-gen-token"
+#define PGM		"srde-gen-token"
+#define COPYRIGHT	"%s: Copyright (c) %s, %s. All rights reserved.\n"
+#define DATE		"2020"
+#define COMPANY		"Enjellic Systems Development, LLC"
 
 
+/* Include files. */
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -90,8 +94,8 @@ static struct LE_ecall1_table {
 static void usage(char *err)
 
 {
-	fprintf(stdout, "%s: SGX EINIT token generator.\n", PGM);
-	fprintf(stdout, "%s: (C)IDfusion, LLC\n", PGM);
+	fprintf(stdout, "%s: EINIT token generator.\n", PGM);
+	fprintf(stdout, COPYRIGHT, PGM, DATE, COMPANY);
 
 	if ( err != NULL )
 		fprintf(stdout, "\n%s\n", err);

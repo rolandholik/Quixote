@@ -11,6 +11,12 @@
  * the source tree for copyright and licensing information.
  **************************************************************************/
 
+/* Definitions specific to this file. */
+#define PGM		"test-pcr"
+#define COPYRIGHT	"%s: Copyright (c) %s, %s. All rights reserved.\n"
+#define DATE		"2020"
+#define COMPANY		"Enjellic Systems Development, LLC"
+
 
 /* Include files. */
 #include <stdio.h>
@@ -156,11 +162,12 @@ extern int main(int argc, char *argv[])
 
 
 	/* Output header. */
-	fprintf(stdout, "%s: IDfusion SGX enclave PCR test utility.\n", \
-		"test-pcr");
-	fprintf(stdout, "%s: (C)Copyright 2017, IDfusion, LLC. All rights "
-		"reserved.\n\n", "test-pcr");
-	fputs("Typed input will added to a SHA256 based measurement value "
+	fprintf(stdout, "%s: Enclave PCR test utility.\n", PGM);
+	fprintf(stdout, COPYRIGHT, PGM, DATE, COMPANY);
+
+
+	/* Output instruction prompt. */
+	fputs("\nTyped input will added to a SHA256 based measurement value "
 	      "maintained\n", stdout);
 	fputs("in an enclave.\n", stdout);
 	fputs("Type 'quit' to terminate.\n\n", stdout);

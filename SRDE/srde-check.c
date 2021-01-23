@@ -26,9 +26,13 @@
  **************************************************************************/
 
 /* Definitions local to this file. */
-#define PGM "srde-check"
+#define PGM		"srde-check"
+#define COPYRIGHT	"%s: Copyright (c) %s, %s. All rights reserved.\n"
+#define DATE		"2020"
+#define COMPANY		"Enjellic Systems Development, LLC"
 
 
+/* Include files. */
 #include <stdio.h>
 #include <stdint.h>
 #include <fcntl.h>
@@ -374,7 +378,7 @@ extern int main(int argc, char *argv[])
 
 
 	fprintf(stdout, "%s: SGX platform capability tester.\n", PGM);
-	fprintf(stdout, "%s: Copyright(C) IDfusion, LLC.\n", PGM);
+	fprintf(stdout, COPYRIGHT, PGM, DATE, COMPANY);
 
 
 	/* Check CPUID leaf 7 for processor support. */

@@ -1,9 +1,9 @@
 /** \file
  * This file contains the implementation of a utility which loads
  * and initializes an SGX enclave.  This utility is primarily useful
- * for testing the IDfusion SGX runtime infrastructure.  It also
- * provides a framework for generating extensive diagnostic information
- * on the enclave loading process.
+ * for testing the SGX runtime infrastructure.  It also provides a
+ * framework for generating extensive diagnostic information on the
+ * enclave loading process.
  */
 
 /**************************************************************************
@@ -14,8 +14,13 @@
  **************************************************************************/
 
 /* Definitions local to this file. */
-#define PGM "srde-load"
+#define PGM		"srde-load"
+#define COPYRIGHT	"%s: Copyright (c) %s, %s. All rights reserved.\n"
+#define DATE		"2020"
+#define COMPANY		"Enjellic Systems Development, LLC"
 
+
+/* Include files. */
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -52,8 +57,8 @@
 static void usage(char *err)
 
 {
-	fprintf(stdout, "%s: SGX enclave loader.\n", PGM);
-	fprintf(stdout, "%s: (C)IDfusion, LLC\n", PGM);
+	fprintf(stdout, "%s: Enclave loader.\n", PGM);
+	fprintf(stdout, COPYRIGHT, PGM, DATE, COMPANY);
 
 	if ( err != NULL )
 		fprintf(stdout, "\n%s", err);

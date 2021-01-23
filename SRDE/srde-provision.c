@@ -11,9 +11,13 @@
  **************************************************************************/
 
 /* Definitions local to this file. */
-#define PGM "srde-provision"
+#define PGM		"srde-provision"
+#define COPYRIGHT	"%s: Copyright (c) %s, %s. All rights reserved.\n"
+#define DATE		"2020"
+#define COMPANY		"Enjellic Systems Development, LLC"
 
 
+/* Include files. */
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
@@ -120,8 +124,8 @@ static _Bool Verbose = false;
 static void usage(char *err)
 
 {
-	fprintf(stdout, "%s: SGX provisioning tool.\n", PGM);
-	fprintf(stdout, "%s: (C)IDfusion, LLC\n", PGM);
+	fprintf(stdout, "%s: EPID provisioning tool.\n", PGM);
+	fprintf(stdout, COPYRIGHT, PGM, DATE, COMPANY);
 
 	if ( err != NULL )
 		fprintf(stdout, "\n%s", err);

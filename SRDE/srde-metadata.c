@@ -11,8 +11,10 @@
  **************************************************************************/
 
 /* Definitions local to this file. */
-#define PGM "srde-metadata"
-#define COPYRIGHT "2016,2017"
+#define PGM		"srde-metadata"
+#define COPYRIGHT	"%s: Copyright (c) %s, %s. All rights reserved.\n"
+#define DATE		"2020"
+#define COMPANY		"Enjellic Systems Development, LLC"
 
 
 #include <stdint.h>
@@ -53,8 +55,8 @@
 static void usage(char *err)
 
 {
-	fprintf(stdout, "%s: SGX enclave metadata utility.\n", PGM);
-	fprintf(stdout, "%s: (C)%s IDfusion, LLC\n", PGM, COPYRIGHT);
+	fprintf(stdout, "%s: Enclave metadata utility.\n", PGM);
+	fprintf(stdout, COPYRIGHT, PGM, DATE, COMPANY);
 
 	if ( err != NULL )
 		fprintf(stdout, "\n%s", err);
