@@ -13,7 +13,8 @@
 
 /* Definitions local to this file. */
 #define PGM "generate-array"
-#define COPYRIGHT "2018"
+#define COPYRIGHT "2020"
+#define COMPANY "Enjellic Systems Development, LLC. All rights reserved."
 
 
 /* Include files. */
@@ -51,7 +52,8 @@ static void usage(char *err)
 
 {
 	fprintf(stdout, "%s: Binary array generation utility.\n", PGM);
-	fprintf(stdout, "%s: (C)%s IDfusion, LLC\n", PGM, COPYRIGHT);
+	fprintf(stdout, "%s: Copyright (c) %s, %s\n", PGM, COPYRIGHT,
+		COMPANY);
 
 	if ( err != NULL )
 		fprintf(stdout, "\n%s", err);
