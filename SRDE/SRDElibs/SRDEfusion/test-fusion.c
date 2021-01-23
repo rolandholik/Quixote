@@ -15,7 +15,11 @@
 #define NUMBER_OF_TESTS 4
 
 /* Name of program and associated enclave. */
-#define PGM "test-fusion"
+#define PGM		"test-fusion"
+#define COPYRIGHT	"%s: Copyright (c) %s, %s. All rights reserved.\n"
+#define DATE		"2020"
+#define COMPANY		"Enjellic Systems Development, LLC"
+
 #define ENCLAVE PGM".signed.so"
 
 
@@ -93,10 +97,8 @@ extern int main(int argc, char *argv[])
 
 
 	/* Output header. */
-	fprintf(stdout, "%s: IDfusion SRDEfusion library test utility.\n", \
-		"fusion-test");
-	fprintf(stdout, "%s: (C)Copyright 2017, IDfusion, LLC. All rights "
-		"reserved.\n\n", "fusion-test");
+	fprintf(stdout, "%s: SRDEfusion library test utility.\n", PGM);
+	fprintf(stdout, COPYRIGHT, PGM, DATE, COMPANY);
 
 
 	/* Parse and verify arguements. */

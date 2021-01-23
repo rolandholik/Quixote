@@ -17,6 +17,6 @@ extern void enclu_ereport(struct SGX_targetinfo *, struct SGX_report *, \
 extern int enclu_egetkey(struct SGX_keyrequest *, uint8_t *);
 
 
-/* External definitions for IDfusion debug and production keys. */
+/* External definitions for debug and production keys. */
 extern const uint8_t Debug_key[32];
 extern const uint8_t Production_key[32];
