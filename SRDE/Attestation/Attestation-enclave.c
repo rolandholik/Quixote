@@ -19,7 +19,7 @@
 
 /* Local defines. */
 #if defined(SRDE_PRODUCTION)
-#define PROVISIONER_HOST "acpv.idfusion.net"
+#define PROVISIONER_HOST "host.domain.com"
 #define CREDENTIAL_FILE  "/var/lib/ESD/data/Attestation.bin"
 #else
 #define PROVISIONER_HOST "localhost"
@@ -164,7 +164,7 @@ time_t time(time_t *timeptr)
  * ECALL 0.
  *
  * This method implements the provisioning of credentials to the
- * enclave from the IDfusion credential provisioning server.
+ * enclave from the credential provisioning server.
  *
  * \param ep	A pointer to the structure that marshals arguements
  *		for the ECALL.
