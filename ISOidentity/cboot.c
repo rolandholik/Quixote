@@ -1316,7 +1316,8 @@ static _Bool setup_namespace(int *fdptr)
 		ERR(goto done);
 
 	memset(fname, '\0', sizeof(fname));
-	if ( snprintf(fname, sizeof(fname), "/sys/fs/iso-identity/update-%u", \
+	if ( snprintf(fname, sizeof(fname),		    \
+		      "/sys/fs/integrity-events/update-%u", \
 		      (unsigned int) statbuf.st_ino) >= sizeof(fname) )
 		ERR(goto done);
 	if ( Debug )
