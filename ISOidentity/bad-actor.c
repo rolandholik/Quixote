@@ -33,7 +33,7 @@
 
 
 /* sys_set_behavior system call interface definition. */
-#define BAD_ACTOR 327
+#define BAD_ACTOR 437
 
 #define BAD_ACTOR_QUERY		0
 #define BAD_ACTOR_SET		1

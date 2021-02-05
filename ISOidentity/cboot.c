@@ -29,7 +29,7 @@
 #define VERIFIERS	"/opt/ESD/etc/verifiers/ISOmanager/*.ivy"
 #define CANISTERS	"/var/run/Canisters"
 
-#define CLONE_BEHAVIOR 0x00001000
+#define CLONE_EVENTS 0x00000040
 
 #define _GNU_SOURCE
 
@@ -190,7 +190,7 @@ static ISOenclave Enclave = NULL;
  */
 static inline int sys_set_bad_actor(pid_t pid, unsigned long flags)
 {
-	return syscall(327, pid, flags);
+	return syscall(437, pid, flags);
 }
 
 
@@ -1307,7 +1307,7 @@ static _Bool setup_namespace(int *fdptr)
 	struct stat statbuf;
 
 
-	if ( unshare(CLONE_BEHAVIOR) < 0 ) {
+	if ( unshare(CLONE_EVENTS) < 0 ) {
 		perror("Unsharing behavior domain");
 		ERR(goto done);
 	}

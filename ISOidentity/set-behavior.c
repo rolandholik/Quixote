@@ -35,20 +35,20 @@
 
 
 /* sys_set_behavior system call interface definition. */
-#define BEHAVIOR 285
+#define BEHAVIOR 436
 
 #define IMA_SET_CONTOUR		0x1
 #define IMA_SET_PSEUDONYM	0x2
 #define IMA_SET_AI		0x4
 
 /* Flag for cloning the system behavior. */
-#define CLONE_BEHAVIOR		0x00001000
+#define CLONE_EVENTS		0x00000040
 
 #if 1
 static inline int sys_behavior(unsigned char *bufr, size_t cnt, \
 			       unsigned long flags)
 {
-	return syscall(326, bufr, cnt, flags);
+	return syscall(BEHAVIOR, bufr, cnt, flags);
 }
 #else
 static __inline long sys_behavior(unsigned char * a1, size_t a2, \
@@ -121,7 +121,7 @@ extern int main(int argc, char *argv[])
 
 	/* Unshare the behavior space. */
 	if ( namespace ) {
-		if ( unshare(CLONE_BEHAVIOR) < 0 )
+		if ( unshare(CLONE_EVENTS) < 0 )
 			perror("Unshare returns");
 		else {
 			fputs("Spawning behavior shell.\n", stdout);
@@ -134,7 +134,7 @@ extern int main(int argc, char *argv[])
 
 	/* Run a command in an independent behavior domain. */
 	if ( command ) {
-		if ( unshare(CLONE_BEHAVIOR) < 0 )
+		if ( unshare(CLONE_EVENTS) < 0 )
 			perror("Unshare returns");
 		else {
 			fprintf(stdout, "Running command: %s\n", command);
