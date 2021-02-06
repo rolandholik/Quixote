@@ -1312,7 +1312,7 @@ static _Bool setup_namespace(int *fdptr)
 		ERR(goto done);
 	}
 
-	if ( stat("/proc/self/ns/behavior", &statbuf) < 0 )
+	if ( stat("/proc/self/ns/events", &statbuf) < 0 )
 		ERR(goto done);
 
 	memset(fname, '\0', sizeof(fname));
