@@ -29,6 +29,8 @@
 #define VERIFIERS	"/opt/ESD/etc/verifiers/ISOmanager/*.ivy"
 #define CANISTERS	"/var/run/Canisters"
 
+#define SYSFS_EXTERNAL	"/sys/kernel/security/integrity/events/external"
+
 #define CLONE_EVENTS 0x00000040
 
 #define _GNU_SOURCE
@@ -1287,6 +1289,10 @@ static _Bool initialize_model(char *mapfile)
  *			file descriptor for the canister measurement
  *			file.
  *
+ * \param external	A flag used to indicate whether or not the
+ *			namespace should be configured for external
+ *			evaluation.
+ *
  * \return		A boolean value is returned to indicate whether
  *			or not the the creation of the namespace was
  *			successful.  A false value indicates setup of
@@ -1295,7 +1301,7 @@ static _Bool initialize_model(char *mapfile)
  *			ready to be measured.
  */
 
-static _Bool setup_namespace(int *fdptr)
+static _Bool setup_namespace(int *fdptr, _Bool external)
 
 {
 	_Bool retn = false;
@@ -1306,10 +1312,30 @@ static _Bool setup_namespace(int *fdptr)
 
 	struct stat statbuf;
 
+	Buffer bufr = NULL;
+
+	File sysfile = NULL;
+
+	static char *enable = "1\n";
+
 
 	if ( unshare(CLONE_EVENTS) < 0 ) {
 		perror("Unsharing behavior domain");
 		ERR(goto done);
+	}
+
+
+	if ( external ) {
+		INIT(HurdLib, File, sysfile, ERR(goto done));
+		if ( !sysfile->open_wo(sysfile, SYSFS_EXTERNAL) )
+			ERR(goto done);
+
+		INIT(HurdLib, Buffer, bufr, ERR(goto done));
+		if ( !bufr->add(bufr, (unsigned char *) enable,
+				strlen(enable)) )
+			ERR(goto done);
+		if ( !sysfile->write_Buffer(sysfile, bufr) )
+			ERR(goto done);
 	}
 
 	if ( stat("/proc/self/ns/events", &statbuf) < 0 )
@@ -1329,6 +1355,9 @@ static _Bool setup_namespace(int *fdptr)
 
 
  done:
+	WHACK(bufr);
+	WHACK(sysfile);
+
 	if ( retn )
 		*fdptr = fd;
 	return retn;
@@ -1512,7 +1541,8 @@ static void * show_mode(CO(char *, root))
 extern int main(int argc, char *argv[])
 
 {
-	_Bool connected = false;
+	_Bool external	= false,
+	      connected = false;
 
 	char *bundle	    = NULL,
 	     *canister	    = NULL,
@@ -1523,7 +1553,6 @@ extern int main(int argc, char *argv[])
 	     *id_token	    = "/opt/ESD/etc/host.idt",
 	     *spid_fname    = SPID_FILENAME,
 	     *token	    = SGX_TOKEN_DIRECTORY"/ISOidentity.token",
-	     *enclave_name  = ENCLAVE_NAME,
 	     bufr[1024],
 	     sockname[UNIX_PATH_MAX];
 
@@ -1560,7 +1589,7 @@ extern int main(int argc, char *argv[])
 	File infile = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "LMSdb:c:e:i:m:n:p:s:t:v:")) != EOF )
+	while ( (opt = getopt(argc, argv, "LMSdeb:c:i:m:n:p:s:t:v:")) != EOF )
 		switch ( opt ) {
 			case 'L':
 				Mode = internal;
@@ -1582,7 +1611,7 @@ extern int main(int argc, char *argv[])
 				canister = optarg;
 				break;
 			case 'e':
-				enclave_name = optarg;
+				external = true;
 				break;
 			case 'i':
 				id_token = optarg;
@@ -1610,7 +1639,7 @@ extern int main(int argc, char *argv[])
 
 	/* Execute measurement mode. */
 	if ( Mode == measure )
-		measurement_mode(enclave_name, token);
+		measurement_mode(ENCLAVE_NAME, token);
 
 
 	/* Execute canister display mode. */
@@ -1681,7 +1710,7 @@ extern int main(int argc, char *argv[])
 		}
 
 		INIT(NAAAIM, ISOenclave, Enclave, ERR(goto done));
-		if ( !Enclave->load_enclave(Enclave, enclave_name, token) ) {
+		if ( !Enclave->load_enclave(Enclave, ENCLAVE_NAME, token) ) {
 			fputs("SGX enclave initialization failure.\n", stderr);
 			goto done;
 		}
@@ -1792,7 +1821,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Setup the behavior namespace. */
-	if ( !setup_namespace(&fd) )
+	if ( !setup_namespace(&fd, external) )
 		ERR(goto done);
 
 
