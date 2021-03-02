@@ -309,6 +309,8 @@ static _Bool update(CO(ISOidentity, this), CO(ExchangeEvent, event), \
 	 */
 	if ( !event->get_identity(event, point) )
 		ERR(goto done);
+	if ( !event->get_pid(event, &S->discipline_pid) )
+		ERR(goto done);
 
 	INIT(NAAAIM, ContourPoint, cp, ERR(goto done));
 	cp->add(cp, point);
@@ -318,10 +320,6 @@ static _Bool update(CO(ISOidentity, this), CO(ExchangeEvent, event), \
 	if ( _is_mapped(S->contours, cp) ) {
 		retn	   = true;
 		*status	   = false;
-		if ( !cp->is_valid(cp) ) {
-			if ( !event->get_pid(event, &S->discipline_pid) )
-				ERR(goto done);
-		}
 		goto done;
 	}
 

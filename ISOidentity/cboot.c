@@ -563,6 +563,11 @@ static _Bool add_event(CO(char *, inbufr))
 	if ( !update->add(update, inbufr) )
 		ERR(goto done);
 
+	if ( Debug ) {
+		fprintf(stderr, "[%s]: ", __func__);
+		update->print(update);
+	}
+
 	INIT(NAAAIM, ExchangeEvent, event, ERR(goto done));
 	if ( !event->parse(event, update) )
 		ERR(goto done);
@@ -571,45 +576,58 @@ static _Bool add_event(CO(char *, inbufr))
 	if ( !Model->update(Model, event, &status, &discipline) )
 		ERR(goto done);
 
-	/* Discipline process in the canister if needed. */
+	Model->discipline_pid(Model, &pid);
+
+	if ( Debug )
+		fprintf(stderr, "Model update: status=%d, discipline=%d\n",
+			status, discipline);
+
+
+	/* Event space is not being disciplined, release the process. */
+	if ( !Sealed ) {
+		if ( Debug )
+			fputs("Unsealed, releasing actor.\n", stderr);
+		if ( sys_set_bad_actor(pid, 2) < 0 )
+			fprintf(stderr, "[%s]: Release actor status: %d:%s\n",
+				__func__, errno, strerror(errno));
+	}
+
+
+	/*
+	 * Event space is disciplined.  Release processes that are not
+	 * in the event map as bad actors and others as good actors.
+	 */
 	if ( Sealed ) {
 		if ( discipline ) {
-			Model->discipline_pid(Model, &pid);
-			discipline = sys_set_bad_actor(pid, 0);
-			if (discipline < 0 ) {
-				fprintf(stderr, "actor status error: %d:%s\n",\
-					errno, strerror(errno));
-			        retn = false;
-				goto done;
-			}
-			if ( discipline > 0 ) {
-				if ( Debug )
-					fprintf(stderr, "PID is " \
-						"disciplined: %d\n", pid);
-			}
-			else {
-				if ( Debug )
-					fprintf(stderr, "PID not "  \
-						"disciplined: %d, " \
-						"disciplining.\n", pid);
-				discipline = sys_set_bad_actor(pid, 1);
-				if ( discipline < 0 ) {
-					fprintf(stderr, "actor status error:" \
-						" %d:%s\n", errno, 	      \
-						strerror(errno));
+			if ( Debug )
+				fprintf(stderr, "[%s]: Unsealed, releasing "
+					"bad actor.\n", __func__);
+			if ( sys_set_bad_actor(pid, 1) < 0 ) {
+				fprintf(stderr, "Bad actor release error:"  \
+					" %d:%s\n", errno, strerror(errno));
 					retn = false;
 					goto done;
-				}
+			}
+		} else {
+			if ( Debug )
+				fprintf(stderr, "[%s]: Unsealed, releasing "
+					"good actor.\n", __func__);
+			if ( sys_set_bad_actor(pid, 2)  < 0 ) {
+				fprintf(stderr, "Good actor release error:"  \
+					" %d:%s\n", errno, strerror(errno));
+					retn = false;
+					goto done;
 			}
 		}
 	}
 
-	if ( !status )
-		WHACK(event);
 	retn = true;
 
 
  done:
+	if ( !status )
+		WHACK(event);
+
 	WHACK(update);
 
 	return retn;
