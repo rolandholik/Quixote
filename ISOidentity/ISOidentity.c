@@ -73,6 +73,9 @@ struct NAAAIM_ISOidentity_State
 	/* Canister identity. */
 	unsigned char hostid[NAAAIM_IDSIZE];
 
+	/* Event domain instance aggregate. */
+	unsigned char domain_aggregate[NAAAIM_IDSIZE];
+
 	/* Canister measurement. */
 	unsigned char measurement[NAAAIM_IDSIZE];
 
@@ -121,6 +124,7 @@ static void _init_state(CO(ISOidentity_State, S))
 	S->discipline_pid = 0;
 
 	memset(S->hostid, '\0', sizeof(S->hostid));
+	memset(S->domain_aggregate, '\0', sizeof(S->domain_aggregate));
 	memset(S->measurement, '\0', sizeof(S->measurement));
 
 	S->size = 0;
@@ -298,6 +302,8 @@ static _Bool update(CO(ISOidentity, this), CO(ExchangeEvent, event), \
 			ERR(goto done);
 		if ( !_update_measurement(S, point->get(point)) )
 			ERR(goto done);
+		memcpy(S->domain_aggregate, S->measurement, \
+		       sizeof(S->domain_aggregate));
 		S->have_aggregate = true;
 		point->reset(point);
 	}
@@ -476,6 +482,8 @@ static _Bool set_aggregate(CO(ISOidentity, this), CO(Buffer, bufr))
 
 	if ( !_update_measurement(S, bufr->get(bufr)) )
 		ERR(goto done);
+	memcpy(S->domain_aggregate, S->measurement, \
+	       sizeof(S->domain_aggregate));
 
 	retn		  = true;
 	S->have_aggregate = true;
