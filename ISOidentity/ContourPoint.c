@@ -77,6 +77,7 @@ static void _init_state(CO(ContourPoint_State, S))
 	S->libid = NAAAIM_LIBID;
 	S->objid = NAAAIM_ContourPoint_OBJID;
 
+	S->poisoned  = false;
 	S->violation = false;
 
 	memset(S->point, '\0', sizeof(S->point));
