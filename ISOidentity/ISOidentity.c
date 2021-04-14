@@ -186,26 +186,29 @@ static _Bool _is_mapped(CO(Buffer, map), CO(ContourPoint, point))
 /**
  * Internal private method.
  *
- * This method is responsible for updating the measurement value of
- * the behavioral model.  It does this by extending a measurement
- * value with the host identity of the canister.  This extended value
- * is then used to extend the current measurement value.
+ * This method is responsible for generating a new terminus point for a
+ * linear extension measurement.  It does by extending an update value
+ * with the domain identity.  This extended value is then used to extend
+ * the current measurement value passed into the caller.
  *
- * \param map		The object containing the current behavioral
- *			contour map.
+ * \param this		A pointer to the state information of the event
+ *			domain supporting the measurement.
  *
  * \param update	A pointer to the buffer containing the value
- *			to be used to extend the measurement state of
- *			the model.
+ *			to be used to extend the specified measuremet value.
+ *
+ * \param measurement	A pointer the buffer that contains a current
+ *			measurement value that will be extended.
  *
  * \return	A boolean value is used to indicate whether or not
- *		the measurement was updated.  A false value indicates
+ *		the measurement was extended.  A false value indicates
  *		an error occurred while a true value indicates the
  *		measurement was successfully extended.
  */
 
-static _Bool _update_measurement(CO(ISOidentity_State, S), \
-				 CO(unsigned char *, update))
+static _Bool _extend_measurement(CO(ISOidentity_State, S),    \
+				 CO(unsigned char *, update), \
+				 unsigned char *measurement)
 
 {
 	_Bool retn = false;
@@ -219,16 +222,16 @@ static _Bool _update_measurement(CO(ISOidentity_State, S), \
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 	INIT(NAAAIM, Sha256, sha256, ERR(goto done));
 
-	/* Project the update into a host specific domain. */
+	/* Project the update into a domain specific value. */
 	bufr->add(bufr, S->hostid, sizeof(S->hostid));
 	bufr->add(bufr, update, NAAAIM_IDSIZE);
 	sha256->add(sha256, bufr);
 	if ( !sha256->compute(sha256) )
 		ERR(goto done);
 
-	/* Extend the canister measurement. */
+	/* Extend the current measurement. */
 	bufr->reset(bufr);
-	bufr->add(bufr, S->measurement, sizeof(S->measurement));
+	bufr->add(bufr, measurement, NAAAIM_IDSIZE);
 
 	b = sha256->get_Buffer(sha256);
 	bufr->add_Buffer(bufr, b);
@@ -238,7 +241,7 @@ static _Bool _update_measurement(CO(ISOidentity_State, S), \
 	if ( !sha256->compute(sha256) )
 		ERR(goto done);
 
-	memcpy(S->measurement, b->get(b), sizeof(S->measurement));
+	memcpy(measurement, b->get(b), NAAAIM_IDSIZE);
 	retn = true;
 
  done:
@@ -300,7 +303,8 @@ static _Bool update(CO(ISOidentity, this), CO(ExchangeEvent, event), \
 	if ( !S->have_aggregate ) {
 		if ( !point->add_hexstring(point, DEFAULT_AGGREGATE) )
 			ERR(goto done);
-		if ( !_update_measurement(S, point->get(point)) )
+		if ( !_extend_measurement(S, point->get(point), \
+					  S->measurement) )
 			ERR(goto done);
 		memcpy(S->domain_aggregate, S->measurement, \
 		       sizeof(S->domain_aggregate));
@@ -331,7 +335,7 @@ static _Bool update(CO(ISOidentity, this), CO(ExchangeEvent, event), \
 
 
 	/* Update the platform measurement. */
-	if ( !_update_measurement(S, cp->get(cp)) )
+	if ( !_extend_measurement(S, cp->get(cp), S->measurement) )
 		ERR(goto done);
 
 
@@ -423,7 +427,7 @@ static _Bool update_map(CO(ISOidentity, this), CO(Buffer, bpoint))
 
 
 	/* Update the platform measurement. */
-	if ( !_update_measurement(S, cp->get(cp)) )
+	if ( !_extend_measurement(S, cp->get(cp), S->measurement) )
 		ERR(goto done);
 
 
@@ -480,7 +484,7 @@ static _Bool set_aggregate(CO(ISOidentity, this), CO(Buffer, bufr))
 	if ( S->have_aggregate )
 		ERR(goto done);
 
-	if ( !_update_measurement(S, bufr->get(bufr)) )
+	if ( !_extend_measurement(S, bufr->get(bufr), S->measurement) )
 		ERR(goto done);
 	memcpy(S->domain_aggregate, S->measurement, \
 	       sizeof(S->domain_aggregate));
