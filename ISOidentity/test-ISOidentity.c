@@ -43,6 +43,7 @@ extern int main(int argc, char *argv[])
 	      forensics		= false,
 	      verbose		= false,
 	      dump_measurement	= false,
+	      dump_state	= false,
 	      dump_events	= false,
 	      dump_contours	= false,
 	      dump_forensics	= false;
@@ -65,7 +66,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "CEFMa:fi:v")) != EOF )
+	while ( (opt = getopt(argc, argv, "CEFMSa:fi:v")) != EOF )
 		switch ( opt ) {
 			case 'C':
 				dump_contours = true;
@@ -78,6 +79,9 @@ extern int main(int argc, char *argv[])
 				break;
 			case 'M':
 				dump_measurement = true;
+				break;
+			case 'S':
+				dump_state = true;
 				break;
 			case 'a':
 				aggregate = optarg;
@@ -183,6 +187,15 @@ extern int main(int argc, char *argv[])
 		if ( verbose )
 			fputs("Measurement:\n", stdout);
 		if ( !model->get_measurement(model, bufr) )
+			ERR(goto done);
+		bufr->print(bufr);
+	}
+
+	if ( dump_state ) {
+		if ( verbose )
+			fputs("State:\n", stdout);
+		bufr->reset(bufr);
+		if ( !model->get_state(model, bufr) )
 			ERR(goto done);
 		bufr->print(bufr);
 	}

@@ -405,6 +405,14 @@ static _Bool receive_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr), \
 			retn = true;
 			break;
 
+		case show_state:
+			if ( !mgmt->receive_Buffer(mgmt, cmdbufr) )
+				ERR(goto done);
+			cmdbufr->print(cmdbufr);
+			cmdbufr->reset(cmdbufr);
+			retn = true;
+			break;
+
 		case show_trajectory:
 			retn = receive_trajectory(mgmt, cmdbufr);
 			break;

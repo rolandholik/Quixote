@@ -678,6 +678,128 @@ static _Bool get_measurement(CO(ISOidentity, this), CO(Buffer, bufr))
 
 
 /**
+ * Internal private function.
+ *
+ * This function implements the sort comparison function for the
+ * ->get_state method.
+ *
+ * \param p1	A pointer to the first point to be compared.
+ *
+ * \param p2	A pointer to the second point to be compared.
+ *
+ * \return	An integer value is returned to reflect the lexicographic
+ *		order of the two points.  A value less then zero indicates
+ *		the first point is less then the second point while a
+ *		value greater then zero indicates the first port is larger
+ *		then the second point.
+ */
+
+static int _state_sort(const void *a1, const void *a2)
+
+{
+	int retn = 0;
+
+	uint8_t lp;
+
+	ContourPoint cp1 = *(ContourPoint *) a1,
+		     cp2 = *(ContourPoint *) a2;
+
+	unsigned char *p1 = cp1->get(cp1),
+		      *p2 = cp2->get(cp2);
+
+	Buffer bufr = NULL;
+
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+
+	for (lp= 0; lp < NAAAIM_IDSIZE; ++lp) {
+		if ( *p1 == *p2 ) {
+			++p1;
+			++p2;
+			continue;
+		}
+		if ( *p1 < *p2 )
+			retn = -1;
+		else
+			retn = 1;
+		goto done;
+	}
+
+
+ done:
+	WHACK(bufr);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method is an accessor method for generating and returning the
+ * current state of the system.
+ *
+ * \param this	A pointer to the canister whose state is to be
+ *		retrieved.
+ *
+ * \param out	The object which the state will be returned in.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		a valid state value was returned.  A false value
+ *		indicates a failure in generating the state while a
+ *		true value indicates the output objects contains a
+ *		valid state value.
+ */
+
+static _Bool get_state(CO(ISOidentity, this), CO(Buffer, out))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	unsigned char state[NAAAIM_IDSIZE];
+
+	size_t cnt;
+
+	Buffer points = NULL;
+
+	ContourPoint *ep,
+		     event;
+
+
+	/* Sort a copy of the event points. */
+	INIT(HurdLib, Buffer, points, ERR(goto done));
+	if ( !points->add_Buffer(points, S->contours) )
+		ERR(goto done);
+
+	cnt = points->size(points) / sizeof(ContourPoint);
+	qsort(points->get(points), cnt, sizeof(ContourPoint), _state_sort);
+
+	ep = (ContourPoint *) points->get(points);
+	memcpy(state, S->domain_aggregate, sizeof(state));
+
+	while ( cnt-- ) {
+		event = *ep;
+		if ( !_extend_measurement(S, event->get(event), state) )
+			ERR(goto done);
+		++ep;
+	}
+
+	if ( !out->add(out, state, sizeof(state)) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	memset(state, '\0', sizeof(state));
+	WHACK(points);
+
+	return retn;
+}
+
+
+/**
  * External public method.
  *
  * This method is an accessor method for accessing the process identifier
@@ -1293,6 +1415,7 @@ extern ISOidentity NAAAIM_ISOidentity_Init(void)
 	this->ai_rewind_event = ai_rewind_event;
 
 	this->get_measurement = get_measurement;
+	this->get_state	      = get_state;
 	this->discipline_pid  = discipline_pid;
 
 	this->get_event	   = get_event;

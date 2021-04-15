@@ -38,6 +38,7 @@ struct NAAAIM_ISOidentity
 	void (*ai_rewind_event)(const ISOidentity);
 
 	_Bool (*get_measurement)(const ISOidentity, const Buffer);
+	_Bool (*get_state)(const ISOidentity, const Buffer);
 	_Bool (*discipline_pid)(const ISOidentity, pid_t *);
 
 	void (*rewind_event)(const ISOidentity);

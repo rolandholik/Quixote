@@ -1224,6 +1224,16 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 			retn = true;
 			break;
 
+		case show_state:
+			cmdbufr->reset(cmdbufr);
+			if ( !Model->get_state(Model, cmdbufr) )
+				ERR(goto done);
+
+			if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
+				ERR(goto done);
+			retn = true;
+			break;
+
 		case show_trajectory:
 			retn = send_trajectory(mgmt, cmdbufr);
 			break;
