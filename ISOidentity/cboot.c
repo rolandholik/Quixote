@@ -33,6 +33,8 @@
 
 #define CLONE_EVENTS 0x00000040
 
+#define CAP_TRUST 38
+
 #define _GNU_SOURCE
 
 #define GWHACK(type, var) {			\
@@ -1364,6 +1366,11 @@ static _Bool setup_namespace(int *fdptr, _Bool external)
 			ERR(goto done);
 		if ( !sysfile->write_Buffer(sysfile, bufr) )
 			ERR(goto done);
+	}
+
+	if ( cap_drop_bound(CAP_TRUST) != 0 ) {
+		perror("Failed drop of CAP_TRUST");
+		ERR(goto done);
 	}
 
 	if ( stat("/proc/self/ns/events", &statbuf) < 0 )

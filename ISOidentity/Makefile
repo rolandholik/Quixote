@@ -34,6 +34,11 @@ SSL_INCLUDE = /usr/local/ESD/include
 SSL_CRYPTO = -L /usr/local/ESD/lib -lcrypto -ldl -lpthread
 endif
 
+# libcap library
+ifeq (${CC}, musl-gcc)
+LIBCAP = -L /usr/local/musl/lib -lcap
+endif
+
 
 #
 # Compilation directives.
@@ -114,7 +119,7 @@ cboot: cboot.o ../SRDE/ISOidentity/ISOenclave.o ISOidentity.o ContourPoint.o \
 	${HURD_LIBRARY}
 	${CC} ${LDFLAGS} -o $@ $< ISOidentity.o ContourPoint.o		     \
 		ExchangeEvent.o Actor.o Subject.o 			     \
-		../SRDE/ISOidentity/ISOenclave.o ${RDKLIB} ${LIBS}	     \
+		../SRDE/ISOidentity/ISOenclave.o ${RDKLIB} ${LIBS} ${LIBCAP} \
 		${SSL_CRYPTO}
 
 cboot-mgr: cboot-mgr.o ../SRDE/ISOidentity/ISOmanager.o \
