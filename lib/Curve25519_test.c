@@ -16,6 +16,7 @@
 
 #include <HurdLib.h>
 #include <Buffer.h>
+#include <String.h>
 #include <File.h>
 
 #include <NAAAIM.h>

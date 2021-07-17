@@ -20,9 +20,9 @@ CSRC = Duct.c OTEDKS.c Curve25519.c IPC.c SoftwareStatus.c Ivy.c IDmgr.c    \
 	RandomBuffer.c AES256_cbc.c IDtoken.c X509cert.c Prompt.c	    \
 	AES128_cmac.c
 
-TESTS = Duct_test OTEDKS_test Curve25519_test IPC_test PossumPipe_test	\
-	RSAkey_test LocalDuct_test X509cert_test Prompt_test		\
-	AES128_cmac_test #SmartCard_test
+TESTS = Duct_test Curve25519_test IPC_test PossumPipe_test RSAkey_test \
+	LocalDuct_test X509cert_test Prompt_test AES128_cmac_test      \
+	#SmartCard_test
 
 CC = musl-gcc
 
@@ -90,7 +90,7 @@ Duct_test: Duct_test.o Duct.o
 LocalDuct_test: LocalDuct_test.o LocalDuct.o
 	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib
 
-OTEDKS_test: OTEDKS_test.o OTEDKS.o ../IDtoken.o
+OTEDKS_test: OTEDKS_test.o OTEDKS.o IDtoken.o
 	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${SSL_CRYPTO};
 
 Curve25519_test: Curve25519_test.o Curve25519.o RandomBuffer.o
@@ -99,7 +99,7 @@ Curve25519_test: Curve25519_test.o Curve25519.o RandomBuffer.o
 IPC_test: IPC_test.o IPC.o
 	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib -lrt;
 
-PossumPipe_test: PossumPipe_test.o PossumPipe.o ../IDtoken.o
+PossumPipe_test: PossumPipe_test.o PossumPipe.o IDtoken.o
 	${CC} ${LDFLAGS} -o $@ $^ -L . -lNAAAIM -L../HurdLib -lHurdLib \
 	${SSL_CRYPTO} -lrt -ltspi;
 
