@@ -24,7 +24,7 @@ PROGRAMMER = ${TOOLDIR}/bin/stm-programmer
 export CC AS RANLIB LIBDIR INCDIR PLATFORM PROGRAMMER
 
 
-SUBDIRS = HurdLib
+SUBDIRS = HurdLib stm32l4xx
 
 
 #
@@ -32,11 +32,16 @@ SUBDIRS = HurdLib
 #
 .PHONY: ${SUBDIRS}
 
+all: ${SUBDIRS}
+
 
 #
 # Subdirectory targets.
 #
 HurdLib:
+	${MAKE} -C $@;
+
+stm32l4xx:
 	${MAKE} -C $@;
 
 
