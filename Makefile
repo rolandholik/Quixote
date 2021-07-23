@@ -19,7 +19,7 @@ CSRC = 	OrgID.c PatientID.c Authenticator.c AuthenReply.c IDqueryReply.c \
 # 	provider-server
 SERVERS = root-referral device-broker user-broker
 
-SUBDIRS	    = idgine utils edi SRDE ISOidentity Quixote # client
+SUBDIRS	    = idgine utils edi SRDE ISOidentity Quixote Sancho # client
 DEV_SUBDIRS = lib SRDE
 
 # CC = gcc
@@ -172,6 +172,9 @@ ISOidentity:
 	${MAKE} -C $@;
 
 Quixote:
+	${MAKE} -C $@;
+
+Sancho:
 	${MAKE} -C $@;
 
 install-bin:
