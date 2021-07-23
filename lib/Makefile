@@ -12,17 +12,17 @@ INSTINCLUDE = ../NAAAIM.h AES256_cbc.h Base64.h Curve25519.h Duct.h	\
 	Duct_mgr.h HTTP.h IDmgr.h IDtoken.h IPC.h Ivy.h LocalDuct.h	\
 	OTEDKS.h PossumPacket.h PossumPipe.h RSAkey.h RandomBuffer.h	\
 	SHA256.h  SHA256_hmac.h SmartCard.h SoftwareStatus.h TPM2cmd.h	\
-	X509cert.h Prompt.h TPMcmd.h AES128_cmac.h
+	X509cert.h Prompt.h TPMcmd.h AES128_cmac.h TTYduct.h
 
 CSRC = Duct.c OTEDKS.c Curve25519.c IPC.c SoftwareStatus.c Ivy.c IDmgr.c    \
 	TPMcmd.c TPM2cmd.c PossumPacket.c PossumPipe.c RSAkey.c SmartCard.c \
 	LocalDuct.c HTTP.c Base64.c Duct_mgr.c SHA256.c SHA256_hmac.c	    \
 	RandomBuffer.c AES256_cbc.c IDtoken.c X509cert.c Prompt.c	    \
-	AES128_cmac.c
+	AES128_cmac.c TTYduct.c
 
 TESTS = Duct_test Curve25519_test IPC_test PossumPipe_test RSAkey_test \
 	LocalDuct_test X509cert_test Prompt_test AES128_cmac_test      \
-	#SmartCard_test
+	TTYduct_test #SmartCard_test
 
 CC = musl-gcc
 
@@ -115,6 +115,9 @@ Prompt_test: Prompt_test.o Prompt.o
 AES128_cmac_test: AES128_cmac_test.o AES128_cmac.o
 	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${SSL_CRYPTO}
 
+TTYduct_test: TTYduct_test.o TTYduct.o
+	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${SSL_CRYPTO}
+
 SmartCard_test: SmartCard_test.o SmartCard.o
 	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib \
 		-L/usr/local/lib -lpcsclite
@@ -161,3 +164,4 @@ IDtoken.o: IDtoken.h SHA256.h SHA256_hmac.h ../NAAAIM.h
 X509cert.o: X509cert.h ../NAAAIM.h
 Prompt.o: Prompt.h ../NAAAIM.h
 AES128_cmac.o : AES128_cmac.h ../NAAAIM.h
+TTYduct.o: TTYduct.h ../NAAAIM.h
