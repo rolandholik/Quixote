@@ -2,8 +2,18 @@
 # * (C)Copyright 2020, Enjellic Systems Development, LLC. All rights reserved.
 # **************************************************************************/
 
-# Variable declarations.
 
+#
+# Include micro-controller build definitions.
+#
+ifndef MCUCFGDIR
+MCUCFGDIR=${shell cd ../../..; pwd}
+endif
+
+include ${MCUCFGDIR}/STmcu.mk
+
+
+# Variable declarations.
 RTOSDIR = ${STMDIR}/Middlewares/Third_Party/FreeRTOS/Source
 
 CINCLUDE = -I ${STMDIR}/Middlewares/Third_Party/FreeRTOS/Source/include	     \
@@ -58,7 +68,6 @@ COBJS = ${CSRC:.c=.o}
 #
 # Target directives.
 #
-
 ${LIBNAME}: ${COBJS}
 	${AR} r ${LIBNAME} $^;
 	${RANLIB} ${LIBNAME};

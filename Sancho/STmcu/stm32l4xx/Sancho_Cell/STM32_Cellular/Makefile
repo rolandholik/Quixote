@@ -2,8 +2,9 @@
 # * (C)Copyright 2021, Enjellic Systems Development, LLC. All rights reserved.
 # **************************************************************************/
 
+#
 # Variable declarations.
-
+#
 LIBDIRS = Com Cellular_Service Ipc Trace AT_Core Rtosal Cellular_Ctrl \
 	Runtime_Library Error Data_Cache PPPosif
 
@@ -14,7 +15,9 @@ LIBDIRS = Com Cellular_Service Ipc Trace AT_Core Rtosal Cellular_Ctrl \
 .PHONY: ${LIBDIRS}
 
 
-# Targets
+#
+# Target definitions.
+#
 all: ${LIBDIRS}
 	set -e; for dir in ${LIBDIRS}; do ${MAKE} -C $$dir; done;
 

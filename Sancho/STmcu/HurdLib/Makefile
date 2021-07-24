@@ -7,6 +7,16 @@
 
 
 #
+# Include micro-controller build definitions.
+#
+ifndef MCUCFGDIR
+MCUCFGDIR=${shell cd ..; pwd}
+endif
+
+include ${MCUCFGDIR}/STmcu.mk
+
+
+#
 # Object and source file definitions.
 #
 CSRC = Origin.c Fibsequence.c Buffer.c String.c

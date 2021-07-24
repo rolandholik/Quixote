@@ -6,23 +6,10 @@
 # **************************************************************************
 
 
+#
 # Variable declarations.
-TOOLDIR = /opt/ESDembedded
-
-CC	= ${TOOLDIR}/bin/arm-none-eabi-gcc
-AS	= ${TOOLDIR}/bin/arm-none-eabi-as
-RANLIB	= ${TOOLDIR}/bin/arm-none-eabi-ranlib
-
-LIBDIR = ${TOOLDIR}/arm-none-eabi/lib
-INCDIR = ${TOOLDIR}/arm-none-eabi/include
-
-PLATFORM = -mthumb -mcpu=cortex-m4 -mfloat-abi=hard -O2 -mfpu=fpv4-sp-d16 \
-	-DSTM32L496xx=1
-
-PROGRAMMER = ${TOOLDIR}/bin/stm-programmer
-
-export CC AS RANLIB LIBDIR INCDIR PLATFORM PROGRAMMER
-
+#
+export MCUCFGDIR=${shell pwd}
 
 SUBDIRS = HurdLib stm32l4xx
 

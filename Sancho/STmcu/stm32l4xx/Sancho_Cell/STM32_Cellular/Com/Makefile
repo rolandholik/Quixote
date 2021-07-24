@@ -2,26 +2,21 @@
 # * (C)Copyright 2020, Enjellic Systems Development, LLC. All rights reserved.
 # **************************************************************************/
 
+
+#
+# Include micro-controller build definitions.
+#
+ifndef MCUCFGDIR
+MCUCFGDIR=${shell cd ../../../..; pwd}
+endif
+
+include ${MCUCFGDIR}/STmcu.mk
+
+
+#
 # Variable declarations.
-
-STMDIR  = /u/usr/sources/Development_STM/STM32CubeExpansion_CELLULAR_V6.0.0
+#
 RTOSDIR = ${STMDIR}/Middlewares/Third_Party/FreeRTOS/Source
-
-LIBDIR = /opt/ESDembedded/arm-none-eabi/lib
-INCDIR = /opt/ESDembedded/arm-none-eabi/include
-
-
-#
-# Compiler and tool definitions.
-#
-
-# CC = arm-gcc
-# AS = arm-as
-
-CC =	 /opt/ESDembedded/bin/arm-none-eabi-gcc
-AS =	 /opt/ESDembedded/bin/arm-none-eabi-as
-AR =	 /opt/ESDembedded/bin/arm-none-eabi-ar
-RANLIB = /opt/ESDembedded/bin/arm-none-eabi-ranlib
 
 CINCLUDE = -I ${STMDIR}/Middlewares/Third_Party/FreeRTOS/Source/include	     \
 	-I ${STMDIR}/Projects/Misc/RTOS/FreeRTOS/Inc			     \
@@ -48,8 +43,6 @@ CINCLUDE = -I ${STMDIR}/Middlewares/Third_Party/FreeRTOS/Source/include	     \
 	-I ../..							     \
 	-I ${RTOSDIR}/CMSIS_RTOS
 
-
-#
 CFLAGS = ${CDEBUG} ${PLATFORM} ${DEFINES} ${CINCLUDE} \
 	-fno-diagnostics-color -Wall
 
@@ -71,16 +64,11 @@ LIBNAME = libcom.a
 # Automatic definition of classes and objects.
 #
 COBJS = ${CSRC:.c=.o}
-AOBJS = ${ASRC:.s=.o}
 
 
 #
-# Target directives.
+# Target definitions.
 #
-# .PHONY: client lib ${SUBDIRS}
-
-
-# Targets
 ${LIBNAME}: ${COBJS}
 	${AR} r ${LIBNAME} $^;
 	${RANLIB} ${LIBNAME};

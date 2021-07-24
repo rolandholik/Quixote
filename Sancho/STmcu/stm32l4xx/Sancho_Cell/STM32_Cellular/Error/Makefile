@@ -2,27 +2,20 @@
 # * (C)Copyright 2020, Enjellic Systems Development, LLC. All rights reserved.
 # **************************************************************************/
 
-# Variable declarations.
 
-STMDIR  = /u/usr/sources/Development_STM/STM32CubeExpansion_CELLULAR_V6.0.0
-RTOSDIR = ${STMDIR}/Middlewares/Third_Party/FreeRTOS/Source
+#
+# Include micro-controller build definitions.
+#
+ifndef MCUCFGDIR
+MCUCFGDIR=${shell cd ../../../..; pwd}
+endif
 
-LIBDIR = /opt/ESDembedded/arm-none-eabi/lib
-INCDIR = /opt/ESDembedded/arm-none-eabi/include
+include ${MCUCFGDIR}/STmcu.mk
 
 
 #
-# Compiler and tool definitions.
+# Variable definitions.
 #
-
-# CC = arm-gcc
-# AS = arm-as
-
-CC =	 /opt/ESDembedded/bin/arm-none-eabi-gcc
-AS =	 /opt/ESDembedded/bin/arm-none-eabi-as
-AR =	 /opt/ESDembedded/bin/arm-none-eabi-ar
-RANLIB = /opt/ESDembedded/bin/arm-none-eabi-ranlib
-
 CINCLUDE = -I ${STMDIR}/Middlewares/Third_Party/FreeRTOS/Source/include \
 	-I ${STMDIR}/Projects/Misc/RTOS/FreeRTOS/Inc			\
 	-I ${STMDIR}/Projects/Misc/Samples/Cellular/Inc			\
@@ -38,8 +31,6 @@ CINCLUDE = -I ${STMDIR}/Middlewares/Third_Party/FreeRTOS/Source/include \
 	-I ../..							    \
 	-I ${RTOSDIR}/CMSIS_RTOS
 
-
-#
 CFLAGS = ${CDEBUG} ${PLATFORM} ${DEFINES} -fno-diagnostics-color -Wall \
 	${CINCLUDE}
 
@@ -59,7 +50,6 @@ LIBNAME = liberror_handler.a
 # Automatic definition of classes and objects.
 #
 COBJS = ${CSRC:.c=.o}
-AOBJS = ${ASRC:.s=.o}
 
 
 #

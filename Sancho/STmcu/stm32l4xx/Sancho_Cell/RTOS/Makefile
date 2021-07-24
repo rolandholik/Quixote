@@ -2,6 +2,17 @@
 # * (C)Copyright 2020, Enjellic Systems Development, LLC. All rights reserved.
 # **************************************************************************/
 
+
+#
+# Include micro-controller build definitions.
+#
+ifndef MCUCFGDIR
+MCUCFGDIR=${shell cd ../../..; pwd}
+endif
+
+include ${MCUCFGDIR}/STmcu.mk
+
+
 # Variable declarations.
 RTOSDIR = ${STMDIR}/Middlewares/Third_Party/FreeRTOS/Source
 
