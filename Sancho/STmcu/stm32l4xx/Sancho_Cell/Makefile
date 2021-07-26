@@ -6,7 +6,7 @@
 
 STMDIR = /u/usr/sources/Development_STM/STM32CubeExpansion_CELLULAR_V6.0.0
 
-LIBDIRS = RTOS Modem STM32_Cellular
+LIBDIRS = RTOS Modem STM32_Cellular Sancho
 
 DEFINES = -DUSE_HAL_DRIVER=1						      \
 	-DHWREF_B_CELL_BG96_V2=1					      \
@@ -37,6 +37,9 @@ Modem:
 	make -C $@;
 
 STM32_Cellular:
+	make -C $@;
+
+Sancho:
 	make -C $@;
 
 
