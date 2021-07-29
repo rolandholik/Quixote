@@ -88,7 +88,6 @@
  * Variable used to indicate whether cartridge is to run in debug mode.
  */
 static _Bool Debug = false;
-static _Bool Seal = false;
 
 /**
  * The object that is used for communicating with the sancho
@@ -257,13 +256,6 @@ static _Bool process_event(CO(TTYduct, duct), const char * const event)
 		fputs("Error sending command.\n", stderr);
 		goto done;
 	}
-
-#if 0
-	if ( Seal ) {
-		fputs("Dropping to terminal:\n", stderr);
-		duct->terminal(duct);
-	}
-#endif
 
 	bufr->reset(bufr);
 	if ( !duct->receive_Buffer(duct, bufr) ) {
@@ -449,7 +441,6 @@ static _Bool process_command(CO(TTYduct, duct), CO(LocalDuct, mgmt), \
 				ERR(goto done);
 
 			retn = true;
-			Seal = true;
 			break;
 
 		case show_measurement:
