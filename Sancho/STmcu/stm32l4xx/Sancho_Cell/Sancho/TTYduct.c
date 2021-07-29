@@ -261,6 +261,8 @@ static _Bool send_Buffer(CO(TTYduct, this), CO(Buffer, bf))
 
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 	bufr->add(bufr, (unsigned char *) &size, sizeof(size));
+	if ( !bufr->add_Buffer(bufr, bf) )
+		ERR(goto done);
 
 	if ( S->debug ) {
 		fputs("Sending buffer.\n", stdout);
@@ -271,16 +273,6 @@ static _Bool send_Buffer(CO(TTYduct, this), CO(Buffer, bf))
 	sent = write(S->fd, bufr->get(bufr), bufr->size(bufr));
 	if ( sent != bufr->size(bufr) )
 		ERR(S->error = errno; goto done);
-	fflush(stdout);
-
-	bufr->reset(bufr);
-	if ( !bufr->add_Buffer(bufr, bf) )
-		ERR(goto done);
-
-	sent = write(S->fd, bufr->get(bufr), bufr->size(bufr));
-	if ( sent != bufr->size(bufr) )
-		ERR(S->error = errno; goto done);
-	fflush(stdout);
 
 	retn = true;
 
