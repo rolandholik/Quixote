@@ -543,11 +543,16 @@ static _Bool format(CO(Actor, this), CO(String, event))
 
 
 	/* Generate the actor string and add it. */
-	used = snprintf(bufr, sizeof(bufr), "actor{uid=%d, euid=%d, suid=%d, gid=%d, egid=%d, sgid=%d, fsuid=%d, fsgid=%d, cap=0x%lx} ",
-		       S->elements.uid, S->elements.euid, S->elements.suid, \
-		       S->elements.gid, S->elements.egid, S->elements.sgid, \
-		       S->elements.fsuid, S->elements.fsgid,		    \
-		       S->elements.capability);
+	used = snprintf(bufr, sizeof(bufr), "actor{uid=%lu, euid=%lu, suid=%lu, gid=%lu, egid=%lu, sgid=%lu, fsuid=%lu, fsgid=%lu, cap=0x%llx} ",      \
+		       (unsigned long int) S->elements.uid,		\
+		       (unsigned long int) S->elements.euid,		\
+		       (unsigned long int) S->elements.suid,		\
+		       (unsigned long int) S->elements.gid,		\
+		       (unsigned long int) S->elements.egid,		\
+		       (unsigned long int) S->elements.sgid,		\
+		       (unsigned long int) S->elements.fsuid,		\
+		       (unsigned long int) S->elements.fsgid,		\
+		       (unsigned long long int) S->elements.capability);
 	if ( used >= sizeof(bufr) )
 		ERR(goto done);
 
@@ -606,15 +611,16 @@ static void dump(CO(Actor, this))
 
 	if ( S->poisoned )
 		fputs("*Poisoned.\n", stdout);
-	fprintf(stdout, "uid:   %u\n", S->elements.uid);
-	fprintf(stdout, "euid:  %u\n", S->elements.euid);
-	fprintf(stdout, "suid:  %u\n", S->elements.suid);
-	fprintf(stdout, "gid:   %u\n", S->elements.gid);
-	fprintf(stdout, "egid:  %u\n", S->elements.egid);
-	fprintf(stdout, "sgid:  %u\n", S->elements.sgid);
-	fprintf(stdout, "fsuid: %u\n", S->elements.fsuid);
-	fprintf(stdout, "fsgid: %u\n", S->elements.fsgid);
-	fprintf(stdout, "caps:  %lx\n", S->elements.capability);
+	fprintf(stdout, "uid:   %lu\n", (unsigned long int) S->elements.uid);
+	fprintf(stdout, "euid:  %lu\n", (unsigned long int) S->elements.euid);
+	fprintf(stdout, "suid:  %lu\n", (unsigned long int) S->elements.suid);
+	fprintf(stdout, "gid:   %lu\n", (unsigned long int) S->elements.gid);
+	fprintf(stdout, "egid:  %lu\n", (unsigned long int) S->elements.egid);
+	fprintf(stdout, "sgid:  %lu\n", (unsigned long int) S->elements.sgid);
+	fprintf(stdout, "fsuid: %lu\n", (unsigned long int) S->elements.fsuid);
+	fprintf(stdout, "fsgid: %lu\n", (unsigned long int) S->elements.fsgid);
+	fprintf(stdout, "caps:  %llx\n", \
+		(unsigned long long int) S->elements.capability);
 
 	fputs("measurement: ", stdout);
 	S->identity->print(S->identity);

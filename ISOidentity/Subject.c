@@ -626,9 +626,11 @@ static _Bool format(CO(Subject, this), CO(String, event))
 
 
 	/* Write the formatted string to the String object. */
-	used = snprintf(bufr, sizeof(bufr), "subject{uid=%d, gid=%d, mode=0%o, name_length=%u, name=",					   		   \
-			S->elements.uid, S->elements.gid, S->elements.mode, \
-			S->elements.name_length);
+	used = snprintf(bufr, sizeof(bufr), "subject{uid=%lu, gid=%lu, mode=0%lo, name_length=%lu, name=",				       \
+			(unsigned long int) S->elements.uid,	\
+			(unsigned long int) S->elements.gid,	\
+			(unsigned long int) S->elements.mode,	\
+			(unsigned long int) S->elements.name_length);
 	if ( used >= sizeof(bufr) )
 		ERR(goto done);
 	if ( !event->add(event, bufr) )
@@ -733,10 +735,11 @@ static void dump(CO(Subject, this))
 	if ( S->poisoned )
 		fputs("*Poisoned.\n", stdout);
 
-	fprintf(stdout, "uid:  %u\n", S->elements.uid);
-	fprintf(stdout, "gid:  %u\n", S->elements.gid);
-	fprintf(stdout, "mode: 0%o\n", S->elements.mode);
-	fprintf(stdout, "name length: %u\n", S->elements.name_length);
+	fprintf(stdout, "uid:  %lu\n", (unsigned long int) S->elements.uid);
+	fprintf(stdout, "gid:  %lu\n", (unsigned long int) S->elements.gid);
+	fprintf(stdout, "mode: 0%lo\n",(unsigned long int) S->elements.mode);
+	fprintf(stdout, "name length: %lu\n", \
+		(unsigned long int) S->elements.name_length);
 
 	if ( !bufr->add(bufr, (unsigned char *) S->elements.name,
 			sizeof(S->elements.name)) )
