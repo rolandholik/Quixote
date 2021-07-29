@@ -64,7 +64,7 @@ struct actor_identity {
 	uint32_t fsgid;
 
 	uint64_t capability;
-} __attribute__((packed));
+};
 
 /** Actor private state information. */
 struct NAAAIM_Actor_State
@@ -430,8 +430,18 @@ static _Bool measure(CO(Actor, this))
 
 
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	if ( !bufr->add(bufr, (void *) &S->elements, \
-			sizeof(struct actor_identity)) )
+	bufr->add(bufr, (void *) &S->elements.uid, sizeof(S->elements.uid));
+	bufr->add(bufr, (void *) &S->elements.euid, sizeof(S->elements.euid));
+	bufr->add(bufr, (void *) &S->elements.suid, sizeof(S->elements.suid));
+	bufr->add(bufr, (void *) &S->elements.gid, sizeof(S->elements.gid));
+	bufr->add(bufr, (void *) &S->elements.egid, sizeof(S->elements.egid));
+	bufr->add(bufr, (void *) &S->elements.sgid, sizeof(S->elements.sgid));
+	bufr->add(bufr, (void *) &S->elements.fsuid, \
+		  sizeof(S->elements.fsuid));
+	bufr->add(bufr, (void *) &S->elements.fsuid, \
+		  sizeof(S->elements.fsgid));
+	if ( !bufr->add(bufr, (void *) &S->elements.capability, \
+			sizeof(S->elements.capability)) )
 		ERR(goto done);
 
 	if ( !S->identity->add(S->identity, bufr) )

@@ -63,7 +63,7 @@ struct subject_identity {
 	uint8_t s_uuid[16];
 
 	char digest[NAAAIM_IDSIZE];
-} __attribute__((packed));
+};
 
 
 /** Subject private state information. */
@@ -511,8 +511,17 @@ static _Bool measure(CO(Subject, this))
 
 
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	if ( !bufr->add(bufr, (void *) &S->elements, \
-			sizeof(struct subject_identity)) )
+	bufr->add(bufr, (void *) &S->elements.uid, sizeof(S->elements.uid));
+	bufr->add(bufr, (void *) &S->elements.gid, sizeof(S->elements.gid));
+	bufr->add(bufr, (void *) &S->elements.mode, sizeof(S->elements.mode));
+	bufr->add(bufr, (void *) &S->elements.name_length, \
+		  sizeof(S->elements.name_length));
+	bufr->add(bufr, (void *) S->elements.name, sizeof(S->elements.name));
+	bufr->add(bufr, (void *) S->elements.s_id, sizeof(S->elements.s_id));
+	bufr->add(bufr, (void *) S->elements.s_uuid, \
+		  sizeof(S->elements.s_uuid));
+	if ( !bufr->add(bufr, (void *) S->elements.digest, \
+			sizeof(S->elements.digest)) )
 		ERR(goto done);
 
 	if ( !S->identity->add(S->identity, bufr) )
