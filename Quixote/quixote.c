@@ -67,7 +67,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
-#include <sys/times.h>
 #include <fcntl.h>
 #include <pthread.h>
 #include <sys/socket.h>
@@ -870,14 +869,9 @@ extern int main(int argc, char *argv[])
 	    fd	 = 0,
 	    retn = 1;
 
-	float event_time = 0,
-	      cycle_time = 0;
-
 	struct pollfd poll_data[2];
 
 	struct sigaction signal_action;
-
-	struct tms time_struct;
 
 	Buffer cmdbufr = NULL;
 
@@ -1004,12 +998,9 @@ extern int main(int argc, char *argv[])
 
 	opt = 0;
 	while ( 1 ) {
-		if ( Debug ) {
-			cycle_time = (float) times(&time_struct);
+		if ( Debug )
 			fprintf(stderr, "\n%d: Poll cycle: %d\n", getpid(), \
 				++opt);
-			fprintf(stderr, "Start time: %f\n", cycle_time);
-		}
 
 		retn = poll(poll_data, 2, -1);
 		if ( retn < 0 ) {
@@ -1061,22 +1052,12 @@ extern int main(int argc, char *argv[])
 				}
 				else
 					*p = '\0';
-				if ( Debug ) {
+				if ( Debug )
 					fprintf(stderr,			  \
 						"Processing event: %s\n", \
 						bufr);
-					event_time = (float) times(&time_struct);
-				}
 				if ( !process_event(Duct, bufr) )
 					ERR(goto done);
-				if ( Debug ) {
-					event_time = times(&time_struct) - event_time;
-					event_time = (event_time / \
-						CLOCKS_PER_SEC) * 1000;
-					fprintf(stderr, "Event time: %.1f\n", \
-						event_time);
-				}
-
 				break;
 			}
 		}
@@ -1111,18 +1092,6 @@ extern int main(int argc, char *argv[])
 			if ( !process_command(Duct, mgmt, cmdbufr) )
 				ERR(goto done);
 			cmdbufr->reset(cmdbufr);
-		}
-
-		if ( Debug ) {
-			if ( Debug ) {
-				cycle_time = times(&time_struct) - cycle_time;
-				fprintf(stderr, "Cycle clocks: %f\n", \
-					cycle_time);
-				cycle_time = (cycle_time / CLOCKS_PER_SEC) * \
-					1000;
-				fprintf(stderr, "Cycle time: %.1f\n", \
-					cycle_time);
-			}
 		}
 	}
 
