@@ -175,7 +175,6 @@ static _Bool init_device(CO(TTYduct, this), CO(char *, path))
 
 	options.c_cc[VTIME] = 1;
 	options.c_cflag |= CRTSCTS;
-	options.c_iflag |= IXON;
 #endif
 
 	tcsetattr(S->fd, TCSANOW, &options);
@@ -373,18 +372,11 @@ static _Bool _read_buffer(const TTYduct_State S, size_t cnt)
 
 	unsigned char *p = S->bufr;
 
-#if 0
 	int rc,
+	    amt,
 	    available;
-#else
-	int rc;
-#endif
 
-	size_t received = 0;
-
-#if 0
 	struct pollfd poll_data[1];
-#endif
 
 
 	/* Validate input. */
@@ -393,18 +385,14 @@ static _Bool _read_buffer(const TTYduct_State S, size_t cnt)
 
 
 	/* Setup poll to return information on available data. */
-#if 0
 	poll_data[0].fd = S->fd;
 	poll_data[0].events = POLLIN;
-#endif
 
 
 	/* Loop until I/O is completed. */
 	memset(S->bufr, '\0', sizeof(S->bufr));
 
-	while ( received < cnt ) {
-#if 0
-		printf("Polling: received=%lu, cnt=%lu\n", received, cnt);
+	while ( cnt ) {
 		rc = poll(poll_data, 1, -1);
 		if ( rc < 0 )
 			ERR(goto done);
@@ -414,18 +402,13 @@ static _Bool _read_buffer(const TTYduct_State S, size_t cnt)
 
 		if ( ioctl(S->fd, FIONREAD, &available) != 0 )
 			ERR(goto done);
+		amt = cnt < available ? cnt : available;
 
-		if ( (rc = read(S->fd, p, available)) < 0 )
+		if ( (rc = read(S->fd, p, amt)) < 0 )
 			ERR(goto done);
-#else
-		if ( (rc = read(S->fd, p, 1)) < 0 )
-			ERR(goto done);
-		if ( rc == 0 )
-			continue;
-#endif
 
-		p	 += rc;
-		received += rc;
+		p   += rc;
+		cnt -= rc;
 	}
 
 	retn = true;
