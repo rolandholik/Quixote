@@ -287,14 +287,11 @@ static _Bool process_command(CO(TTYduct, duct), CO(Buffer, bufr))
 	fputs("Sancho says:\n", stdout);
 
 	switch ( cmd ) {
-		case seal_event:
-			Sealed = true;
-			fputs("sealed\n", stdout);
-			break;
 		case exchange_event:
 		case aggregate_event:
 		case contour_event:
 		case ai_event:
+		case seal_event:
 			fprintf(stdout, "%s\n", bufr->get(bufr));
 			break;
 
