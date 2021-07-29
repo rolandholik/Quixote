@@ -425,6 +425,13 @@ static _Bool process_command(CO(TTYduct, duct), CO(LocalDuct, mgmt), \
 		ERR(goto done);
 
 	cp = (int *) cmdbufr->get(cmdbufr);
+	if ( (*cp < 1) || (*cp > show_events) )
+		ERR(goto done);
+
+	if ( Debug )
+		fprintf(stderr, "Processing managment cmd: %s\n", \
+			Sancho_cmd_list[*cp - 1].syntax);
+
 	switch ( *cp ) {
 		case seal_event:
 			cmdbufr->reset(cmdbufr);
