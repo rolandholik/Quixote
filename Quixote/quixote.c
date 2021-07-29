@@ -85,9 +85,10 @@
 
 
 /**
- * Variable used to indicate whether cartridge is to run in debug mode.
+ * Variable used to indicate that debugging is enabled and to provide
+ * the filehandle to be used for debugging.
  */
-static _Bool Debug = false;
+static FILE *Debug = NULL;
 
 /**
  * The object that is used for communicating with the sancho
@@ -138,7 +139,9 @@ static inline int sys_set_actor(pid_t pid, unsigned long flags)
 void signal_handler(int signal, siginfo_t *siginfo, void *private)
 
 {
-	fprintf(stderr, "%s(%d): signal = %d\n", __func__, getpid(), signal);
+	if ( Debug )
+		fprintf(Debug, "%s(%d): signal = %d\n", __func__, getpid(), \
+			signal);
 
 	switch ( signal ) {
 		case SIGINT:
@@ -264,7 +267,7 @@ static _Bool process_event(CO(TTYduct, duct), const char * const event)
 	}
 
 	if ( Debug )
-		fprintf(stderr, "Sancho says: %s\n", bufr->get(bufr));
+		fprintf(Debug, "Sancho says: %s\n", bufr->get(bufr));
 
 
 	/* Check event return, OK if other then an exchange event. */
@@ -294,7 +297,7 @@ static _Bool process_event(CO(TTYduct, duct), const char * const event)
 		}
 		else {
 			if ( Debug )
-				fprintf(stderr, "Disciplined: %d\n", pid);
+				fprintf(Debug, "Disciplined: %d\n", pid);
 		}
 		retn = true;
 	}
@@ -306,7 +309,7 @@ static _Bool process_event(CO(TTYduct, duct), const char * const event)
 		}
 		else {
 			if ( Debug )
-				fprintf(stderr, "Released: %d\n", pid);
+				fprintf(Debug, "Released: %d\n", pid);
 		}
 		retn = true;
 	}
@@ -421,7 +424,7 @@ static _Bool process_command(CO(TTYduct, duct), CO(LocalDuct, mgmt), \
 		ERR(goto done);
 
 	if ( Debug )
-		fprintf(stderr, "Processing managment cmd: %s\n", \
+		fprintf(Debug, "Processing managment cmd: %s\n", \
 			Sancho_cmd_list[*cp - 1].syntax);
 
 	switch ( *cp ) {
@@ -622,7 +625,7 @@ static _Bool setup_namespace(int *fdptr, _Bool external)
 		      (unsigned int) statbuf.st_ino) >= sizeof(fname) )
 		ERR(goto done);
 	if ( Debug )
-		fprintf(stderr, "Update file: %s\n", fname);
+		fprintf(Debug, "Update file: %s\n", fname);
 
 	if ( (fd = open(fname, O_RDONLY)) < 0 )
 		ERR(goto done);
@@ -779,7 +782,7 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint, \
 	/* Child process - create an independent namespace for this process. */
 	if ( Monitor_pid == 0 ) {
 		if ( Debug )
-			fprintf(stderr, "Monitor process: %d\n", getpid());
+			fprintf(Debug, "Monitor process: %d\n", getpid());
 		close(event_pipe[READ_SIDE]);
 
 		if ( !setup_namespace(&event_fd, external) )
@@ -877,6 +880,7 @@ extern int main(int argc, char *argv[])
 	      connected = false;
 
 	char *p,
+	     *debug	= NULL,
 	     *map	= NULL,
 	     *cartridge	= NULL,
 	     bufr[1024];
@@ -899,13 +903,13 @@ extern int main(int argc, char *argv[])
 	TTYduct Duct = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "Sdeb:c:m:n:")) != EOF )
+	while ( (opt = getopt(argc, argv, "Seb:c:d:m:n:")) != EOF )
 		switch ( opt ) {
 			case 'S':
 				show = true;
 				break;
 			case 'd':
-				Debug = true;
+				debug = optarg;
 				break;
 			case 'e':
 				external = true;
@@ -928,6 +932,15 @@ extern int main(int argc, char *argv[])
 	if ( cartridge == NULL ) {
 		fputs("No software cartridge specified.\n", stderr);
 		goto done;
+	}
+
+
+	/* Handle a debug invocation. */
+	if ( debug ) {
+		if ( (Debug = fopen(optarg, "w+")) == NULL ) {
+			fputs("Cannot open debug file.\n", stderr);
+			goto done;
+		}
 	}
 
 
@@ -990,7 +1003,7 @@ extern int main(int argc, char *argv[])
 
 	/* Launch the software cartridge. */
 	if ( Debug )
-		fprintf(stderr, "Primary process: %d\n", getpid());
+		fprintf(Debug, "Primary process: %d\n", getpid());
 
 	if ( !fire_cartridge(cartridge, &fd, external) )
 		ERR(goto done);
@@ -1006,8 +1019,8 @@ extern int main(int argc, char *argv[])
 
 	/* Dispatch loop. */
 	if ( Debug ) {
-		fprintf(stderr, "%d: Calling event loop\n", getpid());
-		fprintf(stderr, "descriptor 1: %d, descriptor 2: %d\n", \
+		fprintf(Debug, "%d: Calling event loop\n", getpid());
+		fprintf(Debug, "descriptor 1: %d, descriptor 2: %d\n", \
 			poll_data[0].fd, poll_data[1].fd);
 	}
 
@@ -1016,7 +1029,7 @@ extern int main(int argc, char *argv[])
 	opt = 0;
 	while ( 1 ) {
 		if ( Debug )
-			fprintf(stderr, "\n%d: Poll cycle: %d\n", getpid(), \
+			fprintf(Debug, "\n%d: Poll cycle: %d\n", getpid(), \
 				++opt);
 
 		retn = poll(poll_data, 2, -1);
@@ -1033,12 +1046,12 @@ extern int main(int argc, char *argv[])
 		}
 		if ( retn == 0 ) {
 			if ( Debug )
-				fputs("Poll timeout.\n", stderr);
+				fputs("Poll timeout.\n", Debug);
 			continue;
 		}
 
 		if ( Debug )
-			fprintf(stderr, "Events: %d, Data poll=%0x, "	\
+			fprintf(Debug, "Events: %d, Data poll=%0x, "	\
 				"Mgmt poll=%0x\n", retn,		\
 				poll_data[0].revents, poll_data[1].revents);
 
@@ -1070,7 +1083,7 @@ extern int main(int argc, char *argv[])
 				else
 					*p = '\0';
 				if ( Debug )
-					fprintf(stderr,			  \
+					fprintf(Debug,			  \
 						"Processing event: %s\n", \
 						bufr);
 				if ( !process_event(Duct, bufr) )
@@ -1083,7 +1096,7 @@ extern int main(int argc, char *argv[])
 			if ( !connected ) {
 				if ( Debug )
 					fputs("Have socket connection.\n", \
-					      stderr);
+					      Debug);
 
 				if ( !mgmt->accept_connection(mgmt) )
 					ERR(goto done);
@@ -1097,7 +1110,7 @@ extern int main(int argc, char *argv[])
 			if ( mgmt->eof(mgmt) ) {
 				if ( Debug )
 					fputs("Terminating management.\n", \
-					      stderr);
+					      Debug);
 				mgmt->reset(mgmt);
 				if ( !mgmt->get_socket(mgmt, \
 						       &poll_data[1].fd) )
