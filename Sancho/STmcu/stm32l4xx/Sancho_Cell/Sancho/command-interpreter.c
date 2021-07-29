@@ -677,6 +677,12 @@ static void interpreter(const void *arg)
 				duct->send_Buffer(duct, bufr);
 				break;
 
+			case show_state:
+				bufr->reset(bufr);
+				model->get_state(model, bufr);
+				duct->send_Buffer(duct, bufr);
+				break;
+
 			case show_trajectory:
 				send_trajectory(duct, model, bufr);
 				break;

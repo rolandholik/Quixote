@@ -1,3 +1,4 @@
+
 /** \file
  *
  * This file implements a utility for managing a quixote co-processor
@@ -295,6 +296,7 @@ static _Bool receive_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr), \
 			break;
 
 		case show_measurement:
+		case show_state:
 			if ( !mgmt->receive_Buffer(mgmt, cmdbufr) )
 				ERR(goto done);
 			cmdbufr->print(cmdbufr);

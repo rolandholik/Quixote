@@ -20,6 +20,7 @@ enum {
 	seal_event,
 	ai_event,
 	show_measurement,
+	show_state,
 	show_trajectory,
 	show_forensics,
 	show_contours,
@@ -32,15 +33,16 @@ struct sancho_cmd_definition {
 };
 
 struct sancho_cmd_definition Sancho_cmd_list[] = {
-	{contour_event,	    "contour "},
-	{exchange_event,    "exchange "},
-	{aggregate_event,   "aggregate "},
-	{seal_event,	    "seal"},
-	{ai_event,	    "ai_event" },
-	{show_measurement, "show measurement"},
-	{show_trajectory,  "show trajectory"},
-	{show_forensics,   "show forensics"},
-	{show_contours,	   "show contours"},
-	{show_events,	   "show events"},
+	{contour_event,		"contour "},
+	{exchange_event,	"exchange "},
+	{aggregate_event,	"aggregate "},
+	{seal_event,		"seal"},
+	{ai_event,		"ai_event" },
+	{show_measurement,	"show measurement"},
+	{show_state,		"show state"},
+	{show_trajectory,	"show trajectory"},
+	{show_forensics,	"show forensics"},
+	{show_contours,		"show contours"},
+	{show_events,		"show events"},
 	{0, NULL}
 };
