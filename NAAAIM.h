@@ -11,7 +11,9 @@
 #define NAAAIM_DEBUG
 #endif
 
+#if !defined(ERR)
 #define ERR(action) {fprintf(stderr, "[%s,%s,%d]: Error location.\n", __FILE__, __func__, __LINE__); action;}
+#endif
 
 #if defined(NAAAIM_DEBUG)
 #define SAY(msg) {fprintf(stdout, "%s: %s\n", __func__, msg); fflush(stdout);}
