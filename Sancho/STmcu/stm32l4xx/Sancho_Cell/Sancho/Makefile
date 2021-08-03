@@ -33,6 +33,7 @@ CINCLUDE = -I . -I ../../../../../HurdLib -I ../../../include		\
 	-I ${STMDIR}/Middlewares/ST/STM32_Cellular/Interface/Com/Inc	\
 	-I ${STMDIR}/Middlewares/ST/STM32_Cellular/Core/Ipc/Inc		\
 	-I ${STMDIR}/Middlewares/ST/STM32_Cellular/Core/AT_Core/Inc	\
+	-I ${STMDIR}/Middlewares/ST/STM32_Cellular/Core/Data_Cache/Inc	\
 	-I ${STMDIR}/Middlewares/ST/STM32_Cellular/Core/Cellular_Service/Inc \
 	-I ${STMDIR}/Middlewares/ST/STM32_Cellular/Core/Runtime_Library/Inc \
 	-I ${STMDIR}/Middlewares/ST/STM32_Cellular/Interface/Cellular_Ctrl/Inc \

@@ -20,7 +20,8 @@
 #include <cmsis_os.h>
 #include <rtosal.h>
 #include <com_sockets.h>
-
+#include <dc_common.h>
+#include <cellular_service_task.h>
 
 #include "HurdLib.h"
 #include <Buffer.h>
@@ -37,6 +38,11 @@
 
 #include "sancho.h"
 
+
+/**
+ * Flag variable to indicate that cellular notification is available.
+ */
+static _Bool Cellular_Enabled = false;
 
 /* Communications object to be used by all functions. */
 TTYduct Host;
@@ -137,6 +143,9 @@ static void _send_event(CO(String, event))
 
 	Duct duct = NULL;
 
+	if ( !Cellular_Enabled )
+		return;
+
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 	if ( !bufr->add(bufr, (unsigned char *) event->get(event), \
 			event->size(event) + 1) )
@@ -224,9 +233,8 @@ static void add_event(CO(TTYduct, duct), CO(ISOidentity, model), \
 		bufr->reset(bufr);
 		bufr->add(bufr, (unsigned char *) msg, msg_size + 1);
 		duct->send_Buffer(duct, bufr);
-#if 0
-		_send_event(update);
-#endif
+		if ( updated )
+			_send_event(update);
 	} else {
 		memset(msg, '\0', sizeof(msg));
 		event->get_pid(event, &pid);
@@ -596,6 +604,40 @@ done:
 }
 
 
+static void enable_cellular(CO(TTYduct, duct), CO(Buffer, bufr))
+
+{
+	static char *ok = "FAILED";
+
+	unsigned int seconds = 30;
+
+	CST_autom_state_t status;
+
+
+	cellular_start();
+
+	while ( seconds-- > 0 ) {
+		status = CST_get_state();
+		if ( status == CST_MODEM_DATA_READY_STATE ) {
+			Cellular_Enabled = true;
+			send_ok(duct, bufr);
+			return;
+
+		}
+		osDelay(1000);
+	}
+
+	bufr->reset(bufr);
+	if ( !bufr->add(bufr, (unsigned char *) ok, strlen(ok) + 1) )
+		return;
+
+	duct->send_Buffer(duct, bufr);
+	bufr->reset(bufr);
+
+	return;
+}
+
+
 static int get_command(CO(Buffer, bufr))
 
 {
@@ -614,6 +656,7 @@ static int get_command(CO(Buffer, bufr))
 
 	return cp->command;
 }
+
 
 /**
  * External function call.
@@ -697,6 +740,9 @@ static void interpreter(const void *arg)
 
 			case show_events:
 				send_events(duct, model, bufr);
+				break;
+			case enable_cell:
+				enable_cellular(duct, bufr);
 				break;
 		}
 

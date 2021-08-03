@@ -287,6 +287,7 @@ static _Bool receive_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr), \
 
 	switch ( cmdnum ) {
 		case seal_event:
+		case enable_cell:
 			if ( !mgmt->receive_Buffer(mgmt, cmdbufr) )
 				ERR(goto done);
 			fprintf(stdout, "%s\n", cmdbufr->get(cmdbufr));
@@ -320,6 +321,7 @@ static _Bool receive_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr), \
 			retn = receive_ai_events(mgmt, cmdbufr);
 			break;
 	}
+
 
  done:
 	return retn;

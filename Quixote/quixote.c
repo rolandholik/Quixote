@@ -413,14 +413,15 @@ static _Bool process_command(CO(TTYduct, duct), CO(LocalDuct, mgmt), \
 
 	static const char *seal_cmd	   = "seal",
 			  *measurement_cmd = "show measurement",
-			  *state_cmd	   = "show state";
+			  *state_cmd	   = "show state",
+			  *cellular_cmd	   = "enable cellular";
 
 
 	if ( cmdbufr->size(cmdbufr) != sizeof(int) )
 		ERR(goto done);
 
 	cp = (int *) cmdbufr->get(cmdbufr);
-	if ( (*cp < 1) || (*cp > show_events) )
+	if ( (*cp < 1) || (*cp > sancho_cmds_max) )
 		ERR(goto done);
 
 	if ( Debug )
@@ -500,6 +501,24 @@ static _Bool process_command(CO(TTYduct, duct), CO(LocalDuct, mgmt), \
 		case show_events:
 			retn = send_list(duct, mgmt, cmdbufr, \
 					 "show events");
+			break;
+
+		case enable_cell:
+			cmdbufr->reset(cmdbufr);
+			if ( !cmdbufr->add(cmdbufr,			   \
+					   (unsigned char *) cellular_cmd, \
+					   strlen(cellular_cmd) + 1) )
+			       ERR(goto done);
+			if ( !duct->send_Buffer(duct, cmdbufr) )
+				ERR(goto done);
+
+			cmdbufr->reset(cmdbufr);
+			if ( !duct->receive_Buffer(duct, cmdbufr) )
+				ERR(goto done);
+			if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
+				ERR(goto done);
+
+			retn = true;
 			break;
 	}
 

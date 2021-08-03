@@ -292,6 +292,7 @@ static _Bool process_command(CO(TTYduct, duct), CO(Buffer, bufr))
 		case contour_event:
 		case ai_event:
 		case seal_event:
+		case enable_cell:
 			fprintf(stdout, "%s\n", bufr->get(bufr));
 			break;
 
