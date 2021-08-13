@@ -409,6 +409,8 @@ static _Bool process_command(CO(TTYduct, duct), CO(LocalDuct, mgmt), \
 {
 	_Bool retn = false;
 
+	char *cmd;
+
 	int *cp;
 
 	static const char *seal_cmd	   = "seal",
@@ -423,10 +425,10 @@ static _Bool process_command(CO(TTYduct, duct), CO(LocalDuct, mgmt), \
 	cp = (int *) cmdbufr->get(cmdbufr);
 	if ( (*cp < 1) || (*cp > sancho_cmds_max) )
 		ERR(goto done);
+	cmd = Sancho_cmd_list[*cp - 1].syntax;
 
 	if ( Debug )
-		fprintf(Debug, "Processing managment cmd: %s\n", \
-			Sancho_cmd_list[*cp - 1].syntax);
+		fprintf(Debug, "Processing managment cmd: %s\n", cmd);
 
 	switch ( *cp ) {
 		case seal_event:
@@ -509,6 +511,23 @@ static _Bool process_command(CO(TTYduct, duct), CO(LocalDuct, mgmt), \
 					   (unsigned char *) cellular_cmd, \
 					   strlen(cellular_cmd) + 1) )
 			       ERR(goto done);
+			if ( !duct->send_Buffer(duct, cmdbufr) )
+				ERR(goto done);
+
+			cmdbufr->reset(cmdbufr);
+			if ( !duct->receive_Buffer(duct, cmdbufr) )
+				ERR(goto done);
+			if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
+				ERR(goto done);
+
+			retn = true;
+			break;
+
+		case sancho_reset:
+			cmdbufr->reset(cmdbufr);
+			if ( !cmdbufr->add(cmdbufr, (void *) cmd,
+					   strlen(cmd) + 1) )
+				ERR(goto done);
 			if ( !duct->send_Buffer(duct, cmdbufr) )
 				ERR(goto done);
 
@@ -887,6 +906,39 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint, \
 }
 
 
+/**
+ * Private function.
+ *
+ * This function is responsible for issueing a reset request to the
+ * Sancho micro-controller implementation.
+ *
+ * \param duct		A pointer to the object being used to communicate
+ *			with the micro-controller.
+ *
+ * \param bufr		The object which will be used to hold the command
+ *			to be sent.
+ *
+ * \return	No return value is defined.
+ */
+
+static void send_reset(CO(TTYduct, duct), CO(Buffer, bufr))
+
+{
+
+	static unsigned char cmd[] = "reset";
+
+
+	if ( Debug )
+		fputs("Sending reset.\n", Debug);
+
+	bufr->reset(bufr);
+	if ( bufr->add(bufr, cmd, sizeof(cmd)) )
+		duct->send_Buffer(duct, bufr);
+
+	return;
+}
+
+
 /*
  * Program entry point begins here.
  */
@@ -1079,6 +1131,7 @@ extern int main(int argc, char *argv[])
 				if ( !child_exited(Monitor_pid) )
 					continue;
 				fputs("Cartridge exited.\n", stdout);
+				send_reset(Duct, cmdbufr);
 				goto done;
 			}
 		}

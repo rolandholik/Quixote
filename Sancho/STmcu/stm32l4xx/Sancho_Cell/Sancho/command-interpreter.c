@@ -741,8 +741,13 @@ static void interpreter(const void *arg)
 			case show_events:
 				send_events(duct, model, bufr);
 				break;
+
 			case enable_cell:
 				enable_cellular(duct, bufr);
+				break;
+
+			case sancho_reset:
+				NVIC_SystemReset();
 				break;
 		}
 
