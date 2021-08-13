@@ -10,7 +10,7 @@ INSTPATH = ${DESTDIR}/opt/ESD
 
 CSRC = quixote.c quixote-console.c test-sancho.c
 
-TOOLS = quixote quixote-console test-sancho
+TOOLS = quixote quixote-console test-sancho test-thread
 
 INSTALLBIN  = quixote-console
 INSTALLSBIN = quixote
@@ -65,6 +65,9 @@ quixote-console: quixote-console.o ${LIBDEPS}
 
 test-sancho: test-sancho.o ${LIBDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
+
+test-thread: test-thread.o ${LIBDEPS}
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS} -lpthread;
 
 install-bin:
 	[ -d ${INSTPATH}/bin ] || mkdir -p ${INSTPATH}/bin;
