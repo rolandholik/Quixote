@@ -89,7 +89,7 @@ static void send_ok(CO(TTYduct, duct), CO(Buffer, bufr))
 }
 
 
-static _Bool add_contour(ISOidentity model, Buffer cp)
+static _Bool add_state(ISOidentity model, Buffer cp)
 
 {
 	_Bool retn = false;
@@ -692,8 +692,8 @@ static void interpreter(const void *arg)
 		}
 
 		switch ( get_command(bufr) ) {
-			case contour_event:
-				if ( add_contour(model, bufr) )
+			case sancho_state:
+				if ( add_state(model, bufr) )
 					send_ok(duct, bufr);
 				break;
 

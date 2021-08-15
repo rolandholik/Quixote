@@ -91,12 +91,6 @@
 static FILE *Debug = NULL;
 
 /**
- * The object that is used for communicating with the sancho
- * co-processor.
- */
-static TTYduct Duct = NULL;
-
-/**
  * The process id of the cartridge monitor process.
  */
 static pid_t Monitor_pid;
@@ -567,12 +561,13 @@ static _Bool process_command(CO(TTYduct, duct), CO(LocalDuct, mgmt), \
  *			additional command cycle should be processed.
  */
 
-static _Bool initialize_model(char *mapfile)
+static _Bool initialize_state(CO(TTYduct, duct), char *mapfile)
 
 {
 	_Bool retn = false;
 
-	char inbufr[256];
+	char *p,
+	     inbufr[256];
 
 	FILE *bmap = NULL;
 
@@ -584,7 +579,13 @@ static _Bool initialize_model(char *mapfile)
 
 	/* Loop over the mapfile. */
 	while ( fgets(inbufr, sizeof(inbufr), bmap) != NULL ) {
-		if ( !process_event(Duct, inbufr) )
+		if ( (p = strchr(inbufr, '\n')) != 0 )
+			*p = '\0';
+
+		if ( Debug )
+			fprintf(Debug, "Initialize: %s\n", inbufr);
+
+		if ( !process_event(duct, inbufr) )
 			ERR(goto done);
 	}
 
@@ -974,13 +975,10 @@ extern int main(int argc, char *argv[])
 	TTYduct Duct = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "Seb:c:d:m:n:")) != EOF )
+	while ( (opt = getopt(argc, argv, "Sec:d:m:")) != EOF )
 		switch ( opt ) {
 			case 'S':
 				show = true;
-				break;
-			case 'd':
-				debug = optarg;
 				break;
 			case 'e':
 				external = true;
@@ -988,6 +986,9 @@ extern int main(int argc, char *argv[])
 
 			case 'c':
 				cartridge = optarg;
+				break;
+			case 'd':
+				debug = optarg;
 				break;
 			case 'm':
 				map = optarg;
@@ -1008,7 +1009,7 @@ extern int main(int argc, char *argv[])
 
 	/* Handle a debug invocation. */
 	if ( debug ) {
-		if ( (Debug = fopen(optarg, "w+")) == NULL ) {
+		if ( (Debug = fopen(debug, "w+")) == NULL ) {
 			fputs("Cannot open debug file.\n", stderr);
 			goto done;
 		}
@@ -1051,8 +1052,11 @@ extern int main(int argc, char *argv[])
 
 	/* Load and seal a behavior map if specified. */
 	if ( map != NULL ) {
-		if ( !initialize_model(map) ) {
-			fputs("Cannot initialize behavioral map.\n", stderr);
+		if ( Debug )
+			fprintf(Debug, "Loading security state: %s\n", map);
+
+		if ( !initialize_state(Duct, map) ) {
+			fputs("Cannot initialize security state.\n", stderr);
 			goto done;
 		}
 	}

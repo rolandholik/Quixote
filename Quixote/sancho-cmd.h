@@ -14,7 +14,7 @@
 
 /* Command definitions. */
 enum {
-	contour_event=1,
+	sancho_state=1,
 	exchange_event,
 	aggregate_event,
 	seal_event,
@@ -36,7 +36,7 @@ struct sancho_cmd_definition {
 };
 
 struct sancho_cmd_definition Sancho_cmd_list[] = {
-	{contour_event,		"contour "},
+	{sancho_state,		"state "},
 	{exchange_event,	"exchange "},
 	{aggregate_event,	"aggregate "},
 	{seal_event,		"seal"},

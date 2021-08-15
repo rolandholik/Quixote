@@ -287,15 +287,16 @@ static _Bool process_command(CO(TTYduct, duct), CO(Buffer, bufr))
 	fputs("Sancho says:\n", stdout);
 
 	switch ( cmd ) {
+		case sancho_state:
 		case exchange_event:
 		case aggregate_event:
-		case contour_event:
-		case ai_event:
 		case seal_event:
+		case ai_event:
 		case enable_cell:
 			fprintf(stdout, "%s\n", bufr->get(bufr));
 			break;
 
+		case show_state:
 		case show_measurement:
 			bufr->print(bufr);
 			bufr->reset(bufr);
