@@ -10,10 +10,10 @@ INSTPATH = ${DESTDIR}/opt/ESD
 
 CSRC = quixote.c quixote-console.c test-sancho.c
 
-TOOLS = quixote quixote-console test-sancho test-thread
+TOOLS = quixote quixote-us quixote-console test-sancho test-thread
 
 INSTALLBIN  = quixote-console
-INSTALLSBIN = quixote
+INSTALLSBIN = quixote quixote-us
 
 CC = musl-gcc
 
@@ -41,10 +41,24 @@ HURDLIB	     = -L ../HurdLib -lHurdLib
 NAAAIM_LIBRARY = ../lib/libNAAAIM.a
 NAAAIMLIB      = -L ../lib -lNAAAIM
 
-LIBS	= ${NAAAIMLIB} ${HURDLIB}
+# OpenSSL crypto library
+ifeq (${CC}, musl-gcc)
+SSL_INCLUDE = /usr/local/musl/include
+SSL_CRYPTO = -L /usr/local/musl/lib -lcrypto
+else
+LDFLAGS += -Wl,-rpath=/usr/local/ESD/lib
+SSL_INCLUDE = /usr/local/ESD/include
+SSL_CRYPTO = -L /usr/local/ESD/lib -lcrypto -ldl -lpthread
+endif
+
+LIBS	= ${NAAAIMLIB} ${HURDLIB} ${SSL_CRYPTO}
 LIBDEPS = ${HURD_LIBRARY} ${NAAAIM_LIBRARY}
 
-CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib
+MODELDEPS = ../ISOidentity/Actor.o ../ISOidentity/Subject.o	     \
+	../ISOidentity/ContourPoint.o ../ISOidentity/ExchangeEvent.o \
+	../ISOidentity/ISOidentity.o
+
+CFLAGS := ${CFLAGS} -I.. -I../ISOidentity -I../lib -I../HurdLib
 
 
 #
@@ -59,6 +73,9 @@ tools: ${TOOLS}
 
 quixote: quixote.o ${LIBDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
+
+quixote-us: quixote-us.o ${LIBDEPS}
+	${CC} ${LDFLAGS} -o $@ $< ${MODELDEPS} ${LIBS};
 
 quixote-console: quixote-console.o ${LIBDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
