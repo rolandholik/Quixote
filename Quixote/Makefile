@@ -51,7 +51,12 @@ SSL_INCLUDE = /usr/local/ESD/include
 SSL_CRYPTO = -L /usr/local/ESD/lib -lcrypto -ldl -lpthread
 endif
 
-LIBS	= ${NAAAIMLIB} ${HURDLIB} ${SSL_CRYPTO}
+# libcap library
+ifeq (${CC}, musl-gcc)
+LIBCAP = -L /usr/local/musl/lib -lcap
+endif
+
+LIBS	= ${NAAAIMLIB} ${HURDLIB} ${LIBCAP} ${SSL_CRYPTO}
 LIBDEPS = ${HURD_LIBRARY} ${NAAAIM_LIBRARY}
 
 MODELDEPS = ../ISOidentity/Actor.o ../ISOidentity/Subject.o	     \

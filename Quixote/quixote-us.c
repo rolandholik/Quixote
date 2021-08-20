@@ -70,6 +70,7 @@
 #include <limits.h>
 #include <sched.h>
 #include <glob.h>
+#include <sys/capability.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -1176,6 +1177,11 @@ static _Bool setup_namespace(int *fdptr)
 			strlen(enable)) )
 		ERR(goto done);
 	if ( !sysfile->write_Buffer(sysfile, bufr) )
+		ERR(goto done);
+
+
+	/* Drop the ability to modify the security domain. */
+	if ( cap_drop_bound(CAP_TRUST) != 0 )
 		ERR(goto done);
 
 
