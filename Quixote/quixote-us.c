@@ -1178,11 +1178,11 @@ static _Bool setup_namespace(int *fdptr)
 	if ( !sysfile->write_Buffer(sysfile, bufr) )
 		ERR(goto done);
 
+
+	/* Create the pathname to the event update file. */
 	if ( stat("/proc/self/ns/events", &statbuf) < 0 )
 		ERR(goto done);
 
-
-	/* Create the pathname to the event update file. */
 	memset(fname, '\0', sizeof(fname));
 	if ( snprintf(fname, sizeof(fname), SYSFS_UPDATES, \
 		      (unsigned int) statbuf.st_ino) >= sizeof(fname) )

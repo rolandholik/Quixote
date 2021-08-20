@@ -608,10 +608,6 @@ static _Bool initialize_state(CO(TTYduct, duct), char *mapfile)
  *			file descriptor for the cartridge measurement
  *			file.
  *
- * \param external	A flag used to indicate whether or not the
- *			namespace should be configured for external
- *			evaluation.
- *
  * \return		A boolean value is returned to indicate whether
  *			or not the the creation of the namespace was
  *			successful.  A false value indicates setup of
@@ -620,7 +616,7 @@ static _Bool initialize_state(CO(TTYduct, duct), char *mapfile)
  *			ready to be measured.
  */
 
-static _Bool setup_namespace(int *fdptr, _Bool external)
+static _Bool setup_namespace(int *fdptr)
 
 {
 	_Bool retn = false;
@@ -638,24 +634,27 @@ static _Bool setup_namespace(int *fdptr, _Bool external)
 	static char *enable = "1\n";
 
 
+	/* Create an independent security event namespace. */
 	if ( unshare(CLONE_EVENTS) < 0 ) {
 		perror("Unsharing behavior domain");
 		ERR(goto done);
 	}
 
-	if ( external ) {
-		INIT(HurdLib, File, sysfile, ERR(goto done));
-		if (! sysfile->open_wo(sysfile, SYSFS_EXTERNAL) )
-			ERR(goto done);
 
-		INIT(HurdLib, Buffer, bufr, ERR(goto done));
-		if ( !bufr->add(bufr, (unsigned char *) enable, \
-				strlen(enable)) )
-			ERR(goto done);
-		if ( !sysfile->write_Buffer(sysfile, bufr) )
-			ERR(goto done);
-	}
+	/* Configure the security domain for external modeling. */
+	INIT(HurdLib, File, sysfile, ERR(goto done));
+	if (! sysfile->open_wo(sysfile, SYSFS_EXTERNAL) )
+		ERR(goto done);
 
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	if ( !bufr->add(bufr, (unsigned char *) enable, \
+			strlen(enable)) )
+		ERR(goto done);
+	if ( !sysfile->write_Buffer(sysfile, bufr) )
+		ERR(goto done);
+
+
+	/* Create the pathname to the event update file. */
 	if ( stat("/proc/self/ns/events", &statbuf) < 0 )
 		ERR(goto done);
 
@@ -665,7 +664,6 @@ static _Bool setup_namespace(int *fdptr, _Bool external)
 		ERR(goto done);
 	if ( Debug )
 		fprintf(Debug, "Update file: %s\n", fname);
-
 	if ( (fd = open(fname, O_RDONLY)) < 0 )
 		ERR(goto done);
 	retn = true;
@@ -771,17 +769,13 @@ static void * show_mode(CO(char *, root))
  *			the directory which holds the container to
  *			be executed.
  *
- * \param external	A flag that indicates whether or not an
- *			external evaluator is being designated.
- *
  * \return	A boolean value is returned to reflect the status of
  *		the launch.  A false value indicates an error was
  *		encountered while a true value indicates the cartridge
  *		was successfully launched.
  */
 
-static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint, \
-			    _Bool external)
+static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint)
 
 {
 	_Bool retn = false;
@@ -824,7 +818,7 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint, \
 			fprintf(Debug, "Monitor process: %d\n", getpid());
 		close(event_pipe[READ_SIDE]);
 
-		if ( !setup_namespace(&event_fd, external) )
+		if ( !setup_namespace(&event_fd) )
 			exit(1);
 
 		/* Fork again to run the cartridge. */
@@ -948,7 +942,6 @@ extern int main(int argc, char *argv[])
 
 {
 	_Bool show	= false,
-	      external	= false,
 	      connected = false;
 
 	char *p,
@@ -975,13 +968,10 @@ extern int main(int argc, char *argv[])
 	TTYduct Duct = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "Sec:d:m:")) != EOF )
+	while ( (opt = getopt(argc, argv, "Sc:d:m:")) != EOF )
 		switch ( opt ) {
 			case 'S':
 				show = true;
-				break;
-			case 'e':
-				external = true;
 				break;
 
 			case 'c':
@@ -1080,7 +1070,7 @@ extern int main(int argc, char *argv[])
 	if ( Debug )
 		fprintf(Debug, "Primary process: %d\n", getpid());
 
-	if ( !fire_cartridge(cartridge, &fd, external) )
+	if ( !fire_cartridge(cartridge, &fd) )
 		ERR(goto done);
 	poll_data[0].fd	    = fd;
 	poll_data[0].events = POLLIN;
