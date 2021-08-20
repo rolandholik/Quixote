@@ -39,7 +39,8 @@
 
 #define IMA_SET_CONTOUR		0x1
 #define IMA_SET_PSEUDONYM	0x2
-#define IMA_SET_AI		0x4
+#define IMA_SET_TE_HOOK		0x4
+#define IMA_TE_ENFORCE		0x8
 
 /* Flag for cloning the system behavior. */
 #define CLONE_EVENTS		0x00000040
@@ -71,13 +72,14 @@ static __inline long sys_behavior(unsigned char * a1, size_t a2, \
 extern int main(int argc, char *argv[])
 
 {
-	_Bool namespace = false;
+	_Bool enforce = false,
+	      namespace = false;
 
 	char *contour	= NULL,
 	     *pseudonym = NULL,
 	     *command	= NULL,
-	     *ai_hook	= NULL,
-	     *ai_value	= NULL;
+	     *te_hook	= NULL,
+	     *te_value	= NULL;
 
 	unsigned char *p;
 
@@ -88,25 +90,30 @@ extern int main(int argc, char *argv[])
 
 	String value = NULL;
 
-	struct ai_control {
+	struct te_control {
 		unsigned int hook;
 		unsigned int value;
 	} ctl;
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "na:c:p:r:v:")) != EOF )
+	while ( (opt = getopt(argc, argv, "ena:c:p:r:v:")) != EOF )
 		switch ( opt ) {
+			case 'e':
+				enforce = true;
+				break;
 			case 'n':
 				namespace = true;
 				break;
 
+
 			case 'a':
-				ai_hook = optarg;
+				te_hook = optarg;
 				break;
 			case 'c':
 				contour = optarg;
 				break;
+
 			case 'p':
 				pseudonym = optarg;
 				break;
@@ -114,7 +121,7 @@ extern int main(int argc, char *argv[])
 				command = optarg;
 				break;
 			case 'v':
-				ai_value = optarg;
+				te_value = optarg;
 				break;
 		}
 
@@ -124,15 +131,28 @@ extern int main(int argc, char *argv[])
 		if ( unshare(CLONE_EVENTS) < 0 )
 			perror("Unshare returns");
 		else {
-			fputs("Spawning behavior shell.\n", stdout);
+			fputs("Spawning security domain shell.\n", stdout);
 			system("/bin/sh");
-			fputs("Behavior shell terminated.\n", stdout);
+			fputs("Security domain shell terminated.\n", stdout);
 		}
 		goto done;
 	}
 
 
-	/* Run a command in an independent behavior domain. */
+	/* Place security domain in TE enforcing mode. */
+	if ( enforce ) {
+		if ( (retn = sys_behavior(NULL, 0, IMA_TE_ENFORCE)) ) {
+			fprintf(stderr, "TE enforcement failed: %s\n", \
+				strerror(errno));
+			goto done;
+		}
+		fputs("TE enforcement enabled.\n", stdout);
+		retn = 0;
+		goto done;
+	}
+
+
+	/* Run a command in an independent security domain. */
 	if ( command ) {
 		if ( unshare(CLONE_EVENTS) < 0 )
 			perror("Unshare returns");
@@ -143,21 +163,22 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
-	/* Set an introspection hook. */
-	if ( ai_hook != NULL ) {
-		if ( ai_value == NULL ) {
-			fputs("No AI hook behavior specified.\n", stderr);
+
+	/* Configure a TE enforcement hook. */
+	if ( te_hook != NULL ) {
+		if ( te_value == NULL ) {
+			fputs("No TE hook behavior specified.\n", stderr);
 			goto done;
 		}
 
-		opt_arg = strtol(ai_hook, NULL, 0);
+		opt_arg = strtol(te_hook, NULL, 0);
 		if ( (errno == ERANGE) || (errno == EINVAL) ) {
 			fputs("Error in hook value specification.\n", stderr);
 			goto done;
 		}
 		ctl.hook = opt_arg;
 
-		opt_arg = strtol(ai_value, NULL, 0);
+		opt_arg = strtol(te_value, NULL, 0);
 		if ( (errno == ERANGE) || (errno == EINVAL) ) {
 			fputs("Error in hook value specification.\n", stderr);
 			goto done;
@@ -165,8 +186,8 @@ extern int main(int argc, char *argv[])
 		ctl.value = opt_arg;
 
 		if ( (retn = sys_behavior((void *) &ctl, sizeof(ctl), \
-					  IMA_SET_AI)) != 0 ) {
-			fprintf(stdout, "Set ai hook returned: %s\n", \
+					  IMA_SET_TE_HOOK)) != 0 ) {
+			fprintf(stdout, "Set te hook returned: %s\n", \
 				strerror(errno));
 			goto done;
 		}
