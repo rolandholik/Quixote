@@ -42,8 +42,12 @@
 
 #define CAP_TRUST 38
 
-#define DISCIPLINE 1
-#define RELEASE	   2
+#define SYS_CONFIG_DOMAIN  436
+#define IMA_EVENT_EXTERNAL 0x10
+
+#define SYS_CONFIG_ACTOR  437
+#define DISCIPLINE_ACTOR  1
+#define RELEASE_ACTOR	  2
 
 #define _GNU_SOURCE
 
@@ -145,9 +149,18 @@ struct {
 /**
  * System call wrapper for setting the security state of a process.
  */
-static inline int sys_set_actor(pid_t pid, unsigned long flags)
+static inline int sys_config_actor(pid_t pid, unsigned long flags)
 {
-	return syscall(437, pid, flags);
+	return syscall(SYS_CONFIG_ACTOR, pid, flags);
+}
+
+/**
+ * System call wrapper for configuring a security event domain.
+ */
+static inline int sys_config_domain(unsigned char *bufr, size_t cnt, \
+				    unsigned long flags)
+{
+	return syscall(SYS_CONFIG_DOMAIN, bufr, cnt, flags);
 }
 
 
@@ -385,7 +398,7 @@ static _Bool add_event(CO(char *, inbufr))
 	if ( !Sealed ) {
 		if ( Debug )
 			fputs("Unsealed, releasing actor.\n", Debug);
-		if ( sys_set_actor(pid, 2) < 0 )
+		if ( sys_config_actor(pid, RELEASE_ACTOR) < 0 )
 			fprintf(stderr, "[%s]: Release actor status: %d:%s\n",
 				__func__, errno, strerror(errno));
 	}
@@ -400,7 +413,7 @@ static _Bool add_event(CO(char *, inbufr))
 		if ( discipline ) {
 			if ( Debug )
 				fputs("Sealed, releasing bad actor.\n", Debug);
-			if ( sys_set_actor(pid, 1) < 0 ) {
+			if ( sys_config_actor(pid, DISCIPLINE_ACTOR) < 0 ) {
 				fprintf(stderr, "Bad actor release error: "  \
 					"%d:%s\n", errno, strerror(errno));
 					retn = false;
@@ -409,7 +422,7 @@ static _Bool add_event(CO(char *, inbufr))
 		} else {
 			if ( Debug )
 				fputs("Sealed, releasing actor.\n", Debug);
-			if ( sys_set_actor(pid, 2)  < 0 ) {
+			if ( sys_config_actor(pid, RELEASE_ACTOR)  < 0 ) {
 				fprintf(stderr, "Good actor release error: "  \
 					"%d:%s\n", errno, strerror(errno));
 					retn = false;
@@ -1153,30 +1166,12 @@ static _Bool setup_namespace(int *fdptr)
 
 	struct stat statbuf;
 
-	Buffer bufr = NULL;
 
-	File sysfile = NULL;
-
-	static char *enable = "1\n";
-
-
-	/* Create an independent security event namespace. */
-	if ( unshare(CLONE_EVENTS) < 0 ) {
-		perror("Unsharing behavior domain");
-		ERR(goto done);
-	}
-
-
-	/* Configure the security domain for external modeling. */
-	INIT(HurdLib, File, sysfile, ERR(goto done));
-	if (! sysfile->open_wo(sysfile, SYSFS_EXTERNAL) )
+	/* Create an independent and sealed security event domain. */
+	if ( unshare(CLONE_EVENTS) < 0 )
 		ERR(goto done);
 
-	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	if ( !bufr->add(bufr, (unsigned char *) enable, \
-			strlen(enable)) )
-		ERR(goto done);
-	if ( !sysfile->write_Buffer(sysfile, bufr) )
+	if ( sys_config_domain(NULL, 0, IMA_EVENT_EXTERNAL) < 0 )
 		ERR(goto done);
 
 
