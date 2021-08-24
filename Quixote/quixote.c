@@ -26,7 +26,7 @@
  * Copyright (c) 2020, Enjellic Systems Development, LLC. All rights reserved.
  **************************************************************************/
 
-#define CARTRIDGE_DIRECTORY "/var/run/Canisters"
+#define CARTRIDGE_DIRECTORY "/var/run/Cartridges"
 
 #define SYSFS_UPDATES  "/sys/fs/integrity-events/update-%u"
 #define SYSFS_EXTERNAL "/sys/kernel/security/integrity/events/external"
@@ -41,7 +41,7 @@
 #define SYS_CONFIG_DOMAIN  436
 #define IMA_EVENT_EXTERNAL 0x10
 
-#define SYS_CONFIG_ACTOR  427
+#define SYS_CONFIG_ACTOR  437
 #define DISCIPLINE_ACTOR  1
 #define RELEASE_ACTOR	  2
 
@@ -313,7 +313,7 @@ static _Bool process_event(CO(TTYduct, duct), const char * const event)
 	}
 
 	if ( strncmp(bp, release, strlen(release)) == 0 ) {
-		if ( sys_config_actor(pid, DISCIPLINE_ACTOR) < 0 ) {
+		if ( sys_config_actor(pid, RELEASE_ACTOR) < 0 ) {
 			fprintf(stderr, "Failed release: errno=%d, " \
 				"error=%s\n", errno, strerror(errno));
 		}
