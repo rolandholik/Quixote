@@ -610,8 +610,6 @@ static _Bool process_event(const char *event)
 			break;
 	}
 
-	retn = true;
-
 
  done:
 	return retn;
