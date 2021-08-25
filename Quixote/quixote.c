@@ -39,6 +39,7 @@
 #define CAP_TRUST 38
 
 #define SYS_CONFIG_DOMAIN  436
+#define IMA_TE_ENFORCE	   0x8
 #define IMA_EVENT_EXTERNAL 0x10
 
 #define SYS_CONFIG_ACTOR  437
@@ -624,6 +625,10 @@ static _Bool initialize_state(CO(TTYduct, duct), char *mapfile)
  *			file descriptor for the cartridge measurement
  *			file.
  *
+ * \param enforce	A flag variable used to indicate whether or not
+ *			the security domain should be placed in
+ *			enforcement mode.
+ *
  * \return		A boolean value is returned to indicate whether
  *			or not the the creation of the namespace was
  *			successful.  A false value indicates setup of
@@ -632,7 +637,7 @@ static _Bool initialize_state(CO(TTYduct, duct), char *mapfile)
  *			ready to be measured.
  */
 
-static _Bool setup_namespace(int *fdptr)
+static _Bool setup_namespace(int *fdptr, _Bool enforce)
 
 {
 	_Bool retn = false;
@@ -650,6 +655,11 @@ static _Bool setup_namespace(int *fdptr)
 
 	if ( sys_config_domain(NULL, 0, IMA_EVENT_EXTERNAL) < 0 )
 		ERR(goto done);
+
+	if ( enforce ) {
+		if ( sys_config_domain(NULL, 0, IMA_TE_ENFORCE) < 0 )
+			ERR(goto done);
+	}
 
 
 	/* Drop the ability to modify the security domain. */
@@ -772,13 +782,18 @@ static void * show_mode(CO(char *, root))
  *			the directory which holds the container to
  *			be executed.
  *
+ * \param enforce	A flag used to indicate whether or not the
+ *			security domain should be placed in enforcement
+ *			mode.
+ *
  * \return	A boolean value is returned to reflect the status of
  *		the launch.  A false value indicates an error was
  *		encountered while a true value indicates the cartridge
  *		was successfully launched.
  */
 
-static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint)
+static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint,
+			    _Bool enforce)
 
 {
 	_Bool retn = false;
@@ -821,7 +836,7 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint)
 			fprintf(Debug, "Monitor process: %d\n", getpid());
 		close(event_pipe[READ_SIDE]);
 
-		if ( !setup_namespace(&event_fd) )
+		if ( !setup_namespace(&event_fd, enforce) )
 			exit(1);
 
 		/* Fork again to run the cartridge. */
@@ -945,6 +960,7 @@ extern int main(int argc, char *argv[])
 
 {
 	_Bool show	= false,
+	      enforce	= false,
 	      connected = false;
 
 	char *p,
@@ -971,10 +987,13 @@ extern int main(int argc, char *argv[])
 	TTYduct Duct = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "Sc:d:m:")) != EOF )
+	while ( (opt = getopt(argc, argv, "Sec:d:m:")) != EOF )
 		switch ( opt ) {
 			case 'S':
 				show = true;
+				break;
+			case 'e':
+				enforce = true;
 				break;
 
 			case 'c':
@@ -1073,7 +1092,7 @@ extern int main(int argc, char *argv[])
 	if ( Debug )
 		fprintf(Debug, "Primary process: %d\n", getpid());
 
-	if ( !fire_cartridge(cartridge, &fd) )
+	if ( !fire_cartridge(cartridge, &fd, enforce) )
 		ERR(goto done);
 	poll_data[0].fd	    = fd;
 	poll_data[0].events = POLLIN;
