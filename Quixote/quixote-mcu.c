@@ -1177,7 +1177,7 @@ extern int main(int argc, char *argv[])
 				if ( Debug )
 					fputs("Quixote terminated.\n", Debug);
 				kill_cartridge(cartridge);
-				break;
+				goto done;
 			}
 			if ( Signals.sigchild ) {
 				if ( !child_exited(Monitor_pid) )
