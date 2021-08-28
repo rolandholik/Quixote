@@ -857,6 +857,14 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint,
 		poll_data[0].events = POLLPRI;
 
 		while ( true ) {
+			if ( Signals.stop ) {
+				if ( Debug )
+					fputs("Monitor process stopped.\n", \
+					      Debug);
+				retn = true;
+				goto done;
+			}
+
 			if ( Signals.sigchild ) {
 				if ( child_exited(cartridge_pid) ) {
 					fputs("Cartridge spent.\n", stdout);
@@ -952,6 +960,49 @@ static void send_reset(CO(TTYduct, duct), CO(Buffer, bufr))
 }
 
 
+/**
+ * Private function.
+ *
+ * This function is responsible for issueing the runc command needed
+ * to terminate a software cartridge.  The function waits until the
+ * process spawned to execute the runc process terminates.
+ *
+ * \param name		A pointer to a character buffer containing the
+ *			name of the software cartridge.
+ *
+ * \return	No return value is defined.
+ */
+
+static void kill_cartridge(const char *cartridge)
+
+{
+	int status;
+
+	pid_t kill_process;
+
+
+	kill_process = fork();
+	if ( kill_process == -1 )
+		return;
+
+
+	/* Child process - execute runc in kill mode. */
+	if ( kill_process == 0 ) {
+		if ( Debug )
+			fputs("Killing runc cartridge.\n", Debug);
+
+		execlp("runc", "runc", "kill", cartridge, "SIGKILL", NULL);
+		exit(1);
+	}
+
+
+	/* Parent process - wait for the kill process to complete. */
+	waitpid(kill_process, &status, 0);
+
+	return;
+}
+
+
 /*
  * Program entry point begins here.
  */
@@ -1025,6 +1076,7 @@ extern int main(int argc, char *argv[])
 			fputs("Cannot open debug file.\n", stderr);
 			goto done;
 		}
+		setlinebuf(Debug);
 	}
 
 
@@ -1121,14 +1173,21 @@ extern int main(int argc, char *argv[])
 
 		retn = poll(poll_data, 2, -1);
 		if ( retn < 0 ) {
-			if ( Signals.stop )
+			if ( Signals.stop ) {
+				if ( Debug )
+					fputs("Quixote terminated.\n", Debug);
+				kill_cartridge(cartridge);
 				break;
+			}
 			if ( Signals.sigchild ) {
 				if ( !child_exited(Monitor_pid) )
 					continue;
 				fputs("Cartridge exited.\n", stdout);
 				goto done;
 			}
+
+			fputs("Poll error.\n", stderr);
+			kill_cartridge(cartridge);
 			goto done;
 		}
 		if ( retn == 0 ) {
@@ -1146,8 +1205,7 @@ extern int main(int argc, char *argv[])
 			if ( Signals.sigchild ) {
 				if ( !child_exited(Monitor_pid) )
 					continue;
-				fputs("Cartridge exited.\n", stdout);
-				send_reset(Duct, cmdbufr);
+				fputs("Monitor process terminated.\n", stdout);
 				goto done;
 			}
 		}
@@ -1174,8 +1232,14 @@ extern int main(int argc, char *argv[])
 					fprintf(Debug,			  \
 						"Processing event: %s\n", \
 						bufr);
-				if ( !process_event(Duct, bufr) )
-					ERR(goto done);
+				if ( !process_event(Duct, bufr) ) {
+					if ( Debug )
+						fprintf(Debug, "Event "	     \
+							"processing error, " \
+							"%u kill %u\n",	     \
+							getpid(), Monitor_pid);
+					kill(Monitor_pid, SIGTERM);
+				}
 				break;
 			}
 		}
@@ -1215,6 +1279,8 @@ extern int main(int argc, char *argv[])
 
 
  done:
+	send_reset(Duct, cmdbufr);
+
 	WHACK(cmdbufr);
 	WHACK(mgmt);
 	WHACK(infile);
