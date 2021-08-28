@@ -364,8 +364,10 @@ static _Bool update(CO(ISOidentity, this), CO(ExchangeEvent, event), \
 	added = true;
 
  done:
-	*status	    = added;
-	*discipline = !cp->is_valid(cp);
+	if ( retn ) {
+		*status	    = added;
+		*discipline = !cp->is_valid(cp);
+	}
 
 	WHACK(point);
 	if ( release_point )
