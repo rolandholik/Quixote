@@ -90,6 +90,8 @@
 #include "NAAAIM.h"
 #include "TTYduct.h"
 #include "LocalDuct.h"
+#include "ContourPoint.h"
+#include "ExchangeEvent.h"
 
 
 /**
@@ -103,6 +105,12 @@ static FILE *Debug = NULL;
  */
 static pid_t Monitor_pid;
 
+/**
+ * This variable is used to signal that a modeling error has occurred
+ * and signals the disciplining code to unilaterally release a process
+ * rather then model is status in the security domain.
+ */
+static _Bool Model_Error = false;
 
 /**
  * The following variable holds booleans which describe signals
@@ -235,6 +243,10 @@ static _Bool process_event(CO(TTYduct, duct), const char * const event)
 
 	Buffer bufr = NULL;
 
+	String update = NULL;
+
+	ExchangeEvent exchange = NULL;
+
 	static const char *discipline  = "DISCIPLINE ",
 			  *release     = "RELEASE ",
 			  *measurement = "measurement " ;
@@ -291,6 +303,41 @@ static _Bool process_event(CO(TTYduct, duct), const char * const event)
 	}
 
 
+	/*
+	 * If this is a model error release the actor so the runc
+	 * instance can release the domain.
+	 */
+	if ( Model_Error ) {
+		INIT(HurdLib, String, update, ERR(goto done));
+		if ( !update->add(update, event) )
+			ERR(goto done);
+
+		INIT(NAAAIM, ExchangeEvent, exchange, ERR(goto done));
+		if ( !exchange->parse(exchange, update) )
+			ERR(goto done);
+		if ( !exchange->get_pid(exchange, &pid) )
+			ERR(goto done);
+
+		if ( Debug )
+			fprintf(Debug, "Model error, releasing %u.\n", pid);
+
+		if ( sys_config_actor(pid, RELEASE_ACTOR) < 0 ) {
+			fprintf(stderr, "Bad actor release error: "  \
+				"%d:%s\n", errno, strerror(errno));
+		}
+		else
+			retn = true;
+
+		goto done;
+	}
+
+
+	/* Verify this is a valid release or discipline event. */
+	if ( (strncmp(bp, release, strlen(release)) != 0) && \
+	     (strncmp(bp, discipline, strlen(discipline)) != 0) )
+		ERR(goto done);
+
+
 	/* Extract the PID from the exchange event. */
 	if ( (bp = strchr(bp, ' ')) == NULL )
 		goto done;
@@ -299,6 +346,8 @@ static _Bool process_event(CO(TTYduct, duct), const char * const event)
 	if ( errno == ERANGE )
 		ERR(goto done);
 
+
+	/* Proceed with modeling the event. */
 	bp = (char *) bufr->get(bufr);
 
 	if ( strncmp(bp, discipline, strlen(discipline)) == 0 ) {
@@ -328,6 +377,8 @@ static _Bool process_event(CO(TTYduct, duct), const char * const event)
 
  done:
 	WHACK(bufr);
+	WHACK(update);
+	WHACK(exchange);
 
 	return retn;
 }
@@ -970,16 +1021,33 @@ static void send_reset(CO(TTYduct, duct), CO(Buffer, bufr))
  * \param name		A pointer to a character buffer containing the
  *			name of the software cartridge.
  *
+ * \param wait		A boolean flag used to indicate whether or
+ *			not the runc kill process should be waited for.
+ *
  * \return	No return value is defined.
  */
 
-static void kill_cartridge(const char *cartridge)
+static void kill_cartridge(const char *cartridge, const _Bool wait)
 
 {
 	int status;
 
-	pid_t kill_process;
+	static pid_t kill_process;
 
+
+	if ( kill_process ) {
+		waitpid(kill_process, &status, WNOHANG);
+		if ( !WIFEXITED(status) )
+			return;
+
+		if ( Debug )
+			fprintf(Debug, "Cartridge kill status: %d\n", \
+				WEXITSTATUS(status));
+		if ( WEXITSTATUS(status) == 0 ) {
+			kill_process = 0;
+			return;
+		}
+	}
 
 	kill_process = fork();
 	if ( kill_process == -1 )
@@ -997,7 +1065,8 @@ static void kill_cartridge(const char *cartridge)
 
 
 	/* Parent process - wait for the kill process to complete. */
-	waitpid(kill_process, &status, 0);
+	if ( wait )
+		waitpid(kill_process, &status, 0);
 
 	return;
 }
@@ -1019,7 +1088,6 @@ extern int main(int argc, char *argv[])
 	     *map	= NULL,
 	     *cartridge	= NULL,
 	     bufr[1024];
-
 
 	int opt,
 	    fd	 = 0,
@@ -1176,7 +1244,7 @@ extern int main(int argc, char *argv[])
 			if ( Signals.stop ) {
 				if ( Debug )
 					fputs("Quixote terminated.\n", Debug);
-				kill_cartridge(cartridge);
+				kill_cartridge(cartridge, true);
 				goto done;
 			}
 			if ( Signals.sigchild ) {
@@ -1187,7 +1255,7 @@ extern int main(int argc, char *argv[])
 			}
 
 			fputs("Poll error.\n", stderr);
-			kill_cartridge(cartridge);
+			kill_cartridge(cartridge, true);
 			goto done;
 		}
 		if ( retn == 0 ) {
@@ -1238,8 +1306,10 @@ extern int main(int argc, char *argv[])
 							"processing error, " \
 							"%u kill %u\n",	     \
 							getpid(), Monitor_pid);
-					kill(Monitor_pid, SIGTERM);
+					Model_Error = true;
 				}
+				if ( Model_Error )
+					kill_cartridge(cartridge, false);
 				break;
 			}
 		}

@@ -126,6 +126,13 @@ static ISOidentity Model = NULL;
 static _Bool Sealed = false;
 
 /**
+ * This variable is used to signal that a modeling error has occurred
+ * and signals the disciplining code to unilaterally release a process
+ * rather then model is status in the security domain.
+ */
+static _Bool Model_Error = false;
+
+/**
  * The following variable holds the current measurement.
  */
 #if 0
@@ -376,6 +383,7 @@ static _Bool add_event(CO(char *, inbufr))
 	ExchangeEvent event = NULL;
 
 
+	/* Parse the event. */
 	INIT(HurdLib, String, update, ERR(goto done));
 	if ( !update->add(update, inbufr) )
 		ERR(goto done);
@@ -383,6 +391,30 @@ static _Bool add_event(CO(char *, inbufr))
 	INIT(NAAAIM, ExchangeEvent, event, ERR(goto done));
 	if ( !event->parse(event, update) )
 		ERR(goto done);
+
+
+	/*
+	 * If this is a model error release the actor so the runc
+	 * instance can release the domain.
+	 */
+	if ( Model_Error ) {
+		if ( Debug )
+			fputs("Model error, releasing actor.\n", Debug);
+
+		if ( !event->get_pid(event, &pid) )
+			ERR(goto done);
+		if ( sys_config_actor(pid, RELEASE_ACTOR) < 0 ) {
+			fprintf(stderr, "Bad actor release error: "  \
+				"%d:%s\n", errno, strerror(errno));
+		}
+		else
+			retn = true;
+
+		goto done;
+	}
+
+
+	/* Proceed with modeling the event. */
 	if ( !event->measure(event) )
 		ERR(goto done);
 	if ( !Model->update(Model, event, &status, &discipline) )
@@ -1459,15 +1491,33 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint, \
  * \param name		A pointer to a character buffer containing the
  *			name of the software cartridge.
  *
+ * \param wait		A boolean flag used to indicate whether or
+ *			not the runc kill process should be waited for.
+ *
  * \return	No return value is defined.
  */
 
-static void kill_cartridge(const char *cartridge)
+static void kill_cartridge(const char *cartridge, const _Bool wait)
 
 {
 	int status;
 
-	pid_t kill_process;
+	static pid_t kill_process = 0;
+
+
+	if ( kill_process ) {
+		waitpid(kill_process, &status, WNOHANG);
+		if ( !WIFEXITED(status) )
+			return;
+
+		if ( Debug )
+			fprintf(Debug, "Cartridge kill status: %d\n", \
+				WEXITSTATUS(status));
+		if ( WEXITSTATUS(status) == 0 ) {
+			kill_process = 0;
+			return;
+		}
+	}
 
 
 	kill_process = fork();
@@ -1486,7 +1536,8 @@ static void kill_cartridge(const char *cartridge)
 
 
 	/* Parent process - wait for the kill process to complete. */
-	waitpid(kill_process, &status, 0);
+	if ( wait )
+		waitpid(kill_process, &status, 0);
 
 	return;
 }
@@ -1662,7 +1713,7 @@ extern int main(int argc, char *argv[])
 			if ( Signals.stop ) {
 				if ( Debug )
 					fputs("Quixote terminated.\n", Debug);
-				kill_cartridge(cartridge);
+				kill_cartridge(cartridge, true);
 				goto done;
 			}
 			if ( Signals.sigchild ) {
@@ -1673,7 +1724,7 @@ extern int main(int argc, char *argv[])
 			}
 
 			fputs("Poll error.\n", stderr);
-			kill_cartridge(cartridge);
+			kill_cartridge(cartridge, true);
 			goto done;
 		}
 		if ( retn == 0 ) {
@@ -1728,8 +1779,10 @@ extern int main(int argc, char *argv[])
 							"processing error, " \
 							"%u killing %u\n",   \
 							getpid(), Monitor_pid);
-					kill(Monitor_pid, SIGTERM);
+					Model_Error = true;
 				}
+				if ( Model_Error )
+					kill_cartridge(cartridge, false);
 				break;
 			}
 		}

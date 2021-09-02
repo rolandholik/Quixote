@@ -77,7 +77,7 @@ all: ${COBJS} tools
 tools: ${TOOLS}
 
 quixote-mcu: quixote-mcu.o ${LIBDEPS}
-	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
+	${CC} ${LDFLAGS} -o $@ $< ${MODELDEPS} ${LIBS};
 
 quixote-us: quixote-us.o ${LIBDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${MODELDEPS} ${LIBS};
