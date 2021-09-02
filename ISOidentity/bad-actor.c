@@ -37,6 +37,7 @@
 
 #define BAD_ACTOR_QUERY		0
 #define BAD_ACTOR_SET		1
+#define BAD_ACTOR_RELEASE	2
 
 
 /**
@@ -55,8 +56,9 @@ static inline int sys_set_bad_actor(pid_t pid, unsigned long flags)
 extern int main(int argc, char *argv[])
 
 {
-	_Bool set   = false,
-	      query = false;
+	_Bool set     = false,
+	      query   = false,
+	      release = false;
 
 	char *pidstr = NULL;
 
@@ -68,10 +70,15 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "q:s:")) != EOF )
+	while ( (opt = getopt(argc, argv, "q:r:s:")) != EOF )
 		switch ( opt ) {
 			case 'q':
 				query  = true;
+				pidstr = optarg;
+				break;
+
+			case 'r':
+				release = true;
 				pidstr = optarg;
 				break;
 
@@ -83,8 +90,9 @@ extern int main(int argc, char *argv[])
 
 
 	/* Verify arguements. */
-	if ( !query && !set ) {
-		fputs("No mode specified, use -q PID or -s PID\n", stderr);
+	if ( !query && !set && !release ) {
+		fputs("No mode specified, use -q PID, -s PID, or -r PID\n", \
+		      stderr);
 		goto done;
 	}
 
@@ -110,13 +118,13 @@ extern int main(int argc, char *argv[])
 			goto done;
 		}
 
-		fprintf(stderr, "Process %u %s a bad actor.\n", pid, \
-			status ? "is" : "is not");
+		fprintf(stderr, "Process %u is a %s actor.\n", pid, \
+			status ? "bad" : "good");
 		retn = 0;
 	}
 
 
-	/* Set the status of a process. */
+	/* Set the process to be a bad actor. */
 	if ( set ) {
 		status = sys_set_bad_actor(pid, BAD_ACTOR_SET);
 		if ( status < 0 ) {
@@ -130,6 +138,24 @@ extern int main(int argc, char *argv[])
 		}
 
 		fprintf(stderr, "Process %u is now a bad actor.\n", pid);
+		retn = 0;
+	}
+
+
+	/* Set the process to be a good actor. */
+	if ( release ) {
+		status = sys_set_bad_actor(pid, BAD_ACTOR_RELEASE);
+		if ( status < 0 ) {
+			if ( errno == -ESRCH ) {
+				fprintf(stderr, "Pid not found: %u\n", pid);
+				goto done;
+			}
+			fprintf(stderr, "Error setting process: %s\n", \
+				strerror(errno));
+			goto done;
+		}
+
+		fprintf(stderr, "Process %u is now a good actor.\n", pid);
 		retn = 0;
 	}
 
