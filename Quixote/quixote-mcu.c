@@ -26,7 +26,7 @@
  * Copyright (c) 2020, Enjellic Systems Development, LLC. All rights reserved.
  **************************************************************************/
 
-#define CARTRIDGE_DIRECTORY "/var/run/Cartridges"
+#define QUIXOTE_MAGAZINE "/var/lib/Quixote/Magazine"
 
 #define SYSFS_UPDATES  "/sys/fs/integrity-events/update-%u"
 #define SYSFS_EXTERNAL "/sys/kernel/security/integrity/events/external"
@@ -743,22 +743,17 @@ static _Bool setup_namespace(int *fdptr, _Bool enforce)
 /**
  * Private function.
  *
- * This function implements the show mode of the cboot utility.
- * This mode displays the set of Cartridges that are currently
- * provisioned on the host.
+ * This function implements Quixote show mode.  This mode displays the
+ * set of software security cartridges that are currently deployed
+ * on the host.
  *
- * \param root	A pointer to the buffer containing the root directory
- *		to be used to display the cartridges.
+ * \param root	A pointer to the buffer containing the magazine root
+ *		directory.
  *
- * \return	This function exits the program with a status code
- *		indicating whether or not the generation of the
- *		cartridge list was successful.  A non-zero return value
- *		indicates an error was encountered while a return
- *		value of zero indicates the list was successfully
- *		generated.
+ * \return	No return value is defined.
  */
 
-static void * show_mode(CO(char *, root))
+static void * show_magazine(CO(char *, root))
 
 {
 	char *p;
@@ -803,7 +798,7 @@ static void * show_mode(CO(char *, root))
 			p = str->get(str);
 		else
 			++p;
-		fprintf(stdout, "%s\n", p);
+		fprintf(stdout, "\t%s\n", p);
 	}
 
 	retn = 0;
@@ -865,7 +860,7 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint,
 
 	/* Create the name of the bundle directory. */
 	INIT(HurdLib, String, cartridge_dir, ERR(goto done));
-	cartridge_dir->add(cartridge_dir, CARTRIDGE_DIRECTORY);
+	cartridge_dir->add(cartridge_dir, QUIXOTE_MAGAZINE);
 	cartridge_dir->add(cartridge_dir, "/");
 	if ( !cartridge_dir->add(cartridge_dir, cartridge) )
 		ERR(goto done);
@@ -1129,7 +1124,7 @@ extern int main(int argc, char *argv[])
 
 	/* Execute cartridge display mode. */
 	if ( show )
-		show_mode(CARTRIDGE_DIRECTORY);
+		show_magazine(QUIXOTE_MAGAZINE);
 
 
 	if ( cartridge == NULL ) {
