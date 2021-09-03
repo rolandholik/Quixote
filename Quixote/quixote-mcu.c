@@ -126,6 +126,16 @@ struct {
 	_Bool sigchild;
 } Signals;
 
+/**
+ * The following enumeration type specifies the mode the utility is
+ * be running in.
+ */
+enum {
+	show_mode,
+	process_mode,
+	cartridge_mode,
+} Mode = cartridge_mode;
+
 
 /**
  * System call wrapper for setting the security state of a process.
@@ -167,7 +177,7 @@ void signal_handler(int signal, siginfo_t *siginfo, void *private)
 			Signals.stop = true;
 			return;
 		case SIGTERM:
-			Signals.stop = true;
+			Signals.sigterm = true;
 			return;
 		case SIGHUP:
 			Signals.stop = true;
@@ -844,7 +854,7 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint,
 {
 	_Bool retn = false;
 
-	char *bundle,
+	char *bundle = NULL,
 	     bufr[512];
 
 	int rc,
@@ -859,12 +869,14 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint,
 
 
 	/* Create the name of the bundle directory. */
-	INIT(HurdLib, String, cartridge_dir, ERR(goto done));
-	cartridge_dir->add(cartridge_dir, QUIXOTE_MAGAZINE);
-	cartridge_dir->add(cartridge_dir, "/");
-	if ( !cartridge_dir->add(cartridge_dir, cartridge) )
-		ERR(goto done);
-	bundle = cartridge_dir->get(cartridge_dir);
+	if ( Mode == cartridge_mode ) {
+		INIT(HurdLib, String, cartridge_dir, ERR(goto done));
+		cartridge_dir->add(cartridge_dir, QUIXOTE_MAGAZINE);
+		cartridge_dir->add(cartridge_dir, "/");
+		if ( !cartridge_dir->add(cartridge_dir, cartridge) )
+			ERR(goto done);
+		bundle = cartridge_dir->get(cartridge_dir);
+	}
 
 
 	/* Create the subordinate cartridge process. */
@@ -892,10 +904,22 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint,
 
 		/* Child process - run the cartridge. */
 		if ( cartridge_pid == 0 ) {
-			execlp("runc", "runc", "run", "-b", bundle, \
-			       cartridge, NULL);
-			fputs("Cartridge execution failed.\n", stderr);
-			exit(1);
+			if ( Mode == cartridge_mode ) {
+				if ( Debug )
+					fputs("Executing cartridge " \
+					      "process.\n", Debug);
+				execlp("runc", "runc", "run", "-b", bundle, \
+				       cartridge, NULL);
+				fputs("Cartridge process execution failed.\n",\
+				      stderr);
+				exit(1);
+			}
+
+			if ( Mode == process_mode ) {
+				execlp("bash", "bash", "-i", NULL);
+				fputs("Process execution failed.\n", stderr);
+				exit(1);
+			}
 		}
 
 		/* Parent process - monitor for events. */
@@ -909,6 +933,13 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint,
 					      Debug);
 				retn = true;
 				goto done;
+			}
+
+			if ( Signals.sigterm ) {
+				if ( Debug )
+					fputs("Monitor process terminated.\n",\
+					      Debug);
+				kill(cartridge_pid, SIGHUP);
 			}
 
 			if ( Signals.sigchild ) {
@@ -1030,6 +1061,17 @@ static void kill_cartridge(const char *cartridge, const _Bool wait)
 	static pid_t kill_process;
 
 
+	/* Signal the monitor process to shutdown the cartridge process. */
+	if ( Mode == process_mode ) {
+		if ( Debug )
+			fprintf(Debug, "%u sending SIGHUP to %u.\n", \
+				getpid(), Monitor_pid);
+		kill(Monitor_pid, SIGTERM);
+		return;
+	}
+
+
+	/* Check to see if runc kill has finished. */
 	if ( kill_process ) {
 		waitpid(kill_process, &status, WNOHANG);
 		if ( !WIFEXITED(status) )
@@ -1044,6 +1086,8 @@ static void kill_cartridge(const char *cartridge, const _Bool wait)
 		}
 	}
 
+
+	/* Fork a process to use runc to send the terminationa signal. */
 	kill_process = fork();
 	if ( kill_process == -1 )
 		return;
@@ -1074,8 +1118,7 @@ static void kill_cartridge(const char *cartridge, const _Bool wait)
 extern int main(int argc, char *argv[])
 
 {
-	_Bool show	= false,
-	      enforce	= false,
+	_Bool enforce	= false,
 	      connected = false;
 
 	char *p,
@@ -1101,10 +1144,16 @@ extern int main(int argc, char *argv[])
 	TTYduct Duct = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "Sec:d:m:")) != EOF )
+	while ( (opt = getopt(argc, argv, "CPSec:d:m:")) != EOF )
 		switch ( opt ) {
+			case 'C':
+				Mode = cartridge_mode;
+				break;
+			case 'P':
+				Mode = process_mode;
+				break;
 			case 'S':
-				show = true;
+				Mode = show_mode;
 				break;
 			case 'e':
 				enforce = true;
@@ -1123,11 +1172,11 @@ extern int main(int argc, char *argv[])
 
 
 	/* Execute cartridge display mode. */
-	if ( show )
+	if ( show_mode )
 		show_magazine(QUIXOTE_MAGAZINE);
 
 
-	if ( cartridge == NULL ) {
+	if ( (Mode == cartridge_mode) && (cartridge == NULL) ) {
 		fputs("No software cartridge specified.\n", stderr);
 		goto done;
 	}
