@@ -54,6 +54,8 @@ endif
 # libcap library
 ifeq (${CC}, musl-gcc)
 LIBCAP = -L /usr/local/musl/lib -lcap
+else
+LIBCAP = -lcap
 endif
 
 LIBS	= ${NAAAIMLIB} ${HURDLIB} ${LIBCAP} ${SSL_CRYPTO}
