@@ -250,9 +250,12 @@ static _Bool child_exited(const pid_t cartridge)
 static _Bool setup_management(CO(LocalDuct, mgmt), const char *cartridge)
 
 {
-	_Bool retn = false;
+	_Bool rc,
+	      retn = false;
 
 	char pid[11];
+
+	mode_t mask;
 
 	String sockpath = NULL;
 
@@ -291,10 +294,14 @@ static _Bool setup_management(CO(LocalDuct, mgmt), const char *cartridge)
 
 	/* Create socket in desginated path. */
 	if ( Debug )
-		fprintf(Debug, "Opening managment socket: %s\n", \
+		fprintf(Debug, "Opening management socket: %s\n", \
 			sockpath->get(sockpath));
 
-	if ( !mgmt->init_port(mgmt, sockpath->get(sockpath)) ) {
+	mask = umask(0x2);
+	rc = mgmt->init_port(mgmt, sockpath->get(sockpath));
+	mask = umask(mask);
+
+	if ( !rc ) {
 		fprintf(stderr, "Cannot initialize socket: %s.\n", \
 			sockpath->get(sockpath));
 		goto done;
@@ -1004,6 +1011,17 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint,
 			}
 
 			if ( Mode == process_mode ) {
+				if ( geteuid() != getuid() ) {
+					if ( Debug )
+						fprintf(Debug, "Changing to " \
+							"real id: %u\n",      \
+							getuid());
+					if ( setuid(getuid()) != 0 ) {
+						fputs("Cannot change uid.\n", \
+						      stderr);
+						exit(1);
+					}
+				}
 				execlp("bash", "bash", "-i", NULL);
 				fputs("Process execution failed.\n", stderr);
 				exit(1);
