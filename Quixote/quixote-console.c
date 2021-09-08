@@ -52,7 +52,7 @@
 	 show_mode,
 	 process_mode,
 	 cartridge_mode,
-} Mode = cartridge_mode;
+} Mode = show_mode;
 
 
 /**
