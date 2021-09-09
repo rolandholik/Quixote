@@ -1001,7 +1001,7 @@ static _Bool send_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
  *			additional command cycle should be processed.
  */
 
-static _Bool send_states(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
+static _Bool send_points(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 {
 	_Bool retn = false;
@@ -1189,8 +1189,8 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 			retn = send_forensics(mgmt, cmdbufr);
 			break;
 
-		case show_contours:
-			retn = send_states(mgmt, cmdbufr);
+		case show_points:
+			retn = send_points(mgmt, cmdbufr);
 			break;
 
 		case show_events:

@@ -357,8 +357,8 @@ static void add_security(CO(TTYduct, duct), CO(ISOidentity, model), \
  * \return		No return value is defined.
  */
 
-static void send_contours(CO(TTYduct, duct), CO(ISOidentity, model), \
-			  CO(Buffer, bufr))
+static void send_points(CO(TTYduct, duct), CO(ISOidentity, model), \
+			CO(Buffer, bufr))
 
 {
 	uint8_t *p,
@@ -734,8 +734,8 @@ static void interpreter(const void *arg)
 				send_forensics(duct, model, bufr);
 				break;
 
-			case show_contours:
-				send_contours(duct, model, bufr);
+			case show_points:
+				send_points(duct, model, bufr);
 				break;
 
 			case show_events:

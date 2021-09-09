@@ -334,7 +334,7 @@ static _Bool receive_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
  *			properly processed.
  */
 
-static _Bool receive_contours(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
+static _Bool receive_points(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 {
 	_Bool retn = false;
@@ -475,8 +475,8 @@ static _Bool receive_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr), \
 			retn = receive_forensics(mgmt, cmdbufr);
 			break;
 
-		case show_contours:
-			retn = receive_contours(mgmt, cmdbufr);
+		case show_points:
+			retn = receive_points(mgmt, cmdbufr);
 			break;
 
 		case show_events:

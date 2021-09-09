@@ -64,7 +64,7 @@ static double wall_time(void)
  * \return		No return value is defined.
  */
 
-static void receive_contours(CO(TTYduct, duct), CO(Buffer, bufr))
+static void receive_points(CO(TTYduct, duct), CO(Buffer, bufr))
 
 {
 	unsigned int cnt;
@@ -310,8 +310,8 @@ static _Bool process_command(CO(TTYduct, duct), CO(Buffer, bufr))
 			receive_forensics(duct, bufr);
 			break;
 
-		case show_contours:
-			receive_contours(duct, bufr);
+		case show_points:
+			receive_points(duct, bufr);
 			break;
 
 		case show_events:

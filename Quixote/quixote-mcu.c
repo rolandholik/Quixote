@@ -662,9 +662,9 @@ static _Bool process_command(CO(TTYduct, duct), CO(LocalDuct, mgmt), \
 					 "show forensics");
 			break;
 
-		case show_contours:
+		case show_points:
 			retn = send_list(duct, mgmt, cmdbufr, \
-					 "show contours");
+					 "show points");
 			break;
 
 		case show_events:
