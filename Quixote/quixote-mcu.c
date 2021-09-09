@@ -1278,7 +1278,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Execute cartridge display mode. */
-	if ( show_mode )
+	if ( Mode == show_mode )
 		show_magazine(QUIXOTE_MAGAZINE);
 
 
