@@ -1491,7 +1491,8 @@ extern int main(int argc, char *argv[])
 
 
  done:
-	send_reset(Duct, cmdbufr);
+	if ( Duct != NULL )
+		send_reset(Duct, cmdbufr);
 
 	WHACK(cmdbufr);
 	WHACK(mgmt);
