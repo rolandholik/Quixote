@@ -37,10 +37,172 @@
 
 #include <Buffer.h>
 
+#include "quixote.h"
 #include "sancho-cmd.h"
 
 #include "NAAAIM.h"
 #include "LocalDuct.h"
+
+
+/**
+ * The following enumeration type specifies whether or not
+ * the measurements are being managed internally or by an SGX enclave.
+ */
+ enum {
+	 show_mode,
+	 process_mode,
+	 cartridge_mode,
+} Mode = cartridge_mode;
+
+
+/**
+ * Private function.
+ *
+ * This function implements show mode for quixote.  This mode displays
+ * the set of security domains that are current active.
+ *
+ * \param root	A pointer to a null terminated buffer containing the
+ *		root directory of the domain to be displayed.
+ *
+ * \return	No return value is defined.
+ */
+
+static void show_domains(const char *root)
+
+{
+	char *p;
+
+	int rc;
+
+	uint16_t lp;
+
+	glob_t domains;
+
+	String str = NULL;
+
+
+	/* Generate the list of cartridges. */
+	INIT(HurdLib, String, str, ERR(goto done));
+	str->add(str, root);
+	if ( !str->add(str, "/*") )
+		ERR(goto done);
+
+	rc = glob(str->get(str), 0, NULL, &domains);
+	if ( rc == GLOB_NOMATCH ) {
+		fputs("\tNo domains found.\n", stderr);
+		goto done;
+	}
+
+	if ( rc != 0 ) {
+		fprintf(stderr, "Failed read of domain directory %s, " \
+			"code = %d\n", root, rc);
+		goto done;
+	}
+
+
+	/* Iterate through and print the cartridges found .*/
+	for (lp= 0; lp < domains.gl_pathc; ++lp) {
+		str->reset(str);
+		if ( !str->add(str, domains.gl_pathv[lp]) ) {
+			fputs("Error processing domain list\n", stderr);
+			goto done;
+		}
+
+		p = str->get(str);
+		if ( (p = strrchr(str->get(str), '/')) == NULL )
+			p = str->get(str);
+		else
+			++p;
+		fprintf(stdout, "\t%s\n", p);
+	}
+
+
+ done:
+	globfree(&domains);
+	WHACK(str);
+
+        return;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function sets up the UNIX domain management socket.
+ *
+ * \param mgmt		The object that will be used to handle management
+ *			requests.
+ *
+ * \param pidstr	A null terminated string containing the number
+ *			of the process id to be managed.
+ *
+ * \param cartridge	A null terminated string containing the name of
+ *			the cartridge process to be managed.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not setup of the management socket was
+ *			successful.  A true value indicates the setup
+ *			was successful while a false value indicates the
+ *			setup failed.
+ */
+
+static _Bool setup_management(CO(LocalDuct, mgmt), const char *pidstr, \
+			      const char *cartridge)
+
+{
+	_Bool retn = false;
+
+	char pid[11];
+
+	String sockpath = NULL;
+
+
+	/* Initialize socket client mode. */
+	if ( !mgmt->init_client(mgmt) ) {
+		fputs("Cannot initialize management client mode.\n", stderr);
+		goto done;
+	}
+
+	/* Create the appropriate path to the socket location. */
+	INIT(HurdLib, String, sockpath, ERR(goto done));
+
+	switch ( Mode ) {
+		case show_mode:
+			break;
+
+		case process_mode:
+			sockpath->add(sockpath, QUIXOTE_PROCESS_MGMT_DIR);
+			if ( snprintf(pid, sizeof(pid), "/pid-%s", \
+				      pidstr) >=  sizeof(pid) )
+				ERR(goto done);
+			if ( !sockpath->add(sockpath, pid) )
+				ERR(goto done);
+			break;
+
+		case cartridge_mode:
+			sockpath->add(sockpath, QUIXOTE_CARTRIDGE_MGMT_DIR);
+			sockpath->add(sockpath, "/");
+			if ( !sockpath->add(sockpath, cartridge) )
+				ERR(goto done);
+			break;
+	}
+
+
+	/* Create socket in designated path. */
+	if ( !mgmt->init_port(mgmt, sockpath->get(sockpath)) ) {
+		fprintf(stderr, "Cannot initialize socket: %s\n", \
+			sockpath->get(sockpath));
+		goto done;
+	}
+
+	retn = true;
+
+
+ done:
+	WHACK(sockpath);
+
+	return retn;
+}
 
 
 /**
@@ -401,9 +563,12 @@ extern int main(int argc, char *argv[])
 
 {
 	char *p,
+	     *pid	 = NULL,
+	     *cartridge	 = NULL,
 	     inbufr[1024];
 
-	int retn = 1;
+	int opt,
+	    retn = 1;
 
 	FILE *idfile = NULL;
 
@@ -415,18 +580,45 @@ extern int main(int argc, char *argv[])
 	File infile = NULL;
 
 
+	while ( (opt = getopt(argc, argv, "CPSc:p:")) != EOF )
+		switch ( opt ) {
+			case 'C':
+				Mode = cartridge_mode;
+				break;
+			case 'P':
+				Mode = process_mode;
+				break;
+			case 'S':
+				Mode = show_mode;
+				break;
+
+			case 'c':
+				Mode = cartridge_mode;
+				cartridge = optarg;
+				break;
+			case 'p':
+				Mode = process_mode;
+				pid = optarg;
+				break;
+		}
+
+
+	/* Handle show mode. */
+	if ( Mode == show_mode ) {
+		fprintf(stdout, "%s:\n", QUIXOTE_CARTRIDGE_MGMT_DIR);
+		show_domains(QUIXOTE_CARTRIDGE_MGMT_DIR);
+		fputs("\n", stdout);
+		fprintf(stdout, "%s:\n", QUIXOTE_PROCESS_MGMT_DIR);
+		show_domains(QUIXOTE_PROCESS_MGMT_DIR);
+		retn = 0;
+		goto done;
+	}
+
+
 	/* Setup the management socket. */
 	INIT(NAAAIM, LocalDuct, mgmt, ERR(goto done));
-
-	if ( !mgmt->init_client(mgmt) ) {
-		fputs("Cannot set socket client mode.\n", stderr);
-		goto done;
-	}
-
-	if ( !mgmt->init_port(mgmt, SOCKNAME) ) {
-		fputs("Cannot initialize management port.\n", stderr);
-		goto done;
-	}
+	if ( !setup_management(mgmt, pid, cartridge) )
+		ERR(goto done);
 
 
 	/* Command loop. */

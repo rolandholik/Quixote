@@ -1,25 +1,31 @@
 /** \file
  *
  * This file implements a utility for running and managing software
- * stacks in an independent hardware masurement domain.  After creating an
+ * stacks in an independent hardware security domain.  After creating an
  * independent measurement domain the utility forks and then executes
- * the boot of the cartridge in a subordinate process.  The parent
+ * the boot of a software 'cartridge' in a subordinate process.  The parent
  * process monitors the following file:
  *
- * /sys/fs/iso-identity/update
+ * /sys/fs/iso-identity/update-NNNNNNNNNN
  *
- * The measurement update events are transmitted to sancho the
- * hardware security co-processor.  Based on feedback from the
- * processor the processor eliciting the event is either killed or
- * woken with its bad actor status bit set so that its behavior can
- * be disciplined by a linux security module.
+ * Where NNNNNNNNNN is the inode number of the security event namespace.
  *
- * For measurement domain updates.
+ * The security domain state change events are transmitted to a sancho
+ * hardware security co-processor instance.  Based on feedback from the
+ * co-processor the process eliciting the event is woken with its
+ * bad actor status bit set or cleraed.  This security status bit is
+ * interrogated by the TE linux security module that can then interdict
+ * security sensitive events.
  *
- * The domain is managed through a UNIX domain socket which is created
- * in the following location:
+ * The domain is managed through a UNIX domain socket that is created
+ * in one of the the following locations:
  *
- * /var/run/cboot.PIDNUM
+ * /var/run/Quixote/cartridges
+ *
+ * /var/run/Quixote/processes
+ *
+ * Depending on whether or not a runc based cartridge or a simple
+ * process was run by the utility.
  */
 
 /**************************************************************************
@@ -85,6 +91,7 @@
 #include <String.h>
 #include <File.h>
 
+#include "quixote.h"
 #include "sancho-cmd.h"
 
 #include "NAAAIM.h"
@@ -219,6 +226,87 @@ static _Bool child_exited(const pid_t cartridge)
 		return false;
 
 	return true;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function sets up the UNIX domain management socket.
+ *
+ * \param mgmt		The object that will be used to handle management
+ *			requests.
+ *
+ * \param cartridge	A null terminated string containing the name of
+ *			the cartridge process to be managed.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not setup of the management socket was
+ *			successful.  A true value indicates the setup
+ *			was successful while a false value indicates the
+ *			setup failed.
+ */
+
+static _Bool setup_management(CO(LocalDuct, mgmt), const char *cartridge)
+
+{
+	_Bool retn = false;
+
+	char pid[11];
+
+	String sockpath = NULL;
+
+
+	/* Initialize socket server mode. */
+	if ( !mgmt->init_server(mgmt) ) {
+		fputs("Cannot set management server mode.\n", stderr);
+		goto done;
+	}
+
+
+	/* Create the appropriate path to the socket location. */
+	INIT(HurdLib, String, sockpath, ERR(goto done));
+
+	switch ( Mode ) {
+		case show_mode:
+			break;
+
+		case process_mode:
+			sockpath->add(sockpath, QUIXOTE_PROCESS_MGMT_DIR);
+			if ( snprintf(pid, sizeof(pid), "/pid-%u", \
+				      getpid()) >=  sizeof(pid) )
+				ERR(goto done);
+			if ( !sockpath->add(sockpath, pid) )
+				ERR(goto done);
+			break;
+
+		case cartridge_mode:
+			sockpath->add(sockpath, QUIXOTE_CARTRIDGE_MGMT_DIR);
+			sockpath->add(sockpath, "/");
+			if ( !sockpath->add(sockpath, cartridge) )
+				ERR(goto done);
+			break;
+	}
+
+
+	/* Create socket in desginated path. */
+	if ( Debug )
+		fprintf(Debug, "Opening managment socket: %s\n", \
+			sockpath->get(sockpath));
+
+	if ( !mgmt->init_port(mgmt, sockpath->get(sockpath)) ) {
+		fprintf(stderr, "Cannot initialize socket: %s.\n", \
+			sockpath->get(sockpath));
+		goto done;
+	}
+
+	retn = true;
+
+
+ done:
+	WHACK(sockpath);
+
+	return retn;
 }
 
 
@@ -1240,16 +1328,8 @@ extern int main(int argc, char *argv[])
 
 	/* Setup the management socket. */
 	INIT(NAAAIM, LocalDuct, mgmt, ERR(goto done));
-
-	if ( !mgmt->init_server(mgmt) ) {
-		fputs("Cannot set server mode.\n", stderr);
-		goto done;
-	}
-
-	if ( !mgmt->init_port(mgmt, SOCKNAME) ) {
-		fputs("Cannot initialize port.\n", stderr);
-		goto done;
-	}
+	if ( !setup_management(mgmt, cartridge) )
+		ERR(goto done);
 
 
 	/* Launch the software cartridge. */

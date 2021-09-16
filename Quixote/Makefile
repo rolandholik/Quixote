@@ -105,6 +105,7 @@ clean:
 
 
 # Source dependencies.
-quixote-mcu.o: sancho-cmd.h
+quixote-us.o: quixote.h sancho-cmd.h
+quixote-mcu.o: quixote.h sancho-cmd.h
 quixote-console.o: sancho-cmd.h
 test-sancho.o: sancho-cmd.h
