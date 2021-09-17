@@ -8,12 +8,12 @@
 # Variable declarations.
 INSTPATH = ${DESTDIR}/opt/ESD
 
-CSRC = quixote-mcu.c quixote-console.c test-sancho.c
+CSRC = quixote.c quixote-mcu.c quixote-console.c test-sancho.c
 
-TOOLS = quixote-mcu quixote-us quixote-console test-sancho test-thread
+TOOLS = quixote quixote-mcu quixote-us quixote-console test-sancho test-thread
 
 INSTALLBIN  = quixote-console
-INSTALLSBIN = quixote-mcu quixote-us
+INSTALLSBIN = quixote quixote-mcu quixote-us
 
 CC = musl-gcc
 
@@ -78,6 +78,9 @@ all: ${COBJS} tools
 
 tools: ${TOOLS}
 
+quixote: quixote.o ${LIBDEPS}
+	${CC} ${LDFLAGS} -o $@ $< ${MODELDEPS} ${LIBS};
+
 quixote-mcu: quixote-mcu.o ${LIBDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${MODELDEPS} ${LIBS};
 
@@ -107,6 +110,7 @@ clean:
 
 
 # Source dependencies.
+quixote.o: quixote.h sancho-cmd.h
 quixote-us.o: quixote.h sancho-cmd.h
 quixote-mcu.o: quixote.h sancho-cmd.h
 quixote-console.o: sancho-cmd.h
