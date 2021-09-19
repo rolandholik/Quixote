@@ -28,6 +28,7 @@
 #define POINTS_FILE	 "/sys/kernel/security/integrity/events/points"
 #define FORENSICS_FILE	 "/sys/kernel/security/integrity/events/forensics"
 #define SEAL_FILE	 "/sys/kernel/security/integrity/events/sealed"
+#define MAP_FILE	 "/sys/kernel/security/integrity/events/map"
 
 #define READ_SIDE  0
 #define WRITE_SIDE 1
@@ -548,7 +549,7 @@ static _Bool send_points(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
  *			indicates the processing of commands should be
  *			terminated while a true value indicates an
  *			additional command cycle should be processed.
- */
+v */
 
 static _Bool send_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
@@ -613,6 +614,51 @@ static _Bool send_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 /**
  * Private function.
  *
+ * This function writes the directive needed to seal the security
+ * domain to the 'sealed' pseudo-file.
+ *
+ * \param bufr		The object that will be used to hold the value
+ *			to be written to the file.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not the write to the seal file has been
+ *			successfully executed.  A false value indicates
+ *			failure while a true value indicates success.
+ */
+
+static _Bool seal(CO(Buffer, bufr))
+
+{
+	_Bool retn = false;
+
+	File sf = NULL;
+
+	static const unsigned char one[] = "1\n";
+
+
+	INIT(HurdLib, File, sf, ERR(goto done));
+	if ( !sf->open_wo(sf, SEAL_FILE) )
+		ERR(goto done);
+
+	bufr->reset(bufr);
+	bufr->add(bufr, one, sizeof(one) - 1);
+
+	if ( !sf->write_Buffer(sf, bufr) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	WHACK(sf);
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
  * This function is responsible for sealing a security domain.
  *
  * \param mgmt		The socket object used to communicate with
@@ -633,23 +679,13 @@ static _Bool seal_domain(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 {
 	_Bool retn = false;
 
-	File sf = NULL;
-
-	static const unsigned char one[] = "1\n",
-				   ok[]  = "OK";
+	static const unsigned char ok[] = "OK";
 
 
-	/* Open seal file and write command. */
-	INIT(HurdLib, File, sf, ERR(goto done));
-	if ( !sf->open_wo(sf, SEAL_FILE) )
-		ERR(goto done);
-
+	/* Seal the domain. */
 	cmdbufr->reset(cmdbufr);
-	cmdbufr->add(cmdbufr, one, sizeof(one) - 1);
-
-	if ( !sf->write_Buffer(sf, cmdbufr) )
+	if ( !seal(cmdbufr) )
 		ERR(goto done);
-
 
 	/* Send response to caller. */
 	cmdbufr->reset(cmdbufr);
@@ -661,8 +697,6 @@ static _Bool seal_domain(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 
  done:
-	WHACK(sf);
-
 	return retn;
 }
 
@@ -796,22 +830,34 @@ static _Bool add_state(CO(char *, inbufr))
 
 	Buffer bufr = NULL;
 
+	File sf = NULL;
 
-	/* Convert the ASCII encoded state to a binary value. */
+
+	/* Sanity check buffer. */
+	if ( Debug )
+		fprintf(Debug, "adding state: %s\n", inbufr);
+	if ( strlen(inbufr) != (NAAAIM_IDSIZE * 2) )
+		ERR(goto done);
+
+
+	/* Write the hexadecimal point value to the pseudo-file. */
+	INIT(HurdLib, File, sf, ERR(goto done));
+	if ( !sf->open_wo(sf, MAP_FILE) )
+		ERR(goto done);
+
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	bufr->add(bufr, (void *) inbufr, NAAAIM_IDSIZE * 2);
+	bufr->add(bufr, (void *) "\n", 1);
 
-	if ( !bufr->add_hexstring(bufr, inbufr) )
+	if ( !sf->write_Buffer(sf, bufr) )
 		ERR(goto done);
-	if ( bufr->size(bufr) != NAAAIM_IDSIZE )
-		ERR(goto done);
 
-
-	/* Add the state to the model. */
 	retn = true;
 
 
  done:
 	WHACK(bufr);
+	WHACK(sf);
 
 	return retn;
 }
@@ -842,15 +888,10 @@ static _Bool process_event(const char *event)
 
 	struct sancho_cmd_definition *cp;
 
-	static const char *measurement = "measurement ";
+	Buffer bufr = NULL;
 
 
 	/* Locate the event type. */
-	if ( strncmp(event, measurement, strlen(measurement)) == 0 ) {
-		retn = true;
-		goto done;
-	}
-
 	for (cp= Sancho_cmd_list; cp->syntax != NULL; ++cp) {
 		if ( strncmp(cp->syntax, event, strlen(cp->syntax)) == 0 )
 			break;
@@ -862,11 +903,13 @@ static _Bool process_event(const char *event)
 	}
 
 	event_arg = event + strlen(cp->syntax);
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 
 
 	/* Dispatch the event. */
 	switch ( cp->command ) {
 		case aggregate_event:
+			retn = true;
 			break;
 
 		case sancho_state:
@@ -874,6 +917,8 @@ static _Bool process_event(const char *event)
 			break;
 
 		case seal_event:
+			if ( !seal(bufr) )
+				ERR(goto done);
 			if ( Debug )
 				fputs("Sealed domain.\n", Debug);
 
@@ -888,6 +933,8 @@ static _Bool process_event(const char *event)
 
 
  done:
+	WHACK(bufr);
+
 	return retn;
 }
 
@@ -909,7 +956,7 @@ static _Bool process_event(const char *event)
  *			additional command cycle should be processed.
  */
 
-static _Bool initialize_state(char *mapfile)
+static _Bool initialize_state(FILE *mapfile)
 
 {
 	_Bool retn = false;
@@ -917,16 +964,9 @@ static _Bool initialize_state(char *mapfile)
 	char *p,
 	     inbufr[256];
 
-	FILE *bmap = NULL;
 
-
-	/* Open the behavioral map and initialize the binary point object. */
-	if ( (bmap = fopen(mapfile, "r")) == NULL )
-		ERR(goto done);
-
-
-	/* Loop over the mapfile. */
-	while ( fgets(inbufr, sizeof(inbufr), bmap) != NULL ) {
+	/* Loop over the mapfile and process directives. */
+	while ( fgets(inbufr, sizeof(inbufr), mapfile) != NULL ) {
 		if ( (p = strchr(inbufr, '\n')) != 0 )
 			*p = '\0';
 
@@ -1080,6 +1120,11 @@ static void show_magazine(CO(char *, root))
  * \param root		A pointer to the buffer containing the root
  *			directory to be used to display the cartridges.
  *
+ * \param map		A pointer to the file descriptor that contains
+ *			security state directives to be loaded into
+ *			the domain.  This value will be null if a
+ *			state map has not been specified.
+ *
  * \param mgmt_read	A file descriptor to the read end of the pipe
  *			from which management commands will be received.
  *
@@ -1097,7 +1142,7 @@ static void show_magazine(CO(char *, root))
  *		was successfully launched.
  */
 
-static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint, \
+static _Bool fire_cartridge(CO(char *, cartridge), FILE *map, int *endpoint, \
 			    _Bool enforce)
 
 {
@@ -1125,6 +1170,13 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint, \
 
 	if ( Debug )
 		fprintf(Debug, "Monitor process: %d\n", getpid());
+
+
+	/* Load the state map if one has been specified. */
+	if ( map != NULL ) {
+		if ( !initialize_state(map) )
+			ERR(goto done);
+	}
 
 
 	/* Fork again to run the cartridge. */
@@ -1273,6 +1325,8 @@ extern int main(int argc, char *argv[])
 
 	File infile = NULL;
 
+	FILE *state = NULL;
+
 
 	while ( (opt = getopt(argc, argv, "CPSec:d:m:")) != EOF )
 		switch ( opt ) {
@@ -1351,13 +1405,10 @@ extern int main(int argc, char *argv[])
 
 	/* Load and seal a behavior map if specified. */
 	if ( map != NULL ) {
+		if ( (state = fopen(map, "r")) == NULL )
+			ERR(goto done);
 		if ( Debug )
-			fprintf(Debug, "Loading security state: %s\n", map);
-
-		if ( !initialize_state(map) ) {
-			fputs("Cannot initialize security state.\n", stderr);
-			goto done;
-		}
+			fprintf(Debug, "Opened state map: %s\n", map);
 	}
 
 
@@ -1371,7 +1422,7 @@ extern int main(int argc, char *argv[])
 	if ( Debug )
 		fprintf(Debug, "Primary process: %d\n", getpid());
 
-	if ( !fire_cartridge(cartridge, &fd, enforce) )
+	if ( !fire_cartridge(cartridge, state, &fd, enforce) )
 		ERR(goto done);
 
 	if ( !mgmt->get_socket(mgmt, &poll_data[0].fd) ) {
