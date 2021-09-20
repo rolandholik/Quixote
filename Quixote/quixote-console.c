@@ -54,6 +54,12 @@
 	 cartridge_mode,
 } Mode = show_mode;
 
+/**
+ * The following variable is used to indicate whether or not output
+ * is being directed to a tty or a pipe.
+ */
+static _Bool TTY_output = false;
+
 
 /**
  * Private function.
@@ -239,7 +245,8 @@ static _Bool receive_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	if ( !mgmt->receive_Buffer(mgmt, cmdbufr) )
 		ERR(goto done);
 	cnt = *(unsigned int *) cmdbufr->get(cmdbufr);
-	fprintf(stderr, "Trajectory size: %u\n", cnt);
+	if ( TTY_output )
+		fprintf(stdout, "Trajectory size: %u\n", cnt);
 
 
 	/* Output each point. */
@@ -293,7 +300,8 @@ static _Bool receive_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	if ( !mgmt->receive_Buffer(mgmt, cmdbufr) )
 		ERR(goto done);
 	cnt = *(unsigned int *) cmdbufr->get(cmdbufr);
-	fprintf(stderr, "Forensics size: %u\n", cnt);
+	if ( TTY_output )
+		fprintf(stdout, "Forensics size: %u\n", cnt);
 
 
 	/* Output each point. */
@@ -347,7 +355,8 @@ static _Bool receive_points(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	if ( !mgmt->receive_Buffer(mgmt, cmdbufr) )
 		ERR(goto done);
 	cnt = *(unsigned int *) cmdbufr->get(cmdbufr);
-	fprintf(stderr, "Contour size: %u\n", cnt);
+	if ( TTY_output )
+		fprintf(stdout, "State size: %u\n", cnt);
 
 
 	/* Output each point. */
@@ -401,7 +410,8 @@ static _Bool receive_ai_events(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	if ( !mgmt->receive_Buffer(mgmt, cmdbufr) )
 		ERR(goto done);
 	cnt = *(unsigned int *) cmdbufr->get(cmdbufr);
-	fprintf(stderr, "AI event size: %u\n", cnt);
+	if ( TTY_output )
+		fprintf(stdout, "AI event size: %u\n", cnt);
 
 
 	/* Output each point. */
@@ -453,7 +463,6 @@ static _Bool receive_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr), \
 			if ( !mgmt->receive_Buffer(mgmt, cmdbufr) )
 				ERR(goto done);
 			fprintf(stdout, "%s\n", cmdbufr->get(cmdbufr));
-			fflush(stdout);
 			cmdbufr->reset(cmdbufr);
 			retn = true;
 			break;
@@ -531,7 +540,6 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(char *, cmd))
 	}
 	if ( cmdnum == 0 ) {
 		fprintf(stdout, "Unknown command: %s\n", cmd);
-		fflush(stdout);
 		retn = true;
 		goto done;
 	}
@@ -562,6 +570,8 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(char *, cmd))
 extern int main(int argc, char *argv[])
 
 {
+	_Bool tty_input = isatty(fileno(stdin));
+
 	char *p,
 	     *pid	 = NULL,
 	     *cartridge	 = NULL,
@@ -603,6 +613,12 @@ extern int main(int argc, char *argv[])
 		}
 
 
+	/* Configure for output type. */
+	TTY_output = isatty(fileno(stdout));
+	if ( TTY_output )
+		setlinebuf(stdout);
+
+
 	/* Handle show mode. */
 	if ( Mode == show_mode ) {
 		fprintf(stdout, "%s:\n", QUIXOTE_CARTRIDGE_MGMT_DIR);
@@ -627,7 +643,10 @@ extern int main(int argc, char *argv[])
 	while ( 1 ) {
 		memset(inbufr, '\0', sizeof(inbufr));
 
-		fputs("Quixote>", stderr);
+		if ( tty_input ) {
+			fputs("Quixote>", stdout);
+			fflush(stdout);
+		}
 		if ( fgets(inbufr, sizeof(inbufr), stdin) == NULL )
 			goto done;
 		if ( (p = strchr(inbufr, '\n')) != NULL )
