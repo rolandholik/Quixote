@@ -137,6 +137,12 @@ static _Bool Sealed = false;
 static _Bool Model_Error = false;
 
 /**
+ * This object holds the aggregate value that was injected into the
+ * Sancho instance.
+ */
+static Buffer Aggregate = NULL;
+
+/**
  * The following variable holds the current measurement.
  */
 #if 0
@@ -600,25 +606,23 @@ static _Bool add_aggregate(CO(char *, inbufr))
 {
 	_Bool retn = false;
 
-	Buffer aggregate = NULL;
-
 
 	if ( Debug )
 		fprintf(Debug, "aggregate %s", inbufr);
 
-	INIT(HurdLib, Buffer, aggregate, ERR(goto done));
-	if ( !aggregate->add_hexstring(aggregate, inbufr) )
+	if ( Aggregate == NULL ) {
+		INIT(HurdLib, Buffer, Aggregate, ERR(goto done));
+		if ( !Aggregate->add_hexstring(Aggregate, inbufr) )
 		ERR(goto done);
+	}
 
-	if ( !Model->set_aggregate(Model, aggregate) )
+	if ( !Model->set_aggregate(Model, Aggregate) )
 		ERR(goto done);
 
 	retn = true;
 
 
  done:
-	WHACK(aggregate);
-
 	return retn;
 }
 
@@ -1131,6 +1135,49 @@ static _Bool send_events(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 /**
  * Private function.
  *
+ * This function is responsible for returning the current security state
+ * event map to the caller.  This map can be used to define the desired
+ * security state by feeding this map into the quixote utility with the
+ * -m command-line switch.
+ *
+ * \param mgmt		The socket object used to communicate with
+ *			the quixote-console management instance.
+ *
+ * \param cmdbufr	The object which will be used to hold the
+ *			information which will be transmitted.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not the command was processed.  A false value
+ *			indicates an error was encountered while sending
+ *			the event list while a true value indicates the
+ *			event list was succesfully sent.
+ */
+
+static _Bool send_map(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
+
+{
+	_Bool retn = false;
+
+
+	/* Send the domain aggregate. */
+	cmdbufr->reset(cmdbufr);
+	cmdbufr->add_Buffer(cmdbufr, Aggregate);
+	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
+		ERR(goto done);
+
+
+	/* Send each point in the model. */
+	retn = send_points(mgmt, cmdbufr);
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
  * This function implements the processing of a command from the
  * quixote-console utility.
  *
@@ -1195,6 +1242,10 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 		case show_events:
 			retn = send_events(mgmt, cmdbufr);
+			break;
+
+		case show_map:
+			retn = send_map(mgmt, cmdbufr);
 			break;
 
 		case seal_event:
@@ -1962,6 +2013,8 @@ extern int main(int argc, char *argv[])
 	WHACK(cmdbufr);
 	WHACK(mgmt);
 	WHACK(infile);
+
+	WHACK(Aggregate);
 	WHACK(Model);
 
 	if ( fd > 0 )

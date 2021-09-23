@@ -120,6 +120,12 @@ static pid_t Monitor_pid;
 static _Bool Model_Error = false;
 
 /**
+ * This object holds the aggregate value that was injected into the
+ * Sancho instance.
+ */
+static Buffer Aggregate = NULL;
+
+/**
  * The following variable holds booleans which describe signals
  * which were received.
  */
@@ -378,6 +384,17 @@ static _Bool process_event(CO(TTYduct, duct), const char * const event)
 	}
 
 
+	/* Capture the aggregate. */
+	if ( (cp->command == aggregate_event) && (Aggregate == NULL) ) {
+		INIT(HurdLib, Buffer, Aggregate, ERR(goto done));
+
+		if ( (bp = strchr(event, ' ')) == NULL )
+			ERR(goto done);
+		if ( !Aggregate->add_hexstring(Aggregate, ++bp) )
+			ERR(goto done);
+	}
+
+
 	/* Dispatch the event. */
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 	if ( !bufr->add(bufr, (unsigned char *) event, strlen(event) + 1) )
@@ -553,6 +570,48 @@ static _Bool send_list(CO(TTYduct, duct), CO(LocalDuct, mgmt), \
 /**
  * Private function.
  *
+ * This function is responsible for returning the current state map
+ * from the co-processor to a management client.
+ *
+ * \param mgmt	The socket object used to communicate with
+ *		the cartridge management instance.
+ *
+ * \param bufr	The object which will be used to hold the
+ *			information which will be transmitted.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not the command was processed.  A false value
+ *			indicates the processing of commands should be
+ *			terminated while a true value indicates an
+ *			additional command cycle should be processed.
+ */
+
+static _Bool send_map(CO(TTYduct, duct), CO(LocalDuct, mgmt), \
+		      CO(Buffer, bufr))
+
+{
+	_Bool retn = false;
+
+
+	/* Send the specified listing command. */
+	if ( !mgmt->send_Buffer(mgmt, Aggregate) )
+		ERR(goto done);
+
+	retn = true;
+
+
+	/* Return the point stream to the client. */
+	retn = send_list(duct, mgmt, bufr, "show points");
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
  * This function implements the processing of a command from the
  * cartridge management utility.  This command comes in the form
  * of a binary encoding of the desired command to be run.
@@ -670,6 +729,10 @@ static _Bool process_command(CO(TTYduct, duct), CO(LocalDuct, mgmt), \
 		case show_events:
 			retn = send_list(duct, mgmt, cmdbufr, \
 					 "show events");
+			break;
+
+		case show_map:
+			retn = send_map(duct, mgmt, cmdbufr);
 			break;
 
 		case enable_cell:
@@ -1497,6 +1560,8 @@ extern int main(int argc, char *argv[])
 	WHACK(cmdbufr);
 	WHACK(mgmt);
 	WHACK(infile);
+
+	WHACK(Aggregate);
 	WHACK(Duct);
 
 	if ( fd > 0 )

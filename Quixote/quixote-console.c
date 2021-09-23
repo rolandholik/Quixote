@@ -434,6 +434,68 @@ static _Bool receive_ai_events(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 /**
  * Private function.
  *
+ * This function implements the receipt and output of a security state
+ * map.  The protocol is very simple with the aggregate value being
+ * sent followed by each point in the security event namespace.
+ *
+ * \param mgmt		The socket object used to communicate with
+ *			the cartridge management instance.
+ *
+ * \param cmdbufr	The object used to process the remote command
+ *			response.
+ *
+ * \return		A boolean value is returned to indicate the
+ *			status of processing processing the contour
+ *			list.  A false value indicates an error occurred
+ *			while a true value indicates the response was
+ *			properly processed.
+ */
+
+static _Bool receive_map(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
+
+{
+	_Bool retn = false;
+
+	unsigned int cnt;
+
+
+	/* Receive the aggregate value. */
+	cmdbufr->reset(cmdbufr);
+	if ( !mgmt->receive_Buffer(mgmt, cmdbufr) )
+		ERR(goto done);
+
+	fputs("aggregate ", stdout);
+	cmdbufr->print(cmdbufr);
+
+
+	/* Output the points. */
+	cmdbufr->reset(cmdbufr);
+	if ( !mgmt->receive_Buffer(mgmt, cmdbufr) )
+		ERR(goto done);
+	cnt = *(unsigned int *) cmdbufr->get(cmdbufr);
+
+
+	/* Output each point. */
+	while ( cnt ) {
+		cmdbufr->reset(cmdbufr);
+		if ( !mgmt->receive_Buffer(mgmt, cmdbufr) )
+			ERR(goto done);
+		fprintf(stdout, "state %s\n", cmdbufr->get(cmdbufr));
+		--cnt;
+	}
+	fputs("seal\n", stdout);
+
+	cmdbufr->reset(cmdbufr);
+	retn = true;
+
+ done:
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
  * This function implements receipt and processing of the command
  * which was executed on the cartridge management daemon.
  *
@@ -490,6 +552,10 @@ static _Bool receive_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr), \
 
 		case show_events:
 			retn = receive_ai_events(mgmt, cmdbufr);
+			break;
+
+		case show_map:
+			retn = receive_map(mgmt, cmdbufr);
 			break;
 	}
 

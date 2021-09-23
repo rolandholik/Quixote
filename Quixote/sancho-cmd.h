@@ -25,6 +25,7 @@ enum {
 	show_forensics,
 	show_points,
 	show_events,
+	show_map,
 	enable_cell,
 	sancho_reset,
 	sancho_cmds_max
@@ -47,6 +48,7 @@ struct sancho_cmd_definition Sancho_cmd_list[] = {
 	{show_forensics,	"show forensics"},
 	{show_points,		"show points"},
 	{show_events,		"show events"},
+	{show_map,		"show map"},
 	{enable_cell,		"enable cellular"},
 	{sancho_reset,		"reset"},
 	{0, NULL}
