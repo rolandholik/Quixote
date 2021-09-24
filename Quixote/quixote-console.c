@@ -45,6 +45,21 @@
 
 
 /**
+ * The following enumeration type specifies whether or not the utility
+ * is running in one shot mode where the command to be processed is
+ * specified by a command-line argument.
+ */
+enum Oneshot_mode {
+	oneshot_none,
+	oneshot_state,
+	oneshot_trajectory,
+	oneshot_forensics,
+	oneshot_points,
+	oneshot_events,
+	oneshot_map
+};
+
+/**
  * The following enumeration type specifies whether or not
  * the measurements are being managed internally or by an SGX enclave.
  */
@@ -629,6 +644,70 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(char *, cmd))
 }
 
 
+/**
+ * Private function.
+ *
+ * This function implements the processing of a quixote command that
+ * is specified by a command-line argument.
+ *
+ * \param mgmt		The socket object used to communicate with
+ *			the cartridge management instance.
+ *
+ * \param mode		The enumeration type of the command that is to
+ *			be run.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not processing of the command succeeded.  A
+ *			false value indicates the command failed while a
+ *			true value indicates the command was successfully
+ *			processed.
+ */
+
+static _Bool process_oneshot(CO(LocalDuct, mgmt), enum Oneshot_mode mode)
+
+{
+	_Bool retn = false;
+
+	char *cmd = 0;
+
+
+	switch ( mode ) {
+		case oneshot_state:
+			cmd = Sancho_cmd_list[show_state - 1].syntax;
+			break;
+
+		case oneshot_trajectory:
+			cmd = Sancho_cmd_list[show_trajectory - 1].syntax;
+			break;
+
+		case oneshot_forensics:
+			cmd = Sancho_cmd_list[show_forensics - 1].syntax;
+			break;
+
+		case oneshot_points:
+			cmd = Sancho_cmd_list[show_points - 1].syntax;
+			break;
+
+		case oneshot_events:
+			cmd = Sancho_cmd_list[show_events - 1].syntax;
+			break;
+
+		case oneshot_map:
+			cmd = Sancho_cmd_list[show_map - 1].syntax;
+			break;
+
+		case oneshot_none:
+			break;
+	}
+
+	if ( cmd > 0 )
+		retn = process_command(mgmt, cmd);
+
+
+	return retn;
+}
+
+
 /*
  * Program entry point begins here.
  */
@@ -646,6 +725,8 @@ extern int main(int argc, char *argv[])
 	int opt,
 	    retn = 1;
 
+	enum Oneshot_mode oneshot = oneshot_none;
+
 	FILE *idfile = NULL;
 
 	Buffer id_bufr = NULL,
@@ -656,16 +737,25 @@ extern int main(int argc, char *argv[])
 	File infile = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "CPSc:p:")) != EOF )
+	while ( (opt = getopt(argc, argv, "EFMPSTc:p:")) != EOF )
 		switch ( opt ) {
-			case 'C':
-				Mode = cartridge_mode;
+			case 'E':
+				oneshot = oneshot_events;
+				break;
+			case 'F':
+				oneshot = oneshot_forensics;
+				break;
+			case 'M':
+				oneshot = oneshot_map;
 				break;
 			case 'P':
-				Mode = process_mode;
+				oneshot = oneshot_points;
 				break;
 			case 'S':
-				Mode = show_mode;
+				oneshot = oneshot_state;
+				break;
+			case 'T':
+				oneshot = oneshot_trajectory;
 				break;
 
 			case 'c':
@@ -686,7 +776,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Handle show mode. */
-	if ( Mode == show_mode ) {
+	if ( (oneshot == oneshot_none) && (Mode == show_mode) ) {
 		fprintf(stdout, "%s:\n", QUIXOTE_CARTRIDGE_MGMT_DIR);
 		show_domains(QUIXOTE_CARTRIDGE_MGMT_DIR);
 		fputs("\n", stdout);
@@ -697,10 +787,24 @@ extern int main(int argc, char *argv[])
 	}
 
 
-	/* Setup the management socket. */
+	/* Verify that a socket type has been specified. */
+	if ( (pid == NULL) && (cartridge == NULL) ) {
+		fputs("No domain specified.\n", stderr);
+		goto done;
+	}
+
+
+	/* Establish management socket. */
 	INIT(NAAAIM, LocalDuct, mgmt, ERR(goto done));
 	if ( !setup_management(mgmt, pid, cartridge) )
 		ERR(goto done);
+
+
+	/* Handle command-line specified commands. */
+	if ( oneshot != oneshot_none ) {
+		retn = process_oneshot(mgmt, oneshot);
+		goto done;
+	}
 
 
 	/* Command loop. */
