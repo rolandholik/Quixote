@@ -18,7 +18,7 @@ INSTINCLUDE   = PCEenclave.h PVEenclave.h QEenclave.h SRDEaesgcm.h SRDEcmac.h \
 	SRDEquote.h SRDErsa.h SRDEsigstruct.h SRDE.h SRDEenclave.h	      \
 	SRDEocall.h SRDEfusion-ocall.h SRDEnaaaim-ocall.h SRDEpipe.h
 
-SUBDIRS	    = SRDElibs Attestation ISOidentity Sample
+SUBDIRS	    = SRDElibs Attestation Sample
 DEV_SUBDIRS = SRDElibs Sample
 
 CSRC = SRDEmetadata.c SRDEloader.c SRDEenclave.c SRDEsigstruct.c PVEenclave.c \

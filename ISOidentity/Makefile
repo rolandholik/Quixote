@@ -8,6 +8,8 @@
 # Variable declarations.
 INSTPATH       = ${DESTDIR}/opt/ESD
 
+SANCHODIR = ../Sancho/SGX
+
 CSRC = Actor.c Subject.c ExchangeEvent.c ISOidentity.c ContourPoint.c \
 	cboot.c cboot-mgr.c compute-aggregate.c
 
@@ -71,8 +73,7 @@ NAAAIMLIB      = -L ../lib -lNAAAIM
 
 LIBS = ${NAAAIMLIB} ${HURDLIB}
 
-CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I ../SRDE/ISOidentity \
-	-I ../SRDE
+CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I ${SANCHODIR} -I ../SRDE
 
 
 #
@@ -116,18 +117,17 @@ sha-tool: sha-tool.o
 set-behavior: set-behavior.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS}
 
-cboot: cboot.o ../SRDE/ISOidentity/ISOenclave.o ISOidentity.o ContourPoint.o \
+cboot: cboot.o ${SANCHODIR}/ISOenclave.o ISOidentity.o ContourPoint.o \
 	ExchangeEvent.o Actor.o Subject.o ${RDK_LIBRARY} ${NAAAIM_LIBRARY}   \
 	${HURD_LIBRARY}
 	${CC} ${LDFLAGS} -o $@ $< ISOidentity.o ContourPoint.o		     \
-		ExchangeEvent.o Actor.o Subject.o 			     \
-		../SRDE/ISOidentity/ISOenclave.o ${RDKLIB} ${LIBS} ${LIBCAP} \
-		${SSL_CRYPTO}
+		ExchangeEvent.o Actor.o Subject.o ${SANCHODIR}/ISOenclave.o  \
+		${RDKLIB} ${LIBS} ${LIBCAP} ${SSL_CRYPTO};
 
-cboot-mgr: cboot-mgr.o ../SRDE/ISOidentity/ISOmanager.o \
-	${RDK_LIBRARY} ${NAAAIM_LIBRARY} ${HURD_LIBRARY}
-	${CC} ${LDFLAGS} -o $@ $< ../SRDE/ISOidentity/ISOmanager.o \
-		${RDKLIB} ${LIBS} ${SSL_CRYPTO}
+cboot-mgr: cboot-mgr.o ${SANCHODIR}/ISOmanager.o ${RDK_LIBRARY} \
+	${NAAAIM_LIBRARY} ${HURD_LIBRARY}
+	${CC} ${LDFLAGS} -o $@ $< ${SANCHODIR}/ISOmanager.o ${RDKLIB} \
+		${LIBS} ${SSL_CRYPTO};
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};

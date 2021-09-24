@@ -7,7 +7,7 @@
 
 
 # Variable declarations.
-SUBDIRS	    = STmcu
+SUBDIRS	    = STmcu SGX
 
 
 #
@@ -19,7 +19,12 @@ SUBDIRS	    = STmcu
 #
 # Subdirectory targets.
 #
+all: ${SUBDIRS}
+
 STmcu:
+	${MAKE} -C $@;
+
+SGX:
 	${MAKE} -C $@;
 
 

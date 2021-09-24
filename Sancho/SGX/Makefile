@@ -24,15 +24,15 @@ TOOLS = test-ISOidentity-enclave
 
 ENCLAVE_CC = gcc
 
-SGXDIR = ..
+SGXDIR = ../../SRDE
 include ${SGXDIR}/Make.enclave
 
 SGX_SSL = /opt/intel/sgxssl
 
-SGX_INCLUDE = -I $(SGX_SDK)/include -I $(SGX_SDK)/include/tlibc		 \
-	-I $(SGX_SDK)/include/stlport -I ../../ISOidentity		 \
-	-I ../SRDElibs/SRDEfusion -I ../SRDElibs/SRDEnaaaim -I ../../lib \
-	-I ..
+SGX_INCLUDE = -I $(SGX_SDK)/include -I $(SGX_SDK)/include/tlibc		  \
+	-I $(SGX_SDK)/include/stlport -I ../../ISOidentity		  \
+	-I ${SGXDIR}/SRDElibs/SRDEfusion -I ${SGXDIR}/SRDElibs/SRDEnaaaim \
+	-I ../../lib  -I ${SGXDIR}
 
 ENCLAVE_CFLAGS = -Wall -nostdinc -fvisibility=hidden -fpie -fstack-protector \
 	$(SGX_INCLUDE) -fno-builtin ${TYPE}
@@ -47,7 +47,7 @@ SGX_SERVICE_LIBRARY = sgx_tservice
 ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles   \
 	-Wl,--whole-archive -lsgx_tsgxssl -Wl,--no-whole-archive	      \
 	-L . -L ${SGX_LIBRARY_PATH} -L ${SSL_LIBRARY_PATH}		      \
-	-L ../SRDElibs/SRDEfusion -L ../SRDElibs/SRDEnaaaim		      \
+	-L ${SGXDIR}/SRDElibs/SRDEfusion -L ${SGXDIR}/SRDElibs/SRDEnaaaim     \
 	-Wl,--whole-archive						      \
 	-l${SGX_TRTS_LIB} -lSRDEfusion					      \
 	-Wl,--no-whole-archive						      \
@@ -63,7 +63,7 @@ ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles   \
 
 CC = musl-gcc
 
-CFLAGS = -Wall -O2 -fomit-frame-pointer -march=core2 -I .. -I ../.. \
+CFLAGS = -Wall -O2 -fomit-frame-pointer -march=core2 -I ../.. -I ${SGXDIR} \
 	-I ../../HurdLib -I ../../ISOidentity -I ../../lib ${TYPE}
 
 LDFLAGS = -g
@@ -77,7 +77,7 @@ NAAAIM_LIBRARY = ../../lib/libNAAAIM.a
 NAAAIMLIB      = -L ../../lib -lNAAAIM
 
 RDK_LIBRARY = ../libSRDEruntime.a
-RDKLIB	    = -L ../ -lSRDEruntime
+RDKLIB	    = -L ${SGXDIR} -lSRDEruntime
 
 ifeq (${CC}, musl-gcc)
 SSL_INCLUDE = /usr/local/musl/include
@@ -168,6 +168,8 @@ clean:
 	rm -f ${TOOLS};
 	rm -f ISOidentity.so ISOidentity.signed.so ISOmanager.so \
 		ISOmanager.signed.so;
+
+clobber:
 
 
 # Source dependencies.
