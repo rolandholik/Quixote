@@ -394,9 +394,9 @@ static _Bool receive_points(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 /**
  * Private function.
  *
- * This function implements the receipt of a list of AI events from
+ * This function implements the receipt of a list of TE events from
  * the cartridge management daemon.  The protocol used is for the
- * management daemon to send the number of events in the AI list
+ * management daemon to send the number of events in the TE list
  * followed by each event as an ASCII string.
  *
  * \param mgmt		The socket object used to communicate with
@@ -412,7 +412,7 @@ static _Bool receive_points(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
  *			processed.
  */
 
-static _Bool receive_ai_events(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
+static _Bool receive_TE_events(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 {
 	_Bool retn = false;
@@ -426,7 +426,7 @@ static _Bool receive_ai_events(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 		ERR(goto done);
 	cnt = *(unsigned int *) cmdbufr->get(cmdbufr);
 	if ( TTY_output )
-		fprintf(stdout, "AI event size: %u\n", cnt);
+		fprintf(stdout, "TE event size: %u\n", cnt);
 
 
 	/* Output each point. */
@@ -566,7 +566,7 @@ static _Bool receive_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr), \
 			break;
 
 		case show_events:
-			retn = receive_ai_events(mgmt, cmdbufr);
+			retn = receive_TE_events(mgmt, cmdbufr);
 			break;
 
 		case show_map:
