@@ -80,7 +80,7 @@
 #include <IDtoken.h>
 
 #include <SRDE.h>
-#include <ISOenclave.h>
+#include <SanchoSGX.h>
 
 #include "ContourPoint.h"
 #include "ExchangeEvent.h"
@@ -187,7 +187,7 @@ void srde_exception_handler(int, siginfo_t *, void *);
  * The following object is used to manage the measurement enclave
  * when running in SGX mode.
  */
-static ISOenclave Enclave = NULL;
+static SanchoSGX Enclave = NULL;
 
 /**
  * System call wrapper for setting the actor status of a process.
@@ -229,7 +229,7 @@ static inline int sys_set_bad_actor(pid_t pid, unsigned long flags)
  *			loaded.
  */
 
-static _Bool add_verifiers(CO(ISOenclave, enclave), CO(File, infile), \
+static _Bool add_verifiers(CO(SanchoSGX, enclave), CO(File, infile), \
 			   CO(char *, verifier))
 
 {
@@ -1468,7 +1468,7 @@ static void * measurement_mode(CO(char *, enclave_name), CO(char *, token))
 
 
 	/* Setup the ISOidentity enclave and invoke the measurement ECALL. */
-	INIT(NAAAIM, ISOenclave, Enclave, ERR(goto done));
+	INIT(NAAAIM, SanchoSGX, Enclave, ERR(goto done));
 	if ( !Enclave->load_enclave(Enclave, enclave_name, token) ) {
 		fputs("Enclave measurement initialization failure.\n", stderr);
 		goto done;
@@ -1744,7 +1744,7 @@ extern int main(int argc, char *argv[])
 			goto done;
 		}
 
-		INIT(NAAAIM, ISOenclave, Enclave, ERR(goto done));
+		INIT(NAAAIM, SanchoSGX, Enclave, ERR(goto done));
 		if ( !Enclave->load_enclave(Enclave, ENCLAVE_NAME, token) ) {
 			fputs("SGX enclave initialization failure.\n", stderr);
 			goto done;

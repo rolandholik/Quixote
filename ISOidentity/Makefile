@@ -117,11 +117,11 @@ sha-tool: sha-tool.o
 set-behavior: set-behavior.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS}
 
-cboot: cboot.o ${SANCHODIR}/ISOenclave.o ISOidentity.o ContourPoint.o \
+cboot: cboot.o ${SANCHODIR}/SanchoSGX.o ISOidentity.o ContourPoint.o \
 	ExchangeEvent.o Actor.o Subject.o ${RDK_LIBRARY} ${NAAAIM_LIBRARY}   \
 	${HURD_LIBRARY}
-	${CC} ${LDFLAGS} -o $@ $< ISOidentity.o ContourPoint.o		     \
-		ExchangeEvent.o Actor.o Subject.o ${SANCHODIR}/ISOenclave.o  \
+	${CC} ${LDFLAGS} -o $@ $< ISOidentity.o ContourPoint.o		   \
+		ExchangeEvent.o Actor.o Subject.o ${SANCHODIR}/SanchoSGX.o \
 		${RDKLIB} ${LIBS} ${LIBCAP} ${SSL_CRYPTO};
 
 cboot-mgr: cboot-mgr.o ${SANCHODIR}/ISOmanager.o ${RDK_LIBRARY} \

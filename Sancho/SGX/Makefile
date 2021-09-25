@@ -7,14 +7,14 @@
 
 # Variable declarations.
 INSTPATH       = ${DESTDIR}/opt/ESD
-INSTALLENCLAVE = ISOidentity.signed.so ISOmanager.signed.so
+INSTALLENCLAVE = SanchoSGX.signed.so ISOmanager.signed.so
 
 ifdef SRDE_PRODUCTION
 TYPE = -DSRDE_PRODUCTION
 endif
 
-CSRC   = test-ISOidentity-enclave.c ISOenclave.c ISOmanager.c
-ENCSRC = ISOidentity-enclave.c ISOidentity-interface.c ISOidentity-manager.c \
+CSRC   = test-ISOidentity-enclave.c SanchoSGX.c ISOmanager.c
+ENCSRC = SanchoSGX-enclave.c SanchoSGX-interface.c ISOidentity-manager.c \
 	ContourPoint.c Actor.c Subject.c ExchangeEvent.c ISOidentity.c
 
 MGRSRC = ISOmanager-enclave.c ISOmanager-interface.c
@@ -119,13 +119,13 @@ MGROBJS = ${MGRSRC:.c=.o}
 # Targets
 all: ${LIBRARY} ${COBJS} enclave tools
 
-enclave: ldscript ISOidentity.signed.so ISOmanager.signed.so
+enclave: ldscript SanchoSGX.signed.so ISOmanager.signed.so
 
-ISOidentity.signed.so: ISOidentity.so ISOidentity-enclave.xml
+SanchoSGX.signed.so: SanchoSGX.so SanchoSGX-enclave.xml
 	$(SGX_SIGNER) sign -key ${SGXKEY} -enclave $< -out $@ \
-		-config ISOidentity-enclave.xml;
+		-config SanchoSGX-enclave.xml;
 
-ISOidentity.so: ${ENCOBJS}
+SanchoSGX.so: ${ENCOBJS}
 	${ENCLAVE_CC} -o $@ $^ ${ENCLAVE_LDFLAGS};
 
 ISOmanager.signed.so: ISOmanager.so
@@ -147,13 +147,13 @@ ldscript:
 
 tools: ${TOOLS}
 
-test-ISOidentity-enclave: test-ISOidentity-enclave.o ISOenclave.o
-	${CC} ${LDFLAGS} -o $@ $< ISOenclave.o ${LIBS} ${SSL_CRYPTO};
+test-ISOidentity-enclave: test-ISOidentity-enclave.o SanchoSGX.o
+	${CC} ${LDFLAGS} -o $@ $< SanchoSGX.o ${LIBS} ${SSL_CRYPTO};
 
 test-ISOidentity-enclave.o: test-ISOidentity-enclave.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
-ISOenclave.o: ISOenclave.c
+SanchoSGX.o: SanchoSGX.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
 ISOmanager.o: ISOmanager.c

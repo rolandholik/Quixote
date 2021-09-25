@@ -44,19 +44,19 @@
 #include <ContourPoint.h>
 #include <ExchangeEvent.h>
 
-#include "ISOenclave.h"
-#include "ISOidentity-interface.h"
+#include "SanchoSGX.h"
+#include "SanchoSGX-interface.h"
 
 
 /* Object state extraction macro. */
-#define STATE(var) CO(ISOenclave_State, var) = this->state
+#define STATE(var) CO(SanchoSGX_State, var) = this->state
 
 /* Verify library/object header file inclusions. */
 #if !defined(NAAAIM_LIBID)
 #error Library identifier not defined.
 #endif
 
-#if !defined(NAAAIM_ISOenclave_OBJID)
+#if !defined(NAAAIM_SanchoSGX_OBJID)
 #error Object identifier not defined.
 #endif
 
@@ -71,7 +71,7 @@ static inline int sys_set_bad_actor(pid_t pid, unsigned long flags)
 
 
 /* OCALL interface to handle the request to discipline a process. */
-int discipline_pid_ocall(struct ISOenclave_ocall *oc)
+int discipline_pid_ocall(struct SanchoSGX_ocall *oc)
 
 {
 	_Bool discipline,
@@ -110,8 +110,8 @@ int discipline_pid_ocall(struct ISOenclave_ocall *oc)
 }
 
 
-/** ExchangeEvent private state information. */
-struct NAAAIM_ISOenclave_State
+/** SanchoSGX private state information. */
+struct NAAAIM_SanchoSGX_State
 {
 	/* The root object. */
 	Origin root;
@@ -142,18 +142,18 @@ struct NAAAIM_ISOenclave_State
  * Internal private method.
  *
  * This method is responsible for initializing the
- * NAAAIM_ISOenclave_State structure which holds state information
+ * NAAAIM_SanchoSGX_State structure which holds state information
  * for the object.
  *
  * \param S	A pointer to the object containing the state information
  *		which is to be initialized.
  */
 
-static void _init_state(CO(ISOenclave_State, S))
+static void _init_state(CO(SanchoSGX_State, S))
 
 {
 	S->libid = NAAAIM_LIBID;
-	S->objid = NAAAIM_ISOenclave_OBJID;
+	S->objid = NAAAIM_SanchoSGX_OBJID;
 
 	S->poisoned	 = false;
 	S->debug	 = false;
@@ -188,7 +188,7 @@ static void _init_state(CO(ISOenclave_State, S))
  *	        the enclave was loaded an initialized.
  */
 
-static _Bool load_enclave(CO(ISOenclave, this), CO(char *, enclave), \
+static _Bool load_enclave(CO(SanchoSGX, this), CO(char *, enclave), \
 			  CO(char *, token))
 
 {
@@ -290,7 +290,7 @@ static _Bool load_enclave(CO(ISOenclave, this), CO(char *, enclave), \
  *		was updated.
  */
 
-static _Bool update(CO(ISOenclave, this), CO(String, update), \
+static _Bool update(CO(SanchoSGX, this), CO(String, update), \
 		    _Bool *discipline)
 
 {
@@ -354,7 +354,7 @@ static _Bool update(CO(ISOenclave, this), CO(String, update), \
  *		model was updated.
  */
 
-static _Bool update_map(CO(ISOenclave, this), CO(Buffer, bpoint))
+static _Bool update_map(CO(SanchoSGX, this), CO(Buffer, bpoint))
 
 {
 	STATE(S);
@@ -418,7 +418,7 @@ static _Bool update_map(CO(ISOenclave, this), CO(Buffer, bpoint))
  *		measurement.
  */
 
-static _Bool set_aggregate(CO(ISOenclave, this), CO(Buffer, bufr))
+static _Bool set_aggregate(CO(SanchoSGX, this), CO(Buffer, bufr))
 
 {
 	STATE(S);
@@ -482,7 +482,7 @@ static _Bool set_aggregate(CO(ISOenclave, this), CO(Buffer, bufr))
  *		value indicates the model was successfully updated.
  */
 
-static _Bool add_ai_event(CO(ISOenclave, this), CO(String, event))
+static _Bool add_ai_event(CO(SanchoSGX, this), CO(String, event))
 
 {
 	STATE(S);
@@ -547,7 +547,7 @@ static _Bool add_ai_event(CO(ISOenclave, this), CO(String, event))
  *		measurement.
  */
 
-static _Bool get_measurement(CO(ISOenclave, this), CO(Buffer, bufr))
+static _Bool get_measurement(CO(SanchoSGX, this), CO(Buffer, bufr))
 
 {
 	STATE(S);
@@ -612,7 +612,7 @@ static _Bool get_measurement(CO(ISOenclave, this), CO(Buffer, bufr))
  *		process ID.
  */
 
-static _Bool discipline_pid(CO(ISOenclave, this), pid_t * const pid)
+static _Bool discipline_pid(CO(SanchoSGX, this), pid_t * const pid)
 
 {
 	STATE(S);
@@ -674,7 +674,7 @@ static _Bool discipline_pid(CO(ISOenclave, this), pid_t * const pid)
  *		event object being set.
  */
 
-static _Bool get_event(CO(ISOenclave, this), String event)
+static _Bool get_event(CO(SanchoSGX, this), String event)
 
 {
 	STATE(S);
@@ -733,7 +733,7 @@ static _Bool get_event(CO(ISOenclave, this), String event)
  * \return	No return value is defined.
  */
 
-static void rewind_event(CO(ISOenclave, this))
+static void rewind_event(CO(SanchoSGX, this))
 
 {
 	STATE(S);
@@ -797,7 +797,7 @@ static void rewind_event(CO(ISOenclave, this))
  *		contour object being set.
  */
 
-static _Bool get_contour(CO(ISOenclave, this), Buffer contour)
+static _Bool get_contour(CO(SanchoSGX, this), Buffer contour)
 
 {
 	_Bool retn = true;
@@ -818,7 +818,7 @@ static _Bool get_contour(CO(ISOenclave, this), Buffer contour)
  * \return	No return value is defined.
  */
 
-static void rewind_contours(CO(ISOenclave, this))
+static void rewind_contours(CO(SanchoSGX, this))
 
 {
 	return;
@@ -849,7 +849,7 @@ static void rewind_contours(CO(ISOenclave, this))
  *		event object being set.
  */
 
-static _Bool get_forensics(CO(ISOenclave, this), String event)
+static _Bool get_forensics(CO(SanchoSGX, this), String event)
 
 {
 	STATE(S);
@@ -909,7 +909,7 @@ static _Bool get_forensics(CO(ISOenclave, this), String event)
  * \return	No return value is defined.
  */
 
-static void rewind_forensics(CO(ISOenclave, this))
+static void rewind_forensics(CO(SanchoSGX, this))
 
 {
 	STATE(S);
@@ -962,7 +962,7 @@ static void rewind_forensics(CO(ISOenclave, this))
  *
  */
 
-static size_t forensics_size(CO(ISOenclave, this))
+static size_t forensics_size(CO(SanchoSGX, this))
 
 {
 	STATE(S);
@@ -1008,7 +1008,7 @@ static size_t forensics_size(CO(ISOenclave, this))
  *		dumped.
  */
 
-static void dump_events(CO(ISOenclave, this))
+static void dump_events(CO(SanchoSGX, this))
 
 {
 	STATE(S);
@@ -1060,7 +1060,7 @@ static void dump_events(CO(ISOenclave, this))
  *		dumped.
  */
 
-static void dump_forensics(CO(ISOenclave, this))
+static void dump_forensics(CO(SanchoSGX, this))
 
 {
 	STATE(S);
@@ -1112,7 +1112,7 @@ static void dump_forensics(CO(ISOenclave, this))
  *		dumped.
  */
 
-static void dump_contours(CO(ISOenclave, this))
+static void dump_contours(CO(SanchoSGX, this))
 
 {
 #if 0
@@ -1179,7 +1179,7 @@ static void dump_contours(CO(ISOenclave, this))
  *			successfully initiated.
  */
 
-static _Bool manager(CO(ISOenclave, this), CO(Buffer, id_bufr), \
+static _Bool manager(CO(SanchoSGX, this), CO(Buffer, id_bufr), \
 		     uint16_t port, char *spid)
 
 {
@@ -1236,7 +1236,7 @@ static _Bool manager(CO(ISOenclave, this), CO(Buffer, id_bufr), \
  *
  */
 
-static _Bool add_verifier(CO(ISOenclave, this), CO(Buffer, verifier))
+static _Bool add_verifier(CO(SanchoSGX, this), CO(Buffer, verifier))
 
 {
 	STATE(S);
@@ -1287,7 +1287,7 @@ static _Bool add_verifier(CO(ISOenclave, this), CO(Buffer, verifier))
  *
  */
 
-static _Bool seal(CO(ISOenclave, this))
+static _Bool seal(CO(SanchoSGX, this))
 
 {
 	STATE(S);
@@ -1334,7 +1334,7 @@ static _Bool seal(CO(ISOenclave, this))
  *
  */
 
-static size_t size(CO(ISOenclave, this))
+static size_t size(CO(SanchoSGX, this))
 
 {
 	STATE(S);
@@ -1393,7 +1393,7 @@ static size_t size(CO(ISOenclave, this))
  *
  */
 
-static _Bool generate_identity(CO(ISOenclave, this), CO(Buffer, bufr))
+static _Bool generate_identity(CO(SanchoSGX, this), CO(Buffer, bufr))
 
 {
 	STATE(S);
@@ -1452,7 +1452,7 @@ static _Bool generate_identity(CO(ISOenclave, this), CO(Buffer, bufr))
  * \return	No return value is defined.
  */
 
-static void debug(CO(ISOenclave, this), const _Bool state)
+static void debug(CO(SanchoSGX, this), const _Bool state)
 
 {
 	STATE(S);
@@ -1471,7 +1471,7 @@ static void debug(CO(ISOenclave, this), const _Bool state)
  * \param this	A pointer to the object which is to be destroyed.
  */
 
-static void whack(CO(ISOenclave, this))
+static void whack(CO(SanchoSGX, this))
 
 {
 	STATE(S);
@@ -1494,12 +1494,12 @@ static void whack(CO(ISOenclave, this))
  *		indicates an error was encountered in object generation.
  */
 
-extern ISOenclave NAAAIM_ISOenclave_Init(void)
+extern SanchoSGX NAAAIM_SanchoSGX_Init(void)
 
 {
 	Origin root;
 
-	ISOenclave this = NULL;
+	SanchoSGX this = NULL;
 
 	struct HurdLib_Origin_Retn retn;
 
@@ -1508,9 +1508,9 @@ extern ISOenclave NAAAIM_ISOenclave_Init(void)
 	root = HurdLib_Origin_Init();
 
 	/* Allocate the object and internal state. */
-	retn.object_size  = sizeof(struct NAAAIM_ISOenclave);
-	retn.state_size   = sizeof(struct NAAAIM_ISOenclave_State);
-	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_ISOenclave_OBJID,
+	retn.object_size  = sizeof(struct NAAAIM_SanchoSGX);
+	retn.state_size   = sizeof(struct NAAAIM_SanchoSGX_State);
+	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_SanchoSGX_OBJID,
 			 &retn) )
 		return NULL;
 	this	    	  = retn.object;

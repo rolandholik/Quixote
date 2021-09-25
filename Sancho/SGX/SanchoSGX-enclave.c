@@ -17,12 +17,12 @@
 
 #include <NAAAIM.h>
 
-#include "ISOidentity-interface.h"
+#include "SanchoSGX-interface.h"
 #include "regex.h"
 #include "ContourPoint.h"
 #include "ExchangeEvent.h"
 #include "ISOidentity.h"
-#include "ISOenclave.h"
+#include "SanchoSGX.h"
 
 
 /**
@@ -49,16 +49,16 @@ ISOidentity Model = NULL;
  *		data marshalling structure.
  */
 
-static int discipline_ocall(struct ISOenclave_ocall *ocall)
+static int discipline_ocall(struct SanchoSGX_ocall *ocall)
 
 {
 	_Bool retn = false;
 
 	int status = SGX_ERROR_INVALID_PARAMETER;
 
-	size_t arena_size = sizeof(struct ISOenclave_ocall);
+	size_t arena_size = sizeof(struct SanchoSGX_ocall);
 
-	struct ISOenclave_ocall *ocp = NULL;
+	struct SanchoSGX_ocall *ocp = NULL;
 
 
 	/* Allocate and initialize the outbound method structure. */
@@ -70,7 +70,7 @@ static int discipline_ocall(struct ISOenclave_ocall *ocall)
 
 
 	/* Setup arena and pointers to it. */
-	if ( ocall->ocall == ISOenclave_discipline )
+	if ( ocall->ocall == SanchoSGX_discipline )
 		ocp->pid = ocall->pid;
 
 
@@ -143,7 +143,7 @@ _Bool update_model(struct ISOidentity_ecall1_interface *ecall1)
 
 	pid_t pid;
 
-	struct ISOenclave_ocall ocall;
+	struct SanchoSGX_ocall ocall;
 
 	String input = NULL;
 
@@ -173,10 +173,10 @@ _Bool update_model(struct ISOidentity_ecall1_interface *ecall1)
 		if ( !Model->discipline_pid(Model, &pid) )
 			ERR(goto done);
 
-		memset(&ocall, '\0', sizeof(struct ISOenclave_ocall));
+		memset(&ocall, '\0', sizeof(struct SanchoSGX_ocall));
 		ocall.pid   = pid;
 		ocall.debug = ecall1->debug;
-		ocall.ocall = ISOenclave_discipline;
+		ocall.ocall = SanchoSGX_discipline;
 		if ( discipline_ocall(&ocall) != 0 )
 			ERR(goto done);
 	}

@@ -88,7 +88,7 @@
 #define NAAAIM_ExchangeEvent_OBJID	48
 #define NAAAIM_ISOidentity_OBJID	49
 #define NAAAIM_ContourPoint_OBJID	50
-#define NAAAIM_ISOenclave_OBJID		51
+#define NAAAIM_SanchoSGX_OBJID		51
 #define NAAAIM_PVEenclave_OBJID		52
 #define NAAAIM_SRDEmessage_OBJID	53
 #define NAAAIM_SRDEecdsa_OBJID		54

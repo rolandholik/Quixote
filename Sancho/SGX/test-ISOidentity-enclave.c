@@ -44,8 +44,8 @@
 #include <SRDEenclave.h>
 #include <ExchangeEvent.h>
 
-#include "ISOidentity-interface.h"
-#include "ISOenclave.h"
+#include "SanchoSGX-interface.h"
+#include "SanchoSGX.h"
 
 
 /**
@@ -73,8 +73,8 @@ extern int main(int argc, char *argv[])
 	     *trajectory   = NULL,
 	     *id_token	   = NULL,
 	     *verifier	   = NULL,
-	     *token	   = "ISOidentity.token",
-	     *enclave_name = "ISOidentity.signed.so";
+	     *token	   = "SanchoSGX.token",
+	     *enclave_name = "SanchoSGX.signed.so";
 
 	static char *violation = VIOLATION;
 
@@ -87,7 +87,7 @@ extern int main(int argc, char *argv[])
 
 	enum {test, measure} mode = test;
 
-	ISOenclave isoenclave = NULL;
+	SanchoSGX sancho = NULL;
 
 	Buffer ivy     = NULL,
 	       bufr    = NULL,
@@ -135,13 +135,12 @@ extern int main(int argc, char *argv[])
 
 	/* Run measurement mode. */
 	if ( mode == measure ) {
-		INIT(NAAAIM, ISOenclave, isoenclave, ERR(goto done));
-		if ( !isoenclave->load_enclave(isoenclave, enclave_name, \
-					       token) )
+		INIT(NAAAIM, SanchoSGX, sancho, ERR(goto done));
+		if ( !sancho->load_enclave(sancho, enclave_name, token) )
 			ERR(goto done);
 
 		INIT(HurdLib, Buffer, bufr, ERR(goto done));
-		if ( !isoenclave->generate_identity(isoenclave, bufr) )
+		if ( !sancho->generate_identity(sancho, bufr) )
 			ERR(goto done);
 		bufr->print(bufr);
 
@@ -213,8 +212,8 @@ extern int main(int argc, char *argv[])
 
 
 	/* Load enclave and initialize model. */
-	INIT(NAAAIM, ISOenclave, isoenclave, ERR(goto done));
-	if ( !isoenclave->load_enclave(isoenclave, enclave_name, token) )
+	INIT(NAAAIM, SanchoSGX, sancho, ERR(goto done));
+	if ( !sancho->load_enclave(sancho, enclave_name, token) )
 		ERR(goto done);
 
 
@@ -223,7 +222,7 @@ extern int main(int argc, char *argv[])
 	if ( !bufr->add_hexstring(bufr, DEFAULT_AGGREGATE) )
 		ERR(goto done);
 
-	if ( !isoenclave->set_aggregate(isoenclave, bufr) )
+	if ( !sancho->set_aggregate(sancho, bufr) )
 		ERR(goto done);
 
 
@@ -231,7 +230,7 @@ extern int main(int argc, char *argv[])
 	INIT(HurdLib, String, input, ERR(goto done));
 
 	while ( infile->read_String(infile, input) ) {
-		if ( !isoenclave->update(isoenclave, input, &discipline) )
+		if ( !sancho->update(sancho, input, &discipline) )
 			ERR(goto done);
 		if ( discipline ) {
 			fputs("Model needs disciplining.\n", stdout);
@@ -243,23 +242,23 @@ extern int main(int argc, char *argv[])
 
 	/* Dump the events. */
 	fputs("Events:\n", stdout);
-	isoenclave->dump_events(isoenclave);
+	sancho->dump_events(sancho);
 
 
 	/* Seal and violate the model to obtain forensic information. */
-	if ( !isoenclave->seal(isoenclave) )
+	if ( !sancho->seal(sancho) )
 		ERR(goto done);
 
 	input->reset(input);
 	if ( !input->add(input, violation) )
 		ERR(goto done);
 
-	if ( !isoenclave->update(isoenclave, input, &discipline) )
+	if ( !sancho->update(sancho, input, &discipline) )
 		ERR(goto done);
 
 	fputs("\nForensics:\n", stdout);
 	if ( discipline ) {
-		isoenclave->discipline_pid(isoenclave, &pid);
+		sancho->discipline_pid(sancho, &pid);
 		fprintf(stdout, "Forensic event generated for pid=%d.\n\n", \
 			pid);
 	}
@@ -268,12 +267,12 @@ extern int main(int argc, char *argv[])
 		ERR(goto done);
 	}
 
-	isoenclave->dump_forensics(isoenclave);
+	sancho->dump_forensics(sancho);
 
 
 	/* Test retrieval of the model measurement. */
 	bufr->reset(bufr);
-	if ( !isoenclave->get_measurement(isoenclave, bufr) )
+	if ( !sancho->get_measurement(sancho, bufr) )
 		ERR(goto done);
 
 	fputs("\nMeasurement:\n", stdout);
@@ -281,7 +280,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Start management interface test. */
-	if ( !isoenclave->manager(isoenclave, id_bufr, 11990, spid) )
+	if ( !sancho->manager(sancho, id_bufr, 11990, spid) )
 		ERR(goto done);
 
 	retn = true;
@@ -291,7 +290,7 @@ extern int main(int argc, char *argv[])
 	if ( idfile != NULL )
 		fclose(idfile);
 
-	WHACK(isoenclave);
+	WHACK(sancho);
 	WHACK(ivy);
 	WHACK(bufr);
 	WHACK(id_bufr);

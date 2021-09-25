@@ -16,7 +16,7 @@
 #include <HurdLib.h>
 
 #include <NAAAIM.h>
-#include "ISOidentity-interface.h"
+#include "SanchoSGX-interface.h"
 
 
 #define CHECK_REF_POINTER(ptr, siz) do {	\

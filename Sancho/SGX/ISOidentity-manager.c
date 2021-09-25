@@ -35,7 +35,7 @@
 
 #include <cboot.h>
 
-#include "ISOidentity-interface.h"
+#include "SanchoSGX-interface.h"
 #include "ContourPoint.h"
 #include "ExchangeEvent.h"
 #include "ISOidentity.h"
