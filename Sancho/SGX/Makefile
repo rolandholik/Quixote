@@ -121,16 +121,14 @@ all: ${LIBRARY} ${COBJS} enclave tools
 
 enclave: ldscript SanchoSGX.signed.so ISOmanager.signed.so
 
-SanchoSGX.signed.so: SanchoSGX.so SanchoSGX-enclave.xml
-	$(SGX_SIGNER) sign -key ${SGXKEY} -enclave $< -out $@ \
-		-config SanchoSGX-enclave.xml;
+SanchoSGX.signed.so: SanchoSGX.so SanchoSGX-enclave.meta
+	${SRDE_SIGN} -m SanchoSGX-enclave.meta -k ${SGXKEY} -e $< -o $@;
 
 SanchoSGX.so: ${ENCOBJS}
 	${ENCLAVE_CC} -o $@ $^ ${ENCLAVE_LDFLAGS};
 
-ISOmanager.signed.so: ISOmanager.so
-	$(SGX_SIGNER) sign -key ${SGXKEY} -enclave $< -out $@ \
-		-config ISOmanager-enclave.xml;
+ISOmanager.signed.so: ISOmanager.so ISOmanager-enclave.meta
+	${SRDE_SIGN} -m ISOmanager-enclave.meta -k ${SGXKEY} -e $< -o $@;
 
 ISOmanager.so: ${MGROBJS}
 	${ENCLAVE_CC} -o $@ $^ ${ENCLAVE_LDFLAGS};
