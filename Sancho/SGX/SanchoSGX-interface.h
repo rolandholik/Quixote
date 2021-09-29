@@ -25,6 +25,7 @@
 /* ECALL interface definitions. */
 struct ISOidentity_ecall0_interface {
 	_Bool retn;
+	_Bool init;
 };
 
 struct ISOidentity_ecall1_interface {

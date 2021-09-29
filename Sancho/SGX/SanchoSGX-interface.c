@@ -33,7 +33,7 @@
 
 
 /* Prototype definitions for enclave functions. */
-extern _Bool init_model(void);
+extern _Bool init_model(_Bool);
 extern _Bool update_model(struct ISOidentity_ecall1_interface *);
 extern void seal_model(void);
 extern void dump_model(void);
@@ -78,9 +78,8 @@ static sgx_status_t sgx_init_model(void *pms)
 	/* Verify arguements. */
 	CHECK_REF_POINTER(pms, sizeof(struct ISOidentity_ecall0_interface));
 
-
 	/* Call enclave function and return result. */
-	ms->retn = init_model();
+	ms->retn = init_model(ms->init);
 
 	return retn;
 }

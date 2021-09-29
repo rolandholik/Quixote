@@ -240,6 +240,8 @@ static _Bool load_enclave(CO(SanchoSGX, this), CO(char *, enclave), \
 
 
 	/* Call ECALL slot 0 to initialize the ISOidentity model. */
+	ecall0.init = true;
+
 	if ( !S->enclave->boot_slot(S->enclave, 0, ocall_table, &ecall0, \
 				    &rc) ) {
 		S->enclave_error = rc;
@@ -1468,7 +1470,23 @@ static void whack(CO(SanchoSGX, this))
 {
 	STATE(S);
 
+	int rc;
 
+	struct ISOidentity_ecall0_interface ecall0;
+
+	struct OCALL_api *ocall_table;
+
+
+	/* Call ECALL slot 0 to de-initialize the SecurityState model. */
+	ecall0.init = false;
+
+	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
+		ERR(goto done);
+
+	S->enclave->boot_slot(S->enclave, 0, ocall_table, &ecall0, &rc);
+
+
+ done:
 	WHACK(S->enclave);
 	WHACK(S->ocall);
 

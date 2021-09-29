@@ -164,7 +164,7 @@ install-bin:
 clean:
 	rm -f *.o *~ ldscript;
 	rm -f ${TOOLS};
-	rm -f ISOidentity.so ISOidentity.signed.so ISOmanager.so \
+	rm -f SanchoSGX.so SanchoSGX.signed.so ISOmanager.so \
 		ISOmanager.signed.so;
 
 clobber:

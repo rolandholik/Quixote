@@ -98,8 +98,11 @@ static int discipline_ocall(struct SanchoSGX_ocall *ocall)
 /**
  * External ECALL 0.
  *
- * This method implements the initialization of the ISOidentity model
+ * This method implements the initialization of the SecurityState model
  * inside of the enclave.
+ *
+ * \param init	A boolean value used to indicate whether the model
+ *		should be initialized or destroyed.
  *
  * \return	A boolean value is used to indicate whether or not
  *		initialization of the model succeeded.  A false value
@@ -107,13 +110,18 @@ static int discipline_ocall(struct SanchoSGX_ocall *ocall)
  *		indicates the enclave is ready to receive measurements.
  */
 
-_Bool init_model(void)
+_Bool init_model(_Bool init)
 
 {
 	_Bool retn = false;
 
 
-	INIT(NAAAIM, ISOidentity, Model, ERR(goto done));
+	if ( init ) {
+		INIT(NAAAIM, ISOidentity, Model, ERR(goto done));
+	}
+	else
+		WHACK(Model);
+
 	retn = true;
 
 
