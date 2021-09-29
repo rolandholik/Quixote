@@ -44,6 +44,9 @@
 #include <SRDEenclave.h>
 #include <ExchangeEvent.h>
 
+#include <SRDEfusion-ocall.h>
+#include <SRDEnaaaim-ocall.h>
+
 #include "SanchoSGX-interface.h"
 #include "SanchoSGX.h"
 

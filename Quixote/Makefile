@@ -8,12 +8,19 @@
 # Variable declarations.
 INSTPATH = ${DESTDIR}/opt/ESD
 
-CSRC = quixote.c quixote-mcu.c quixote-console.c test-sancho.c
+SGXDIR = ../SRDE
+include ${SGXDIR}/Make.enclave
 
-TOOLS = quixote quixote-mcu quixote-us quixote-console test-sancho test-thread
+SANCHODIR = ../Sancho
+SANCHOSGX = ${SANCHODIR}/SGX
+
+CSRC = quixote.c quixote-mcu.c quixote-sgx.c quixote-console.c test-sancho.c
+
+TOOLS = quixote quixote-mcu quixote-us quixote-sgx quixote-console \
+	test-sancho test-thread
 
 INSTALLBIN  = quixote-console
-INSTALLSBIN = quixote quixote-mcu quixote-us
+INSTALLSBIN = quixote quixote-mcu quixote-us quixote-sgx
 
 CC = musl-gcc
 
@@ -41,6 +48,11 @@ HURDLIB	     = -L ../HurdLib -lHurdLib
 NAAAIM_LIBRARY = ../lib/libNAAAIM.a
 NAAAIMLIB      = -L ../lib -lNAAAIM
 
+SEDE_LIBRARY = ../libSRDEruntime.a
+SEDELIB	     = -L ${SGXDIR} -lSRDEruntime
+
+ELFLIB = -lelf
+
 # OpenSSL crypto library
 ifeq (${CC}, musl-gcc)
 SSL_INCLUDE = /usr/local/musl/include
@@ -65,7 +77,8 @@ MODELDEPS = ../ISOidentity/Actor.o ../ISOidentity/Subject.o	     \
 	../ISOidentity/ContourPoint.o ../ISOidentity/ExchangeEvent.o \
 	../ISOidentity/ISOidentity.o
 
-CFLAGS := ${CFLAGS} -I.. -I../ISOidentity -I../lib -I../HurdLib
+CFLAGS := ${CFLAGS} -I .. -I ../ISOidentity -I ../lib -I ../HurdLib \
+	-I ${SGXDIR} -I ${SANCHOSGX}
 
 
 #
@@ -86,6 +99,10 @@ quixote-mcu: quixote-mcu.o ${LIBDEPS}
 
 quixote-us: quixote-us.o ${LIBDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${MODELDEPS} ${LIBS};
+
+quixote-sgx: quixote-sgx.o ${LIBDEPS}
+	${CC} ${LDFLAGS} -o $@ $< ${SANCHOSGX}/SanchoSGX.o ${SEDELIB} ${LIBS} \
+		${ELFLIB} ${SSL_CRYPTO};
 
 quixote-console: quixote-console.o ${LIBDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${LIBS};

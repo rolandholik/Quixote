@@ -19,7 +19,7 @@
 
 /* Number of enclave interfaces. */
 #define ECALL_NUMBER 15
-#define OCALL_NUMBER 6
+#define OCALL_NUMBER 3 + 5 + 1
 
 
 /* ECALL interface definitions. */
@@ -105,4 +105,28 @@ struct ISOidentity_ecall14 {
 
 	uint8_t *ai_event;
 	size_t ai_event_size;
+};
+
+
+/**
+ * Enumeration type which defines the userspace action being requested.
+ */
+enum SanchoSGX_ocalls {
+	SanchoSGX_discipline,
+	SanchoSGX_END
+};
+
+
+/**
+ * Structure which marshalls the data for the call into and out of
+ * the the SanchoSGX ocall.
+ */
+struct SanchoSGX_ocall {
+	_Bool retn;
+	_Bool debug;
+
+	enum SanchoSGX_ocalls ocall;
+
+	pid_t pid;
+	_Bool discipline;
 };

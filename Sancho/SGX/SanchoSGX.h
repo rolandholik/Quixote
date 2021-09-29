@@ -22,29 +22,6 @@ typedef struct NAAAIM_SanchoSGX_State * SanchoSGX_State;
 
 
 /**
- * Enumeration type which defines the userspace action being requested.
- */
-enum SanchoSGX_ocalls {
-	SanchoSGX_discipline,
-	SanchoSGX_END
-};
-
-
-/**
- * Structure which marshalls the data for the call into and out of
- * the the SanchoSGX ocall.
- */
-struct SanchoSGX_ocall {
-	_Bool retn;
-	_Bool debug;
-
-	enum SanchoSGX_ocalls ocall;
-
-	pid_t pid;
-};
-
-
-/**
  * External ExchangeEvent object representation.
  */
 struct NAAAIM_SanchoSGX

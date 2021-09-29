@@ -13,6 +13,10 @@
 /* Local defines. */
 #define SGX_DEVICE "/dev/isgx"
 
+#define SYS_CONFIG_ACTOR  437
+#define DISCIPLINE_ACTOR  1
+#define RELEASE_ACTOR	  2
+
 
 /* Include files. */
 #include <stdio.h>
@@ -61,47 +65,35 @@
 #endif
 
 
+
 /**
  * System call wrapper for setting the actor status of a process.
  */
 static inline int sys_set_bad_actor(pid_t pid, unsigned long flags)
 {
-	return syscall(327, pid, flags);
+	return syscall(SYS_CONFIG_ACTOR, pid, flags);
 }
 
 
 /* OCALL interface to handle the request to discipline a process. */
-int discipline_pid_ocall(struct SanchoSGX_ocall *oc)
+static int discipline_pid_ocall(struct SanchoSGX_ocall *oc)
 
 {
 	_Bool discipline,
 	      retn = false;
 
+	int mode = oc->discipline ? DISCIPLINE_ACTOR : RELEASE_ACTOR;
 
-	discipline = sys_set_bad_actor(oc->pid, 0);
-	if (discipline < 0 ) {
-		fprintf(stderr, "actor status error: %d:%s\n", errno, \
+
+	discipline = sys_set_bad_actor(oc->pid, mode);
+	if ( discipline < 0 ) {
+		fprintf(stderr, "actor %s status error: %d:%s\n",	  \
+			oc->discipline ? "discipline" : "release", errno, \
 			strerror(errno));
-		retn = false;
 		goto done;
 	}
 
-	if ( discipline > 0 ) {
-		if ( oc->debug )
-			fprintf(stderr, "PID is disciplined: %d\n", oc->pid);
-	}
-	else {
-		if ( oc->debug )
-			fprintf(stderr, "PID not disciplined: %d, " \
-				"disciplining.\n", oc->pid);
-		discipline = sys_set_bad_actor(oc->pid, 1);
-		if ( discipline < 0 ) {
-			fprintf(stderr, "actor status error: %d:%s\n", errno, \
-			        strerror(errno));
-			retn = false;
-			goto done;
-		}
-	}
+	retn = true;
 
 
  done:

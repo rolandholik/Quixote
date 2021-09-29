@@ -17,6 +17,9 @@
 
 #include <NAAAIM.h>
 
+#include <SRDEfusion-ocall.h>
+#include <SRDEnaaaim-ocall.h>
+
 #include "SanchoSGX-interface.h"
 #include "regex.h"
 #include "ContourPoint.h"
@@ -74,8 +77,8 @@ static int discipline_ocall(struct SanchoSGX_ocall *ocall)
 		ocp->pid = ocall->pid;
 
 
-	/* Call the SGX duct manager. */
-	if ( (status = sgx_ocall(5, ocp)) == 0 ) {
+	/* Call the SanchoSGX ocall routine. */
+	if ( (status = sgx_ocall(SRDENAAAIM_MAX_OCALL + 1, ocp)) == 0 ) {
 		retn = true;
 		*ocall = *ocp;
 	}
@@ -169,17 +172,16 @@ _Bool update_model(struct ISOidentity_ecall1_interface *ecall1)
 		ERR(goto done);
 	if ( !updated )
 		WHACK(event);
-	if ( ecall1->discipline ) {
-		if ( !Model->discipline_pid(Model, &pid) )
-			ERR(goto done);
+	if ( !Model->discipline_pid(Model, &pid) )
+		ERR(goto done);
 
-		memset(&ocall, '\0', sizeof(struct SanchoSGX_ocall));
-		ocall.pid   = pid;
-		ocall.debug = ecall1->debug;
-		ocall.ocall = SanchoSGX_discipline;
-		if ( discipline_ocall(&ocall) != 0 )
-			ERR(goto done);
-	}
+	memset(&ocall, '\0', sizeof(struct SanchoSGX_ocall));
+	ocall.pid	 = pid;
+	ocall.debug	 = ecall1->debug;
+	ocall.ocall	 = SanchoSGX_discipline;
+	ocall.discipline = ecall1->discipline;
+	if ( discipline_ocall(&ocall) != 0 )
+		ERR(goto done);
 
 	retn = true;
 

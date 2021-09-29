@@ -32,6 +32,8 @@
 
 #include <SRDE.h>
 #include <SRDEfusion.h>
+#include <SRDEfusion-ocall.h>
+#include <SRDEnaaaim-ocall.h>
 
 #include <cboot.h>
 
