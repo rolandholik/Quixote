@@ -628,7 +628,7 @@ static _Bool send_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
 		ERR(goto done);
 	if ( Debug )
-		fprintf(stderr, "Sent trajectory size: %zu\n", cnt);
+		fprintf(Debug, "Sent trajectory size: %zu\n", cnt);
 
 
 	/* Send each trajectory point. */
