@@ -17,6 +17,11 @@
 #define ISO_IDENTITY_CONTOURS	2
 
 
+/* Security state measurement definitions. */
+#define DOMAIN_MEASUREMENT 0
+#define DOMAIN_STATE	   1
+
+
 /* Number of enclave interfaces. */
 #define ECALL_NUMBER 15
 #define OCALL_NUMBER 3 + 5 + 1
@@ -49,6 +54,7 @@ struct ISOidentity_ecall5_interface {
 
 struct ISOidentity_ecall6_interface {
 	_Bool retn;
+	int type;
 	unsigned char measurement[NAAAIM_IDSIZE];
 };
 

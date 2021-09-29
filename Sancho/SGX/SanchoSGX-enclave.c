@@ -429,13 +429,20 @@ _Bool add_ai_event(struct ISOidentity_ecall14 *ecall14)
 /**
  * External ECALL.
  *
- * This method implements retrieving the current measurement value
- * from the model.
+ * This method implements retrieving the security domain attestation
+ * value.
  *
  * \param aggregate	The buffer which will be loaded with the
  *			binary measurement value.  This routine
  *			assumes the length of the buffer to be
  *			the current identity size of 32 bytes.
+ *
+ * \param type		An integer value indicating the type of
+ *			measurement to be returned.  A value of zero
+ *			indicates that the time domain dependent
+ *			measurement is to be returned.  A value of
+ *			one indicates that the time independent state
+ *			value should be returned.
  *
  * \return		A boolean value is returned to indicate the
  *			status of the retrieval of the measurement
@@ -445,7 +452,7 @@ _Bool add_ai_event(struct ISOidentity_ecall14 *ecall14)
  *			valid.
  */
 
-_Bool get_measurement(unsigned char *measurement)
+_Bool get_measurement(unsigned char *measurement, int type)
 
 {
 	_Bool retn = false;
@@ -455,8 +462,14 @@ _Bool get_measurement(unsigned char *measurement)
 
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 
-	if ( !Model->get_measurement(Model, bufr) )
-		ERR(goto done);
+	if ( type == DOMAIN_MEASUREMENT ) {
+		if ( !Model->get_measurement(Model, bufr) )
+			ERR(goto done);
+	}
+	else {
+		if ( !Model->get_state(Model, bufr) )
+			ERR(goto done);
+	}
 
 	memcpy(measurement, bufr->get(bufr), bufr->size(bufr));
 	retn = true;

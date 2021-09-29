@@ -100,7 +100,7 @@ quixote-mcu: quixote-mcu.o ${LIBDEPS}
 quixote-us: quixote-us.o ${LIBDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${MODELDEPS} ${LIBS};
 
-quixote-sgx: quixote-sgx.o ${LIBDEPS}
+quixote-sgx: quixote-sgx.o ${SANCHOSGX}/SanchoSGX.o ${LIBDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${SANCHOSGX}/SanchoSGX.o ${SEDELIB} ${LIBS} \
 		${ELFLIB} ${SSL_CRYPTO};
 

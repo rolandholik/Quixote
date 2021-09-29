@@ -526,11 +526,13 @@ static _Bool add_ai_event(CO(SanchoSGX, this), CO(String, event))
 /**
  * External public method.
  *
- * This method is an accessor method for accessing the currrent
- * measurement of the model.
+ * This method is an accessor method for accessing the current
+ * measurement of of a security domain.
  *
- * \param this	A pointer to the canister whose measurement is to be
- *		retrieved.
+ * \param this	A pointer to the TMA for the domain whose measurement
+ *		is to be retrieved.
+ *
+ * \param bufr	The object which the state will be returned in.
  *
  * \param bufr	The object which the measurement will be returned in.
  *
@@ -565,6 +567,74 @@ static _Bool get_measurement(CO(SanchoSGX, this), CO(Buffer, bufr))
 
 
 	/* Call ECALL slot 6 to get model measurement. */
+	ecall6.type = DOMAIN_MEASUREMENT;
+
+	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
+		ERR(goto done);
+
+	if ( !S->enclave->boot_slot(S->enclave, 6, ocall_table, &ecall6, \
+				    &rc) ) {
+		S->enclave_error = rc;
+		ERR(goto done);
+	}
+	if ( !ecall6.retn )
+		ERR(goto done);
+	if ( !bufr->add(bufr, ecall6.measurement, sizeof(ecall6.measurement)) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method is an accessor method for accessing the currrent
+ * security state value of a security domain.
+ *
+ * \param this	A pointer to the TMA for the domain whose state is to
+ *		be retrieved.
+ *
+ * \param bufr	The object which the state will be returned in.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		a valid state was returned.  A false value
+ *		indicate a failure in returning state while a
+ *		true value indicates the object contains a valid
+ *		measurement.
+ */
+
+static _Bool get_state(CO(SanchoSGX, this), CO(Buffer, bufr))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	int rc;
+
+	struct OCALL_api *ocall_table;
+
+	struct ISOidentity_ecall6_interface ecall6;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( bufr == NULL )
+		ERR(goto done);
+	if ( bufr->poisoned(bufr) )
+		ERR(goto done);
+
+
+	/* Call ECALL slot 6 to get model measurement. */
+	ecall6.type = DOMAIN_STATE;
+
 	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
 		ERR(goto done);
 
@@ -1542,6 +1612,7 @@ extern SanchoSGX NAAAIM_SanchoSGX_Init(void)
 
 	this->set_aggregate   = set_aggregate;
 	this->get_measurement = get_measurement;
+	this->get_state	      = get_state;
 	this->discipline_pid  = discipline_pid;
 
 	this->get_event	   = get_event;

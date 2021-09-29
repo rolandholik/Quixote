@@ -37,6 +37,7 @@ struct NAAAIM_SanchoSGX
 	_Bool (*add_ai_event)(const SanchoSGX, const String);
 
 	_Bool (*get_measurement)(const SanchoSGX, const Buffer);
+	_Bool (*get_state)(const SanchoSGX, const Buffer);
 	_Bool (*discipline_pid)(const SanchoSGX, pid_t *);
 
 	void (*rewind_event)(const SanchoSGX);

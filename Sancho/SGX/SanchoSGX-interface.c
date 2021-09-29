@@ -39,7 +39,7 @@ extern void seal_model(void);
 extern void dump_model(void);
 extern size_t get_size(int);
 extern _Bool set_aggregate(uint8_t *, size_t);
-extern _Bool get_measurement(unsigned char *);
+extern _Bool get_measurement(unsigned char *, int);
 extern _Bool get_pid(pid_t *);
 extern void rewind(int);
 extern _Bool get_event(int, char *, size_t);
@@ -260,7 +260,7 @@ static sgx_status_t sgx_get_measurement(void *pms)
 
 
 	/* Call enclave function with local arguement. */
-	ms->retn = get_measurement(e_measurement);
+	ms->retn = get_measurement(e_measurement, ms->type);
 	memcpy(ms->measurement, e_measurement, NAAAIM_IDSIZE);
 
 

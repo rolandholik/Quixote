@@ -986,7 +986,6 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 			break;
 
 		case show_state:
-#if 0
 			cmdbufr->reset(cmdbufr);
 			if ( !Model->get_state(Model, cmdbufr) )
 				ERR(goto done);
@@ -994,7 +993,6 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 			if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
 				ERR(goto done);
 			retn = true;
-#endif
 			break;
 
 		case show_trajectory:
