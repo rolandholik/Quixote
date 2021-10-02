@@ -43,6 +43,7 @@ struct NAAAIM_ISOidentity
 
 	void (*rewind_event)(const ISOidentity);
 	_Bool (*get_event)(const ISOidentity, ExchangeEvent *);
+	size_t (*trajectory_size)(const ISOidentity);
 
 	void (*rewind_contours)(const ISOidentity);
 	_Bool (*get_contour)(const ISOidentity, ContourPoint *);

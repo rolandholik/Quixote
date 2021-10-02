@@ -931,6 +931,27 @@ static void rewind_event(CO(ISOidentity, this))
 /**
  * External public method.
  *
+ * This method implements returning the number of event in the
+ * security domain.
+ *
+ * \param this	A pointer to the object whose event size is to be returned.
+ *
+ * \return	The size of the events list.
+ *
+ */
+
+static size_t trajectory_size(CO(ISOidentity, this))
+
+{
+	STATE(S);
+
+	return S->trajectory->size(S->trajectory) / sizeof(Buffer);
+}
+
+
+/**
+ * External public method.
+ *
  * This method is an accessor method for retrieving the contour points
  * which comprise the behavior model implemented in an object.  This
  * method is designed to be called repeatedly until the list of events
@@ -1420,8 +1441,9 @@ extern ISOidentity NAAAIM_ISOidentity_Init(void)
 	this->get_state	      = get_state;
 	this->discipline_pid  = discipline_pid;
 
-	this->get_event	   = get_event;
-	this->rewind_event = rewind_event;
+	this->get_event	       = get_event;
+	this->rewind_event     = rewind_event;
+	this->trajectory_size  = trajectory_size;
 
 	this->get_contour     = get_contour;
 	this->rewind_contours = rewind_contours;
