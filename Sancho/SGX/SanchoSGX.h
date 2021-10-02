@@ -43,8 +43,9 @@ struct NAAAIM_SanchoSGX
 	void (*rewind_event)(const SanchoSGX);
 	_Bool (*get_event)(const SanchoSGX, String);
 
-	void (*rewind_contours)(const SanchoSGX);
-	_Bool (*get_contour)(const SanchoSGX, Buffer);
+	void (*rewind_points)(const SanchoSGX);
+	_Bool (*get_point)(const SanchoSGX, Buffer);
+	size_t (*trajectory_size)(const SanchoSGX);
 
 	void (*rewind_forensics)(const SanchoSGX);
 	_Bool (*get_forensics)(const SanchoSGX, String);

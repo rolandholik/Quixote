@@ -621,7 +621,7 @@ static _Bool send_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	 * Compute the number of elements in the list and send it to
 	 * the client.
 	 */
-	cnt = Model->size(Model);
+	cnt = Model->trajectory_size(Model);
 
 	cmdbufr->reset(cmdbufr);
 	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
@@ -765,9 +765,6 @@ static _Bool send_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 static _Bool send_points(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 {
-#if 1
-	return true;
-#else
 	_Bool retn = false;
 
 	uint8_t *p,
@@ -777,8 +774,6 @@ static _Bool send_points(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 	size_t lp,
 	       cnt = 0;
-
-	ContourPoint cp = NULL;
 
 
 	/*
@@ -792,20 +787,18 @@ static _Bool send_points(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
 		ERR(goto done);
 	if ( Debug )
-		fprintf(Debug, "Sent contour size: %zu\n", cnt);
+		fprintf(Debug, "Sent state size: %zu\n", cnt);
 
 
 	/* Send each trajectory point. */
-	Model->rewind_contours(Model);
+	Model->rewind_points(Model);
 
 	for (lp= 0; lp < cnt; ++lp ) {
-		if ( !Model->get_contour(Model, &cp) )
+		cmdbufr->reset(cmdbufr);
+		if ( !Model->get_point(Model, cmdbufr) )
 			ERR(goto done);
-		if ( cp == NULL )
-			continue;
 
-		memset(point, '\0', sizeof(point));
-		p = cp->get(cp);
+		p = cmdbufr->get(cmdbufr);
 		for (pi= 0; pi < NAAAIM_IDSIZE; ++pi)
 			snprintf(&point[pi*2], 3, "%02x", *p++);
 
@@ -820,7 +813,6 @@ static _Bool send_points(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
  done:
 
 	return retn;
-#endif
 }
 
 

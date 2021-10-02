@@ -48,6 +48,7 @@ extern _Bool generate_identity(uint8_t *);
 extern _Bool update_map(struct ISOidentity_ecall12_interface *);
 extern _Bool add_verifier(struct ISOidentity_ecall13 *);
 extern _Bool add_ai_event(struct ISOidentity_ecall14 *);
+extern _Bool get_point(uint8_t *);
 
 
 static _Bool SGXidf_untrusted_region(void *ptr, size_t size)
@@ -562,6 +563,37 @@ static sgx_status_t sgx_add_ai_event(void *pms)
 }
 
 
+/* ECALL15 interface function. */
+static sgx_status_t sgx_get_point(void *pms)
+
+{
+	sgx_status_t status = SGX_ERROR_INVALID_PARAMETER;
+
+	struct SanchoSGX_ecall15 *ms,
+				 ecall15;
+
+
+	/* Verify argument. */
+	if ( !SGXidf_untrusted_region(pms, sizeof(struct SanchoSGX_ecall15)) )
+		goto done;
+	ms = (struct SanchoSGX_ecall15 *) pms;
+	__builtin_ia32_lfence();
+
+
+	/* Call the trusted function. */
+	memset(&ecall15, '\0', sizeof(struct SanchoSGX_ecall15));
+	ecall15.retn = get_point(ecall15.point);
+
+	*ms = ecall15;
+	status = SGX_SUCCESS;
+
+
+ done:
+	memset(&ecall15, '\0', sizeof(struct SanchoSGX_ecall15));
+	return status;
+}
+
+
 /* ECALL interface table. */
 SGX_EXTERNC const struct {
 	size_t nr_ecall;
@@ -583,7 +615,8 @@ SGX_EXTERNC const struct {
 		{(void*)(uintptr_t)sgx_generate_identity, 0},
 		{(void*)(uintptr_t)sgx_update_map, 0},
 		{(void*)(uintptr_t)sgx_add_verifier, 0},
-		{(void*)(uintptr_t)sgx_add_ai_event, 0}
+		{(void*)(uintptr_t)sgx_add_ai_event, 0},
+		{(void*)(uintptr_t)sgx_get_point, 0}
 	}
 };
 
@@ -595,14 +628,14 @@ SGX_EXTERNC const struct {
 } g_dyn_entry_table = {
 	OCALL_NUMBER,
 	{
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 	}
 };

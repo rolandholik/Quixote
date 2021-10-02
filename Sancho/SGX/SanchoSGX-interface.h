@@ -14,7 +14,7 @@
 /* Model selector definitions. */
 #define ISO_IDENTITY_EVENT     	0
 #define ISO_IDENTITY_FORENSICS	1
-#define ISO_IDENTITY_CONTOURS	2
+#define DOMAIN_POINTS		2
 
 
 /* Security state measurement definitions. */
@@ -23,7 +23,7 @@
 
 
 /* Number of enclave interfaces. */
-#define ECALL_NUMBER 15
+#define ECALL_NUMBER 16
 #define OCALL_NUMBER 3 + 5 + 1
 
 
@@ -112,6 +112,12 @@ struct ISOidentity_ecall14 {
 
 	uint8_t *ai_event;
 	size_t ai_event_size;
+};
+
+struct SanchoSGX_ecall15 {
+	_Bool retn;
+
+	uint8_t point[NAAAIM_IDSIZE];
 };
 
 

@@ -840,33 +840,113 @@ static void rewind_event(CO(SanchoSGX, this))
 /**
  * External public method.
  *
- * This method is an accessor method for retrieving the contour points
- * which comprise the behavior model implemented in an object.  This
- * method is designed to be called repeatedly until the list of events
- * is completely traversed.  The traversal can be reset by calling the
- * ->rewind_contours method.
+ * This method implements returning the number of security state events
+ * in the security domain
  *
- * \param this		A pointer to the canister whose contours are to
- *			be retrieved.
+ * \param this	A pointer to the object whose events size is to be
+ *		returned.
  *
- * \param contour	The object which the contour will be copied to.
+ * \return	The number of security state events
  *
- * \return	A boolean value is used to indicate whether or not
- *		a contour event was returned.  A false value
- *		indicates a failure occurred and a valid conour is
- *		not available.  A true value indicates the contour
- *		object contains a valid value.
- *
- *		The end of the contour list is signified by a NULL
- *		contour object being set.
  */
 
-static _Bool get_contour(CO(SanchoSGX, this), Buffer contour)
+static size_t trajectory_size(CO(SanchoSGX, this))
 
 {
-	_Bool retn = true;
+	STATE(S);
+
+	_Bool retn = false;
+
+	int rc;
+
+	struct OCALL_api *ocall_table;
+
+	struct ISOidentity_ecall4_interface ecall4;
 
 
+	/* Call ECALL slot 4 to get the size. */
+	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
+		ERR(goto done);
+
+	ecall4.type = DOMAIN_POINTS;
+	ecall4.size = 0;
+	if ( !S->enclave->boot_slot(S->enclave, 4, ocall_table, &ecall4, \
+				    &rc) ) {
+		S->enclave_error = rc;
+		ERR(goto done);
+	}
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return ecall4.size;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method is an accessor method for retrieving the security state
+ * points in the domain.  This method is designed to be called
+ * repeatedly until the list of points is completely traversed.  The
+ * traversal can be reset by calling the ->rewind_contours method.
+ *
+ * \param this		A pointer to the domain whose contours are to
+ *			be retrieved.
+ *
+ * \param point		The object which the point will be copied into.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		a state pointd was returned.  A false value indicates
+ *		a failure occurred and a valid state point is not
+ *		available.  A true value indicates the point object
+ *		contains a valid value.
+ */
+
+static _Bool get_point(CO(SanchoSGX, this), Buffer point)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	int rc;
+
+	struct OCALL_api *ocall_table;
+
+	struct SanchoSGX_ecall15 ecall15;
+
+
+	/* Verify object and inputs. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( point == NULL )
+		ERR(goto done);
+	if ( point->poisoned(point) )
+		ERR(goto done);
+
+
+	/* Call slot 15 to get the state point. */
+	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
+		ERR(goto done);
+
+	if ( !S->enclave->boot_slot(S->enclave, 15, ocall_table, &ecall15, \
+				    &rc) ) {
+		S->enclave_error = rc;
+		ERR(goto done);
+	}
+	if ( !ecall15.retn )
+		ERR(goto done);
+
+	if ( !point->add(point, ecall15.point, sizeof(ecall15.point)) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
 	return retn;
 }
 
@@ -882,9 +962,42 @@ static _Bool get_contour(CO(SanchoSGX, this), Buffer contour)
  * \return	No return value is defined.
  */
 
-static void rewind_contours(CO(SanchoSGX, this))
+static void rewind_points(CO(SanchoSGX, this))
 
 {
+	STATE(S);
+
+	_Bool retn = false;
+
+	int rc;
+
+	struct OCALL_api *ocall_table;
+
+	struct ISOidentity_ecall8_interface ecall8;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+
+
+	/* Call ECALL slot 8 to rewind points cursor. */
+	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
+		ERR(goto done);
+
+	ecall8.type = DOMAIN_POINTS;
+	if ( !S->enclave->boot_slot(S->enclave, 8, ocall_table, &ecall8, \
+				    &rc) ) {
+		S->enclave_error = rc;
+		ERR(goto done);
+	}
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
 	return;
 }
 
@@ -1615,11 +1728,12 @@ extern SanchoSGX NAAAIM_SanchoSGX_Init(void)
 	this->get_state	      = get_state;
 	this->discipline_pid  = discipline_pid;
 
-	this->get_event	   = get_event;
-	this->rewind_event = rewind_event;
+	this->get_event	      = get_event;
+	this->rewind_event    = rewind_event;
+	this->trajectory_size = trajectory_size;
 
-	this->get_contour     = get_contour;
-	this->rewind_contours = rewind_contours;
+	this->get_point     = get_point;
+	this->rewind_points = rewind_points;
 
 	this->get_forensics	= get_forensics;
 	this->rewind_forensics	= rewind_forensics;

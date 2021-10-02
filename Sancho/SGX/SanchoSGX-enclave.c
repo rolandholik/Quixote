@@ -289,11 +289,14 @@ size_t get_size(int type)
 
 	/* Return the requested model size. */
 	switch ( type ) {
-		case 0:
-			size = Model->size(Model);
+		case ISO_IDENTITY_EVENT:
+			size = Model->contours_size(Model);
 			break;
-		case 1:
+		case ISO_IDENTITY_FORENSICS:
 			size = Model->forensics_size(Model);
+			break;
+		case DOMAIN_POINTS:
+			size = Model->trajectory_size(Model);
 			break;
 	}
 
@@ -543,7 +546,7 @@ void rewind(int type)
 		case ISO_IDENTITY_FORENSICS:
 			Model->rewind_forensics(Model);
 			break;
-		case ISO_IDENTITY_CONTOURS:
+		case DOMAIN_POINTS:
 			Model->rewind_contours(Model);
 			break;
 	}
@@ -628,5 +631,46 @@ _Bool get_event(char type, char *update, size_t size)
  done:
 	WHACK(es);
 
+	return retn;
+}
+
+
+/**
+ * External ECALL 15.
+ *
+ * This method implements the retrieval of security event state points
+ *
+ * \param point		A character pointer to the buffer that the binary
+ *			value of the state point will be loaded into.
+ *			An assumption is made that the pointer
+ *			references an area large enough to hold
+ *			the binary value of a state point.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		a valid value is returned.  A false value indicates
+ *		a valid event is not available while a true value
+ *		indicates the event return was valid.
+ */
+
+_Bool get_point(unsigned char *pt)
+
+{
+	_Bool retn = false;
+
+	ContourPoint cp = NULL;
+
+
+	if ( !Model->get_contour(Model, &cp) )
+		ERR(goto done);
+	if ( cp == NULL )
+		ERR(goto done);
+
+	cp->get(cp);
+	memcpy(pt, cp->get(cp), NAAAIM_IDSIZE);
+
+	retn = true;
+
+
+ done:
 	return retn;
 }
