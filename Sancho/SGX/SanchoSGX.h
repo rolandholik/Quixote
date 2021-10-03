@@ -28,6 +28,8 @@ struct NAAAIM_SanchoSGX
 {
 	/* External methods. */
 	_Bool (*load_enclave)(const SanchoSGX, const char *, const char *);
+	_Bool (*load_enclave_memory)(const SanchoSGX, const uint8_t *, \
+				     size_t, const char *);
 
 	_Bool (*update)(const SanchoSGX, const String, _Bool *);
 	_Bool (*update_map)(const SanchoSGX, const Buffer);

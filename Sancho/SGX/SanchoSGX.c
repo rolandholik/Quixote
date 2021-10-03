@@ -266,6 +266,115 @@ static _Bool load_enclave(CO(SanchoSGX, this), CO(char *, enclave), \
 /**
  * External public method.
  *
+ * This method implements opening a SanchoSGX trusted modeling agent
+ * from a memory image.
+ *
+ * \param this 		A pointer to the SanchoSGX modeling object.
+ *
+ * \param enclave	A pointer to the memory buffer containing
+ *			the enclave to load.
+ *
+ * \param size		The size of the memory buffer containing the
+ *			enclave image.
+ *
+ * \param token		A null terminated buffer containing the name
+ *			of the file containing the initialization
+ *			token.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the enclave was successfully loaded..  A false value
+ *		indicates a failure while a true value indicates
+ *	        the enclave was loaded an initialized.
+ */
+
+static _Bool load_enclave_memory(CO(SanchoSGX, this), CO(uint8_t *, enclave), \
+				 size_t size, CO(char *, token))
+
+{
+	STATE(S);
+
+	int rc;
+
+	_Bool retn = false;
+
+	struct SGX_einittoken *einit_token;
+
+	struct ISOidentity_ecall0_interface ecall0;
+
+	struct OCALL_api *ocall_table;
+
+	Buffer tbufr = NULL;
+
+	File token_file = NULL;
+
+
+	/* Load the EINITTOKEN. */
+	INIT(HurdLib, File, token_file, ERR(goto done));
+	INIT(HurdLib, Buffer, tbufr, ERR(goto done));
+
+	if ( !token_file->open_ro(token_file, token) )
+		ERR(goto done);
+	if ( !token_file->slurp(token_file, tbufr) )
+		ERR(goto done);
+	einit_token = (struct SGX_einittoken *) tbufr->get(tbufr);
+
+
+	/* Load and initialize the enclave. */
+	INIT(NAAAIM, SRDEenclave, S->enclave, ERR(goto done));
+
+	if ( !S->enclave->open_enclave_memory(S->enclave, SGX_DEVICE, \
+					      (const char *) enclave, size,
+					      true) )
+		ERR(goto done);
+
+	if ( !S->enclave->create_enclave(S->enclave) )
+		ERR(goto done);
+
+	if ( !S->enclave->load_enclave(S->enclave) )
+		ERR(goto done);
+
+	if ( !S->enclave->init_enclave(S->enclave, einit_token) )
+		ERR(goto done);
+
+
+	/* Setup the OCALL dispatch table. */
+	INIT(NAAAIM, SRDEocall, S->ocall, ERR(goto done));
+
+	S->ocall->add_table(S->ocall, SRDEfusion_ocall_table);
+	S->ocall->add_table(S->ocall, SRDEnaaaim_ocall_table);
+	S->ocall->add(S->ocall,	discipline_pid_ocall);
+
+	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
+		ERR(goto done);
+
+
+	/* Call ECALL slot 0 to initialize the ISOidentity model. */
+	ecall0.init = true;
+
+	if ( !S->enclave->boot_slot(S->enclave, 0, ocall_table, &ecall0, \
+				    &rc) ) {
+		S->enclave_error = rc;
+		ERR(goto done);
+	}
+	if ( !ecall0.retn )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	WHACK(tbufr);
+	WHACK(token_file);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements updating the currently maintained behavioral
  * model with an information exchange event.
  *
@@ -1716,7 +1825,8 @@ extern SanchoSGX NAAAIM_SanchoSGX_Init(void)
 	/* Initialize aggregate objects. */
 
 	/* Method initialization. */
-	this->load_enclave = load_enclave;
+	this->load_enclave	  = load_enclave;
+	this->load_enclave_memory = load_enclave_memory;
 
 	this->update	 = update;
 	this->update_map = update_map;

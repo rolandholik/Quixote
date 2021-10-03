@@ -14,13 +14,14 @@ include ${SGXDIR}/Make.enclave
 SANCHODIR = ../Sancho
 SANCHOSGX = ${SANCHODIR}/SGX
 
-CSRC = quixote.c quixote-mcu.c quixote-sgx.c quixote-console.c test-sancho.c
+CSRC = quixote.c quixote-mcu.c quixote-sgx.c quixote-sgx-u.c \
+	quixote-console.c test-sancho.c
 
-TOOLS = quixote quixote-mcu quixote-us quixote-sgx quixote-console \
-	test-sancho test-thread
+TOOLS = quixote quixote-mcu quixote-us quixote-sgx quixote-sgx-u \
+	quixote-console test-sancho test-thread
 
 INSTALLBIN  = quixote-console
-INSTALLSBIN = quixote quixote-mcu quixote-us quixote-sgx
+INSTALLSBIN = quixote quixote-mcu quixote-us quixote-sgx quixote-sgx-u
 
 CC = musl-gcc
 
@@ -104,6 +105,11 @@ quixote-sgx: quixote-sgx.o ${SANCHOSGX}/SanchoSGX.o ${LIBDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${SANCHOSGX}/SanchoSGX.o ${SEDELIB} ${LIBS} \
 		${ELFLIB} ${SSL_CRYPTO};
 
+quixote-sgx-u: quixote-sgx-u.o ${SANCHOSGX}/SanchoSGX.o sancho-enclave.h \
+	${LIBDEPS}
+	${CC} ${LDFLAGS} -o $@ $< ${SANCHOSGX}/SanchoSGX.o ${SEDELIB} ${LIBS} \
+		${ELFLIB} ${SSL_CRYPTO};
+
 quixote-console: quixote-console.o ${LIBDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
 
@@ -112,6 +118,10 @@ test-sancho: test-sancho.o ${LIBDEPS}
 
 test-thread: test-thread.o ${LIBDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${LIBS} -lpthread;
+
+sancho-enclave.h:
+	${SGXDIR}/generate-array -i ${SANCHOSGX}/SanchoSGX.signed.so \
+		-n Enclave > $@ || rm $@;
 
 install-bin:
 	[ -d ${INSTPATH}/bin ] || mkdir -p ${INSTPATH}/bin;
@@ -130,5 +140,6 @@ clean:
 quixote.o: quixote.h sancho-cmd.h
 quixote-us.o: quixote.h sancho-cmd.h
 quixote-mcu.o: quixote.h sancho-cmd.h
+quixote-sgx-u.o: quixote.h sancho-cmd.h sancho-enclave.h
 quixote-console.o: sancho-cmd.h
 test-sancho.o: sancho-cmd.h
