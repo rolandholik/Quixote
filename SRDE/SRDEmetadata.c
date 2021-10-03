@@ -455,17 +455,16 @@ static _Bool load_memory(CO(SRDEmetadata, this), char * enclave, \
 
 	_Bool retn = false;
 
-	uint8_t *dirp;
+	uint8_t *dirp,
+		*metaptr;
 
 	uint32_t cnt;
 
 	int index;
 
-	size_t name_index,
-	       offset;
+	size_t name_index;
 
-	uint32_t name_size,
-		 desc_size;
+	uint32_t name_size;
 
 	Elf64_Ehdr *ehdr;
 
@@ -516,13 +515,13 @@ static _Bool load_memory(CO(SRDEmetadata, this), char * enclave, \
 		if ( strcmp((char *) (name_data->d_buf + shdr->sh_name),
 			    ".note.sgxmeta") == 0 ) {
 			name_size = *((uint32_t *) data->d_buf);
-			desc_size = *((uint32_t *) (data->d_buf + \
-						    sizeof(uint32_t)));
-			offset = (3 * sizeof(uint32_t)) + name_size;
+			S->section_size = *((uint32_t *) (data->d_buf + \
+							  sizeof(uint32_t)));
+			metaptr = data->d_buf + (3 * sizeof(uint32_t)) + \
+				name_size;
 
-			memcpy(&S->metadata, \
-			       (uint8_t *) (data->d_buf + offset), desc_size);
-			retn = true;
+			if ( !_load_metadata(this, metaptr) )
+				ERR(goto done);
 		}
 	}
 
@@ -557,6 +556,8 @@ static _Bool load_memory(CO(SRDEmetadata, this), char * enclave, \
 				sizeof(struct _layout_entry_t));
 		++layout;
 	}
+
+	retn = true;
 
 
  done:
