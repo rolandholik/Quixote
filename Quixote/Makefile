@@ -119,7 +119,7 @@ test-sancho: test-sancho.o ${LIBDEPS}
 test-thread: test-thread.o ${LIBDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${LIBS} -lpthread;
 
-sancho-enclave.h:
+sancho-enclave.h: ${SANCHOSGX}/SanchoSGX.signed.so
 	${SGXDIR}/generate-array -i ${SANCHOSGX}/SanchoSGX.signed.so \
 		-n Enclave > $@ || rm $@;
 
