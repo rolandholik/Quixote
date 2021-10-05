@@ -843,9 +843,6 @@ static _Bool send_points(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 static _Bool send_events(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 {
-#if 1
-	return true;
-#else
 	_Bool retn = false;
 
 	size_t lp,
@@ -855,27 +852,29 @@ static _Bool send_events(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 
 	/*
-	 * Compute the number of elements in the AI list and send it to
+	 * Compute the number of elements in the TE list and send it to
 	 * the client.
 	 */
-	cnt = Model->size(Model);
+	cnt = Model->te_size(Model);
 
 	cmdbufr->reset(cmdbufr);
 	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
 	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
 		ERR(goto done);
 	if ( Debug )
-		fprintf(Debug, "Sent event size: %zu\n", cnt);
+		fprintf(Debug, "Sent TE size: %zu\n", cnt);
 
 
 	/* Send each event. */
-	Model->rewind_event(Model);
+	INIT(HurdLib, String, event, ERR(goto done));
+
+	Model->rewind_te(Model);
 
 	for (lp= 0; lp < cnt; ++lp) {
-		if ( !Model->get_event(Model, event) )
+		if ( !Model->get_te_event(Model, event) )
 			ERR(goto done);
 		if ( Debug )
-			fprintf(Debug, "Have event: %s\n", event->get(event));
+			fprintf(Debug, "Have TE: %s\n", event->get(event));
 		if ( event == NULL )
 			continue;
 
@@ -884,14 +883,17 @@ static _Bool send_events(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 			     event->size(event));
 		if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
 			ERR(goto done);
+
+		event->reset(event);
 	}
 
 	retn = true;
 
 
  done:
+	WHACK(event);
+
 	return retn;
-#endif
 }
 
 

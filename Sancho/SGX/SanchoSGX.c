@@ -635,6 +635,177 @@ static _Bool add_ai_event(CO(SanchoSGX, this), CO(String, event))
 /**
  * External public method.
  *
+ * This method is an accessor method for retrieving a TE event from a
+ * security domain model.  This method is designed to be called
+ * repeatedly until the list of events is completely traversed.  The
+ * traversal can be reset by calliong the ->rewind_event method.
+ *
+ * \param this	A pointer to the security domain whose TE events are to
+ *		be retrieved.
+ *
+ * \param event	The object which the event will be copied into.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		a valid event was returned.  A false value
+ *		indicates a failure occurred and a valid event is
+ *		not available.  A true value indicates the event
+ *		object contains a valid value.
+ *
+ *		The end of the event list is signified by a NULL
+ *		event object being set.
+ */
+
+static _Bool get_te_event(CO(SanchoSGX, this), String event)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	int rc;
+
+	struct OCALL_api *ocall_table;
+
+	struct ISOidentity_ecall9_interface ecall9;
+
+
+	/* Verify object and inputs. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( event == NULL )
+		ERR(goto done);
+	if ( event->poisoned(event) )
+		ERR(goto done);
+
+
+	/* Call slot 9 to get model event. */
+	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
+		ERR(goto done);
+
+	ecall9.type = TE_EVENTS;
+	if ( !S->enclave->boot_slot(S->enclave, 9, ocall_table, &ecall9, \
+				    &rc) ) {
+		S->enclave_error = rc;
+		ERR(goto done);
+	}
+	if ( !ecall9.retn )
+		ERR(goto done);
+
+	if ( strlen(ecall9.event) != 0 ) {
+		if ( !event->add(event, ecall9.event) )
+			ERR(goto done);
+	}
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements returning the number of TE events in a
+ * security domain
+ *
+ * \param this	A pointer to the object whose TE size is to be
+ *		returned.
+ *
+ * \return	The number of TE events.
+ *
+ */
+
+static size_t te_size(CO(SanchoSGX, this))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	int rc;
+
+	struct OCALL_api *ocall_table;
+
+	struct ISOidentity_ecall4_interface ecall4;
+
+
+	/* Call ECALL slot 4 to get the size. */
+	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
+		ERR(goto done);
+
+	ecall4.type = TE_EVENTS;
+	ecall4.size = 0;
+	if ( !S->enclave->boot_slot(S->enclave, 4, ocall_table, &ecall4, \
+				    &rc) ) {
+		S->enclave_error = rc;
+		ERR(goto done);
+	}
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return ecall4.size;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method resets the TE event cursor.
+ *
+ * \param this	A pointer to the security domain whose TE event cursor
+ *		is to be rewound.
+ *
+ * \return	No return value is defined.
+ */
+
+static void rewind_te(CO(SanchoSGX, this))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	int rc;
+
+	struct OCALL_api *ocall_table;
+
+	struct ISOidentity_ecall8_interface ecall8;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+
+
+	/* Call ECALL slot 8 to rewind event cursor. */
+	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
+		ERR(goto done);
+
+	ecall8.type = TE_EVENTS;
+	if ( !S->enclave->boot_slot(S->enclave, 8, ocall_table, &ecall8, \
+				    &rc) ) {
+		S->enclave_error = rc;
+		ERR(goto done);
+	}
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return;
+}
+
+
+/**
+ * External public method.
+ *
  * This method is an accessor method for accessing the current
  * measurement of of a security domain.
  *
@@ -1832,6 +2003,9 @@ extern SanchoSGX NAAAIM_SanchoSGX_Init(void)
 	this->update_map = update_map;
 
 	this->add_ai_event = add_ai_event;
+	this->get_te_event = get_te_event;
+	this->te_size	   = te_size;
+	this->rewind_te	   = rewind_te;
 
 	this->set_aggregate   = set_aggregate;
 	this->get_measurement = get_measurement;

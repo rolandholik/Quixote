@@ -37,6 +37,9 @@ struct NAAAIM_SanchoSGX
 	_Bool (*set_aggregate)(const SanchoSGX, const Buffer);
 
 	_Bool (*add_ai_event)(const SanchoSGX, const String);
+	_Bool (*get_te_event)(const SanchoSGX, const String);
+	size_t (*te_size)(const SanchoSGX);
+	void (*rewind_te)(const SanchoSGX);
 
 	_Bool (*get_measurement)(const SanchoSGX, const Buffer);
 	_Bool (*get_state)(const SanchoSGX, const Buffer);

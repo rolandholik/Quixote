@@ -298,6 +298,9 @@ size_t get_size(int type)
 		case DOMAIN_POINTS:
 			size = Model->trajectory_size(Model);
 			break;
+		case TE_EVENTS:
+			size = Model->ai_events_size(Model);
+			break;
 	}
 
 
@@ -549,6 +552,9 @@ void rewind(int type)
 		case DOMAIN_POINTS:
 			Model->rewind_contours(Model);
 			break;
+		case TE_EVENTS:
+			Model->ai_rewind_event(Model);
+			break;
 	}
 
 	return;
@@ -598,8 +604,28 @@ _Bool get_event(char type, char *update, size_t size)
 	ExchangeEvent event;
 
 
-	INIT(HurdLib, String, es, ERR(goto done));
 	memset(update, '\0', size);
+
+
+	if ( type == TE_EVENTS ) {
+		if ( !Model->get_ai_event(Model, &es) )
+			ERR(goto done);
+		if ( es == NULL ) {
+			retn = true;
+			goto done;
+		}
+
+		if ( (es->size(es) + 1) > size )
+			ERR(goto done);
+		memcpy(update, es->get(es), es->size(es));
+
+		es   = NULL;
+		retn = true;
+		goto done;
+	}
+
+
+	INIT(HurdLib, String, es, ERR(goto done));
 
 	if ( type == ISO_IDENTITY_EVENT ) {
 		if ( !Model->get_event(Model, &event) )

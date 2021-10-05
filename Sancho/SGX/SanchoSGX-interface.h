@@ -15,6 +15,7 @@
 #define ISO_IDENTITY_EVENT     	0
 #define ISO_IDENTITY_FORENSICS	1
 #define DOMAIN_POINTS		2
+#define TE_EVENTS		3
 
 
 /* Security state measurement definitions. */
