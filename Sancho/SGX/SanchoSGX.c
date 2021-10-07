@@ -215,7 +215,8 @@ static _Bool load_enclave(CO(SanchoSGX, this), CO(char *, enclave), \
 	/* Load and initialize the enclave. */
 	INIT(NAAAIM, SRDEenclave, S->enclave, ERR(goto done));
 
-	if ( !S->enclave->open_enclave(S->enclave, SGX_DEVICE, enclave, true) )
+	if ( !S->enclave->open_enclave(S->enclave, SGX_DEVICE, enclave, \
+				       ENCLAVE_DEBUG) )
 		ERR(goto done);
 
 	if ( !S->enclave->create_enclave(S->enclave) )
@@ -324,7 +325,7 @@ static _Bool load_enclave_memory(CO(SanchoSGX, this), CO(uint8_t *, enclave), \
 
 	if ( !S->enclave->open_enclave_memory(S->enclave, SGX_DEVICE, \
 					      (const char *) enclave, size,
-					      true) )
+					      ENCLAVE_DEBUG) )
 		ERR(goto done);
 
 	if ( !S->enclave->create_enclave(S->enclave) )
