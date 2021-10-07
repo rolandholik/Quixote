@@ -8,6 +8,10 @@
 # Variable declarations.
 INSTPATH = ${DESTDIR}/opt/ESD
 
+ifdef SRDE_PRODUCTION
+TYPE = -DSRDE_PRODUCTION
+endif
+
 SGXDIR = ../SRDE
 include ${SGXDIR}/Make.enclave
 
@@ -26,7 +30,7 @@ INSTALLSBIN = quixote quixote-mcu quixote-us quixote-sgx quixote-sgx-u
 CC = musl-gcc
 
 CDEBUG = -g -O2 -fomit-frame-pointer -march=core2
-CFLAGS = -Wall ${CDEBUG}
+CFLAGS = -Wall ${CDEBUG} ${TYPE}
 
 LDFLAGS = ${STATIC} -g
 

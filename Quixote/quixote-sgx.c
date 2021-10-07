@@ -38,6 +38,8 @@
 #define SYSFS_UPDATES  "/sys/fs/integrity-events/update-%u"
 #define SYSFS_EXTERNAL "/sys/kernel/security/integrity/events/external"
 
+#define SRDE_OWNER "Quixote"
+
 #define READ_SIDE  0
 #define WRITE_SIDE 1
 
