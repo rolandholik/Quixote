@@ -29,8 +29,11 @@
 #define SGX_TOKEN_DIRECTORY "/var/lib/ESD/tokens"
 
 #if defined(SRDE_PRODUCTION)
-#define ENCLAVE_DIR	"/opt/ESD/lib/enclaves"
-#define TOKEN_DIR	"/var/lib/ESD/tokens"
+#if !defined(SRDE_OWNER)
+#define SRDE_OWNER "ESD"
+#endif
+#define ENCLAVE_DIR	"/opt/"SRDE_OWNER"/lib/enclaves"
+#define TOKEN_DIR	"/var/lib/"SRDE_OWNER"/tokens"
 #define ENCLAVE_DEBUG	false
 #else
 #define ENCLAVE_DIR	"."
