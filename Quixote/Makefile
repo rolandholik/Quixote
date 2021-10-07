@@ -6,7 +6,7 @@
 # **************************************************************************/
 
 # Variable declarations.
-INSTPATH = ${DESTDIR}/opt/ESD
+INSTPATH = ${DESTDIR}/opt/Quixote
 
 ifdef SRDE_PRODUCTION
 TYPE = -DSRDE_PRODUCTION
@@ -132,8 +132,6 @@ install-bin:
 	install -s ${INSTALLBIN} ${INSTPATH}/bin;
 	[ -d ${INSTPATH}/sbin ] || mkdir -p ${INSTPATH}/sbin;
 	install -s ${INSTALLSBIN} ${INSTPATH}/sbin;
-	[ -e /distrib/SRDE/opt/ESD/sbin/runc ] && \
-		install /distrib/SRDE/opt/ESD/sbin/runc ${INSTPATH}/sbin;
 
 clean:
 	rm -f *.o *~;
