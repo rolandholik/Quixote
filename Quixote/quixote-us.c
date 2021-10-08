@@ -102,7 +102,7 @@
 
 #include "ContourPoint.h"
 #include "ExchangeEvent.h"
-#include "ISOidentity.h"
+#include "TSEM.h"
 
 
 /**
@@ -119,7 +119,7 @@ static pid_t Monitor_pid;
 /**
  * The modeling object for the canister.
  */
-static ISOidentity Model = NULL;
+static TSEM Model = NULL;
 
 /**
  * The seal status of the domain.  This variable is set by a
@@ -1844,7 +1844,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Initialize the security model. */
-	INIT(NAAAIM, ISOidentity, Model, ERR(goto done));
+	INIT(NAAAIM, TSEM, Model, ERR(goto done));
 
 
 	/* Load and seal a behavior map if specified. */

@@ -40,13 +40,13 @@
 #include "SanchoSGX-interface.h"
 #include "ContourPoint.h"
 #include "ExchangeEvent.h"
-#include "ISOidentity.h"
+#include "TSEM.h"
 
 
 /**
  * A reference to the model object being maintained.
  */
-extern ISOidentity Model;
+extern TSEM Model;
 
 
 /**

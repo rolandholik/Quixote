@@ -78,7 +78,7 @@
 #define NAAAIM_Actor_OBJID		41
 #define NAAAIM_Subject_OBJID		42
 #define NAAAIM_ExchangeEvent_OBJID	43
-#define NAAAIM_ISOidentity_OBJID	44
+#define NAAAIM_TSEM_OBJID		44
 #define NAAAIM_ContourPoint_OBJID	45
 #define NAAAIM_SRDEquote_OBJID		46
 #define NAAAIM_SEALkey_OBJID		47

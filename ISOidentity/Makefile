@@ -10,7 +10,7 @@ INSTPATH       = ${DESTDIR}/opt/ESD
 
 SANCHODIR = ../Sancho/SGX
 
-CSRC = Actor.c Subject.c ExchangeEvent.c ISOidentity.c ContourPoint.c \
+CSRC = Actor.c Subject.c ExchangeEvent.c TSEM.c ContourPoint.c \
 	cboot.c cboot-mgr.c compute-aggregate.c
 
 TOOLS = test-actor test-subject test-event generate-contours sha-tool	  \
@@ -95,7 +95,7 @@ test-subject: test-subject.o Subject.o
 test-event: test-event.o ExchangeEvent.o Actor.o Subject.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
-test-ISOidentity: test-ISOidentity.o ISOidentity.o ContourPoint.o \
+test-ISOidentity: test-ISOidentity.o TSEM.o ContourPoint.o \
 	ExchangeEvent.o Actor.o Subject.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
@@ -117,10 +117,10 @@ sha-tool: sha-tool.o
 set-behavior: set-behavior.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS}
 
-cboot: cboot.o ${SANCHODIR}/SanchoSGX.o ISOidentity.o ContourPoint.o \
+cboot: cboot.o ${SANCHODIR}/SanchoSGX.o TSEM.o ContourPoint.o \
 	ExchangeEvent.o Actor.o Subject.o ${RDK_LIBRARY} ${NAAAIM_LIBRARY}   \
 	${HURD_LIBRARY}
-	${CC} ${LDFLAGS} -o $@ $< ISOidentity.o ContourPoint.o		   \
+	${CC} ${LDFLAGS} -o $@ $< TSEM.o ContourPoint.o		   	   \
 		ExchangeEvent.o Actor.o Subject.o ${SANCHODIR}/SanchoSGX.o \
 		${RDKLIB} ${LIBS} ${LIBCAP} ${SSL_CRYPTO};
 
@@ -152,7 +152,7 @@ clean:
 Actor.o: Actor.h
 ContourPoint.o: ContourPoint.h
 ExchangeEvent.o: ExchangeEvent.h
-ISOidentity.o: ISOidentity.h
+TSEM.o: TSEM.h
 # SRDEmetadata.o: SGX.h SRDEmetadata.h
 # SRDEloader.o: SRDE.h SRDEloader.h
 # SGXenclave.o: SRDE.h SRDEenclave.h SRDEmetadata.h SRDEloader.h

@@ -61,7 +61,7 @@ MISCSRC = cmd.c
 
 APPSRC = sancho.c command-interpreter.c ip4_addr.c sha256.c SHA256.c	   \
 	Duct.c Actor.c Subject.c ExchangeEvent.c ContourPoint.c		   \
-	ISOidentity.c TTYduct.c regcomp.c regexec.c regerror.c tre-mem.c   \
+	TSEM.c TTYduct.c regcomp.c regexec.c regerror.c tre-mem.c   \
 	reg-support.c gpio.c rng.c rtc.c usart.c stm32l4xx_hal_msp.c	   \
 	stm32l4xx_it.c stm32l4xx_hal_timebase_TIM.c system_stm32l4xx.c usart.c
 

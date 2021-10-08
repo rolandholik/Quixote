@@ -28,7 +28,7 @@
 #include <NAAAIM.h>
 #include "ContourPoint.h"
 #include "ExchangeEvent.h"
-#include "ISOidentity.h"
+#include "TSEM.h"
 
 
 /*
@@ -62,7 +62,7 @@ extern int main(int argc, char *argv[])
 
 	ExchangeEvent event = NULL;
 
-	ISOidentity model = NULL;
+	TSEM model = NULL;
 
 
 	/* Parse and verify arguements. */
@@ -111,7 +111,7 @@ extern int main(int argc, char *argv[])
 
 	/* Set the aggregate value for the behavioral model. */
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	INIT(NAAAIM, ISOidentity, model, ERR(goto done));
+	INIT(NAAAIM, TSEM, model, ERR(goto done));
 	if ( aggregate != NULL ) {
 		if ( strlen(aggregate) != NAAAIM_IDSIZE*2 ) {
 			fputs("Invalid aggregate value.\n", stderr);

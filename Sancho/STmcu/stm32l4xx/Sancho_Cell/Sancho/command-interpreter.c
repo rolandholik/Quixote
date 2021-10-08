@@ -32,7 +32,7 @@
 
 #include "ExchangeEvent.h"
 #include "ContourPoint.h"
-#include "ISOidentity.h"
+#include "TSEM.h"
 #include "TTYduct.h"
 #include "Duct.h"
 
@@ -89,7 +89,7 @@ static void send_ok(CO(TTYduct, duct), CO(Buffer, bufr))
 }
 
 
-static _Bool add_state(ISOidentity model, Buffer cp)
+static _Bool add_state(TSEM model, Buffer cp)
 
 {
 	_Bool retn = false;
@@ -187,8 +187,7 @@ static void _send_event(CO(String, event))
  * \return		No return value is defined.
  */
 
-static void add_event(CO(TTYduct, duct), CO(ISOidentity, model), \
-		      CO(Buffer, bufr))
+static void add_event(CO(TTYduct, duct), CO(TSEM, model), CO(Buffer, bufr))
 
 {
 	char *p,
@@ -272,8 +271,7 @@ static void add_event(CO(TTYduct, duct), CO(ISOidentity, model), \
  * \return		No return value is defined.
  */
 
-static void add_aggregate(CO(TTYduct, duct), CO(ISOidentity, model), \
-			  CO(Buffer, bufr))
+static void add_aggregate(CO(TTYduct, duct), CO(TSEM, model), CO(Buffer, bufr))
 
 {
 	char *p;
@@ -321,8 +319,7 @@ static void add_aggregate(CO(TTYduct, duct), CO(ISOidentity, model), \
  * \return		No return value is defined.
  */
 
-static void add_security(CO(TTYduct, duct), CO(ISOidentity, model), \
-			 CO(Buffer, bufr))
+static void add_security(CO(TTYduct, duct), CO(TSEM, model), CO(Buffer, bufr))
 
 {
 	String event = NULL;
@@ -357,8 +354,7 @@ static void add_security(CO(TTYduct, duct), CO(ISOidentity, model), \
  * \return		No return value is defined.
  */
 
-static void send_points(CO(TTYduct, duct), CO(ISOidentity, model), \
-			CO(Buffer, bufr))
+static void send_points(CO(TTYduct, duct), CO(TSEM, model), CO(Buffer, bufr))
 
 {
 	uint8_t *p,
@@ -429,7 +425,7 @@ static void send_points(CO(TTYduct, duct), CO(ISOidentity, model), \
  * \return		No return value is defined.
  */
 
-static void send_trajectory(CO(TTYduct, duct), CO(ISOidentity, model), \
+static void send_trajectory(CO(TTYduct, duct), CO(TSEM, model), \
 			    CO(Buffer, bufr))
 
 {
@@ -496,7 +492,7 @@ static void send_trajectory(CO(TTYduct, duct), CO(ISOidentity, model), \
  * \return		No return value is defined.
  */
 
-static void send_forensics(CO(TTYduct, duct), CO(ISOidentity, model), \
+static void send_forensics(CO(TTYduct, duct), CO(TSEM, model), \
 			   CO(Buffer, bufr))
 
 {
@@ -563,8 +559,7 @@ static void send_forensics(CO(TTYduct, duct), CO(ISOidentity, model), \
  * \return		No return value is defined.
  */
 
-static void send_events(CO(TTYduct, duct), CO(ISOidentity, model), \
-			CO(Buffer, bufr))
+static void send_events(CO(TTYduct, duct), CO(TSEM, model), CO(Buffer, bufr))
 
 {
 	size_t lp,
@@ -673,7 +668,7 @@ static void interpreter(const void *arg)
 
 	TTYduct duct = NULL;
 
-	ISOidentity model = NULL;
+	TSEM model = NULL;
 
 
 	INIT(HurdLib, Buffer, bufr, (printf("init error.\n")));
@@ -683,7 +678,7 @@ static void interpreter(const void *arg)
 
 	Host = duct;
 
-	INIT(NAAAIM, ISOidentity, model, (printf("Model init error.\n")));
+	INIT(NAAAIM, TSEM, model, (printf("Model init error.\n")));
 
 	while ( true ) {
 		if ( !duct->receive_Buffer(duct, bufr) ) {

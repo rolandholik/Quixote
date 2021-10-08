@@ -86,7 +86,7 @@
 #define NAAAIM_Actor_OBJID		46
 #define NAAAIM_Subject_OBJID		47
 #define NAAAIM_ExchangeEvent_OBJID	48
-#define NAAAIM_ISOidentity_OBJID	49
+#define NAAAIM_TSEM_OBJID		49
 #define NAAAIM_ContourPoint_OBJID	50
 #define NAAAIM_SanchoSGX_OBJID		51
 #define NAAAIM_PVEenclave_OBJID		52

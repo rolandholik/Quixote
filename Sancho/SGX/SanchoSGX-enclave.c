@@ -24,14 +24,14 @@
 #include "regex.h"
 #include "ContourPoint.h"
 #include "ExchangeEvent.h"
-#include "ISOidentity.h"
+#include "TSEM.h"
 #include "SanchoSGX.h"
 
 
 /**
  * The model being implemented.
  */
-ISOidentity Model = NULL;
+TSEM Model = NULL;
 
 
 /**
@@ -117,7 +117,7 @@ _Bool init_model(_Bool init)
 
 
 	if ( init ) {
-		INIT(NAAAIM, ISOidentity, Model, ERR(goto done));
+		INIT(NAAAIM, TSEM, Model, ERR(goto done));
 	}
 	else
 		WHACK(Model);

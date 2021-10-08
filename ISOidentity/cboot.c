@@ -84,7 +84,7 @@
 
 #include "ContourPoint.h"
 #include "ExchangeEvent.h"
-#include "ISOidentity.h"
+#include "TSEM.h"
 #include "cboot.h"
 
 
@@ -97,7 +97,7 @@ static _Bool Debug = false;
 /**
  * The modeling object for the canister.
  */
-static ISOidentity Model = NULL;
+static TSEM Model = NULL;
 
 /**
  * The seal status of the encounter.  This variable is set by a
@@ -1822,7 +1822,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Load and seal the behavioral map. */
-	INIT(NAAAIM, ISOidentity, Model, ERR(goto done));
+	INIT(NAAAIM, TSEM, Model, ERR(goto done));
 
 	if ( map != NULL ) {
 		if ( !initialize_model(map) ) {
