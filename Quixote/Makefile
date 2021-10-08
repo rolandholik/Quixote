@@ -78,8 +78,8 @@ endif
 LIBS	= ${NAAAIMLIB} ${HURDLIB} ${LIBCAP} ${SSL_CRYPTO}
 LIBDEPS = ${HURD_LIBRARY} ${NAAAIM_LIBRARY}
 
-MODELDEPS = ../ISOidentity/Actor.o ../ISOidentity/Subject.o	     \
-	../ISOidentity/ContourPoint.o ../ISOidentity/ExchangeEvent.o \
+MODELDEPS = ../ISOidentity/Actor.o ../ISOidentity/Subject.o	      \
+	../ISOidentity/SecurityPoint.o ../ISOidentity/ExchangeEvent.o \
 	../ISOidentity/TSEM.o
 
 CFLAGS := ${CFLAGS} -I .. -I ../ISOidentity -I ../lib -I ../HurdLib \

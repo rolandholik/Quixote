@@ -22,7 +22,7 @@
 
 #include "SanchoSGX-interface.h"
 #include "regex.h"
-#include "ContourPoint.h"
+#include "SecurityPoint.h"
 #include "ExchangeEvent.h"
 #include "TSEM.h"
 #include "SanchoSGX.h"
@@ -683,7 +683,7 @@ _Bool get_point(unsigned char *pt)
 {
 	_Bool retn = false;
 
-	ContourPoint cp = NULL;
+	SecurityPoint cp = NULL;
 
 
 	if ( !Model->get_contour(Model, &cp) )

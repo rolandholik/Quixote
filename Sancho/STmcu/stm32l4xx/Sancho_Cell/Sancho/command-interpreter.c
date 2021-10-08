@@ -31,7 +31,7 @@
 #include <sancho-cmd.h>
 
 #include "ExchangeEvent.h"
-#include "ContourPoint.h"
+#include "SecurityPoint.h"
 #include "TSEM.h"
 #include "TTYduct.h"
 #include "Duct.h"
@@ -365,7 +365,7 @@ static void send_points(CO(TTYduct, duct), CO(TSEM, model), CO(Buffer, bufr))
 	size_t lp,
 	       cnt = 0;
 
-	ContourPoint cp = NULL;
+	SecurityPoint cp = NULL;
 
 
 	/*

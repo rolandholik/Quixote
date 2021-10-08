@@ -38,7 +38,7 @@
 #include <cboot.h>
 
 #include "SanchoSGX-interface.h"
-#include "ContourPoint.h"
+#include "SecurityPoint.h"
 #include "ExchangeEvent.h"
 #include "TSEM.h"
 
@@ -263,7 +263,7 @@ static _Bool send_contours(CO(PossumPipe, mgmt), CO(Buffer, cmdbufr))
 	size_t lp,
 	       cnt = 0;
 
-	ContourPoint cp = NULL;
+	SecurityPoint cp = NULL;
 
 
 	/*

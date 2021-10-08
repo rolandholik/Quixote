@@ -83,7 +83,7 @@
 #include "LocalDuct.h"
 #include "SHA256.h"
 
-#include "ContourPoint.h"
+#include "SecurityPoint.h"
 #include "ExchangeEvent.h"
 #include "TSEM.h"
 

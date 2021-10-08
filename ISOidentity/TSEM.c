@@ -25,7 +25,7 @@
 
 #include "NAAAIM.h"
 #include "SHA256.h"
-#include "ContourPoint.h"
+#include "SecurityPoint.h"
 #include "ExchangeEvent.h"
 #include "TSEM.h"
 
@@ -160,14 +160,14 @@ static void _init_state(CO(TSEM_State, S))
  *		a true value indicated the point was present.
  */
 
-static _Bool _is_mapped(CO(Buffer, map), CO(ContourPoint, point))
+static _Bool _is_mapped(CO(Buffer, map), CO(SecurityPoint, point))
 
 {
 	_Bool retn = false;
 
-	size_t cnt = map->size(map) / sizeof(ContourPoint);
+	size_t cnt = map->size(map) / sizeof(SecurityPoint);
 
-	ContourPoint *cp = (ContourPoint *) map->get(map);
+	SecurityPoint *cp = (SecurityPoint *) map->get(map);
 
 
 	while ( cnt-- ) {
@@ -290,7 +290,7 @@ static _Bool update(CO(TSEM, this), CO(ExchangeEvent, event), \
 	Buffer list,
 	       point = NULL;
 
-	ContourPoint cp = NULL;
+	SecurityPoint cp = NULL;
 
 
 	/* Verify object status and input. */
@@ -322,7 +322,7 @@ static _Bool update(CO(TSEM, this), CO(ExchangeEvent, event), \
 	if ( !event->get_pid(event, &S->discipline_pid) )
 		ERR(goto done);
 
-	INIT(NAAAIM, ContourPoint, cp, ERR(goto done));
+	INIT(NAAAIM, SecurityPoint, cp, ERR(goto done));
 	cp->add(cp, point);
 
 
@@ -404,7 +404,7 @@ static _Bool update_map(CO(TSEM, this), CO(Buffer, bpoint))
 
 	_Bool retn = false;
 
-	ContourPoint cp = NULL;
+	SecurityPoint cp = NULL;
 
 
 	/* Validate object status and inputs. */
@@ -419,7 +419,7 @@ static _Bool update_map(CO(TSEM, this), CO(Buffer, bpoint))
 
 
 	/* Register the binary contour point. */
-	INIT(NAAAIM, ContourPoint, cp, ERR(goto done));
+	INIT(NAAAIM, SecurityPoint, cp, ERR(goto done));
 
 	cp->add(cp, bpoint);
 	if ( _is_mapped(S->contours, cp) ) {
@@ -435,7 +435,7 @@ static _Bool update_map(CO(TSEM, this), CO(Buffer, bpoint))
 
 	/* Add the contour point. */
 	if ( !S->contours->add(S->contours, (unsigned char *) &cp, \
-			       sizeof(ContourPoint)) )
+			       sizeof(SecurityPoint)) )
 		ERR(goto done);
 	retn = true;
 
@@ -703,8 +703,8 @@ static int _state_sort(const void *a1, const void *a2)
 
 	uint8_t lp;
 
-	ContourPoint cp1 = *(ContourPoint *) a1,
-		     cp2 = *(ContourPoint *) a2;
+	SecurityPoint cp1 = *(SecurityPoint *) a1,
+		      cp2 = *(SecurityPoint *) a2;
 
 	unsigned char *p1 = cp1->get(cp1),
 		      *p2 = cp2->get(cp2);
@@ -766,8 +766,8 @@ static _Bool get_state(CO(TSEM, this), CO(Buffer, out))
 
 	Buffer points = NULL;
 
-	ContourPoint *ep,
-		     event;
+	SecurityPoint *ep,
+		      event;
 
 
 	/* Sort a copy of the event points. */
@@ -775,10 +775,10 @@ static _Bool get_state(CO(TSEM, this), CO(Buffer, out))
 	if ( !points->add_Buffer(points, S->contours) )
 		ERR(goto done);
 
-	cnt = points->size(points) / sizeof(ContourPoint);
-	qsort(points->get(points), cnt, sizeof(ContourPoint), _state_sort);
+	cnt = points->size(points) / sizeof(SecurityPoint);
+	qsort(points->get(points), cnt, sizeof(SecurityPoint), _state_sort);
 
-	ep = (ContourPoint *) points->get(points);
+	ep = (SecurityPoint *) points->get(points);
 	memcpy(state, S->domain_aggregate, sizeof(state));
 
 	while ( cnt-- ) {
@@ -973,7 +973,7 @@ static size_t trajectory_size(CO(TSEM, this))
  *		contour object being set.
  */
 
-static _Bool get_contour(CO(TSEM, this), ContourPoint * const contour)
+static _Bool get_contour(CO(TSEM, this), SecurityPoint * const contour)
 
 {
 	STATE(S);
@@ -982,8 +982,8 @@ static _Bool get_contour(CO(TSEM, this), ContourPoint * const contour)
 
 	size_t size;
 
-	ContourPoint *contour_ptr,
-		     return_contour = NULL;
+	SecurityPoint *contour_ptr,
+		      return_contour = NULL;
 
 
 	/* Check object status. */
@@ -992,13 +992,13 @@ static _Bool get_contour(CO(TSEM, this), ContourPoint * const contour)
 
 
 	/* Get and verify cursor position. */
-	size = S->contours->size(S->contours) / sizeof(ContourPoint);
+	size = S->contours->size(S->contours) / sizeof(SecurityPoint);
 	if ( S->contours_cursor >= size ) {
 		retn = true;
 		goto done;
 	}
 
-	contour_ptr  = (ContourPoint *) S->contours->get(S->contours);
+	contour_ptr  = (SecurityPoint *) S->contours->get(S->contours);
 	contour_ptr += S->contours_cursor;
 	return_contour = *contour_ptr;
 	++S->contours_cursor;
@@ -1270,7 +1270,7 @@ static void dump_contours(CO(TSEM, this))
 
 	Buffer bufr = NULL;
 
-	ContourPoint contour;
+	SecurityPoint contour;
 
 
 	/* Verify object status. */
@@ -1374,7 +1374,7 @@ static void whack(CO(TSEM, this))
 	GWHACK(ExchangeEvent, S->forensics);
 	WHACK(S->forensics);
 
-	GWHACK(ContourPoint, S->contours);
+	GWHACK(SecurityPoint, S->contours);
 	WHACK(S->contours);
 
 	GWHACK(String, S->ai_events);

@@ -26,7 +26,7 @@
 #include <File.h>
 
 #include <NAAAIM.h>
-#include "ContourPoint.h"
+#include "SecurityPoint.h"
 #include "ExchangeEvent.h"
 #include "TSEM.h"
 

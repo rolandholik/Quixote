@@ -1,6 +1,6 @@
 /** \file
- * This file contains the implementation of an object which manages
- * a single contour point in an iso-identity behavioral map.
+ * This file contains the implementation of an object that manages
+ * a single security state point in a Turing Security Event model.
  */
 
 /**************************************************************************
@@ -22,24 +22,24 @@
 #include <Buffer.h>
 
 #include "NAAAIM.h"
-#include "ContourPoint.h"
+#include "SecurityPoint.h"
 
 
 /* Object state extraction macro. */
-#define STATE(var) CO(ContourPoint_State, var) = this->state
+#define STATE(var) CO(SecurityPoint_State, var) = this->state
 
 /* Verify library/object header file inclusions. */
 #if !defined(NAAAIM_LIBID)
 #error Library identifier not defined.
 #endif
 
-#if !defined(NAAAIM_ContourPoint_OBJID)
+#if !defined(NAAAIM_SecurityPoint_OBJID)
 #error Object identifier not defined.
 #endif
 
 
 /** ExchangeEvent private state information. */
-struct NAAAIM_ContourPoint_State
+struct NAAAIM_SecurityPoint_State
 {
 	/* The root object. */
 	Origin root;
@@ -71,11 +71,11 @@ struct NAAAIM_ContourPoint_State
  *		which is to be initialized.
  */
 
-static void _init_state(CO(ContourPoint_State, S))
+static void _init_state(CO(SecurityPoint_State, S))
 
 {
 	S->libid = NAAAIM_LIBID;
-	S->objid = NAAAIM_ContourPoint_OBJID;
+	S->objid = NAAAIM_SecurityPoint_OBJID;
 
 	S->poisoned  = false;
 	S->violation = false;
@@ -98,7 +98,7 @@ static void _init_state(CO(ContourPoint_State, S))
  *			for the point.
  */
 
-static void add(CO(ContourPoint, this), CO(Buffer, bufr))
+static void add(CO(SecurityPoint, this), CO(Buffer, bufr))
 
 {
 	STATE(S);
@@ -130,7 +130,7 @@ static void add(CO(ContourPoint, this), CO(Buffer, bufr))
  *		measurement value of the point.
  */
 
-static unsigned char * get(CO(ContourPoint, this))
+static unsigned char * get(CO(SecurityPoint, this))
 
 {
 	return this->state->point;
@@ -156,7 +156,7 @@ static unsigned char * get(CO(ContourPoint, this))
  *		measurement point.
  */
 
-static _Bool get_Buffer(CO(ContourPoint, this), CO(Buffer, bufr))
+static _Bool get_Buffer(CO(SecurityPoint, this), CO(Buffer, bufr))
 
 {
 	STATE(S);
@@ -193,7 +193,7 @@ static _Bool get_Buffer(CO(ContourPoint, this), CO(Buffer, bufr))
  * \param this		The object whose status is to be set.
  */
 
-static void set_invalid(CO(ContourPoint, this))
+static void set_invalid(CO(SecurityPoint, this))
 
 {
 	this->state->violation = true;
@@ -216,7 +216,7 @@ static void set_invalid(CO(ContourPoint, this))
  *		is a valid behavior point on the contour map.
  */
 
-static _Bool is_valid(CO(ContourPoint, this))
+static _Bool is_valid(CO(SecurityPoint, this))
 
 {
 	return !this->state->violation;
@@ -240,7 +240,7 @@ static _Bool is_valid(CO(ContourPoint, this))
  *		the points are equal.
  */
 
-static _Bool equal(CO(ContourPoint, this), CO(ContourPoint, other))
+static _Bool equal(CO(SecurityPoint, this), CO(SecurityPoint, other))
 
 {
 	STATE(S);
@@ -257,7 +257,7 @@ static _Bool equal(CO(ContourPoint, this), CO(ContourPoint, other))
  * \param this	A pointer to the object which is to be destroyed.
  */
 
-static void whack(CO(ContourPoint, this))
+static void whack(CO(SecurityPoint, this))
 
 {
 	STATE(S);
@@ -276,12 +276,12 @@ static void whack(CO(ContourPoint, this))
  *		indicates an error was encountered in object generation.
  */
 
-extern ContourPoint NAAAIM_ContourPoint_Init(void)
+extern SecurityPoint NAAAIM_SecurityPoint_Init(void)
 
 {
 	Origin root;
 
-	ContourPoint this = NULL;
+	SecurityPoint this = NULL;
 
 	struct HurdLib_Origin_Retn retn;
 
@@ -290,9 +290,9 @@ extern ContourPoint NAAAIM_ContourPoint_Init(void)
 	root = HurdLib_Origin_Init();
 
 	/* Allocate the object and internal state. */
-	retn.object_size  = sizeof(struct NAAAIM_ContourPoint);
-	retn.state_size   = sizeof(struct NAAAIM_ContourPoint_State);
-	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_ContourPoint_OBJID,
+	retn.object_size  = sizeof(struct NAAAIM_SecurityPoint);
+	retn.state_size   = sizeof(struct NAAAIM_SecurityPoint_State);
+	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_SecurityPoint_OBJID,
 			 &retn) )
 		return NULL;
 	this	    	  = retn.object;

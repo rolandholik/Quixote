@@ -45,7 +45,7 @@
 #include <SRDEfusion-ocall.h>
 #include <SRDEnaaaim-ocall.h>
 
-#include <ContourPoint.h>
+#include <SecurityPoint.h>
 #include <ExchangeEvent.h>
 
 #include "SanchoSGX.h"

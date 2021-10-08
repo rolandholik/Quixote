@@ -79,7 +79,7 @@
 #define NAAAIM_Subject_OBJID		42
 #define NAAAIM_ExchangeEvent_OBJID	43
 #define NAAAIM_TSEM_OBJID		44
-#define NAAAIM_ContourPoint_OBJID	45
+#define NAAAIM_SecurityPoint_OBJID	45
 #define NAAAIM_SRDEquote_OBJID		46
 #define NAAAIM_SEALkey_OBJID		47
 #define NAAAIM_SEALEDblob_OBJID		48

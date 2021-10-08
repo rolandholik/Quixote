@@ -97,7 +97,7 @@
 #include "NAAAIM.h"
 #include "TTYduct.h"
 #include "LocalDuct.h"
-#include "ContourPoint.h"
+#include "SecurityPoint.h"
 #include "ExchangeEvent.h"
 
 
