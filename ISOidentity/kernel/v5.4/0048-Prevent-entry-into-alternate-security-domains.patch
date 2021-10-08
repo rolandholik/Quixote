@@ -1,0 +1,106 @@
+From bad9d3045364c6324628eb3f34d91fb557ebb7e6 Mon Sep 17 00:00:00 2001
+From: "Dr. Greg" <greg@enjellic.com>
+Date: Thu, 2 Sep 2021 15:26:30 -0500
+Subject: [PATCH 48/50] Prevent entry into alternate security domains.
+
+The setns() system call provides the ability for a process to
+request entry into an alternate namespace of its choosing.  This
+presents a potentail security issue to security domains.
+
+Since the standard runc utility does not currently 'know' about
+security domain namespaces it will execute commands in the
+context of a security domain without entering the security event
+namespace.  This provides an opportunity to execute events
+inside the security domain that are not constrained by the model
+definitions for the domain.
+
+The problematic issue in addressing this is that there is not a
+straight forward method of determining the process ID (PID) that
+is using a particular namespace.  Which PID a namespace belongs
+to is maintained by information in the /proc filesystem but is
+not readily exposed by the proc filesystem code.
+
+As of the 5.4 kernel release the setns() system call is handed a
+file descriptor to one of the pseudo-symlinks in the following
+pseudo-directory:
+
+/proc/PID/ns/EVENT
+
+Where PID is the process id of a process whose namespace is to be
+referenced and EVENT is a pseudo-symlink link that references the
+namespace inode.
+
+For the setns() system call to work the process requesting the
+service will have had to open the pseudo-symlink.  This causes
+the get_link method of the proc_ns_link_inode_operations
+structure to be invoked.
+
+Since the proc_ns_get_link() function which is used to implement
+the get_link method has access to the task control structure of
+the process that 'owns' the ns pseudo-directory the security
+event namespace of the process can be determined.  The function
+was modified to stash a pointer to the security event namespace
+of the process that holds a reference to the namespace in the
+task control structure of the process that is issueing the setns
+system call.
+
+The setns system call was modified to compare the security event
+namespace of the calling process to the securityh event namespace
+of the 'target' process whose namespace is to be accessed.  The
+system call returns -EPERM if they do not match.  This prevents a
+process from attaching to an alterate security event namespace.
+
+This issue will need to be re-visited when porting the Quixote
+code to newer kernels that a PID file descriptor to be passed as
+an argument to the setns system call.
+---
+ fs/proc/namespaces.c  | 5 +++++
+ include/linux/sched.h | 1 +
+ kernel/nsproxy.c      | 3 +++
+ 3 files changed, 9 insertions(+)
+
+diff --git a/fs/proc/namespaces.c b/fs/proc/namespaces.c
+index addf13a54ce6..4df7d177b3f1 100644
+--- a/fs/proc/namespaces.c
++++ b/fs/proc/namespaces.c
+@@ -55,6 +55,11 @@ static const char *proc_ns_get_link(struct dentry *dentry,
+ 	if (!task)
+ 		return error;
+ 
++	if ( task_pid_nr(current) != task_pid_nr(task) )
++		current->nsenter_events_ns = task->nsproxy->events_ns;
++	else
++		current->nsenter_events_ns = NULL;
++
+ 	if (ptrace_may_access(task, PTRACE_MODE_READ_FSCREDS)) {
+ 		error = ns_get_path(&ns_path, task, ns_ops);
+ 		if (!error)
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index d85e0b42093f..8ff9eff6b891 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -783,6 +783,7 @@ struct task_struct {
+ 
+ #ifdef CONFIG_IMA
+ 	unsigned			bad_actor;
++	struct ima_events_namespace	*nsenter_events_ns;
+ #endif
+ 
+ 	unsigned long			atomic_flags; /* Flags requiring atomic access. */
+diff --git a/kernel/nsproxy.c b/kernel/nsproxy.c
+index 32946e66ba9a..ede6ab84e340 100644
+--- a/kernel/nsproxy.c
++++ b/kernel/nsproxy.c
+@@ -255,6 +255,9 @@ SYSCALL_DEFINE2(setns, int, fd, int, nstype)
+ 	struct ns_common *ns;
+ 	int err;
+ 
++	if (current->nsproxy->events_ns != current->nsenter_events_ns)
++		return -EPERM;
++
+ 	file = proc_ns_fget(fd);
+ 	if (IS_ERR(file))
+ 		return PTR_ERR(file);
+-- 
+2.31.1
+

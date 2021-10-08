@@ -1,0 +1,132 @@
+From 2678bd26cb72b5aa1fe873b8cc9555434e23a20e Mon Sep 17 00:00:00 2001
+From: "Dr. Greg" <greg@enjellic.com>
+Date: Fri, 13 Aug 2021 03:47:18 -0500
+Subject: [PATCH 45/50] Address signal handling issues in event export.
+
+A regression was noted wherein TE events were being triggered
+when an event domain was not in a sealed state.  An extremely
+long investigative process ended up demonstrating that this was
+being caused by signal reception by a task that was waiting
+on an external validation event.
+
+In the export_event() function the process is set into a bad
+actor status before being put to sleep to wait for the response
+from the external validator.  This was implemented, naively, by a
+single call to schedule() after setting the task state to
+TASK_INTERRUPTIBLE.
+
+Reception of a signal caused the process to return from the
+schedule() call and continue execution with bad actor status.
+This caused the sys_set_bad_actor() function to actually get out
+of synchronization with respect to authorizing events.  If the
+process received a signal a situation was created where the
+authorization was for an event earlier then what the process was
+actually attempting.
+
+This was addressed by changing the bad_actor indicator from a
+single bit in a bit-field in the task control structure to an
+integer value.  Prior to putting the process to sleep this
+variable is set to a value of 2.  The sys_set_bad_actor() system
+call sets the value to either 0 or 1 depending on the
+determination by the validator.
+
+In the export_event function the task looks re-entering the sleep
+state until the bad_actor value is no longer 2.
+---
+ include/linux/sched.h               |  3 ++-
+ security/integrity/ima/ima_events.c | 35 +++++++++++++++++------------
+ 2 files changed, 23 insertions(+), 15 deletions(-)
+
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index bbdf3ef5a086..d85e0b42093f 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -780,8 +780,9 @@ struct task_struct {
+ 	/* to be used once the psi infrastructure lands upstream. */
+ 	unsigned			use_memdelay:1;
+ #endif
++
+ #ifdef CONFIG_IMA
+-	unsigned			bad_actor:1;
++	unsigned			bad_actor;
+ #endif
+ 
+ 	unsigned long			atomic_flags; /* Flags requiring atomic access. */
+diff --git a/security/integrity/ima/ima_events.c b/security/integrity/ima/ima_events.c
+index b965ac01826b..a83eac975e28 100644
+--- a/security/integrity/ima/ima_events.c
++++ b/security/integrity/ima/ima_events.c
+@@ -576,15 +576,18 @@ static int export_event(const char *filename, struct event_actor *actor,
+ 
+ 	sysfs_notify(ima_events_kobject, NULL, map->update.attr.name);
+ 
+-	pr_debug("[%s]: %s:%s sleeping for authorization.\n", __func__,
+-		 current->comm, filename);
++	pr_debug("[%s]: %u sleeping for authorization on %s:%s.\n", __func__,
++		 task_pid_nr(current), current->comm, filename);
+ 
+-	current->bad_actor = 1;
+-	set_current_state(TASK_INTERRUPTIBLE);
+-	schedule();
++	current->bad_actor = 2;
++	while (current->bad_actor == 2) {
++		set_current_state(TASK_INTERRUPTIBLE);
++		schedule();
++	}
+ 
+-	pr_debug("[%s]: %s:%s continueing with actor status: %d\n",
+-		 __func__, current->comm, filename, current->bad_actor);
++	pr_debug("[%s]: %u signal %u continue %s:%s with status %u\n",
++		 __func__, task_pid_nr(current), signal_pending(current),
++		 current->comm, filename, current->bad_actor);
+  done:
+ 	return retn;
+ }
+@@ -2322,6 +2325,7 @@ int ima_events_process_te(unsigned int event)
+ 
+ SYSCALL_DEFINE2(set_bad_actor, pid_t, pid, unsigned long, flags)
+ {
++	bool wakeup = true;
+ 	int retn = -ESRCH;
+ 	struct task_struct *actor;
+ 
+@@ -2334,26 +2338,29 @@ SYSCALL_DEFINE2(set_bad_actor, pid_t, pid, unsigned long, flags)
+ 		if (flags == 0) {
+ 			pr_debug("[%s]: Checking actor status, pid=%u\n",
+ 				 __func__, pid);
++			wakeup = false;
+ 			retn = actor->bad_actor;
+ 		}
+ 
+ 		if (flags == 1) {
+-			pr_debug("[%s]: Releasing bad actor, %s\n",
+-				 __func__, actor->comm);
+-			wake_up_process(actor);
++			actor->bad_actor = 1;
+ 			retn = 0;
+ 		}
+ 
+-		if (flags == 2 ) {
+-			pr_debug("[%s]: Releasing actor, pid=%s\n",
+-				 __func__, actor->comm);
++		if (flags == 2) {
+ 			actor->bad_actor = 0;
+-			wake_up_process(actor);
+ 			retn = 0;
+ 		}
+ 	}
+ 	rcu_read_unlock();
+ 
++	if (wakeup) {
++		wake_up_process(actor);
++		pr_debug("[%s]: Releasing actor: pid=%u, comm=%s, status=%u\n",
++			 __func__, task_pid_nr(actor), actor->comm,
++			 actor->bad_actor);
++	}
++
+ 	return retn;
+ }
+ 
+-- 
+2.31.1
+

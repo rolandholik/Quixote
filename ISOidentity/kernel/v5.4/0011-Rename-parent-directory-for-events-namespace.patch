@@ -1,0 +1,119 @@
+From e4614fc835b0741c600ea92a51314ed113e9c1b2 Mon Sep 17 00:00:00 2001
+From: "Dr. Greg" <greg@enjellic.com>
+Date: Sat, 6 Feb 2021 10:15:24 -0600
+Subject: [PATCH 11/50] Rename parent directory for events namespace.
+
+This update changes the variable name that holds the direntry
+pointer for the pseudo-directory that manages the events
+namespace from identity_dir to events_dir.
+---
+ security/integrity/ima/ima_events.c | 28 ++++++++++++++--------------
+ 1 file changed, 14 insertions(+), 14 deletions(-)
+
+diff --git a/security/integrity/ima/ima_events.c b/security/integrity/ima/ima_events.c
+index 84fd4e9cd4c6..abe7fcba01ac 100644
+--- a/security/integrity/ima/ima_events.c
++++ b/security/integrity/ima/ima_events.c
+@@ -75,7 +75,7 @@ static char aggregate[WP256_DIGEST_SIZE];
+  * Root dentry for the 'events' directory and dentries for the
+  * pseudo-files in that directory.
+  */
+-static struct dentry *identity_dir;
++static struct dentry *events_dir;
+ static struct dentry *contours;
+ static struct dentry *map;
+ static struct dentry *pseudonym;
+@@ -567,7 +567,7 @@ static int get_host_measurement(struct crypto_shash *tfm, char *id,
+ 	return retn;
+ }
+ 
+-static int update_behavior_measurement(struct crypto_shash *tfm, char *id)
++static int update_events_measurement(struct crypto_shash *tfm, char *id)
+ {
+ 	int retn;
+ 	char digest[WP256_DIGEST_SIZE];
+@@ -737,7 +737,7 @@ static int load_contour(const char __user *contour, size_t datalen)
+ 		goto done;
+ 	}
+ 
+-        retn = update_behavior_measurement(tfmsha256, mapping);
++        retn = update_events_measurement(tfmsha256, mapping);
+ 	if (retn != 0)
+ 		goto done;
+ 
+@@ -1363,7 +1363,7 @@ int ima_events_genhash(struct ima_template_entry *entry, char *tpm_digest)
+ 		retn = PTR_ERR(tfm);
+ 		goto done;
+ 	}
+-        retn = update_behavior_measurement(tfm, identity.hdr.digest);
++        retn = update_events_measurement(tfm, identity.hdr.digest);
+ 	if (retn != 0)
+ 		goto done;
+ 	crypto_free_shash(tfm);
+@@ -1663,53 +1663,53 @@ int __init ima_events_init(void)
+ {
+ 	int retn = -1;
+ 
+-	identity_dir = ima_fs_init_identity();
+-	if (identity_dir == NULL)
++	events_dir = ima_fs_init_identity();
++	if (events_dir == NULL)
+ 		goto done;
+ 
+ 	contours = securityfs_create_file("contours", S_IRUSR | S_IRGRP,
+-					  identity_dir, NULL,
++					  events_dir, NULL,
+ 					  &ima_contours_ops);
+ 	if (IS_ERR(contours))
+ 		goto err;
+ 
+-	map = securityfs_create_file("map", S_IWUSR, identity_dir, NULL,
++	map = securityfs_create_file("map", S_IWUSR, events_dir, NULL,
+ 				     &ima_map_ops);
+ 	if (IS_ERR(map))
+ 		goto err;
+ 
+-	pseudonym = securityfs_create_file("pseudonym", S_IWUSR, identity_dir,
++	pseudonym = securityfs_create_file("pseudonym", S_IWUSR, events_dir,
+ 					   NULL, &ima_pseudonym_ops);
+ 	if (IS_ERR(pseudonym))
+ 		goto err;
+ 
+ 	host_identity = securityfs_create_file("host_identity", S_IWUSR,
+-					       identity_dir, NULL,
++					       events_dir, NULL,
+ 					       &ima_host_identity_ops);
+ 	if (IS_ERR(host_identity))
+ 		goto err;
+ 
+-	sealed = securityfs_create_file("sealed", S_IWUSR, identity_dir, NULL,
++	sealed = securityfs_create_file("sealed", S_IWUSR, events_dir, NULL,
+ 					&ima_sealed_ops);
+ 	if (IS_ERR(sealed))
+ 		goto err;
+ 
+ 	forensics = securityfs_create_file("forensics", S_IRUSR | S_IRGRP,
+-					   identity_dir, NULL,
++					   events_dir, NULL,
+ 					   &ima_forensics_ops);
+ 	if (IS_ERR(forensics))
+ 		goto err;
+ 
+ 	measurement_file = securityfs_create_file("measurement",
+ 						  S_IRUSR | S_IRGRP,
+-						  identity_dir, NULL,
++						  events_dir, NULL,
+ 						  &ima_measurement_ops);
+ 	if (IS_ERR(measurement_file))
+ 		goto err;
+ 
+ 	trajectory = securityfs_create_file("trajectory",
+ 					    S_IRUSR | S_IRGRP,
+-					    identity_dir, NULL,
++					    events_dir, NULL,
+ 					    &ima_trajectory_ops);
+ 	if (IS_ERR(trajectory))
+ 		goto err;
+-- 
+2.31.1
+

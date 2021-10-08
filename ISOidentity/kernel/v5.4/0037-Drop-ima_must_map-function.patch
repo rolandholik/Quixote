@@ -1,0 +1,69 @@
+From 29ed1310ebc6b4d67c42483a61488abdf6c219b4 Mon Sep 17 00:00:00 2001
+From: "Dr. Greg" <greg@enjellic.com>
+Date: Fri, 26 Mar 2021 02:41:09 -0500
+Subject: [PATCH 37/50] Drop ima_must_map function.
+
+The ima_must_map() function was implemented in order to reproduce
+the functionality that determines whether an event represents
+either a Time Of Measurement Time Of Use (TOMTOU) or open-writers
+violation.
+
+As part of the port to the 5.4 kernel this function had been
+converted to alway return a boolean true value.  This update
+removes the function and its use in preparation for the update to
+the pseudonym implementation.
+---
+ security/integrity/ima/ima.h        | 1 -
+ security/integrity/ima/ima_api.c    | 9 ---------
+ security/integrity/ima/ima_events.c | 3 ---
+ 3 files changed, 13 deletions(-)
+
+diff --git a/security/integrity/ima/ima.h b/security/integrity/ima/ima.h
+index 0abee48f59cf..b89d0e3227d6 100644
+--- a/security/integrity/ima/ima.h
++++ b/security/integrity/ima/ima.h
+@@ -223,7 +223,6 @@ int ima_get_action(struct inode *inode, const struct cred *cred, u32 secid,
+ 		   int mask, enum ima_hooks func, int *pcr,
+ 		   struct ima_template_desc **template_desc);
+ int ima_must_measure(struct inode *inode, int mask, enum ima_hooks func);
+-int ima_must_map(struct inode *inode, int mask, int function);
+ int ima_collect_measurement(struct integrity_iint_cache *iint,
+ 			    struct file *file, void *buf, loff_t size,
+ 			    enum hash_algo algo, struct modsig *modsig);
+diff --git a/security/integrity/ima/ima_api.c b/security/integrity/ima/ima_api.c
+index 505e1f15a8a9..d1b0a3788630 100644
+--- a/security/integrity/ima/ima_api.c
++++ b/security/integrity/ima/ima_api.c
+@@ -203,15 +203,6 @@ int ima_get_action(struct inode *inode, const struct cred *cred, u32 secid,
+ 				template_desc);
+ }
+ 
+-int ima_must_map(struct inode *inode, int mask, int function)
+-{
+-#if 1
+-	return 1;
+-#else
+-	return ima_match_policy(inode, function, mask, IMA_MAP);
+-#endif
+-}
+-
+ /*
+  * ima_collect_measurement - collect file measurement
+  *
+diff --git a/security/integrity/ima/ima_events.c b/security/integrity/ima/ima_events.c
+index 9bfcfb3d7bca..72c3901ef2ce 100644
+--- a/security/integrity/ima/ima_events.c
++++ b/security/integrity/ima/ima_events.c
+@@ -1389,9 +1389,6 @@ static int have_violation(struct file *file, struct integrity_iint_cache *iint,
+ 		}
+ 
+ 	}
+-	if (ima_must_map(inode, MAY_READ, FILE_CHECK) &&
+-	    (atomic_read(&inode->i_writecount) > 0))
+-		writers = true;
+ 
+ 	if (iint->flags & IMA_PSEUDONYM) {
+ 		if (tomtou)
+-- 
+2.31.1
+

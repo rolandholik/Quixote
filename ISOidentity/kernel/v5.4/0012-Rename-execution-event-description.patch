@@ -1,0 +1,133 @@
+From 098ec5dd1edb5137441b5a2246e3fef526397b76 Mon Sep 17 00:00:00 2001
+From: "Dr. Greg" <greg@enjellic.com>
+Date: Sat, 6 Feb 2021 10:58:17 -0600
+Subject: [PATCH 12/50] Rename execution event description.
+
+This commit changes the description used for an event identifier
+from identity to point.  This is part of a strategy to change
+nomenclature to describe the security state of the system as a
+set of defined points in an execution field.
+---
+ security/integrity/ima/ima.h        |  2 +-
+ security/integrity/ima/ima_api.c    |  2 +-
+ security/integrity/ima/ima_events.c | 22 +++++++++++-----------
+ 3 files changed, 13 insertions(+), 13 deletions(-)
+
+diff --git a/security/integrity/ima/ima.h b/security/integrity/ima/ima.h
+index 2361dcf4c676..7edd974044d2 100644
+--- a/security/integrity/ima/ima.h
++++ b/security/integrity/ima/ima.h
+@@ -68,7 +68,7 @@ struct ima_event_data {
+ 
+ /* IMA template field data definition */
+ struct ima_field_data {
+-	void *identity;
++	void *point;
+ 	u8 *data;
+ 	u32 len;
+ };
+diff --git a/security/integrity/ima/ima_api.c b/security/integrity/ima/ima_api.c
+index f8954e143314..505e1f15a8a9 100644
+--- a/security/integrity/ima/ima_api.c
++++ b/security/integrity/ima/ima_api.c
+@@ -25,7 +25,7 @@ void ima_free_template_entry(struct ima_template_entry *entry)
+ 	int i;
+ 
+ 	for (i = 0; i < entry->template_desc->num_fields; i++) {
+-		kfree(entry->template_data[i].identity);
++		kfree(entry->template_data[i].point);
+ 		kfree(entry->template_data[i].data);
+ 	}
+ 
+diff --git a/security/integrity/ima/ima_events.c b/security/integrity/ima/ima_events.c
+index abe7fcba01ac..ee34ced3b805 100644
+--- a/security/integrity/ima/ima_events.c
++++ b/security/integrity/ima/ima_events.c
+@@ -129,7 +129,7 @@ struct AIevent AI_events[] = {
+ /* Structure defining an event contour point. */
+ struct contour {
+ 	struct list_head list;
+-	char identity[WP256_DIGEST_SIZE];
++	char point[WP256_DIGEST_SIZE];
+ 	bool valid;
+ };
+ 
+@@ -317,7 +317,7 @@ static int have_contour(char *point)
+ 
+ 	mutex_lock(&map->contour_list_mutex);
+ 	list_for_each_entry(entry, &map->contour_list, list) {
+-		if (memcmp(entry->identity, point, WP256_DIGEST_SIZE) == 0) {
++		if (memcmp(entry->point, point, WP256_DIGEST_SIZE) == 0) {
+ 			retn = 1;
+ 			goto done;
+ 		}
+@@ -345,7 +345,7 @@ static int have_valid_contour(char *point)
+ 
+ 	mutex_lock(&map->contour_list_mutex);
+ 	list_for_each_entry(entry, &map->contour_list, list) {
+-		if (memcmp(entry->identity, point, WP256_DIGEST_SIZE) == 0 &&
++		if (memcmp(entry->point, point, WP256_DIGEST_SIZE) == 0 &&
+ 		    entry->valid) {
+ 			retn = 1;
+ 			goto done;
+@@ -376,7 +376,7 @@ static int add_contour_point(char *point, bool valid)
+ 		goto done;
+ 
+ 	mutex_lock(&map->contour_list_mutex);
+-	memcpy(entry->identity, point, WP256_DIGEST_SIZE);
++	memcpy(entry->point, point, WP256_DIGEST_SIZE);
+ 	entry->valid = valid;
+ 	list_add_tail(&entry->list, &map->contour_list);
+ 	++map->contour_count;
+@@ -924,7 +924,7 @@ static int ima_contours_show(struct seq_file *c, void *identity)
+ 	struct contour *id;
+ 
+ 	id = list_entry(identity, struct contour, list);
+-	seq_printf(c, "%*phN\n", WP256_DIGEST_SIZE, id->identity);
++	seq_printf(c, "%*phN\n", WP256_DIGEST_SIZE, id->point);
+ 	return 0;
+ }
+ 
+@@ -1425,7 +1425,7 @@ int ima_get_actor(struct ima_field_data *field_data, char *actor)
+ 	retn = ima_get_actor_identity(tfm, identity, actor);
+ 	if(retn!=0)
+ 		goto done;
+-	field_data->identity = identity;
++	field_data->point = identity;
+ 	retn = 0;
+ 
+  done:
+@@ -1523,7 +1523,7 @@ int ima_get_subject(struct ima_event_data *event_data,
+ 	retn = ima_get_subject_identity(tfm, identity, subject);
+ 	if (retn)
+ 		goto done;
+-	field_data->identity = identity;
++	field_data->point = identity;
+ 	retn = 0;
+ 
+  done:
+@@ -1564,8 +1564,8 @@ static int ima_map_identity(int function, struct integrity_iint_cache *iint,
+ 					 entry->template_desc,
+ 					 num_fields, &hash.hdr);
+ 
+-	*actor = *(struct actor_identity *) entry->template_data[0].identity;
+-	*subject = *(struct subject_identity *) entry->template_data[1].identity;
++	*actor = *(struct actor_identity *) entry->template_data[0].point;
++	*subject = *(struct subject_identity *) entry->template_data[1].point;
+ 	memcpy(mapping, hash.digest, sizeof(hash.digest));
+ 
+ 	ima_free_template_entry(entry);
+@@ -1781,8 +1781,8 @@ void ima_free_ns(struct kref *kref)
+ 	list_for_each_entry_safe(centry, tmp_centry, &ns->map->contour_list,
+ 				 list) {
+ 		list_del(&centry->list);
+-		pr_debug("[%s]: Removing contour: %*phN\n", __func__,
+-			WP256_DIGEST_SIZE, centry->identity);
++		pr_debug("[%s]: Removing point: %*phN\n", __func__,
++			WP256_DIGEST_SIZE, centry->point);
+ 		kfree(centry);
+ 		++cnt;
+ 	}
+-- 
+2.31.1
+

@@ -1,0 +1,160 @@
+From fa6eaa8c111a32764071d0182be4860d3468b710 Mon Sep 17 00:00:00 2001
+From: "Dr. Greg" <greg@enjellic.com>
+Date: Thu, 11 Feb 2021 08:16:26 -0600
+Subject: [PATCH 19/50] Convert from actor identity to event.
+
+This commit changes the nomenclature for the measurement of a
+context of execution participating in a security event from
+identity to event.
+---
+ security/integrity/ima/ima_events.c | 36 ++++++++++++++---------------
+ 1 file changed, 18 insertions(+), 18 deletions(-)
+
+diff --git a/security/integrity/ima/ima_events.c b/security/integrity/ima/ima_events.c
+index 25576121020a..1c32749fed36 100644
+--- a/security/integrity/ima/ima_events.c
++++ b/security/integrity/ima/ima_events.c
+@@ -31,8 +31,8 @@
+ #define IMA_SET_PSEUDONYM	0x2
+ #define IMA_SET_AI		0x4
+ 
+-/* Structure defining actor identity elements. */
+-struct actor_identity {
++/* Structure defining actor elements. */
++struct actor_event {
+ 	uid_t uid;
+ 	uid_t euid;
+ 	uid_t suid;
+@@ -139,7 +139,7 @@ struct trajectory {
+ 	char *filename;
+ 	char *process;
+ 	pid_t pid;
+-	struct actor_identity actor;
++	struct actor_event actor;
+ 	struct subject_identity subject;
+ };
+ 
+@@ -272,10 +272,10 @@ static int generate_event(struct ima_events_map *map, enum event_types event)
+  *	*id: A pointer to the user identity structure to be populated.
+  *
+  *	This function populates the provided structure with the
+- *	elements used to define an actor's identity state.
++ *	elements used to define the measurement of the actor.
+  */
+ 
+-static void get_identity(struct actor_identity *id)
++static void get_identity(struct actor_event *id)
+ 
+ {
+ 	kernel_cap_t eff, per, inh;
+@@ -396,7 +396,7 @@ static int add_event_point(char *point, bool valid)
+  */
+ 
+ static struct trajectory * create_point(const char *filename,
+-					struct actor_identity *actor,
++					struct actor_event *actor,
+ 					struct subject_identity *subject)
+ {
+ 	bool err = true;
+@@ -433,14 +433,14 @@ static struct trajectory * create_point(const char *filename,
+ /**
+  *	add_trajectory_point - Add a point to the event trajectory.
+  *	@filename: The name of the event.
+- *	@actor: The actor identity elements.
++ *	@actor: The actor elements.
+  *	@subject: The subject identity elements.
+  *
+  *	Returns a non-zero value on a failure to add a point.
+  */
+ 
+ static int add_trajectory_point(const char *filename,
+-				struct actor_identity *actor,
++				struct actor_event *actor,
+ 				struct subject_identity *subject)
+ {
+ 	int retn = 1;
+@@ -471,14 +471,14 @@ static int add_trajectory_point(const char *filename,
+  *	add_forensic_point - Add a point which documents a forensic
+  *	event on the trajectory surface.
+  *	@filename: The name of the event.
+- *	@actor: The actor identity elements.
++ *	@actor: The actor elements.
+  *	@subject: The subject identity elements.
+  *
+  *	Returns a non-zero value on a failure to add a point.
+  */
+ 
+ static int add_forensic_point(const char *filename,
+-			      struct actor_identity *actor,
++			      struct actor_event *actor,
+ 			      struct subject_identity *subject)
+ {
+ 	int retn = 1;
+@@ -506,7 +506,7 @@ static int add_forensic_point(const char *filename,
+ }
+ 
+ static int add_exchange_event(const char *filename,
+-			      struct actor_identity *actor,
++			      struct actor_event *actor,
+ 			      struct subject_identity *subject)
+ {
+ 	int retn = 1;
+@@ -1383,8 +1383,8 @@ int ima_events_genhash(struct ima_template_entry *entry, char *tpm_digest)
+ 	return retn;
+ }
+ 
+-static int ima_get_actor_identity(struct crypto_shash *tfm,
+-				  struct actor_identity *identity,
++static int ima_get_actor_event(struct crypto_shash *tfm,
++				  struct actor_event *identity,
+ 				  char *mapping)
+ {
+ 	int retn = 0;
+@@ -1412,7 +1412,7 @@ int ima_get_actor(struct ima_field_data *field_data, char *actor)
+ {
+ 	int retn = 1;
+ 	struct crypto_shash *tfm;
+-	struct actor_identity *identity = NULL;
++	struct actor_event *identity = NULL;
+ 
+ 	tfm = crypto_alloc_shash("sha256", 0, 0);
+ 	if (IS_ERR(tfm))
+@@ -1422,7 +1422,7 @@ int ima_get_actor(struct ima_field_data *field_data, char *actor)
+ 	if (!identity)
+ 		goto done;
+ 
+-	retn = ima_get_actor_identity(tfm, identity, actor);
++	retn = ima_get_actor_event(tfm, identity, actor);
+ 	if(retn!=0)
+ 		goto done;
+ 	field_data->point = identity;
+@@ -1536,7 +1536,7 @@ int ima_get_subject(struct ima_event_data *event_data,
+ static int ima_map_identity(int function, struct integrity_iint_cache *iint,
+ 			    struct ima_template_desc *template_desc,
+ 			    struct file *file, const char *pathname,
+-			    struct actor_identity *actor,
++			    struct actor_event *actor,
+ 			    struct subject_identity *subject, char *mapping)
+ {
+ 	int retn, num_fields;
+@@ -1564,7 +1564,7 @@ static int ima_map_identity(int function, struct integrity_iint_cache *iint,
+ 					 entry->template_desc,
+ 					 num_fields, &hash.hdr);
+ 
+-	*actor = *(struct actor_identity *) entry->template_data[0].point;
++	*actor = *(struct actor_event *) entry->template_data[0].point;
+ 	*subject = *(struct subject_identity *) entry->template_data[1].point;
+ 	memcpy(mapping, hash.digest, sizeof(hash.digest));
+ 
+@@ -1606,7 +1606,7 @@ int ima_events_is_mapped(int function, struct integrity_iint_cache *iint,
+ {
+ 	int retn = 0;
+ 	char mapping[WP256_DIGEST_SIZE];
+-	struct actor_identity actor;
++	struct actor_event actor;
+ 	struct subject_identity subject;
+ 	struct ima_events_map *map = current_map();
+ 
+-- 
+2.31.1
+

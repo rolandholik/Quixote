@@ -1,0 +1,400 @@
+From 57c0ff380298236a4c36bfd23fb7406b211cdd6c Mon Sep 17 00:00:00 2001
+From: "Dr. Greg" <greg@enjellic.com>
+Date: Sat, 6 Feb 2021 11:19:06 -0600
+Subject: [PATCH 14/50] Change from countours to points nomenclature.
+
+Previously the list of Turing events was referred to as a
+contour.  The changes in this commit convert from the
+nomenclature of a contour to a point and a point list.
+
+The pseudo-directory containing the current set of event points
+was also changed from the following:
+
+/sys/kernel/security/integrity/events/contours
+
+To:
+
+/sys/kernel/security/integrity/events/points
+---
+ security/integrity/ima/ima_events.c | 137 ++++++++++++++--------------
+ 1 file changed, 68 insertions(+), 69 deletions(-)
+
+diff --git a/security/integrity/ima/ima_events.c b/security/integrity/ima/ima_events.c
+index 98c9acd17329..f136425f1174 100644
+--- a/security/integrity/ima/ima_events.c
++++ b/security/integrity/ima/ima_events.c
+@@ -76,7 +76,7 @@ static char aggregate[WP256_DIGEST_SIZE];
+  * pseudo-files in that directory.
+  */
+ static struct dentry *events_dir;
+-static struct dentry *contours;
++static struct dentry *points;
+ static struct dentry *map;
+ static struct dentry *pseudonym;
+ static struct dentry *host_identity;
+@@ -175,9 +175,9 @@ struct ima_events_map {
+ 	char measurement [WP256_DIGEST_SIZE];
+ 
+ 	struct event_point cp;
+-	unsigned int contour_count;
+-	struct mutex contour_list_mutex;
+-	struct list_head contour_list;
++	unsigned int point_count;
++	struct mutex point_list_mutex;
++	struct list_head point_list;
+ 
+ 	unsigned int trajectory_count;
+ 	struct mutex trajectory_list_mutex;
+@@ -195,8 +195,8 @@ struct ima_events_map {
+ 
+ 	struct kobj_attribute update;
+ } init_ima_events_map = {
+-	.contour_list_mutex = __MUTEX_INITIALIZER(init_ima_events_map.contour_list_mutex),
+-	.contour_list = LIST_HEAD_INIT(init_ima_events_map.contour_list),
++	.point_list_mutex = __MUTEX_INITIALIZER(init_ima_events_map.point_list_mutex),
++	.point_list = LIST_HEAD_INIT(init_ima_events_map.point_list),
+ 
+ 	.trajectory_list_mutex = __MUTEX_INITIALIZER(init_ima_events_map.trajectory_list_mutex),
+ 	.trajectory_list = LIST_HEAD_INIT(init_ima_events_map.trajectory_list),
+@@ -301,22 +301,22 @@ static void get_identity(struct actor_identity *id)
+ }
+ 
+ /**
+- *	have_contour - Search contour list for a given point.
+- *	@point: buffer containing the contour point to search for.
++ *	have_point - Search event list for a given point.
++ *	@point: buffer containing the point to search for.
+  *
+- *	Search the current contour list attempting to find the
++ *	Search the current event list attempting to find the
+  *	point specified by the caller.  Return true if the point
+  *	is located.
+  */
+ 
+-static int have_contour(char *point)
++static int have_point(char *point)
+ {
+ 	int retn = 0;
+ 	struct event_point *entry;
+ 	struct ima_events_map *map = current_map();
+ 
+-	mutex_lock(&map->contour_list_mutex);
+-	list_for_each_entry(entry, &map->contour_list, list) {
++	mutex_lock(&map->point_list_mutex);
++	list_for_each_entry(entry, &map->point_list, list) {
+ 		if (memcmp(entry->point, point, WP256_DIGEST_SIZE) == 0) {
+ 			retn = 1;
+ 			goto done;
+@@ -324,27 +324,27 @@ static int have_contour(char *point)
+ 	}
+ 
+  done:
+-	mutex_unlock(&map->contour_list_mutex);
++	mutex_unlock(&map->point_list_mutex);
+ 	return retn;
+ }
+ 
+ /**
+- *	have_valid_contour - Search contour list for a given point.
+- *	@point: buffer containing the contour point to search for.
++ *	have_valid_point - Search event list for a given point.
++ *	@point: buffer containing the event point to search for.
+  *
+- *	Search the current contour list attempting to find the
++ *	Search the current event list attempting to find the
+  *	point specified by the caller.  Return true if the point
+  *	is located.
+  */
+ 
+-static int have_valid_contour(char *point)
++static int have_valid_point(char *point)
+ {
+ 	int retn = 0;
+ 	struct event_point *entry;
+ 	struct ima_events_map *map = current_map();
+ 
+-	mutex_lock(&map->contour_list_mutex);
+-	list_for_each_entry(entry, &map->contour_list, list) {
++	mutex_lock(&map->point_list_mutex);
++	list_for_each_entry(entry, &map->point_list, list) {
+ 		if (memcmp(entry->point, point, WP256_DIGEST_SIZE) == 0 &&
+ 		    entry->valid) {
+ 			retn = 1;
+@@ -353,19 +353,19 @@ static int have_valid_contour(char *point)
+ 	}
+ 
+  done:
+-	mutex_unlock(&map->contour_list_mutex);
++	mutex_unlock(&map->point_list_mutex);
+ 	return retn;
+ }
+ 
+ /**
+- *	add_countour_point - Add a point to the contour list.
+- *	@point: buffer containing the contour point to add.
++ *	add_event_point - Add a point to the event list.
++ *	@point: buffer containing the event point to add.
+  *	@valid: The status of the point.
+  *
+  *	Returns a non-zero value on a failure to add a point.
+  */
+ 
+-static int add_contour_point(char *point, bool valid)
++static int add_event_point(char *point, bool valid)
+ {
+ 	int retn = 1;
+ 	struct event_point *entry;
+@@ -375,12 +375,12 @@ static int add_contour_point(char *point, bool valid)
+ 	if (!entry)
+ 		goto done;
+ 
+-	mutex_lock(&map->contour_list_mutex);
++	mutex_lock(&map->point_list_mutex);
+ 	memcpy(entry->point, point, WP256_DIGEST_SIZE);
+ 	entry->valid = valid;
+-	list_add_tail(&entry->list, &map->contour_list);
+-	++map->contour_count;
+-	mutex_unlock(&map->contour_list_mutex);
++	list_add_tail(&entry->list, &map->point_list);
++	++map->point_count;
++	mutex_unlock(&map->point_list_mutex);
+ 	retn = 0;
+ 
+  done:
+@@ -389,7 +389,7 @@ static int add_contour_point(char *point, bool valid)
+ 
+ /**
+  *	create_point - This function is a helper function for the
+- *	add add_contour_point() and add_forensic_point() functions.  It
++ *	add add_event_point() and add_forensic_point() functions.  It
+  *	consolidates all of the functionality needed to create the
+  *	list entry leaving the addition of the entry to the calling
+  *	functions.
+@@ -678,16 +678,16 @@ static int load_pseudonym(const char __user *pathbufr, size_t datalen)
+ }
+ 
+ /**
+- *	load_contour - Add a contour point to the event namespace
++ *	load_point - Add an event point to the event namespace
+  *	description.
+- *	@contour: The buffer containing the contour point in ASCII
++ *	@point: The buffer containing the point in ASCII
+  *	hexadecimal format.
+  *	@datalen: The size of the buffer.
+  *
+  *	Returns a non-zero value on a failure to add a point.
+  */
+ 
+-static int load_contour(const char __user *contour, size_t datalen)
++static int load_point(const char __user *point, size_t datalen)
+ {
+ 	char *p, idbufr[WP256_DIGEST_SIZE*2 + 1], mapping[WP256_DIGEST_SIZE],
+ 		tpm_digest[SHA1_DIGEST_SIZE];
+@@ -700,7 +700,7 @@ static int load_contour(const char __user *contour, size_t datalen)
+ 	}
+ 
+ 	memset(idbufr, '\0', sizeof(idbufr));
+-	if (copy_from_user(idbufr, contour, datalen)) {
++	if (copy_from_user(idbufr, point, datalen)) {
+ 		retn = -EFAULT;
+ 		goto done;
+ 	}
+@@ -716,16 +716,16 @@ static int load_contour(const char __user *contour, size_t datalen)
+ 		goto done;
+ 	}
+ 
+-	if (have_valid_contour(mapping)) {
++	if (have_valid_point(mapping)) {
+ 		retn = datalen;
+ 		goto done;
+ 	}
+-	if (add_contour_point(mapping, true)) {
++	if (add_event_point(mapping, true)) {
+ 		retn = -ENOMEM;
+ 		goto done;
+ 	}
+ 
+-	/* Add the contour point measurement. */
++	/* Add the point measurement. */
+ 	tfmsha1 = crypto_alloc_shash("sha1", 0, 0);
+ 	if (IS_ERR(tfmsha1)) {
+ 		retn = PTR_ERR(tfmsha1);
+@@ -897,29 +897,29 @@ static const struct file_operations ima_trajectory_ops = {
+ 	.release = seq_release,
+ };
+ 
+-static void *ima_contours_start(struct seq_file *c, loff_t *pos)
++static void *ima_point_start(struct seq_file *c, loff_t *pos)
+ {
+ 	struct ima_events_map *map = current_map();
+-	if (*pos >= map->contour_count)
++	if (*pos >= map->point_count)
+ 		return NULL;
+ 
+-	mutex_lock(&map->contour_list_mutex);
+-	return seq_list_start(&map->contour_list, *pos);
++	mutex_lock(&map->point_list_mutex);
++	return seq_list_start(&map->point_list, *pos);
+ }
+ 
+-static void *ima_contours_next(struct seq_file *c, void *p, loff_t *pos)
++static void *ima_point_next(struct seq_file *c, void *p, loff_t *pos)
+ {
+ 	struct ima_events_map *map = current_map();
+-	return seq_list_next(p, &map->contour_list, pos);
++	return seq_list_next(p, &map->point_list, pos);
+ }
+ 
+-static void ima_contours_stop(struct seq_file *c, void *pos)
++static void ima_point_stop(struct seq_file *c, void *pos)
+ {
+ 	struct ima_events_map *map = current_map();
+-	mutex_unlock(&map->contour_list_mutex);
++	mutex_unlock(&map->point_list_mutex);
+ }
+ 
+-static int ima_contours_show(struct seq_file *c, void *identity)
++static int ima_point_show(struct seq_file *c, void *identity)
+ {
+ 	struct event_point *id;
+ 
+@@ -928,24 +928,24 @@ static int ima_contours_show(struct seq_file *c, void *identity)
+ 	return 0;
+ }
+ 
+-static const struct seq_operations ima_contours_seqops = {
+-	.start = ima_contours_start,
+-	.next = ima_contours_next,
+-	.stop = ima_contours_stop,
+-	.show = ima_contours_show
++static const struct seq_operations ima_point_seqops = {
++	.start = ima_point_start,
++	.next = ima_point_next,
++	.stop = ima_point_stop,
++	.show = ima_point_show
+ };
+ 
+-static int ima_contours_open(struct inode *inode, struct file *file)
++static int ima_point_open(struct inode *inode, struct file *file)
+ {
+ 	struct ima_events_map *map = current_map();
+ 
+ 	if (map->domain_sealed)
+ 		return -EACCES;
+-	return seq_open(file, &ima_contours_seqops);
++	return seq_open(file, &ima_point_seqops);
+ }
+ 
+-static const struct file_operations ima_contours_ops = {
+-	.open = ima_contours_open,
++static const struct file_operations ima_point_ops = {
++	.open = ima_point_open,
+ 	.read = seq_read,
+ 	.llseek = seq_lseek,
+ 	.release = seq_release,
+@@ -974,7 +974,7 @@ static ssize_t ima_write_map(struct file *file, const char __user *buf,
+ 		goto done;
+ 	}
+ 
+-	retn = load_contour(buf, datalen);
++	retn = load_point(buf, datalen);
+ 	if ( retn != 0 )
+ 		goto done;
+ 
+@@ -1591,7 +1591,7 @@ static void ima_set_actor_status(int function, const char *pathname,
+ 	pr_debug("[%s]: Actor %d:%s function=%d, subject=%*phN, status=%u\n",
+ 		 __func__, current->pid, pathname, function, WP256_DIGEST_SIZE,
+ 		 subject->digest, current->bad_actor);
+-	if (!have_valid_contour(mapping)) {
++	if (!have_valid_point(mapping)) {
+ 		current->bad_actor = 1;
+ 		pr_debug("[%s]: Setting bad actor status.\n", __func__);
+ 	}
+@@ -1621,8 +1621,8 @@ int ima_events_is_mapped(int function, struct integrity_iint_cache *iint,
+ 
+ 	add_exchange_event(pathname, &actor, &subject);
+ 
+-	if (have_contour(mapping)) {
+-		pr_debug("[%s]: Contour cache hit path=%s, mapping=%*phN\n",
++	if (have_point(mapping)) {
++		pr_debug("[%s]: Point cache hit path=%s, mapping=%*phN\n",
+ 			 __func__, pathname, WP256_DIGEST_SIZE, mapping);
+ 		return 1;
+ 	}
+@@ -1639,10 +1639,10 @@ int ima_events_is_mapped(int function, struct integrity_iint_cache *iint,
+ 	if (map->domain_sealed) {
+ 		retn = add_forensic_point(pathname, &actor, &subject);
+ 		if (retn == 0 )
+-			retn = add_contour_point(mapping, false);
++			retn = add_event_point(mapping, false);
+ 	}
+ 	else {
+-		retn = add_contour_point(mapping, true);
++		retn = add_event_point(mapping, true);
+ 		if (retn == 0)
+ 			retn = add_trajectory_point(pathname, &actor,
+ 						    &subject);
+@@ -1667,10 +1667,9 @@ int __init ima_events_init(void)
+ 	if (events_dir == NULL)
+ 		goto done;
+ 
+-	contours = securityfs_create_file("contours", S_IRUSR | S_IRGRP,
+-					  events_dir, NULL,
+-					  &ima_contours_ops);
+-	if (IS_ERR(contours))
++	points = securityfs_create_file("points", S_IRUSR | S_IRGRP,
++					events_dir, NULL, &ima_point_ops);
++	if (IS_ERR(points))
+ 		goto err;
+ 
+ 	map = securityfs_create_file("map", S_IWUSR, events_dir, NULL,
+@@ -1725,7 +1724,7 @@ int __init ima_events_init(void)
+ 	return retn;
+ 
+  err:
+-	securityfs_remove(contours);
++	securityfs_remove(points);
+ 	securityfs_remove(map);
+ 	securityfs_remove(pseudonym);
+ 	securityfs_remove(host_identity);
+@@ -1778,7 +1777,7 @@ void ima_free_ns(struct kref *kref)
+ 	ns = container_of(kref, struct ima_events_namespace, kref);
+ 
+ 	cnt = 0;
+-	list_for_each_entry_safe(centry, tmp_centry, &ns->map->contour_list,
++	list_for_each_entry_safe(centry, tmp_centry, &ns->map->point_list,
+ 				 list) {
+ 		list_del(&centry->list);
+ 		pr_debug("[%s]: Removing point: %*phN\n", __func__,
+@@ -1786,7 +1785,7 @@ void ima_free_ns(struct kref *kref)
+ 		kfree(centry);
+ 		++cnt;
+ 	}
+-	pr_debug("[%s]: Released %d contours.\n", __func__, cnt);
++	pr_debug("[%s]: Released %d points.\n", __func__, cnt);
+ 
+ 	cnt = 0;
+ 	list_for_each_entry_safe(tentry, tmp_tentry, &ns->map->trajectory_list,
+@@ -1917,8 +1916,8 @@ struct ima_events_namespace *ima_copy_events_ns(unsigned long flags,
+ 		retn = -ENOMEM;
+ 		goto done;
+ 	}
+-	mutex_init(&ns->map->contour_list_mutex);
+-	INIT_LIST_HEAD(&ns->map->contour_list);
++	mutex_init(&ns->map->point_list_mutex);
++	INIT_LIST_HEAD(&ns->map->point_list);
+ 
+ 	mutex_init(&ns->map->trajectory_list_mutex);
+ 	INIT_LIST_HEAD(&ns->map->trajectory_list);
+@@ -2096,7 +2095,7 @@ SYSCALL_DEFINE3(config_events_ns, unsigned char *, bufr, size_t, cnt,
+ 	if (flags & IMA_SET_CONTOUR) {
+ 		if (map->domain_sealed)
+ 			return -EPERM;
+-		retn = load_contour(bufr, cnt);
++		retn = load_point(bufr, cnt);
+ 		goto done;
+ 	}
+ 
+-- 
+2.31.1
+

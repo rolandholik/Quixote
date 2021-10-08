@@ -1,0 +1,160 @@
+From 5b322df6cb7a16053c571011a90a2d14204bc095 Mon Sep 17 00:00:00 2001
+From: "Dr. Greg" <greg@enjellic.com>
+Date: Fri, 19 Feb 2021 04:43:48 -0600
+Subject: [PATCH 30/50] Implement support for designating an external
+ evaluator.
+
+The current event implementation does not have strict separation
+between kernel evaluation and an external evaluator.  In
+preparation for making this separation more complete a boolean is
+added to the event namespace to designate whether the kernel or
+an external evaluator should be reponsible for interpreting
+events.
+
+The following pseudo-file is implemented in order to allow an
+orchestrator to set this namespace configuration:
+
+/sys/kernel/security/integrity/events/external
+
+Writing an ASCII value of 0 to this file designates that the in
+kernel evaluator should be used.  A value of 1 written to the
+file indicates that an external evaluator should be used.
+
+Writes to this file are rejected if the event namespace has been
+sealed.
+---
+ security/integrity/ima/ima_events.c | 79 +++++++++++++++++++++++++++--
+ 1 file changed, 76 insertions(+), 3 deletions(-)
+
+diff --git a/security/integrity/ima/ima_events.c b/security/integrity/ima/ima_events.c
+index 91deada20d94..85df12af9568 100644
+--- a/security/integrity/ima/ima_events.c
++++ b/security/integrity/ima/ima_events.c
+@@ -80,6 +80,7 @@ static struct dentry *map;
+ static struct dentry *pseudonym;
+ static struct dentry *base;
+ static struct dentry *sealed;
++static struct dentry *external;
+ static struct dentry *forensics;
+ static struct dentry *measurement_file;
+ static struct dentry *trajectory;
+@@ -170,8 +171,10 @@ struct event {
+  * to support an events namespace.
+  */
+ struct ima_events_map {
++	bool external;
++
+ 	char base[WP256_DIGEST_SIZE];
+-	char measurement [WP256_DIGEST_SIZE];
++	char measurement[WP256_DIGEST_SIZE];
+ 
+ 	struct event_point cp;
+ 	unsigned int point_count;
+@@ -1178,6 +1181,66 @@ static const struct file_operations ima_sealed_ops = {
+ 	.llseek = generic_file_llseek,
+ };
+ 
++static int ima_open_external(struct inode * inode, struct file * filp)
++{
++	struct ima_events_map *map = current_map();
++
++	if (map->domain_sealed)
++		return -EACCES;
++	if (!(filp->f_flags & O_WRONLY))
++		return -EACCES;
++	return 0;
++}
++
++static ssize_t ima_write_external(struct file *file,
++				  const char __user *buf, size_t datalen,
++				  loff_t *ppos)
++{
++	char external[2];
++	ssize_t retn = -EINVAL;
++	struct ima_events_map *map = current_map();
++
++	if (datalen != 2)
++		goto done;
++
++	if (*ppos != 0)
++		goto done;
++
++	if (copy_from_user(external, buf, sizeof(external))) {
++		retn = -EFAULT;
++		goto done;
++	}
++
++	if (external[1] != '\n')
++		goto done;
++
++	if (external[0] == '0') {
++		retn = datalen;
++		map->external = false;
++		pr_debug("[%s]: Disabling external evaluator.\n", __func__);
++	}
++	if (external[0] == '1') {
++		retn = datalen;
++		map->external = true;
++		pr_debug("[%s]: Enabling external evaluator.\n", __func__);
++	}
++
++done:
++	return retn;
++}
++
++static int ima_release_external(struct inode *inode, struct file *file)
++{
++	return 0;
++}
++
++static const struct file_operations ima_external_ops = {
++	.open = ima_open_external,
++	.write = ima_write_external,
++	.release = ima_release_external,
++	.llseek = generic_file_llseek,
++};
++
+ static void *ima_forensics_start(struct seq_file *c, loff_t *pos)
+ {
+ 	struct ima_events_map *map = current_map();
+@@ -1703,6 +1766,11 @@ int __init ima_events_init(void)
+ 	if (IS_ERR(sealed))
+ 		goto err;
+ 
++	external = securityfs_create_file("external", 0200, events_dir, NULL,
++					  &ima_external_ops);
++	if (IS_ERR(sealed))
++		goto err;
++
+ 	forensics = securityfs_create_file("forensics", S_IRUSR | S_IRGRP,
+ 					   events_dir, NULL,
+ 					   &ima_forensics_ops);
+@@ -1739,6 +1807,7 @@ int __init ima_events_init(void)
+ 	securityfs_remove(pseudonym);
+ 	securityfs_remove(base);
+ 	securityfs_remove(sealed);
++	securityfs_remove(external);
+ 	securityfs_remove(forensics);
+ 	securityfs_remove(measurement_file);
+ 	securityfs_remove(trajectory);
+@@ -1945,11 +2014,15 @@ struct ima_events_namespace *ima_copy_events_ns(unsigned long flags,
+ 	}
+ 	memcpy(ns->map->AI_events, AI_events, sizeof(AI_events));
+ 
+-	if (events_ns)
++	if (events_ns) {
++		ns->map->external = events_ns->map->external;
+ 		memcpy(ns->map->base, events_ns->map->base, WP256_DIGEST_SIZE);
+-	else
++	}
++	else {
++		ns->map->external = init_ima_events_ns.map->external;
+ 		memcpy(ns->map->base, init_ima_events_ns.map->base,
+ 		       WP256_DIGEST_SIZE);
++	}
+ 
+ 	/* Setup the update pseudo-file for this namespace. */
+ 	if (snprintf(bufr, sizeof(bufr), "%s%u", update, ns->ns.inum) >=
+-- 
+2.31.1
+

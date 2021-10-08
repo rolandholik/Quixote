@@ -1,0 +1,77 @@
+From 633fc46d075532719331b753219ba0aef10de81a Mon Sep 17 00:00:00 2001
+From: "Dr. Greg" <greg@enjellic.com>
+Date: Fri, 13 Aug 2021 01:08:00 -0500
+Subject: [PATCH 44/50] Improve TE log messages.
+
+This update enhances the log messages that are issued when the TE
+LSM encounters a process that is running with 'bad actor' status.
+
+The most important change is to include the PID of the process
+that is generating the event so the origin of security events can
+be better determined.
+
+The te_file_open() hook was modified to change the informative
+message that is issued when the hook is called with bad actor
+status from pr_info() to pr_debug() status.  The specific fault
+messages indicating the interdiction of a read or write remain at
+the pr_info() log level.
+---
+ security/te/te.c | 22 ++++++++++++----------
+ 1 file changed, 12 insertions(+), 10 deletions(-)
+
+diff --git a/security/te/te.c b/security/te/te.c
+index 4bdb561439fb..9212938af594 100644
+--- a/security/te/te.c
++++ b/security/te/te.c
+@@ -42,19 +42,19 @@ static int te_file_open(struct file *f)
+ 	if ( !current->bad_actor )
+ 		return 0;
+ 
+-	pr_info("%s: Bad actor=%s, subject=%s, flags=0x%x\n", __func__,
+-		current->comm, f->f_path.dentry->d_name.name,
+-		f->f_flags);
++	pr_debug("%s: Bad actor=%s, subject=%s, flags=0x%x\n", __func__,
++		 current->comm, f->f_path.dentry->d_name.name,
++		 f->f_flags);
+ 
+ 	if ( ((f->f_flags & O_ACCMODE) == O_RDONLY) ||
+ 	     (f->f_flags & O_RDWR) )
+-		pr_info("%s: Restricting read %s access to %s.\n",
+-			__func__, current->comm,
++		pr_info("%s: Restricting read access: pid=%u, comm=%s, name=%s\n",
++			__func__, task_pid_nr(current), current->comm,
+ 			f->f_path.dentry->d_name.name);
+ 
+ 	if ( f->f_flags & (O_CREAT | O_TRUNC | O_WRONLY | O_RDWR) )
+-		pr_info("%s: Restricting write %s access to %s.\n",
+-			__func__, current->comm,
++		pr_info("%s: Restricting write access: pid=%u, comm=%s, name=%s\n",
++			__func__, task_pid_nr(current), current->comm,
+ 			f->f_path.dentry->d_name.name);
+ 
+ 	return ima_events_process_te(TE_file_open);
+@@ -97,8 +97,9 @@ static int te_socket_connect(struct socket *sock, struct sockaddr *addr,
+ 	if ( !current->bad_actor )
+ 		return 0;
+ 
+-	pr_info("%s: Refused socket open, family=%u, length=%d, addr=%*phN\n", 
+-		__func__, addr->sa_family, addr_len, addr_len, addr->sa_data);
++	pr_info("%s: Refused socket open: pid=%u, comm=%s, family=%u, length=%d, addr=%*phN\n",
++		__func__, task_pid_nr(current), current->comm,
++		addr->sa_family, addr_len, addr_len, addr->sa_data);
+ 
+ 	return ima_events_process_te(TE_socket_connect);
+ }
+@@ -119,7 +120,8 @@ static int te_socket_listen(struct socket *sock, int backlog)
+ 	if ( !current->bad_actor )
+ 		return 0;
+ 
+-	pr_info("%s: Refused socket listen, backlog=%d\n", __func__, backlog);
++	pr_info("%s: Refused socket listen: pid=%u, comm=%s, backlog=%d\n",
++		__func__, task_pid_nr(current), current->comm, backlog);
+ 	return ima_events_process_te(TE_socket_listen);
+ }
+ 
+-- 
+2.31.1
+

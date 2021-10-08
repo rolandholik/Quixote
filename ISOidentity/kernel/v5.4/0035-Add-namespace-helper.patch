@@ -1,0 +1,82 @@
+From fb8b67b51a2a1de62f3f1683277d2b90060e700b Mon Sep 17 00:00:00 2001
+From: "Dr. Greg" <greg@enjellic.com>
+Date: Sat, 6 Mar 2021 09:19:05 -0600
+Subject: [PATCH 35/50] Add namespace helper.
+
+This commit adds the is_ns() function which returns a boolean
+value indicating whether or not the context of execution is
+running in an event namespace.  Consistent with the naming
+semantics a value of 'true' is returned to indicate that the
+context is operating in an event namespace.
+
+Update the points in the code that were explicitly testing
+whether or not the pointer to the events description structure
+was non-NULL.
+---
+ security/integrity/ima/ima_events.c | 23 +++++++++++++----------
+ 1 file changed, 13 insertions(+), 10 deletions(-)
+
+diff --git a/security/integrity/ima/ima_events.c b/security/integrity/ima/ima_events.c
+index e4a29e924d37..bd418a121164 100644
+--- a/security/integrity/ima/ima_events.c
++++ b/security/integrity/ima/ima_events.c
+@@ -224,16 +224,19 @@ struct ima_events_namespace init_ima_events_ns = {
+ 
+ static atomic_t map_opencount = ATOMIC_INIT(1);
+ 
+-/**
+- *	current_map - This function returns the currently active
+- *	events namespace.
+- *
+- *	Returns a a pointer to the currently active evants map.
++/*
++ * Helper functions to determine whether or not execution is occurring
++ * in an event namespace and to return the map of the namespace.
+  */
+ 
++static bool is_ns(void)
++{
++	return current->nsproxy->events_ns != NULL;
++}
++
+ static struct ima_events_map *current_map(void)
+ {
+-	if (current->nsproxy->events_ns)
++	if (is_ns())
+ 		return current->nsproxy->events_ns->map;
+ 	return init_ima_events_ns.map;
+ }
+@@ -519,7 +522,7 @@ static int export_event(const char *filename, struct event_actor *actor,
+ 	struct event *mp;
+ 	struct trajectory *event;
+ 
+-	if (!current->nsproxy->events_ns)
++	if (!is_ns())
+ 		return 0;
+ 	map = current_map();
+ 
+@@ -1899,7 +1902,7 @@ int ima_measure_ns(const u8 *hash)
+ 	struct ima_events_map *map;
+ 	struct event *mp;
+ 
+-	if (!current->nsproxy->events_ns)
++	if (!is_ns())
+ 		return 0;
+ 
+ 	map = current_map();
+@@ -2178,10 +2181,10 @@ SYSCALL_DEFINE3(config_events_ns, unsigned char *, bufr, size_t, cnt,
+ 	pr_debug("[%s]: Called: cnt=%zu, flags=%lu.\n", __func__, cnt, flags);
+ 
+ 	/* Verify permissions for system call. */
+-	if (!current->nsproxy->events_ns && !capable(CAP_SYS_ADMIN))
++	if (!is_ns() && !capable(CAP_SYS_ADMIN))
+ 		return -EPERM;
+ 
+-	if (current->nsproxy->events_ns) {
++	if (is_ns()) {
+ 		root_uid = make_kuid(current_cred()->user_ns, 0);
+ 		if ( !uid_eq(current_euid(), root_uid) )
+ 			return -EPERM;
+-- 
+2.31.1
+

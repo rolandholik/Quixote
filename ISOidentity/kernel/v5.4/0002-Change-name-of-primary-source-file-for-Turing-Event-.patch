@@ -1,0 +1,36 @@
+From 0341f229c7e14902cb335e6d97edc93f889d4f11 Mon Sep 17 00:00:00 2001
+From: "Dr. Greg" <greg@enjellic.com>
+Date: Wed, 27 Jan 2021 04:44:49 -0600
+Subject: [PATCH 02/50] Change name of primary source file for Turing Event
+ modeling.
+
+This update changes the name of the source file that contains the
+event modeling code to a basename of ima_events.  This sets the
+stage for the conversion of all naming from ima_identity to
+ima_events.
+---
+ security/integrity/ima/Makefile                         | 2 +-
+ security/integrity/ima/{ima_identity.c => ima_events.c} | 0
+ 2 files changed, 1 insertion(+), 1 deletion(-)
+ rename security/integrity/ima/{ima_identity.c => ima_events.c} (100%)
+
+diff --git a/security/integrity/ima/Makefile b/security/integrity/ima/Makefile
+index d9cc59f70e24..000f1264d1fb 100644
+--- a/security/integrity/ima/Makefile
++++ b/security/integrity/ima/Makefile
+@@ -7,7 +7,7 @@
+ obj-$(CONFIG_IMA) += ima.o
+ 
+ ima-y := ima_fs.o ima_queue.o ima_init.o ima_main.o ima_crypto.o ima_api.o \
+-	 ima_policy.o ima_template.o ima_template_lib.o ima_identity.o
++	 ima_policy.o ima_template.o ima_template_lib.o ima_events.o
+ ima-$(CONFIG_IMA_APPRAISE) += ima_appraise.o
+ ima-$(CONFIG_IMA_APPRAISE_MODSIG) += ima_modsig.o
+ ima-$(CONFIG_HAVE_IMA_KEXEC) += ima_kexec.o
+diff --git a/security/integrity/ima/ima_identity.c b/security/integrity/ima/ima_events.c
+similarity index 100%
+rename from security/integrity/ima/ima_identity.c
+rename to security/integrity/ima/ima_events.c
+-- 
+2.31.1
+

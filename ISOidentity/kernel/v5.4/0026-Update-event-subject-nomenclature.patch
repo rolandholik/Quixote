@@ -1,0 +1,108 @@
+From 8c4dfe47a975eed5c8fb4d33101aef44c10bff8e Mon Sep 17 00:00:00 2001
+From: "Dr. Greg" <greg@enjellic.com>
+Date: Thu, 11 Feb 2021 18:37:47 -0600
+Subject: [PATCH 26/50] Update event subject nomenclature.
+
+Similar to the treatment of the context of execution (actor) this
+update changes from using identity nomeclature to using subject
+and measurement as the terms.
+---
+ security/integrity/ima/ima_events.c | 38 ++++++++++++++---------------
+ 1 file changed, 19 insertions(+), 19 deletions(-)
+
+diff --git a/security/integrity/ima/ima_events.c b/security/integrity/ima/ima_events.c
+index e19b72f12cf3..99987c3c5c8b 100644
+--- a/security/integrity/ima/ima_events.c
++++ b/security/integrity/ima/ima_events.c
+@@ -1465,7 +1465,7 @@ static int ima_add_subject_name(struct crypto_shash *tfm,
+ 
+ static int ima_get_event_subject(struct crypto_shash *tfm,
+ 				    struct event_subject *subject,
+-				    char *identity)
++				    char *measurement)
+ {
+ 	int retn = 0;
+ 	SHASH_DESC_ON_STACK(shash, tfm);
+@@ -1476,61 +1476,61 @@ static int ima_get_event_subject(struct crypto_shash *tfm,
+ 		goto done;
+ 
+ 	retn = crypto_shash_finup(shash, (char *) subject,
+-				  sizeof(struct event_subject), identity);
++				  sizeof(struct event_subject), measurement);
+ 
+  done:
+ 	return retn;
+ }
+ 
+ int ima_get_subject(struct ima_event_data *event_data,
+-		    struct ima_field_data *field_data, char *subject)
++		    struct ima_field_data *field_data, char *measurement)
+ {
+ 	const char *filename;
+ 	int retn=1;
+ 	struct crypto_shash *tfm;
+-	struct event_subject *identity = NULL;
++	struct event_subject *subject = NULL;
+ 	struct inode *inode;
+ 
+ 	tfm = crypto_alloc_shash("sha256", 0, 0);
+ 	if (IS_ERR(tfm))
+ 		return PTR_ERR(tfm);
+ 
+-	identity = kzalloc(sizeof(*identity), GFP_KERNEL);
+-	if (!identity)
++	subject = kzalloc(sizeof(*subject), GFP_KERNEL);
++	if (!subject)
+ 		goto done;
+ 
+ 	filename = event_data->filename;
+-	memset(identity, '\0', sizeof(struct event_subject));
++	memset(subject, '\0', sizeof(struct event_subject));
+ 
+ 	/* Add hash of subject name. */
+-	if (ima_add_subject_name(tfm, identity, event_data) != 0)
++	if (ima_add_subject_name(tfm, subject, event_data) != 0)
+ 		goto done;
+ 
+ 	/* Add the digest of the subject. */
+-	memcpy(identity->digest, event_data->iint->ima_hash->digest,
++	memcpy(subject->digest, event_data->iint->ima_hash->digest,
+ 	       WP256_DIGEST_SIZE);
+ 
+ 	/* Add subject characteristics. */
+ 	if (event_data->file) {
+ 		inode = file_inode(event_data->file);
+-		identity->uid = from_kuid(&init_user_ns, inode->i_uid);
+-		identity->gid = from_kgid(&init_user_ns, inode->i_gid);
+-		identity->mode = inode->i_mode;
+-		memcpy(identity->s_id, inode->i_sb->s_id,
+-		       sizeof(identity->s_id));
+-		memcpy(identity->s_uuid, inode->i_sb->s_uuid.b,
+-		       sizeof(identity->s_uuid));
++		subject->uid = from_kuid(&init_user_ns, inode->i_uid);
++		subject->gid = from_kgid(&init_user_ns, inode->i_gid);
++		subject->mode = inode->i_mode;
++		memcpy(subject->s_id, inode->i_sb->s_id,
++		       sizeof(subject->s_id));
++		memcpy(subject->s_uuid, inode->i_sb->s_uuid.b,
++		       sizeof(subject->s_uuid));
+ 	}
+ 
+-	retn = ima_get_event_subject(tfm, identity, subject);
++	retn = ima_get_event_subject(tfm, subject, measurement);
+ 	if (retn)
+ 		goto done;
+-	field_data->point = identity;
++	field_data->point = subject;
+ 	retn = 0;
+ 
+  done:
+ 	if (retn)
+-		kfree(identity);
++		kfree(subject);
+ 	crypto_free_shash(tfm);
+ 	return retn;
+ }
+-- 
+2.31.1
+

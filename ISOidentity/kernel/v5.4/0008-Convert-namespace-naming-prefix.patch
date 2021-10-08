@@ -1,0 +1,299 @@
+From 3a9140844edf9ee187418a7d4610064a3a6598cb Mon Sep 17 00:00:00 2001
+From: "Dr. Greg" <greg@enjellic.com>
+Date: Sat, 6 Feb 2021 08:57:51 -0600
+Subject: [PATCH 08/50] Convert namespace naming prefix.
+
+This update converts the name of the events namespace from
+behavior_ns to events_ns.
+---
+ fs/proc/namespaces.c                |  2 +-
+ include/linux/ima.h                 |  6 +--
+ include/linux/nsproxy.h             |  2 +-
+ include/linux/proc_ns.h             |  4 +-
+ kernel/nsproxy.c                    | 12 +++---
+ security/integrity/ima/ima_events.c | 66 ++++++++++++++---------------
+ security/integrity/ima/ima_queue.c  |  4 +-
+ 7 files changed, 48 insertions(+), 48 deletions(-)
+
+diff --git a/fs/proc/namespaces.c b/fs/proc/namespaces.c
+index 6ef5a8e605de..addf13a54ce6 100644
+--- a/fs/proc/namespaces.c
++++ b/fs/proc/namespaces.c
+@@ -31,7 +31,7 @@ static const struct proc_ns_operations *ns_entries[] = {
+ 	&userns_operations,
+ #endif
+ #ifdef CONFIG_IMA
+-	&behavior_operations,
++	&events_operations,
+ #endif
+ 	&mntns_operations,
+ #ifdef CONFIG_CGROUPS
+diff --git a/include/linux/ima.h b/include/linux/ima.h
+index 0d9059efb326..2bde8dd43b00 100644
+--- a/include/linux/ima.h
++++ b/include/linux/ima.h
+@@ -53,9 +53,9 @@ static inline const char * const *arch_get_ima_policy(void)
+ }
+ #endif
+ 
+-extern struct ima_events_namespace * ima_copy_behavior_ns(unsigned long,
+-					      struct user_namespace *,
+-					      struct ima_events_namespace *);
++extern struct ima_events_namespace * ima_copy_events_ns(unsigned long,
++						struct user_namespace *,
++						struct ima_events_namespace *);
+ extern int ima_measure_ns(const u8 *);
+ extern void ima_free_ns(struct kref *);
+ 
+diff --git a/include/linux/nsproxy.h b/include/linux/nsproxy.h
+index 807714921676..e0e0eefcce7f 100644
+--- a/include/linux/nsproxy.h
++++ b/include/linux/nsproxy.h
+@@ -37,7 +37,7 @@ struct nsproxy {
+ 	struct pid_namespace *pid_ns_for_children;
+ 	struct net 	     *net_ns;
+ 	struct cgroup_namespace *cgroup_ns;
+-	struct ima_events_namespace *behavior_ns;
++	struct ima_events_namespace *events_ns;
+ };
+ extern struct nsproxy init_nsproxy;
+ 
+diff --git a/include/linux/proc_ns.h b/include/linux/proc_ns.h
+index 75cbc4d3296c..61533678005f 100644
+--- a/include/linux/proc_ns.h
++++ b/include/linux/proc_ns.h
+@@ -32,7 +32,7 @@ extern const struct proc_ns_operations pidns_for_children_operations;
+ extern const struct proc_ns_operations userns_operations;
+ extern const struct proc_ns_operations mntns_operations;
+ extern const struct proc_ns_operations cgroupns_operations;
+-extern const struct proc_ns_operations behavior_operations;
++extern const struct proc_ns_operations events_operations;
+ 
+ /*
+  * We always define these enumerators
+@@ -44,7 +44,7 @@ enum {
+ 	PROC_USER_INIT_INO	= 0xEFFFFFFDU,
+ 	PROC_PID_INIT_INO	= 0xEFFFFFFCU,
+ 	PROC_CGROUP_INIT_INO	= 0xEFFFFFFBU,
+-	PROC_BEHAVIOR_INIT_INO	= 0xEFFFFFFAU,
++	PROC_EVENTS_INIT_INO	= 0xEFFFFFFAU,
+ };
+ 
+ #ifdef CONFIG_PROC_FS
+diff --git a/kernel/nsproxy.c b/kernel/nsproxy.c
+index dfa4fc2711bb..b500c7997d99 100644
+--- a/kernel/nsproxy.c
++++ b/kernel/nsproxy.c
+@@ -107,10 +107,10 @@ static struct nsproxy *create_new_namespaces(unsigned long flags,
+ 		goto out_net;
+ 	}
+ 
+-	new_nsp->behavior_ns = ima_copy_behavior_ns(flags, user_ns,
+-						    tsk->nsproxy->behavior_ns);
+-	if (IS_ERR(new_nsp->behavior_ns)) {
+-		err = PTR_ERR(new_nsp->behavior_ns);
++	new_nsp->events_ns = ima_copy_events_ns(flags, user_ns,
++						tsk->nsproxy->events_ns);
++	if (IS_ERR(new_nsp->events_ns)) {
++		err = PTR_ERR(new_nsp->events_ns);
+ 		goto out_behavior;
+ 	}
+ 
+@@ -187,8 +187,8 @@ void free_nsproxy(struct nsproxy *ns)
+ 		put_ipc_ns(ns->ipc_ns);
+ 	if (ns->pid_ns_for_children)
+ 		put_pid_ns(ns->pid_ns_for_children);
+-	if (ns->behavior_ns)
+-		ima_put_ns(ns->behavior_ns);
++	if (ns->events_ns)
++		ima_put_ns(ns->events_ns);
+ 	put_cgroup_ns(ns->cgroup_ns);
+ 	put_net(ns->net_ns);
+ 	kmem_cache_free(nsproxy_cachep, ns);
+diff --git a/security/integrity/ima/ima_events.c b/security/integrity/ima/ima_events.c
+index c1aba0e8c17d..2e6316e12edc 100644
+--- a/security/integrity/ima/ima_events.c
++++ b/security/integrity/ima/ima_events.c
+@@ -214,8 +214,8 @@ struct ima_events_namespace init_ima_events_ns = {
+ 
+ 	.map = &init_ima_events_map,
+ 
+-	.ns.inum = PROC_BEHAVIOR_INIT_INO,
+-	.ns.ops = &behavior_operations
++	.ns.inum = PROC_EVENTS_INIT_INO,
++	.ns.ops = &events_operations
+ };
+ 
+ static atomic_t map_opencount = ATOMIC_INIT(1);
+@@ -229,8 +229,8 @@ static atomic_t map_opencount = ATOMIC_INIT(1);
+ 
+ static struct ima_events_map *current_map(void)
+ {
+-	if (current->nsproxy->behavior_ns)
+-		return current->nsproxy->behavior_ns->map;
++	if (current->nsproxy->events_ns)
++		return current->nsproxy->events_ns->map;
+ 	return init_ima_events_ns.map;
+ }
+ 
+@@ -514,7 +514,7 @@ static int add_exchange_event(const char *filename,
+ 	struct event *mp;
+ 	struct trajectory *event;
+ 
+-	if (!current->nsproxy->behavior_ns)
++	if (!current->nsproxy->events_ns)
+ 		return 0;
+ 	map = current_map();
+ 
+@@ -1746,7 +1746,7 @@ int ima_measure_ns(const u8 *hash)
+ 	struct ima_events_map *map;
+ 	struct event *mp;
+ 
+-	if (!current->nsproxy->behavior_ns)
++	if (!current->nsproxy->events_ns)
+ 		return 0;
+ 
+ 	map = current_map();
+@@ -1883,9 +1883,9 @@ static int add_aggregate(struct crypto_shash *tfm,
+ 	return retn;
+ }
+ 
+-struct ima_events_namespace *ima_copy_behavior_ns(unsigned long flags,
++struct ima_events_namespace *ima_copy_events_ns(unsigned long flags,
+ 				    struct user_namespace *user_ns,
+-				    struct ima_events_namespace *behavior_ns)
++				    struct ima_events_namespace *events_ns)
+ {
+ 	static char *update = "update-";
+ 	char bufr[7 + 10 + 1];
+@@ -1896,11 +1896,11 @@ struct ima_events_namespace *ima_copy_behavior_ns(unsigned long flags,
+ 	pr_debug("[%s]: New ns = %s\n", __func__,
+ 		 flags & CLONE_EVENTS ? "yes" : "no");
+ 
+-	if (behavior_ns)
+-		ima_get_ns(behavior_ns);
++	if (events_ns)
++		ima_get_ns(events_ns);
+ 
+ 	if (!(flags & CLONE_EVENTS))
+-		return behavior_ns;
++		return events_ns;
+ 
+ 	ns = kzalloc(sizeof(struct ima_events_namespace), GFP_KERNEL);
+ 	if (!ns) {
+@@ -1974,10 +1974,10 @@ struct ima_events_namespace *ima_copy_behavior_ns(unsigned long flags,
+ 	}
+ 
+ 	kref_init(&ns->kref);
+-	ns->ns.ops = &behavior_operations;
++	ns->ns.ops = &events_operations;
+ 	ns->user_ns = get_user_ns(user_ns);
+-	if (behavior_ns)
+-		ima_put_ns(behavior_ns);
++	if (events_ns)
++		ima_put_ns(events_ns);
+ 	return ns;
+ }
+ 
+@@ -2072,10 +2072,10 @@ SYSCALL_DEFINE3(set_behavior, unsigned char *, bufr, size_t, cnt,
+ 	pr_debug("[%s]: Called: cnt=%zu, flags=%lu.\n", __func__, cnt, flags);
+ 
+ 	/* Verify permissions for system call. */
+-	if (!current->nsproxy->behavior_ns && !capable(CAP_SYS_ADMIN))
++	if (!current->nsproxy->events_ns && !capable(CAP_SYS_ADMIN))
+ 		return -EPERM;
+ 
+-	if (current->nsproxy->behavior_ns) {
++	if (current->nsproxy->events_ns) {
+ 		root_uid = make_kuid(current_cred()->user_ns, 0);
+ 		if ( !uid_eq(current_euid(), root_uid) )
+ 			return -EPERM;
+@@ -2139,15 +2139,15 @@ SYSCALL_DEFINE3(set_behavior, unsigned char *, bufr, size_t, cnt,
+  * operation dispatch structure.
+  */
+ 
+-static void behavior_put(struct ns_common *ns)
++static void events_put(struct ns_common *ns)
+ {
+-	struct ima_events_namespace *behavior_ns =
++	struct ima_events_namespace *events_ns =
+ 		container_of(ns, struct ima_events_namespace, ns);
+ 
+-	ima_put_ns(behavior_ns);
++	ima_put_ns(events_ns);
+ }
+ 
+-static struct ns_common *behavior_get(struct task_struct *task)
++static struct ns_common *events_get(struct task_struct *task)
+ {
+ 	struct ima_events_namespace *ns = NULL;
+ 	struct nsproxy *nsproxy;
+@@ -2155,7 +2155,7 @@ static struct ns_common *behavior_get(struct task_struct *task)
+ 	task_lock(task);
+ 	nsproxy = task->nsproxy;
+ 	if (nsproxy) {
+-		ns = nsproxy->behavior_ns;
++		ns = nsproxy->events_ns;
+ 		if (ns)
+ 			ima_get_ns(ns);
+ 		else {
+@@ -2168,28 +2168,28 @@ static struct ns_common *behavior_get(struct task_struct *task)
+ 	return ns ? &ns->ns : NULL;
+ }
+ 
+-static int behavior_install(struct nsproxy *nsproxy, struct ns_common *new)
++static int events_install(struct nsproxy *nsproxy, struct ns_common *new)
+ {
+-	struct ima_events_namespace *behavior_ns =
++	struct ima_events_namespace *events_ns =
+ 		container_of(new, struct ima_events_namespace, ns);
+ 
+-	if (!ns_capable(behavior_ns->user_ns, CAP_SYS_ADMIN) ||
++	if (!ns_capable(events_ns->user_ns, CAP_SYS_ADMIN) ||
+ 	    !ns_capable(current_user_ns(), CAP_SYS_ADMIN))
+ 		return -EPERM;
+ 
+-	if (behavior_ns) {
+-		ima_get_ns(behavior_ns);
+-		ima_put_ns(nsproxy->behavior_ns);
++	if (events_ns) {
++		ima_get_ns(events_ns);
++		ima_put_ns(nsproxy->events_ns);
+ 	}
+ 
+-	nsproxy->behavior_ns = behavior_ns;
++	nsproxy->events_ns = events_ns;
+ 	return 0;
+ }
+ 
+-const struct proc_ns_operations behavior_operations = {
+-	.name		= "behavior",
++const struct proc_ns_operations events_operations = {
++	.name		= "events",
+ 	.type		= CLONE_EVENTS,
+-	.get		= behavior_get,
+-	.put		= behavior_put,
+-	.install	= behavior_install,
++	.get		= events_get,
++	.put		= events_put,
++	.install	= events_install,
+ };
+diff --git a/security/integrity/ima/ima_queue.c b/security/integrity/ima/ima_queue.c
+index 3d76b8ec46f9..727b7f8d4fab 100644
+--- a/security/integrity/ima/ima_queue.c
++++ b/security/integrity/ima/ima_queue.c
+@@ -176,9 +176,9 @@ int ima_add_template_entry(struct ima_template_entry *entry, int violation,
+ 	int result = 0, tpmresult = 0;
+ 
+ 	mutex_lock(&ima_extend_list_mutex);
+-	if (current->nsproxy->behavior_ns)
++	if (current->nsproxy->events_ns)
+ 		memcpy(digest, entry->digest, sizeof(digest));
+-	if (!violation && !current->nsproxy->behavior_ns) {
++	if (!violation && !current->nsproxy->events_ns) {
+ 		memcpy(digest, entry->digest, sizeof(digest));
+ 		if (ima_lookup_digest_entry(digest, entry->pcr)) {
+ 			audit_cause = "hash_exists";
+-- 
+2.31.1
+

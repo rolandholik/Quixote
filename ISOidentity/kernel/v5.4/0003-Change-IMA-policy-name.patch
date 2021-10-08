@@ -1,0 +1,62 @@
+From 76f56689cbed31e3cc7f761c6868a2f07fd249bf Mon Sep 17 00:00:00 2001
+From: "Dr. Greg" <greg@enjellic.com>
+Date: Fri, 29 Jan 2021 19:37:01 -0600
+Subject: [PATCH 03/50] Change IMA policy name.
+
+This update changes the IMA policy name for Turing Event modeling
+from:
+
+iso-identity
+
+To:
+
+ima-events
+---
+ security/integrity/ima/ima_policy.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/security/integrity/ima/ima_policy.c b/security/integrity/ima/ima_policy.c
+index 99be5c526e09..d99b4acd423d 100644
+--- a/security/integrity/ima/ima_policy.c
++++ b/security/integrity/ima/ima_policy.c
+@@ -59,7 +59,7 @@ enum lsm_rule_types { LSM_OBJ_USER, LSM_OBJ_ROLE, LSM_OBJ_TYPE,
+ 	LSM_SUBJ_USER, LSM_SUBJ_ROLE, LSM_SUBJ_TYPE
+ };
+ 
+-enum policy_types { ORIGINAL_TCB = 1, DEFAULT_TCB, ISO_IDENTITY_TCB };
++enum policy_types { ORIGINAL_TCB = 1, DEFAULT_TCB, EVENTS_TCB };
+ 
+ enum policy_rule_list { IMA_DEFAULT_POLICY = 1, IMA_CUSTOM_POLICY };
+ 
+@@ -244,8 +244,8 @@ static int __init policy_setup(char *str)
+ 		if (*p == ' ')
+ 			continue;
+ 
+-		if (strcmp(p, "iso-identity") == 0)
+-			ima_policy = ISO_IDENTITY_TCB;
++		if (strcmp(p, "ima-events") == 0)
++			ima_policy = EVENTS_TCB;
+ 
+ 		if ((strcmp(p, "tcb") == 0) && !ima_policy)
+ 			ima_policy = DEFAULT_TCB;
+@@ -679,7 +679,7 @@ void __init ima_init_policy(void)
+ 
+ 	/* if !ima_policy, we load NO default rules */
+ 	if (ima_policy) {
+-		if (ima_policy == ISO_IDENTITY_TCB) {
++		if (ima_policy == EVENTS_TCB) {
+ 			for (i=0; i < ARRAY_SIZE(dont_measure_rules); ++i)
+ 				dont_measure_rules[i].action = DONT_MAP;
+ 		}
+@@ -698,7 +698,7 @@ void __init ima_init_policy(void)
+ 			  ARRAY_SIZE(default_measurement_rules),
+ 			  IMA_DEFAULT_POLICY);
+ 		break;
+-	case ISO_IDENTITY_TCB:
++	case EVENTS_TCB:
+ 		add_rules(iso_identity_measurement_rules,
+ 			  ARRAY_SIZE(iso_identity_measurement_rules),
+ 			  IMA_DEFAULT_POLICY);
+-- 
+2.31.1
+

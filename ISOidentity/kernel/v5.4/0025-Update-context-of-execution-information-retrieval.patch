@@ -1,0 +1,134 @@
+From 09067e4c83b8477a60712cebc564b9cdaeb093e9 Mon Sep 17 00:00:00 2001
+From: "Dr. Greg" <greg@enjellic.com>
+Date: Thu, 11 Feb 2021 18:27:53 -0600
+Subject: [PATCH 25/50] Update context of execution information retrieval.
+
+This commit modifies the infrastructure that obtains the
+structure that defines the actor component of an information
+exchange event to remove the use of the term identity in favor
+of measurement and related terms.
+---
+ security/integrity/ima/ima_events.c | 54 +++++++++++++++--------------
+ 1 file changed, 28 insertions(+), 26 deletions(-)
+
+diff --git a/security/integrity/ima/ima_events.c b/security/integrity/ima/ima_events.c
+index 3630d29b4c85..e19b72f12cf3 100644
+--- a/security/integrity/ima/ima_events.c
++++ b/security/integrity/ima/ima_events.c
+@@ -268,34 +268,36 @@ static int generate_event(struct ima_events_map *map, enum event_types event)
+ }
+ 
+ /**
+- *	get_identity - Obtain user identity factors.
+- *	*id: A pointer to the user identity structure to be populated.
++ *	get_actor - Retrieve context of execution event description.
++ *	*id: A pointer to the structure that will be populated with
++ *	the actor description data.
+  *
+  *	This function populates the provided structure with the
+- *	elements used to define the measurement of the actor.
++ *	elements used to define the event measurement for a
++ *	context of execution.
+  */
+ 
+-static void get_identity(struct event_actor *id)
++static void get_actor(struct event_actor *actor)
+ 
+ {
+ 	kernel_cap_t eff, per, inh;
+ 
+-	id->uid = from_kuid(&init_user_ns, current_uid());
+-	id->euid = from_kuid(&init_user_ns, current_euid());
+-	id->suid = from_kuid(&init_user_ns, current_suid());
++	actor->uid = from_kuid(&init_user_ns, current_uid());
++	actor->euid = from_kuid(&init_user_ns, current_euid());
++	actor->suid = from_kuid(&init_user_ns, current_suid());
+ 
+-	id->gid = from_kgid(&init_user_ns, current_gid());
+-	id->egid = from_kgid(&init_user_ns, current_egid());
+-	id->sgid = from_kgid(&init_user_ns, current_sgid());
++	actor->gid = from_kgid(&init_user_ns, current_gid());
++	actor->egid = from_kgid(&init_user_ns, current_egid());
++	actor->sgid = from_kgid(&init_user_ns, current_sgid());
+ 
+-	id->fsuid = from_kuid(&init_user_ns, current_fsuid());
+-	id->fsgid = from_kgid(&init_user_ns, current_fsgid());
++	actor->fsuid = from_kuid(&init_user_ns, current_fsuid());
++	actor->fsgid = from_kgid(&init_user_ns, current_fsgid());
+ 
+ 	if (security_capget(current, &eff, &inh, &per) != 0 ) {
+ 		eff = CAP_FULL_SET;
+ 		per = CAP_FULL_SET;
+ 	}
+-	id->capability.mask = cap_combine(eff, per);
++	actor->capability.mask = cap_combine(eff, per);
+ 
+ 	return;
+ }
+@@ -1384,7 +1386,7 @@ int ima_events_genhash(struct ima_template_entry *entry, char *tpm_digest)
+ }
+ 
+ static int ima_get_event_actor(struct crypto_shash *tfm,
+-			       struct event_actor *identity,
++			       struct event_actor *actor,
+ 			       char *mapping)
+ {
+ 	int retn = 0;
+@@ -1395,12 +1397,12 @@ static int ima_get_event_actor(struct crypto_shash *tfm,
+ 	if (retn != 0)
+ 		goto done;
+ 
+-	get_identity(identity);
+-	retn = crypto_shash_finup(shash, (char *) identity,sizeof(*identity),
++	get_actor(actor);
++	retn = crypto_shash_finup(shash, (char *) actor, sizeof(*actor),
+ 				  mapping);
+-	pr_debug("IMA[%s]: comm=%s, pid=%d, [ue]id=%d/%d, caps=%llx, mapping=%*phN\n",
+-		__func__, current->comm, current->pid, identity->uid,
+-		identity->euid, identity->capability.value, WP256_DIGEST_SIZE,
++	pr_debug("IMA[%s]: comm=%s, pid=%d, [ue]id=%d/%d, caps=%llx, measurement=%*phN\n",
++		__func__, current->comm, current->pid, actor->uid,
++		actor->euid, actor->capability.value, WP256_DIGEST_SIZE,
+ 		mapping);
+ 
+  done:
+@@ -1408,29 +1410,29 @@ static int ima_get_event_actor(struct crypto_shash *tfm,
+ }
+ 
+ 
+-int ima_get_actor(struct ima_field_data *field_data, char *actor)
++int ima_get_actor(struct ima_field_data *field_data, char *measurement)
+ {
+ 	int retn = 1;
+ 	struct crypto_shash *tfm;
+-	struct event_actor *identity = NULL;
++	struct event_actor *actor = NULL;
+ 
+ 	tfm = crypto_alloc_shash("sha256", 0, 0);
+ 	if (IS_ERR(tfm))
+ 		return PTR_ERR(tfm);
+ 
+-	identity = kzalloc(sizeof(*identity), GFP_KERNEL);
+-	if (!identity)
++	actor = kzalloc(sizeof(*actor), GFP_KERNEL);
++	if (!actor)
+ 		goto done;
+ 
+-	retn = ima_get_event_actor(tfm, identity, actor);
++	retn = ima_get_event_actor(tfm, actor, measurement);
+ 	if(retn!=0)
+ 		goto done;
+-	field_data->point = identity;
++	field_data->point = actor;
+ 	retn = 0;
+ 
+  done:
+ 	if (retn)
+-		kfree(identity);
++		kfree(actor);
+ 	crypto_free_shash(tfm);
+ 	return retn;
+ }
+-- 
+2.31.1
+

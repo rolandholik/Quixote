@@ -1,0 +1,70 @@
+From d37c6a206a18466614390800b9bc4fa497b510b8 Mon Sep 17 00:00:00 2001
+From: "Dr. Greg" <greg@enjellic.com>
+Date: Thu, 11 Feb 2021 10:36:28 -0600
+Subject: [PATCH 23/50] Change event measurement nomenclature.
+
+Previously the code in the ima_events_genhash() function referred
+to the hash of the actor and subject measurements to be an
+identity.  Change the nomenclature to refer to the generation of
+a measurement which is the more correct definition.
+---
+ security/integrity/ima/ima_events.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/security/integrity/ima/ima_events.c b/security/integrity/ima/ima_events.c
+index 3d3581265a35..ee774deb08b6 100644
+--- a/security/integrity/ima/ima_events.c
++++ b/security/integrity/ima/ima_events.c
+@@ -1337,33 +1337,33 @@ int ima_events_genhash(struct ima_template_entry *entry, char *tpm_digest)
+ 	struct {
+ 		struct ima_digest_data hdr;
+ 		char digest[WP256_DIGEST_SIZE];
+-	} identity;
++	} measurement;
+ 	struct crypto_shash *tfm = NULL;
+ 
+-	/* Construct identity. */
+-	identity.hdr.algo = HASH_ALGO_SHA256;
++	/* Construct measurement. */
++	measurement.hdr.algo = HASH_ALGO_SHA256;
+ 	retn = ima_calc_field_array_hash(&entry->template_data[0],
+ 					 entry->template_desc,
+ 					 entry->template_desc->num_fields,
+-					 &identity.hdr);
++					 &measurement.hdr);
+ 	if (retn != 0)
+ 		goto done;
+ 
+ 	/* Save the aggregate measurement. */
+ 	if (!have_aggregate) {
+-		memcpy(aggregate, identity.hdr.digest, WP256_DIGEST_SIZE);
++		memcpy(aggregate, measurement.hdr.digest, WP256_DIGEST_SIZE);
+ 		have_aggregate = true;
+ 		pr_debug("%s: Saved aggregate: %*phN\n", __FILE__,
+ 			 WP256_DIGEST_SIZE, aggregate);
+ 	}
+ 
+-	/* Extend current identity measurement state. */
++	/* Extend current event measurement value. */
+ 	tfm = crypto_alloc_shash("sha256", 0, 0);
+ 	if (IS_ERR(tfm)) {
+ 		retn = PTR_ERR(tfm);
+ 		goto done;
+ 	}
+-        retn = update_events_measurement(tfm, identity.hdr.digest);
++        retn = update_events_measurement(tfm, measurement.hdr.digest);
+ 	if (retn != 0)
+ 		goto done;
+ 	crypto_free_shash(tfm);
+@@ -1372,7 +1372,7 @@ int ima_events_genhash(struct ima_template_entry *entry, char *tpm_digest)
+ 	tfm = crypto_alloc_shash("sha1", 0, 0);
+ 	if (IS_ERR(tfm))
+ 		return PTR_ERR(tfm);
+-	retn = get_host_measurement(tfm, identity.hdr.digest,
++	retn = get_host_measurement(tfm, measurement.hdr.digest,
+ 				    WP256_DIGEST_SIZE, tpm_digest);
+ 	if (retn != 0)
+ 		goto done;
+-- 
+2.31.1
+

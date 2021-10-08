@@ -1,0 +1,59 @@
+From 25ba53da8351db53300aa08946aeb8a4f6a36638 Mon Sep 17 00:00:00 2001
+From: "Dr. Greg" <greg@enjellic.com>
+Date: Sat, 6 Feb 2021 10:02:59 -0600
+Subject: [PATCH 09/50] Rename event configuration system call.
+
+This commit changes the system call used to configure an event
+namespace from the follow:
+
+sys_set_behavior
+
+To the following:
+
+sys_config_events_ns
+---
+ arch/x86/entry/syscalls/syscall_32.tbl | 2 +-
+ arch/x86/entry/syscalls/syscall_64.tbl | 2 +-
+ security/integrity/ima/ima_events.c    | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/x86/entry/syscalls/syscall_32.tbl b/arch/x86/entry/syscalls/syscall_32.tbl
+index 2d9c0aca6c37..33dcac507697 100644
+--- a/arch/x86/entry/syscalls/syscall_32.tbl
++++ b/arch/x86/entry/syscalls/syscall_32.tbl
+@@ -440,5 +440,5 @@
+ 433	i386	fspick			sys_fspick			__ia32_sys_fspick
+ 434	i386	pidfd_open		sys_pidfd_open			__ia32_sys_pidfd_open
+ 435	i386	clone3			sys_clone3			__ia32_sys_clone3
+-436	i386	set_behavior		sys_set_behavior		__ia32_sys_set_behavior
++436	i386	config_events_ns	sys_config_events_ns		__ia32_sys_config_events_ns
+ 437	i386	set_bad_actor		sys_set_bad_actor		__ia32_sys_set_bad_actor
+diff --git a/arch/x86/entry/syscalls/syscall_64.tbl b/arch/x86/entry/syscalls/syscall_64.tbl
+index 11059df85210..5b06d4dacb75 100644
+--- a/arch/x86/entry/syscalls/syscall_64.tbl
++++ b/arch/x86/entry/syscalls/syscall_64.tbl
+@@ -357,7 +357,7 @@
+ 433	common	fspick			__x64_sys_fspick
+ 434	common	pidfd_open		__x64_sys_pidfd_open
+ 435	common	clone3			__x64_sys_clone3/ptregs
+-436	common	set_behavior		__x64_sys_set_behavior
++436	common	config_events_ns	__x64_sys_config_events_ns
+ 437	common	set_bad_actor		__x64_sys_set_bad_actor
+ 
+ #
+diff --git a/security/integrity/ima/ima_events.c b/security/integrity/ima/ima_events.c
+index 2e6316e12edc..3b2a755a0570 100644
+--- a/security/integrity/ima/ima_events.c
++++ b/security/integrity/ima/ima_events.c
+@@ -2058,7 +2058,7 @@ SYSCALL_DEFINE2(set_bad_actor, pid_t, pid, unsigned long, flags)
+ 	return retn;
+ }
+ 
+-SYSCALL_DEFINE3(set_behavior, unsigned char *, bufr, size_t, cnt,
++SYSCALL_DEFINE3(config_events_ns, unsigned char *, bufr, size_t, cnt,
+ 		unsigned long, flags)
+ {
+ 	int retn = -EINVAL;
+-- 
+2.31.1
+

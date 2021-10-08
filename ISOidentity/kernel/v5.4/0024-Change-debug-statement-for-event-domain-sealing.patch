@@ -1,0 +1,28 @@
+From afade871afb0077910cd7b0a6d6c85008e9ad3c2 Mon Sep 17 00:00:00 2001
+From: "Dr. Greg" <greg@enjellic.com>
+Date: Thu, 11 Feb 2021 10:39:17 -0600
+Subject: [PATCH 24/50] Change debug statement for event domain sealing.
+
+The debug statement used to document that the event domain was
+being locked against further modifications referred to an
+identity domain.  Change this to refer to an event domain.
+---
+ security/integrity/ima/ima_events.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/security/integrity/ima/ima_events.c b/security/integrity/ima/ima_events.c
+index ee774deb08b6..3630d29b4c85 100644
+--- a/security/integrity/ima/ima_events.c
++++ b/security/integrity/ima/ima_events.c
+@@ -1158,7 +1158,7 @@ static ssize_t ima_write_sealed(struct file *file,
+ 	if (retn)
+ 		goto done;
+ 
+-	pr_debug("[%s]: Sealed identity domain.\n", __func__);
++	pr_debug("[%s]: Sealed event domain.\n", __func__);
+ 	retn = datalen;
+ 
+ done:
+-- 
+2.31.1
+

@@ -1,0 +1,43 @@
+From 218fafc7f83fa2231be9f91d8a38cc800764ae74 Mon Sep 17 00:00:00 2001
+From: "Dr. Greg" <greg@enjellic.com>
+Date: Thu, 2 Sep 2021 17:28:41 -0500
+Subject: [PATCH 49/50] Properly signal status for external evaluation.
+
+Testing indicated that requests were being emitted to external
+evaluators for measurement events.  Measurement events were
+originally designed to reflect what would have been input to a
+TPM for extension summing but the utility of that for external
+evaluators is now considered to be of limited value.
+
+The current code was always returning a value of zero after a
+security state event was exported.  This was causing the random
+generation of measurement requests to the external evaluator.
+
+The export_event() function returns a negative value if an error
+occurs during event export or a value of 1 otherwise.  The error
+return value is checked and a value of 0 is returned if an error
+during event export was detected.
+
+This behavior needs further rationalization down the road.
+---
+ security/integrity/ima/ima_events.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/security/integrity/ima/ima_events.c b/security/integrity/ima/ima_events.c
+index 6523f1181450..9beaacfe3bb2 100644
+--- a/security/integrity/ima/ima_events.c
++++ b/security/integrity/ima/ima_events.c
+@@ -1862,8 +1862,8 @@ int ima_events_is_mapped(int function, struct integrity_iint_cache *iint,
+ 	}
+ 
+ 	if (map->external) {
+-		export_event(pathname, &actor, &subject);
+-		return 0;
++		retn = export_event(pathname, &actor, &subject);
++		return retn < 0 ? 0 : 1;
+ 	}
+ 
+ 	ima_set_actor_status(function, pathname, &subject, mapping);
+-- 
+2.31.1
+

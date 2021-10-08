@@ -1,0 +1,75 @@
+From 13ba8108ac76812930677db00bab13197cdee747 Mon Sep 17 00:00:00 2001
+From: "Dr. Greg" <greg@enjellic.com>
+Date: Mon, 1 Mar 2021 18:55:42 -0600
+Subject: [PATCH 34/50] Use explicit sleep and wakeup model for external
+ evaluation.
+
+When the external flag is set for an event namespace the
+export_event() function sets the bad_actor status bit in the task
+control structure of the context of execution that is initiating
+the event.  The process is then placed into an interruptible
+sleep state after userspace is notified that an event is present.
+
+The set_bad_actor system call was modified to add the
+interpretation of a flags value of 2 as a request to release a
+'good actor', ie. an actor that has the bad_actor bit in the task
+control structure cleared.
+
+If the external evaluator determines that the event namespace
+description is sealed and the event is not in the permitted event
+space, the set_bad_actor system call is called with a flags value
+of 1 that wakes the specified process up but does not clear the
+bad_actor status of the process.
+
+This model implies that by default a context of execution is
+defined as not being trusted unless the evaluator elects to trust
+the status of the process.
+---
+ security/integrity/ima/ima_events.c | 22 +++++++++++++++++++---
+ 1 file changed, 19 insertions(+), 3 deletions(-)
+
+diff --git a/security/integrity/ima/ima_events.c b/security/integrity/ima/ima_events.c
+index bdbdd2264199..e4a29e924d37 100644
+--- a/security/integrity/ima/ima_events.c
++++ b/security/integrity/ima/ima_events.c
+@@ -542,8 +542,16 @@ static int export_event(const char *filename, struct event_actor *actor,
+ 	mutex_unlock(&map->measurement_mutex);
+ 
+ 	sysfs_notify(ima_events_kobject, NULL, map->update.attr.name);
++
++	pr_debug("[%s]: %s:%s sleeping for authorization.\n", __func__,
++		 current->comm, filename);
++
++	current->bad_actor = 1;
++	set_current_state(TASK_INTERRUPTIBLE);
+ 	schedule();
+ 
++	pr_debug("[%s]: %s:%s continueing with actor status: %d\n",
++		 __func__, current->comm, filename, current->bad_actor);
+  done:
+ 	return retn;
+ }
+@@ -2137,9 +2145,17 @@ SYSCALL_DEFINE2(set_bad_actor, pid_t, pid, unsigned long, flags)
+ 		}
+ 
+ 		if (flags == 1) {
+-			pr_debug("[%s]: Setting actor status, pid=%u\n",
+-				 __func__, pid);
+-			actor->bad_actor = 1;
++			pr_debug("[%s]: Releasing bad actor, %s\n",
++				 __func__, actor->comm);
++			wake_up_process(actor);
++			retn = 0;
++		}
++
++		if (flags == 2 ) {
++			pr_debug("[%s]: Releasing actor, pid=%s\n",
++				 __func__, actor->comm);
++			actor->bad_actor = 0;
++			wake_up_process(actor);
+ 			retn = 0;
+ 		}
+ 	}
+-- 
+2.31.1
+

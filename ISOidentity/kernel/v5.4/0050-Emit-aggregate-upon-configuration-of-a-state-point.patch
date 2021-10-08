@@ -1,0 +1,181 @@
+From 7cc76349e9c69ab07ef278a3fc820294000675aa Mon Sep 17 00:00:00 2001
+From: "Dr. Greg" <greg@enjellic.com>
+Date: Mon, 20 Sep 2021 17:50:07 -0500
+Subject: [PATCH 50/50] Emit aggregate upon configuration of a state point.
+
+An inconsistency with state/measurement calculations were noted
+for in-kernel modeling when a state map was specified vs. when
+the same trajectory was followed as defined by the state map.
+
+This was being caused by a security event namespace not adding
+the aggregate value to the measurement of a namespace when state
+maps were being mapped prior to execution.
+
+This was addressed by modifying the load_point() function to see
+whether or not the aggregate value has been injected into the
+measurement of the namespace.  If the namespace is running
+without an aggregate value it is injected into the measurement
+stream before the point is added.  The flag variable is then set
+to indicate that the namespace has had an aggregate value
+injected into it.
+---
+ security/integrity/ima/ima_events.c | 115 +++++++++++++++-------------
+ 1 file changed, 62 insertions(+), 53 deletions(-)
+
+diff --git a/security/integrity/ima/ima_events.c b/security/integrity/ima/ima_events.c
+index 9beaacfe3bb2..7176a327694b 100644
+--- a/security/integrity/ima/ima_events.c
++++ b/security/integrity/ima/ima_events.c
+@@ -299,6 +299,58 @@ static int generate_event(struct ima_events_map *map, enum event_types event)
+ 	return retn;
+ }
+ 
++static int add_aggregate(struct crypto_shash *tfm, struct ima_events_map *map)
++{
++	int retn = 0;
++	char host_measurement[WP256_DIGEST_SIZE];
++	struct event *mp;
++	SHASH_DESC_ON_STACK(shash, tfm);
++
++	/* Handle aggregate for an external evaluator. */
++	if (map->external) {
++		mp = kzalloc(sizeof(struct event), GFP_KERNEL);
++		if (!mp) {
++			retn = -ENOMEM;
++			goto done;
++		}
++
++		mp->type = aggregate_event;
++
++		mutex_lock(&map->measurement_mutex);
++		list_add_tail(&mp->list, &map->measurement_list);
++		mutex_unlock(&map->measurement_mutex);
++
++		sysfs_notify(ima_events_kobject, NULL, map->update.attr.name);
++		goto done;
++	}
++
++	/* Extend the aggregate measurement into a host domain. */
++	shash->tfm = tfm;
++	retn = crypto_shash_init(shash);
++	if (retn != 0)
++		goto done;
++	retn = crypto_shash_update(shash, map->base, WP256_DIGEST_SIZE);
++	if (retn != 0)
++		goto done;
++	retn = crypto_shash_finup(shash, aggregate, sizeof(aggregate),
++				  host_measurement);
++	if (retn != 0)
++		goto done;
++
++	/* Extend the measurement with the host aggregate measurement. */
++	retn = crypto_shash_init(shash);
++	if (retn != 0)
++		goto done;
++	retn = crypto_shash_update(shash, map->measurement, WP256_DIGEST_SIZE);
++	if (retn != 0)
++		goto done;
++	retn = crypto_shash_finup(shash, host_measurement,
++				  sizeof(host_measurement), map->measurement);
++
++ done:
++	return retn;
++}
++
+ /**
+  *	get_actor - Retrieve context of execution event description.
+  *	*id: A pointer to the structure that will be populated with
+@@ -745,6 +797,7 @@ static int load_point(const char __user *point, size_t datalen)
+ 		tpm_digest[SHA1_DIGEST_SIZE];
+ 	ssize_t retn;
+ 	struct crypto_shash *tfmsha1 = NULL, *tfmsha256 = NULL;
++	struct ima_events_map *map = current_map();
+ 
+ 	if (datalen != sizeof(idbufr)) {
+ 		retn = -EINVAL;
+@@ -777,7 +830,7 @@ static int load_point(const char __user *point, size_t datalen)
+ 		goto done;
+ 	}
+ 
+-	/* Add the point measurement. */
++	/* Update domain measurement with new point. */
+ 	tfmsha1 = crypto_alloc_shash("sha1", 0, 0);
+ 	if (IS_ERR(tfmsha1)) {
+ 		retn = PTR_ERR(tfmsha1);
+@@ -789,6 +842,14 @@ static int load_point(const char __user *point, size_t datalen)
+ 		goto done;
+ 	}
+ 
++	/* Add the aggregate if this is the first measurement event. */
++	if (map->emit_aggregate) {
++		map->emit_aggregate = false;
++		retn = add_aggregate(tfmsha256, map);
++		if (retn != 0)
++			goto done;
++	}
++
+         retn = update_events_measurement(tfmsha256, mapping);
+ 	if (retn != 0)
+ 		goto done;
+@@ -1782,58 +1843,6 @@ static void ima_set_actor_status(int function, const char *pathname,
+ 	return;
+ }
+ 
+-static int add_aggregate(struct crypto_shash *tfm, struct ima_events_map *map)
+-{
+-	int retn = 0;
+-	char host_measurement[WP256_DIGEST_SIZE];
+-	struct event *mp;
+-	SHASH_DESC_ON_STACK(shash, tfm);
+-
+-	/* Handle aggregate for an external evaluator. */
+-	if (map->external) {
+-		mp = kzalloc(sizeof(struct event), GFP_KERNEL);
+-		if (!mp) {
+-			retn = -ENOMEM;
+-			goto done;
+-		}
+-
+-		mp->type = aggregate_event;
+-
+-		mutex_lock(&map->measurement_mutex);
+-		list_add_tail(&mp->list, &map->measurement_list);
+-		mutex_unlock(&map->measurement_mutex);
+-
+-		sysfs_notify(ima_events_kobject, NULL, map->update.attr.name);
+-		goto done;
+-	}
+-
+-	/* Extend the aggregate measurement into a host domain. */
+-	shash->tfm = tfm;
+-	retn = crypto_shash_init(shash);
+-	if (retn != 0)
+-		goto done;
+-	retn = crypto_shash_update(shash, map->base, WP256_DIGEST_SIZE);
+-	if (retn != 0)
+-		goto done;
+-	retn = crypto_shash_finup(shash, aggregate, sizeof(aggregate),
+-				  host_measurement);
+-	if (retn != 0)
+-		goto done;
+-
+-	/* Extend the measurement with the host aggregate measurement. */
+-	retn = crypto_shash_init(shash);
+-	if (retn != 0)
+-		goto done;
+-	retn = crypto_shash_update(shash, map->measurement, WP256_DIGEST_SIZE);
+-	if (retn != 0)
+-		goto done;
+-	retn = crypto_shash_finup(shash, host_measurement,
+-				  sizeof(host_measurement), map->measurement);
+-
+- done:
+-	return retn;
+-}
+-
+ int ima_events_is_mapped(int function, struct integrity_iint_cache *iint,
+ 			 struct file *file, const char *pathname,
+ 			 struct ima_template_desc *template_desc,
+-- 
+2.31.1
+
