@@ -19,7 +19,7 @@ CSRC = 	OrgID.c PatientID.c Authenticator.c AuthenReply.c IDqueryReply.c \
 # 	provider-server
 SERVERS = root-referral device-broker user-broker
 
-SUBDIRS	    = idgine utils edi SRDE Sancho ISOidentity Quixote # client
+SUBDIRS	    = utils SRDE Sancho ISOidentity Quixote
 DEV_SUBDIRS = lib SRDE
 
 # CC = gcc
@@ -81,7 +81,7 @@ CFLAGS := ${CFLAGS} -I./HurdLib -I${SSL_INCLUDE} -I./lib
 #
 # Target directives.
 #
-.PHONY: client lib ${SUBDIRS}
+.PHONY: lib ${SUBDIRS}
 
 
 # Targets
@@ -131,9 +131,6 @@ gen-brokerdb: gen-brokerdb.o ${COBJS} DBduct.o
 token: token.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl ${SSL_LIBRARY};
 
-dotest: dotest.o ${COBJS}
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
-
 ID_test: ID_test.o ${COBJS}
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_LIBRARY};
 
@@ -153,12 +150,6 @@ DBduct.o: DBduct.c
 #
 # Subdirectory targets.
 #
-client:
-	${MAKE} -C $@;
-
-idgine:
-	${MAKE} -C $@;
-
 lib:
 	${MAKE} -C $@;
 
