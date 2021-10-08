@@ -10,7 +10,7 @@ INSTPATH       = ${DESTDIR}/opt/ESD
 
 SANCHODIR = ../Sancho/SGX
 
-CSRC = Actor.c Subject.c ExchangeEvent.c TSEM.c SecurityPoint.c cboot.c \
+CSRC = Actor.c Subject.c SecurityEvent.c SecurityPoint.c TSEM.c cboot.c \
 	cboot-mgr.c compute-aggregate.c
 
 TOOLS = test-actor test-subject test-event generate-contours sha-tool	  \
@@ -92,14 +92,14 @@ test-actor: test-actor.o Actor.o
 test-subject: test-subject.o Subject.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
-test-event: test-event.o ExchangeEvent.o Actor.o Subject.o
+test-event: test-event.o SecurityEvent.o Actor.o Subject.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
-test-ISOidentity: test-ISOidentity.o TSEM.o SecurityPoint.o \
-	ExchangeEvent.o Actor.o Subject.o
+test-ISOidentity: test-ISOidentity.o TSEM.o SecurityPoint.o SecurityEvent.o \
+	Actor.o Subject.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
-generate-contours: generate-contours.o ExchangeEvent.o Actor.o Subject.o
+generate-contours: generate-contours.o SecurityEvent.o Actor.o Subject.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 compute-measurement: compute-measurement.o Actor.o Subject.o
@@ -117,11 +117,11 @@ sha-tool: sha-tool.o
 set-behavior: set-behavior.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS}
 
-cboot: cboot.o ${SANCHODIR}/SanchoSGX.o TSEM.o SecurityPoint.o \
-	ExchangeEvent.o Actor.o Subject.o ${RDK_LIBRARY} ${NAAAIM_LIBRARY}   \
+cboot: cboot.o ${SANCHODIR}/SanchoSGX.o TSEM.o SecurityPoint.o		   \
+	SecurityEvent.o Actor.o Subject.o ${RDK_LIBRARY} ${NAAAIM_LIBRARY} \
 	${HURD_LIBRARY}
 	${CC} ${LDFLAGS} -o $@ $< TSEM.o SecurityPoint.o	   	   \
-		ExchangeEvent.o Actor.o Subject.o ${SANCHODIR}/SanchoSGX.o \
+		SecurityEvent.o Actor.o Subject.o ${SANCHODIR}/SanchoSGX.o \
 		${RDKLIB} ${LIBS} ${LIBCAP} ${SSL_CRYPTO};
 
 cboot-mgr: cboot-mgr.o ${SANCHODIR}/ISOmanager.o ${RDK_LIBRARY} \
@@ -151,7 +151,7 @@ clean:
 
 Actor.o: Actor.h
 SecurityPoint.o: SecurityPoint.h
-ExchangeEvent.o: ExchangeEvent.h
+SecurityEvent.o: SecurityEvent.h
 TSEM.o: TSEM.h
 
 # SRDEmetadata.o: SGX.h SRDEmetadata.h

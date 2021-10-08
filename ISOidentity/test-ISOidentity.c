@@ -27,7 +27,7 @@
 
 #include <NAAAIM.h>
 #include "SecurityPoint.h"
-#include "ExchangeEvent.h"
+#include "SecurityEvent.h"
 #include "TSEM.h"
 
 
@@ -60,7 +60,7 @@ extern int main(int argc, char *argv[])
 
 	String input = NULL;
 
-	ExchangeEvent event = NULL;
+	SecurityEvent event = NULL;
 
 	TSEM model = NULL;
 
@@ -129,7 +129,7 @@ extern int main(int argc, char *argv[])
 	INIT(HurdLib, String, input, ERR(goto done));
 
 	while ( infile->read_String(infile, input) ) {
-		INIT(NAAAIM, ExchangeEvent, event, ERR(goto done));
+		INIT(NAAAIM, SecurityEvent, event, ERR(goto done));
 		if ( !event->parse(event, input) ) {
 			fputs("Failed to parse event:\n", stderr);
 			input->print(input);
@@ -155,7 +155,7 @@ extern int main(int argc, char *argv[])
 		if ( !input->add(input, "event{sh:/bin/dotest.sh} actor{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=0x20000420} subject{uid=0, gid=0, mode=0100755, name_length=14, name=3bb11576b7c0dd5cf9f4308f60f8e58a07590c0c5db20859f86611c54c67013b, s_id=xvdb, s_uuid=f37070fc24894435b96e88f40a12a7c0, digest=1a3847fb368bde910be9095a52859a88faff7d0474528cadedf46f96802cc9fc}") )
 			ERR(goto done);
 
-		INIT(NAAAIM, ExchangeEvent, event, ERR(goto done));
+		INIT(NAAAIM, SecurityEvent, event, ERR(goto done));
 		if ( !event->parse(event, input) ) {
 			fputs("Failed to parse event:\n", stderr);
 			input->print(input);

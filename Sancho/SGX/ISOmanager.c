@@ -41,7 +41,7 @@
 #include <SRDEnaaaim-ocall.h>
 
 #include <SecurityPoint.h>
-#include <ExchangeEvent.h>
+#include <SecurityEvent.h>
 
 #include "ISOmanager.h"
 #include "ISOmanager-interface.h"

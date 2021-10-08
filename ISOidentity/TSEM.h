@@ -26,7 +26,7 @@ typedef struct NAAAIM_TSEM_State * TSEM_State;
 struct NAAAIM_TSEM
 {
 	/* External methods. */
-	_Bool (*update)(const TSEM, const ExchangeEvent, _Bool *, \
+	_Bool (*update)(const TSEM, const SecurityEvent, _Bool *, \
 			_Bool *);
 	_Bool (*update_map)(const TSEM, const Buffer);
 
@@ -42,7 +42,7 @@ struct NAAAIM_TSEM
 	_Bool (*discipline_pid)(const TSEM, pid_t *);
 
 	void (*rewind_event)(const TSEM);
-	_Bool (*get_event)(const TSEM, ExchangeEvent *);
+	_Bool (*get_event)(const TSEM, SecurityEvent *);
 	size_t (*trajectory_size)(const TSEM);
 
 	void (*rewind_contours)(const TSEM);
@@ -50,7 +50,7 @@ struct NAAAIM_TSEM
 	size_t (*contours_size)(const TSEM);
 
 	void (*rewind_forensics)(const TSEM);
-	_Bool (*get_forensics)(const TSEM, ExchangeEvent *);
+	_Bool (*get_forensics)(const TSEM, SecurityEvent *);
 	size_t (*forensics_size)(const TSEM);
 
 	void (*dump_events)(const TSEM);

@@ -39,7 +39,7 @@
 
 #include "SanchoSGX-interface.h"
 #include "SecurityPoint.h"
-#include "ExchangeEvent.h"
+#include "SecurityEvent.h"
 #include "TSEM.h"
 
 
@@ -103,7 +103,7 @@ static _Bool send_trajectory(CO(PossumPipe, mgmt), CO(Buffer, cmdbufr))
 	size_t lp,
 	       cnt = 0;
 
-	ExchangeEvent event;
+	SecurityEvent event;
 
 	String es = NULL;
 
@@ -181,7 +181,7 @@ static _Bool send_forensics(CO(PossumPipe, mgmt), CO(Buffer, cmdbufr))
 	size_t lp,
 	       cnt = 0;
 
-	ExchangeEvent event;
+	SecurityEvent event;
 
 	String es = NULL;
 

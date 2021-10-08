@@ -33,7 +33,7 @@
 #include <NAAAIM.h>
 #include <SHA256.h>
 
-#include "ExchangeEvent.h"
+#include "SecurityEvent.h"
 
 
 /*
@@ -56,7 +56,7 @@ extern int main(int argc, char *argv[])
 
 	String entry = NULL;
 
-	ExchangeEvent event = NULL;
+	SecurityEvent event = NULL;
 
 
 	/* Parse and verify arguements. */
@@ -80,7 +80,7 @@ extern int main(int argc, char *argv[])
 	/* Read and process file. */
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 
-	INIT(NAAAIM, ExchangeEvent, event, ERR(goto done));
+	INIT(NAAAIM, SecurityEvent, event, ERR(goto done));
 
 	INIT(HurdLib, String, entry, ERR(goto done));
 

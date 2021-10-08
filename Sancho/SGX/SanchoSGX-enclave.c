@@ -23,7 +23,7 @@
 #include "SanchoSGX-interface.h"
 #include "regex.h"
 #include "SecurityPoint.h"
-#include "ExchangeEvent.h"
+#include "SecurityEvent.h"
 #include "TSEM.h"
 #include "SanchoSGX.h"
 
@@ -158,7 +158,7 @@ _Bool update_model(struct ISOidentity_ecall1_interface *ecall1)
 
 	String input = NULL;
 
-	ExchangeEvent event = NULL;
+	SecurityEvent event = NULL;
 
 
 	/* Initialize a string object with the model update. */
@@ -168,7 +168,7 @@ _Bool update_model(struct ISOidentity_ecall1_interface *ecall1)
 
 
 	/* Parse and measure the event. */
-	INIT(NAAAIM, ExchangeEvent, event, ERR(goto done));
+	INIT(NAAAIM, SecurityEvent, event, ERR(goto done));
 	if ( !event->parse(event, input) )
 		ERR(goto done);
 	if ( !event->measure(event) )
@@ -601,7 +601,7 @@ _Bool get_event(char type, char *update, size_t size)
 
 	String es = NULL;
 
-	ExchangeEvent event;
+	SecurityEvent event;
 
 
 	memset(update, '\0', size);

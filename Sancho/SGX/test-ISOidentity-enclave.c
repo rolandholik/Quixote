@@ -42,7 +42,7 @@
 #include <IDtoken.h>
 #include <SRDE.h>
 #include <SRDEenclave.h>
-#include <ExchangeEvent.h>
+#include <SecurityEvent.h>
 
 #include <SRDEfusion-ocall.h>
 #include <SRDEnaaaim-ocall.h>

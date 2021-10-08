@@ -101,7 +101,7 @@
 #include "SHA256.h"
 
 #include "SecurityPoint.h"
-#include "ExchangeEvent.h"
+#include "SecurityEvent.h"
 #include "TSEM.h"
 
 
@@ -489,7 +489,7 @@ static _Bool add_event(CO(char *, inbufr))
 
 	String update = NULL;
 
-	ExchangeEvent event = NULL;
+	SecurityEvent event = NULL;
 
 
 	/* Parse the event. */
@@ -497,7 +497,7 @@ static _Bool add_event(CO(char *, inbufr))
 	if ( !update->add(update, inbufr) )
 		ERR(goto done);
 
-	INIT(NAAAIM, ExchangeEvent, event, ERR(goto done));
+	INIT(NAAAIM, SecurityEvent, event, ERR(goto done));
 	if ( !event->parse(event, update) )
 		ERR(goto done);
 
@@ -845,7 +845,7 @@ static _Bool send_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	size_t lp,
 	       cnt = 0;
 
-	ExchangeEvent event;
+	SecurityEvent event;
 
 	String es = NULL;
 
@@ -923,7 +923,7 @@ static _Bool send_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	size_t lp,
 	       cnt = 0;
 
-	ExchangeEvent event;
+	SecurityEvent event;
 
 	String es = NULL;
 

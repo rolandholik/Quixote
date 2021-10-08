@@ -30,7 +30,7 @@
 
 #include <sancho-cmd.h>
 
-#include "ExchangeEvent.h"
+#include "SecurityEvent.h"
 #include "SecurityPoint.h"
 #include "TSEM.h"
 #include "TTYduct.h"
@@ -202,7 +202,7 @@ static void add_event(CO(TTYduct, duct), CO(TSEM, model), CO(Buffer, bufr))
 
 	String update = NULL;
 
-	ExchangeEvent event = NULL;
+	SecurityEvent event = NULL;
 
 
 	/* Parse event. */
@@ -215,7 +215,7 @@ static void add_event(CO(TTYduct, duct), CO(TSEM, model), CO(Buffer, bufr))
 	if ( !update->add(update, p) )
 		ERR(goto done);
 
-	INIT(NAAAIM, ExchangeEvent, event, ERR(goto done));
+	INIT(NAAAIM, SecurityEvent, event, ERR(goto done));
 	if ( !event->parse(event, update) )
 		ERR(goto done);
 	if ( !event->measure(event) )
@@ -432,7 +432,7 @@ static void send_trajectory(CO(TTYduct, duct), CO(TSEM, model), \
 	size_t lp,
 	       cnt = 0;
 
-	ExchangeEvent event;
+	SecurityEvent event;
 
 	String es = NULL;
 
@@ -499,7 +499,7 @@ static void send_forensics(CO(TTYduct, duct), CO(TSEM, model), \
 	size_t lp,
 	       cnt = 0;
 
-	ExchangeEvent event;
+	SecurityEvent event;
 
 	String es = NULL;
 

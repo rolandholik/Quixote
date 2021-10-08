@@ -46,7 +46,7 @@
 #include <SRDEnaaaim-ocall.h>
 
 #include <SecurityPoint.h>
-#include <ExchangeEvent.h>
+#include <SecurityEvent.h>
 
 #include "SanchoSGX.h"
 #include "SanchoSGX-interface.h"

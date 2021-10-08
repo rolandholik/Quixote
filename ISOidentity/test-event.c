@@ -32,7 +32,7 @@
 
 #include <NAAAIM.h>
 
-#include "ExchangeEvent.h"
+#include "SecurityEvent.h"
 
 
 /*
@@ -49,7 +49,7 @@ extern int main(int argc, char *argv[])
 
 	Buffer bufr = NULL;
 
-	ExchangeEvent event = NULL;
+	SecurityEvent event = NULL;
 
 
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
@@ -62,7 +62,7 @@ extern int main(int argc, char *argv[])
 	fputc('\n', stdout);
 
 
-	INIT(NAAAIM, ExchangeEvent, event, ERR(goto done));
+	INIT(NAAAIM, SecurityEvent, event, ERR(goto done));
 	if ( !event->parse(event, entry) )
 		ERR(goto done);
 	if ( !event->measure(event) )

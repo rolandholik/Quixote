@@ -98,7 +98,7 @@
 #include "TTYduct.h"
 #include "LocalDuct.h"
 #include "SecurityPoint.h"
-#include "ExchangeEvent.h"
+#include "SecurityEvent.h"
 
 
 /**
@@ -356,7 +356,7 @@ static _Bool process_event(CO(TTYduct, duct), const char * const event)
 
 	String update = NULL;
 
-	ExchangeEvent exchange = NULL;
+	SecurityEvent exchange = NULL;
 
 	static const char *discipline  = "DISCIPLINE ",
 			  *release     = "RELEASE ",
@@ -434,7 +434,7 @@ static _Bool process_event(CO(TTYduct, duct), const char * const event)
 		if ( !update->add(update, event) )
 			ERR(goto done);
 
-		INIT(NAAAIM, ExchangeEvent, exchange, ERR(goto done));
+		INIT(NAAAIM, SecurityEvent, exchange, ERR(goto done));
 		if ( !exchange->parse(exchange, update) )
 			ERR(goto done);
 		if ( !exchange->get_pid(exchange, &pid) )

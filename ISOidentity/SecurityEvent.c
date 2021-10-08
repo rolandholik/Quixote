@@ -1,7 +1,6 @@
 /** \file
  * This file contains the implementation of an object which manages
- * an information exchange event in the Turing event modeling
- * architecture.
+ * an security interaction event in a Turing Security Event Model.
  */
 
 /**************************************************************************
@@ -28,7 +27,7 @@
 
 #include "NAAAIM.h"
 #include "SHA256.h"
-#include "ExchangeEvent.h"
+#include "SecurityEvent.h"
 #include "Actor.h"
 #include "Subject.h"
 
@@ -38,20 +37,20 @@
 
 
 /* Object state extraction macro. */
-#define STATE(var) CO(ExchangeEvent_State, var) = this->state
+#define STATE(var) CO(SecurityEvent_State, var) = this->state
 
 /* Verify library/object header file inclusions. */
 #if !defined(NAAAIM_LIBID)
 #error Library identifier not defined.
 #endif
 
-#if !defined(NAAAIM_ExchangeEvent_OBJID)
+#if !defined(NAAAIM_SecurityEvent_OBJID)
 #error Object identifier not defined.
 #endif
 
 
-/** ExchangeEvent private state information. */
-struct NAAAIM_ExchangeEvent_State
+/** SecurityEvent private state information. */
+struct NAAAIM_SecurityEvent_State
 {
 	/* The root object. */
 	Origin root;
@@ -92,11 +91,11 @@ struct NAAAIM_ExchangeEvent_State
  *		which is to be initialized.
  */
 
-static void _init_state(CO(ExchangeEvent_State, S))
+static void _init_state(CO(SecurityEvent_State, S))
 
 {
 	S->libid = NAAAIM_LIBID;
-	S->objid = NAAAIM_ExchangeEvent_OBJID;
+	S->objid = NAAAIM_SecurityEvent_OBJID;
 
 	S->poisoned = false;
 
@@ -114,18 +113,18 @@ static void _init_state(CO(ExchangeEvent_State, S))
 /**
  * Internal private method.
  *
- * This method is responsible for parsing the pid component of an
- * information exchange event.  The pid description is in the
- * following clause of the event:
+ * This method is responsible for parsing the pid component of a security
+ * interaction event.  The pid description is in th  following clause of
+ * the event:
  *
  *	pid{NN}
  *
  * Where NN is the numeric identifier of the process which executed
- * the information exchange event.
+ * the information interaction event.
  *
  *
  * \param S	A pointer to the state information for the information
- *		exchange event.
+ *		interaction event.
  *
  * \param event	The object containing the event.
  *
@@ -136,7 +135,7 @@ static void _init_state(CO(ExchangeEvent_State, S))
  *		populated.
  */
 
-static _Bool _parse_pid(CO(ExchangeEvent_State, S), CO(String, event))
+static _Bool _parse_pid(CO(SecurityEvent_State, S), CO(String, event))
 
 {
 	_Bool retn       = false,
@@ -191,14 +190,14 @@ static _Bool _parse_pid(CO(ExchangeEvent_State, S), CO(String, event))
  * Internal private method.
  *
  * This method is responsible for parsing the event component of an
- * information exchange event.  The event description is in the the
+ * information interaction event.  The event description is in the the
  * following clause of the event:
  *
  *	evant{proc=process_name, path=pathname, pid=PID}
  *
  *
  * \param S	A pointer to the state information for the information
- *		exchange event.
+ *		interaction event.
  *
  * \param event	The object containing the event.
  *
@@ -209,7 +208,7 @@ static _Bool _parse_pid(CO(ExchangeEvent_State, S), CO(String, event))
  *		populated.
  */
 
-static _Bool _parse_event(CO(ExchangeEvent_State, S), CO(String, event))
+static _Bool _parse_event(CO(SecurityEvent_State, S), CO(String, event))
 
 {
 	_Bool retn	 = false,
@@ -260,12 +259,12 @@ static _Bool _parse_event(CO(ExchangeEvent_State, S), CO(String, event))
 /**
  * External public method.
  *
- * This method the parsing of an information exchange event in ASCII
+ * This method the parsing of an information interaction event in ASCII
  * form.  This method uses the Actor and Subject objects to parse
  * and aggregate those components of the event.
  *
- * \param this	A pointer to the exchange event object which is to
- *	        be parsed.
+ * \param this	A pointer to the security interaction event object which
+ *		is to be parsed.
  *
  * \param event	The object containing the string which is to be
  *
@@ -276,7 +275,7 @@ static _Bool _parse_event(CO(ExchangeEvent_State, S), CO(String, event))
  *		populated.
  */
 
-static _Bool parse(CO(ExchangeEvent, this), CO(String, event))
+static _Bool parse(CO(SecurityEvent, this), CO(String, event))
 
 {
 	STATE(S);
@@ -318,12 +317,12 @@ static _Bool parse(CO(ExchangeEvent, this), CO(String, event))
 /**
  * External public method.
  *
- * This method the parsing of an information exchange event in ASCII
+ * This method the parsing of an security interaction event in ASCII
  * form.  This method uses the Actor and Subject objects to parse
  * and aggregate those components of the event.
  *
- * \param this	A pointer to the exchange event object which is to
- *	        be parsed.
+ * \param this	A pointer to the security interaction event object which
+ *		is tobe parsed.
  *
  * \param event	The object containing the string which is to be
  *
@@ -334,7 +333,7 @@ static _Bool parse(CO(ExchangeEvent, this), CO(String, event))
  *		populated.
  */
 
-static _Bool measure(CO(ExchangeEvent, this))
+static _Bool measure(CO(SecurityEvent, this))
 
 {
 	STATE(S);
@@ -391,9 +390,9 @@ static _Bool measure(CO(ExchangeEvent, this))
  * External public method.
  *
  * This method implements an accessor function for retrieving the
- * identity/measurement of an exchange event.  It is considered to
- * be a terminal error for the object for this function to be called
- * without previously calling the ->measurement method.
+ * identity/measurement of an security interaction event.  It is
+ * considered to be a terminal error for the object for this function
+ * to be called without previously calling the ->measurement method.
  *
  * \param this	A pointer to the actor identity whose identity is
  *		to be retrieved.
@@ -409,7 +408,7 @@ static _Bool measure(CO(ExchangeEvent, this))
  *		measurement.
  */
 
-static _Bool get_identity(CO(ExchangeEvent, this), CO(Buffer, bufr))
+static _Bool get_identity(CO(SecurityEvent, this), CO(Buffer, bufr))
 
 {
 	STATE(S);
@@ -439,8 +438,9 @@ static _Bool get_identity(CO(ExchangeEvent, this), CO(Buffer, bufr))
  * External public method.
  *
  * This method implements an accessor function for retrieving the
- * description of an exchange event.  This is the name of the actor
- * process and subject which are involved in the exchange event.
+ * description of a security interaction event.  This is the name of
+ * the actor process and subject which are involved in the interaction
+ * event.
  *
  * \param this	A pointer to the actor identity whose identity is
  *		to be retrieved.
@@ -454,7 +454,7 @@ static _Bool get_identity(CO(ExchangeEvent, this), CO(Buffer, bufr))
  *		object has a valid copy of this object's measurement.
  */
 
-static _Bool get_event(CO(ExchangeEvent, this), CO(String, event))
+static _Bool get_event(CO(SecurityEvent, this), CO(String, event))
 
 {
 	STATE(S);
@@ -484,7 +484,7 @@ static _Bool get_event(CO(ExchangeEvent, this), CO(String, event))
  * External public method.
  *
  * This method implements an accessor function for retrieving the
- * process identifer of an exchange event.
+ * process identifer of a security interaction event.
  *
  * \param this	A pointer to the event from which the process
  *		identifier is to be retrieved.
@@ -500,7 +500,7 @@ static _Bool get_event(CO(ExchangeEvent, this), CO(String, event))
  *		the caller contains a valid process identifier.
  */
 
-static _Bool get_pid(CO(ExchangeEvent, this), pid_t * const pid)
+static _Bool get_pid(CO(SecurityEvent, this), pid_t * const pid)
 
 {
 	STATE(S);
@@ -518,7 +518,7 @@ static _Bool get_pid(CO(ExchangeEvent, this), pid_t * const pid)
  * External public method.
  *
  * This method implements the generation of an ASCII formatted
- * representation of the information exchange event modeled by an
+ * representation of the security interaction event modeled by an
  * object.  The string generated is in the same format that is
  * interpreted by the ->parse method.
  *
@@ -529,7 +529,7 @@ static _Bool get_pid(CO(ExchangeEvent, this), pid_t * const pid)
  *		be copied.
  */
 
-static _Bool format(CO(ExchangeEvent, this), CO(String, event))
+static _Bool format(CO(SecurityEvent, this), CO(String, event))
 
 {
 	STATE(S);
@@ -564,15 +564,15 @@ static _Bool format(CO(ExchangeEvent, this), CO(String, event))
 /**
  * External public method.
  *
- * This method implements the reset of an information exchange event
+ * This method implements the reset of an security information event
  * object to a state which would allow the processing of a new
- * exchange event.
+ * event.
  *
- * \param this	A pointer to the exchange event object which is to
- *	        be reset.
+ * \param this	A pointer to the security interaction event object which
+ *		is to be reset.
  */
 
-static void reset(CO(ExchangeEvent, this))
+static void reset(CO(SecurityEvent, this))
 
 {
 	STATE(S);
@@ -590,14 +590,14 @@ static void reset(CO(ExchangeEvent, this))
 /**
  * External public method.
  *
- * This method implements output of the characteristis of the exchange
+ * This method implements output of the characteristis of the interaction
  * event represented by the object.
  *
  * \param this	A pointer to the object whose identity state is to be
  *		dumped.
  */
 
-static void dump(CO(ExchangeEvent, this))
+static void dump(CO(SecurityEvent, this))
 
 {
 	STATE(S);
@@ -624,12 +624,12 @@ static void dump(CO(ExchangeEvent, this))
 /**
  * External public method.
  *
- * This method implements a destructor for an ExchangeEvent object.
+ * This method implements a destructor for an SecurityEvent object.
  *
  * \param this	A pointer to the object which is to be destroyed.
  */
 
-static void whack(CO(ExchangeEvent, this))
+static void whack(CO(SecurityEvent, this))
 
 {
 	STATE(S);
@@ -647,18 +647,18 @@ static void whack(CO(ExchangeEvent, this))
 /**
  * External constructor call.
  *
- * This function implements a constructor call for an ExchangeEvent object.
+ * This function implements a constructor call for an SecurityEvent object.
  *
- * \return	A pointer to the initialized exchange event.  A null value
+ * \return	A pointer to the initialized interaction event.  A null value
  *		indicates an error was encountered in object generation.
  */
 
-extern ExchangeEvent NAAAIM_ExchangeEvent_Init(void)
+extern SecurityEvent NAAAIM_SecurityEvent_Init(void)
 
 {
 	Origin root;
 
-	ExchangeEvent this = NULL;
+	SecurityEvent this = NULL;
 
 	struct HurdLib_Origin_Retn retn;
 
@@ -667,9 +667,9 @@ extern ExchangeEvent NAAAIM_ExchangeEvent_Init(void)
 	root = HurdLib_Origin_Init();
 
 	/* Allocate the object and internal state. */
-	retn.object_size  = sizeof(struct NAAAIM_ExchangeEvent);
-	retn.state_size   = sizeof(struct NAAAIM_ExchangeEvent_State);
-	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_ExchangeEvent_OBJID,
+	retn.object_size  = sizeof(struct NAAAIM_SecurityEvent);
+	retn.state_size   = sizeof(struct NAAAIM_SecurityEvent_State);
+	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_SecurityEvent_OBJID,
 			 &retn) )
 		return NULL;
 	this	    	  = retn.object;

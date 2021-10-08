@@ -26,7 +26,7 @@
 #include "NAAAIM.h"
 #include "SHA256.h"
 #include "SecurityPoint.h"
-#include "ExchangeEvent.h"
+#include "SecurityEvent.h"
 #include "TSEM.h"
 
 
@@ -277,8 +277,8 @@ static _Bool _extend_measurement(CO(TSEM_State, S),    \
  *		was updated.
  */
 
-static _Bool update(CO(TSEM, this), CO(ExchangeEvent, event), \
-		    _Bool *status, _Bool *discipline)
+static _Bool update(CO(TSEM, this), CO(SecurityEvent, event), _Bool *status, \
+		    _Bool *discipline)
 
 {
 	STATE(S);
@@ -357,7 +357,7 @@ static _Bool update(CO(TSEM, this), CO(ExchangeEvent, event), \
 	}
 
 	if ( !list->add(list, (unsigned char *) &event, \
-			sizeof(ExchangeEvent)) )
+			sizeof(SecurityEvent)) )
 		ERR(goto done);
 
 	retn  = true;
@@ -868,7 +868,7 @@ static _Bool discipline_pid(CO(TSEM, this), pid_t * const pid)
  *		event object being set.
  */
 
-static _Bool get_event(CO(TSEM, this), ExchangeEvent * const event)
+static _Bool get_event(CO(TSEM, this), SecurityEvent * const event)
 
 {
 	STATE(S);
@@ -877,7 +877,7 @@ static _Bool get_event(CO(TSEM, this), ExchangeEvent * const event)
 
 	size_t size;
 
-	ExchangeEvent *event_ptr,
+	SecurityEvent *event_ptr,
 		      return_event = NULL;
 
 
@@ -887,13 +887,13 @@ static _Bool get_event(CO(TSEM, this), ExchangeEvent * const event)
 
 
 	/* Get and verify cursor position. */
-	size = S->trajectory->size(S->trajectory) / sizeof(ExchangeEvent);
+	size = S->trajectory->size(S->trajectory) / sizeof(SecurityEvent);
 	if ( S->trajectory_cursor >= size ) {
 		retn = true;
 		goto done;
 	}
 
-	event_ptr  = (ExchangeEvent *) S->trajectory->get(S->trajectory);
+	event_ptr  = (SecurityEvent *) S->trajectory->get(S->trajectory);
 	event_ptr += S->trajectory_cursor;
 	return_event = *event_ptr;
 	++S->trajectory_cursor;
@@ -1079,7 +1079,7 @@ static size_t contours_size(CO(TSEM, this))
  *		event object being set.
  */
 
-static _Bool get_forensics(CO(TSEM, this), ExchangeEvent * const event)
+static _Bool get_forensics(CO(TSEM, this), SecurityEvent * const event)
 
 {
 	STATE(S);
@@ -1088,7 +1088,7 @@ static _Bool get_forensics(CO(TSEM, this), ExchangeEvent * const event)
 
 	size_t size;
 
-	ExchangeEvent *event_ptr,
+	SecurityEvent *event_ptr,
 		      return_event = NULL;
 
 
@@ -1098,13 +1098,13 @@ static _Bool get_forensics(CO(TSEM, this), ExchangeEvent * const event)
 
 
 	/* Get and verify cursor position. */
-	size = S->forensics->size(S->forensics) / sizeof(ExchangeEvent);
+	size = S->forensics->size(S->forensics) / sizeof(SecurityEvent);
 	if ( S->forensics_cursor >= size ) {
 		retn = true;
 		goto done;
 	}
 
-	event_ptr  = (ExchangeEvent *) S->forensics->get(S->forensics);
+	event_ptr  = (SecurityEvent *) S->forensics->get(S->forensics);
 	event_ptr += S->forensics_cursor;
 	return_event = *event_ptr;
 	++S->forensics_cursor;
@@ -1157,7 +1157,7 @@ static size_t forensics_size(CO(TSEM, this))
 {
 	STATE(S);
 
-	return S->forensics->size(S->forensics) / sizeof(ExchangeEvent);
+	return S->forensics->size(S->forensics) / sizeof(SecurityEvent);
 }
 
 
@@ -1178,7 +1178,7 @@ static void dump_events(CO(TSEM, this))
 
 	size_t lp = 1;
 
-	ExchangeEvent event;
+	SecurityEvent event;
 
 
 	/* Verify object status. */
@@ -1224,7 +1224,7 @@ static void dump_forensics(CO(TSEM, this))
 
 	size_t lp = 1;
 
-	ExchangeEvent event;
+	SecurityEvent event;
 
 
 	/* Verify object status. */
@@ -1368,10 +1368,10 @@ static void whack(CO(TSEM, this))
 	STATE(S);
 
 
-	GWHACK(ExchangeEvent, S->trajectory);
+	GWHACK(SecurityEvent, S->trajectory);
 	WHACK(S->trajectory);
 
-	GWHACK(ExchangeEvent, S->forensics);
+	GWHACK(SecurityEvent, S->forensics);
 	WHACK(S->forensics);
 
 	GWHACK(SecurityPoint, S->contours);
