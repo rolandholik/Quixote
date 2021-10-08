@@ -36,7 +36,7 @@
 #include <NAAAIM.h>
 #include <SHA256.h>
 
-#include "Actor.h"
+#include "COE.h"
 #include "Subject.h"
 
 

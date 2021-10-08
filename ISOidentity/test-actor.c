@@ -32,7 +32,7 @@
 
 #include <NAAAIM.h>
 
-#include "Actor.h"
+#include "COE.h"
 
 
 /*
@@ -49,7 +49,7 @@ extern int main(int argc, char *argv[])
 
 	Buffer bufr = NULL;
 
-	Actor actor = NULL;
+	COE coe = NULL;
 
 
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
@@ -62,27 +62,27 @@ extern int main(int argc, char *argv[])
 	fputc('\n', stdout);
 
 
-	INIT(NAAAIM, Actor, actor, ERR(goto done));
-	if ( !actor->parse(actor, entry) )
+	INIT(NAAAIM, COE, coe, ERR(goto done));
+	if ( !coe->parse(coe, entry) )
 		ERR(goto done);
-	if ( !actor->measure(actor) )
+	if ( !coe->measure(coe) )
 		ERR(goto done);
-	if ( !actor->get_measurement(actor, bufr) )
+	if ( !coe->get_measurement(coe, bufr) )
 		ERR(goto done);
-	actor->dump(actor);
+	coe->dump(coe);
 
 
-	actor->reset(actor);
-	if ( !actor->parse(actor, entry) )
+	coe->reset(coe);
+	if ( !coe->parse(coe, entry) )
 		ERR(goto done);
-	if ( !actor->measure(actor) )
+	if ( !coe->measure(coe) )
 		ERR(goto done);
 	fputs("\nMeasurement after reset:\n", stdout);
 	bufr->print(bufr);
 
 	fputs("\nIdentity elements:\n", stdout);
 	entry->reset(entry);
-	if ( !actor->format(actor, entry) )
+	if ( !coe->format(coe, entry) )
 		ERR(goto done);
 	entry->print(entry);
 
@@ -92,7 +92,7 @@ extern int main(int argc, char *argv[])
  done:
 	WHACK(bufr);
 	WHACK(entry);
-	WHACK(actor);
+	WHACK(coe);
 
 	return retn;
 }

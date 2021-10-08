@@ -1,9 +1,7 @@
 /** \file
- * This file contains the implementation of an object which represents
- * an actor identity in the Linux iso-identity modeling system.  The
- * purpose of this object is to consolidate all of the identity
- * characteristics of an actor process for the purposes of computing
- * its measured identity.
+ * This file contains the implementation of an object which manages the
+ * parameters defining a context of execution in a Turing Security
+ * Event Model.
  */
 
 /**************************************************************************
@@ -30,7 +28,7 @@
 
 #include "NAAAIM.h"
 #include "SHA256.h"
-#include "Actor.h"
+#include "COE.h"
 
 #if !defined(REG_OK)
 #define REG_OK REG_NOERROR
@@ -38,20 +36,20 @@
 
 
 /* Object state extraction macro. */
-#define STATE(var) CO(Actor_State, var) = this->state
+#define STATE(var) CO(COE_State, var) = this->state
 
 /* Verify library/object header file inclusions. */
 #if !defined(NAAAIM_LIBID)
 #error Library identifier not defined.
 #endif
 
-#if !defined(NAAAIM_Actor_OBJID)
+#if !defined(NAAAIM_COE_OBJID)
 #error Object identifier not defined.
 #endif
 
 
-/* Actor identity elements. */
-struct actor_identity {
+/* COE identity elements. */
+struct coe_characteristics {
 	uint32_t uid;
 	uint32_t euid;
 	uint32_t suid;
@@ -66,8 +64,8 @@ struct actor_identity {
 	uint64_t capability;
 };
 
-/** Actor private state information. */
-struct NAAAIM_Actor_State
+/** COE private state information. */
+struct NAAAIM_COE_State
 {
 	/* The root object. */
 	Origin root;
@@ -81,8 +79,8 @@ struct NAAAIM_Actor_State
 	/* Object status. */
 	_Bool poisoned;
 
-	/* Actor identity elements. */
-	struct actor_identity elements;
+	/* COE characteristics. */
+	struct coe_characteristics character;
 
 	/* Measured identity. */
 	_Bool measured;
@@ -93,22 +91,22 @@ struct NAAAIM_Actor_State
 /**
  * Internal private method.
  *
- * This method is responsible for initializing the NAAAIM_Actor_State
+ * This method is responsible for initializing the NAAAIM_COE_State
  * structure which holds state information for each instantiated object.
  *
  * \param S A pointer to the object containing the state information which
  *        is to be initialized.
  */
 
-static void _init_state(CO(Actor_State, S))
+static void _init_state(CO(COE_State, S))
 
 {
 	S->libid = NAAAIM_LIBID;
-	S->objid = NAAAIM_Actor_OBJID;
+	S->objid = NAAAIM_COE_OBJID;
 
 	S->poisoned = false;
 
-	memset(&S->elements, '\0', sizeof(struct actor_identity));
+	memset(&S->character, '\0', sizeof(struct coe_characteristics));
 
 	S->measured = false;
 	S->identity = NULL;
@@ -120,14 +118,14 @@ static void _init_state(CO(Actor_State, S))
 /**
  * External public method.
  *
- * This method implements a method for setting all of the identity
- * characteristics for an actor identity.
+ * This method implements a method for setting all of the characteristics
+ * of a context of execution.
  *
- * \param this	A pointer to the actor object whose identity elements
- *		are being set.
+ * \param this	A pointer to the object whose identity elements are to
+ *		bet set.
  */
 
-static void set_identity_elements(CO(Actor, this), const uint32_t uid,	     \
+static void set_characteristics(CO(COE, this), const uint32_t uid,	     \
 				  const uint32_t euid, const uint32_t suid,  \
 				  const uint32_t gid, const uint32_t egid,   \
 				  const uint32_t sgid, const uint32_t fsuid, \
@@ -137,18 +135,18 @@ static void set_identity_elements(CO(Actor, this), const uint32_t uid,	     \
 {
 	STATE(S);
 
-	S->elements.uid  = uid;
-	S->elements.euid = euid;
-	S->elements.suid = suid;
+	S->character.uid  = uid;
+	S->character.euid = euid;
+	S->character.suid = suid;
 
-	S->elements.gid  = gid;
-	S->elements.egid = egid;
-	S->elements.sgid = sgid;
+	S->character.gid  = gid;
+	S->character.egid = egid;
+	S->character.sgid = sgid;
 
-	S->elements.fsuid = fsuid;
-	S->elements.fsgid = fsgid;
+	S->character.fsuid = fsuid;
+	S->character.fsgid = fsgid;
 
-	S->elements.capability = capability;
+	S->character.capability = capability;
 
 	return;
 }
@@ -227,7 +225,7 @@ static _Bool _get_field(CO(char *, field), CO(char *, fd), uint32_t *value)
 /**
  * Internal private function.
  *
- * This method parses the capability entry from the actor definition
+ * This method parses the capability entry from the coe definition
  * field.  This is special cased since the capability field is a
  * 64-bit entry.
  *
@@ -299,9 +297,9 @@ static _Bool _get_caps(CO(char *, field), CO(char *, fd), uint64_t *value)
  * External public method.
  *
  * This method implements parsing of a trajectory entry for the
- * characteristcis of a actor identity.
+ * characteristics of a context of action
  *
- * \param this	A pointer to the actor object whose trajectory entry
+ * \param this	A pointer to the object whose trajectory entry
  *		is to be parsed.
  *
  * \param entry	A pointer to the object which contains the template
@@ -314,7 +312,7 @@ static _Bool _get_caps(CO(char *, field), CO(char *, fd), uint64_t *value)
  *		populated.
  */
 
-static _Bool parse(CO(Actor, this), CO(String, entry))
+static _Bool parse(CO(COE, this), CO(String, entry))
 
 {
 	STATE(S);
@@ -337,7 +335,7 @@ static _Bool parse(CO(Actor, this), CO(String, entry))
 	if ( entry->poisoned(entry) )
 		ERR(goto done);
 
-	/* Extract actor field. */
+	/* Extract coe field. */
 	INIT(HurdLib, Buffer, field, ERR(goto done));
 
 	if ( regcomp(&regex, "actor\\{[^}]*\\}", REG_EXTENDED) != 0 )
@@ -356,31 +354,31 @@ static _Bool parse(CO(Actor, this), CO(String, entry))
 
 	/* Parse field entries. */
 	fp = (char *) field->get(field);
-	if ( !_get_field(fp, "uid=([^,]*)", &S->elements.uid) )
+	if ( !_get_field(fp, "uid=([^,]*)", &S->character.uid) )
 		ERR(goto done);
 
-	if ( !_get_field(fp, "euid=([^,]*)", &S->elements.euid) )
+	if ( !_get_field(fp, "euid=([^,]*)", &S->character.euid) )
 		ERR(goto done);
 
-	if ( !_get_field(fp, "suid=([^,]*)", &S->elements.suid) )
+	if ( !_get_field(fp, "suid=([^,]*)", &S->character.suid) )
 		ERR(goto done);
 
-	if ( !_get_field(fp, "gid=([^,]*)", &S->elements.gid) )
+	if ( !_get_field(fp, "gid=([^,]*)", &S->character.gid) )
 		ERR(goto done);
 
-	if ( !_get_field(fp, "egid=([^,]*)", &S->elements.egid) )
+	if ( !_get_field(fp, "egid=([^,]*)", &S->character.egid) )
 		ERR(goto done);
 
-	if ( !_get_field(fp, "sgid=([^,]*)", &S->elements.sgid) )
+	if ( !_get_field(fp, "sgid=([^,]*)", &S->character.sgid) )
 		ERR(goto done);
 
-	if ( !_get_field(fp, "fsuid=([^,]*)", &S->elements.fsuid) )
+	if ( !_get_field(fp, "fsuid=([^,]*)", &S->character.fsuid) )
 		ERR(goto done);
 
-	if ( !_get_field(fp, "fsgid=([^,]*)", &S->elements.fsgid) )
+	if ( !_get_field(fp, "fsgid=([^,]*)", &S->character.fsgid) )
 		ERR(goto done);
 
-	if ( !_get_caps(fp, "cap=([^}]*)", &S->elements.capability) )
+	if ( !_get_caps(fp, "cap=([^}]*)", &S->character.capability) )
 		ERR(goto done);
 
 	retn = true;
@@ -400,19 +398,19 @@ static _Bool parse(CO(Actor, this), CO(String, entry))
 /**
  * External public method.
  *
- * This method implements computing of the measurement of the actor
- * identity.  This involves the computation of the digest over the
- * structure which defines the identity characteristics of the actor
- * process.
+ * This method implements computing of the measurement of the coe
+ * characteristics.  This involves the computation of the digest over the
+ * structure which defines the characteristics of the context of
+ * execution.
  *
- * \param this	A pointer to the actor which is to be measured.
+ * \param this	A pointer to the object that is to be measured.
  *
  * \return	A boolean value is used to indicate whether or not
  *		the measurement has succeeded.  A false value
  *		indicates failure while a true value indicates success.
  */
 
-static _Bool measure(CO(Actor, this))
+static _Bool measure(CO(COE, this))
 
 {
 	STATE(S);
@@ -430,18 +428,22 @@ static _Bool measure(CO(Actor, this))
 
 
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	bufr->add(bufr, (void *) &S->elements.uid, sizeof(S->elements.uid));
-	bufr->add(bufr, (void *) &S->elements.euid, sizeof(S->elements.euid));
-	bufr->add(bufr, (void *) &S->elements.suid, sizeof(S->elements.suid));
-	bufr->add(bufr, (void *) &S->elements.gid, sizeof(S->elements.gid));
-	bufr->add(bufr, (void *) &S->elements.egid, sizeof(S->elements.egid));
-	bufr->add(bufr, (void *) &S->elements.sgid, sizeof(S->elements.sgid));
-	bufr->add(bufr, (void *) &S->elements.fsuid, \
-		  sizeof(S->elements.fsuid));
-	bufr->add(bufr, (void *) &S->elements.fsuid, \
-		  sizeof(S->elements.fsgid));
-	if ( !bufr->add(bufr, (void *) &S->elements.capability, \
-			sizeof(S->elements.capability)) )
+	bufr->add(bufr, (void *) &S->character.uid, sizeof(S->character.uid));
+	bufr->add(bufr, (void *) &S->character.euid, \
+		  sizeof(S->character.euid));
+	bufr->add(bufr, (void *) &S->character.suid, \
+		  sizeof(S->character.suid));
+	bufr->add(bufr, (void *) &S->character.gid, sizeof(S->character.gid));
+	bufr->add(bufr, (void *) &S->character.egid, \
+		  sizeof(S->character.egid));
+	bufr->add(bufr, (void *) &S->character.sgid, \
+		  sizeof(S->character.sgid));
+	bufr->add(bufr, (void *) &S->character.fsuid, \
+		  sizeof(S->character.fsuid));
+	bufr->add(bufr, (void *) &S->character.fsuid, \
+		  sizeof(S->character.fsgid));
+	if ( !bufr->add(bufr, (void *) &S->character.capability, \
+			sizeof(S->character.capability)) )
 		ERR(goto done);
 
 	if ( !S->identity->add(S->identity, bufr) )
@@ -465,12 +467,12 @@ static _Bool measure(CO(Actor, this))
  * External public method.
  *
  * This method implements an accessor function for retrieving the
- * measurement of the actor object.  It is considered to be a terminal
+ * measurement of the coe object.  It is considered to be a terminal
  * error for the object for this function to be called without
  * previously calling the ->measurement method.
  *
- * \param this	A pointer to the actor identity whose measurement is
- *		to be retrieved.
+ * \param this	A pointer to the object whose measurement is to be
+ *		retrieved.
  *
  * \param bufr	The object which the measurement is to be loaded into.
  *
@@ -483,7 +485,7 @@ static _Bool measure(CO(Actor, this))
  *		measurement.
  */
 
-static _Bool get_measurement(CO(Actor, this), CO(Buffer, bufr))
+static _Bool get_measurement(CO(COE, this), CO(Buffer, bufr))
 
 {
 	STATE(S);
@@ -513,17 +515,18 @@ static _Bool get_measurement(CO(Actor, this), CO(Buffer, bufr))
  * External public method.
  *
  * This method implements the generation of an ASCII formatted
- * representation of the identity elements.  The string generated
- * is in the same format that is interpreted by the ->parse method.
+ * representation of the characteristics of a context of execution.  The
+ * string generated is in the same format that is interpreted by
+ * the ->parse method.
  *
- * \param this	A pointer to the actor object containing the
- *		identity elements which are to be formatted.
+ * \param this	A pointer to the object containing the characteristics
+ *		that are to be formatted.
  *
  * \param event	The object into which the formatted string is to
  *		be copied.
  */
 
-static _Bool format(CO(Actor, this), CO(String, event))
+static _Bool format(CO(COE, this), CO(String, event))
 
 {
 	STATE(S);
@@ -542,17 +545,17 @@ static _Bool format(CO(Actor, this), CO(String, event))
 		ERR(goto done);
 
 
-	/* Generate the actor string and add it. */
+	/* Generate the coe string and add it. */
 	used = snprintf(bufr, sizeof(bufr), "actor{uid=%lu, euid=%lu, suid=%lu, gid=%lu, egid=%lu, sgid=%lu, fsuid=%lu, fsgid=%lu, cap=0x%llx} ",      \
-		       (unsigned long int) S->elements.uid,		\
-		       (unsigned long int) S->elements.euid,		\
-		       (unsigned long int) S->elements.suid,		\
-		       (unsigned long int) S->elements.gid,		\
-		       (unsigned long int) S->elements.egid,		\
-		       (unsigned long int) S->elements.sgid,		\
-		       (unsigned long int) S->elements.fsuid,		\
-		       (unsigned long int) S->elements.fsgid,		\
-		       (unsigned long long int) S->elements.capability);
+		       (unsigned long int) S->character.uid,		\
+		       (unsigned long int) S->character.euid,		\
+		       (unsigned long int) S->character.suid,		\
+		       (unsigned long int) S->character.gid,		\
+		       (unsigned long int) S->character.egid,		\
+		       (unsigned long int) S->character.sgid,		\
+		       (unsigned long int) S->character.fsuid,		\
+		       (unsigned long int) S->character.fsgid,		\
+		       (unsigned long long int) S->character.capability);
 	if ( used >= sizeof(bufr) )
 		ERR(goto done);
 
@@ -571,13 +574,13 @@ static _Bool format(CO(Actor, this), CO(String, event))
 /**
  * External public method.
  *
- * This method implements the reset of the Actor object to a state which
- * would allow the generation of a new actor identity.
+ * This method implements the reset of the COE object to a state which
+ * would allow the creation of a new set of characteristics.
  *
- * \param this	A pointer to the actor object which is to be reset.
+ * \param this	A pointer to the object which is to be reset.
  */
 
-static void reset(CO(Actor, this))
+static void reset(CO(COE, this))
 
 {
 	STATE(S);
@@ -585,7 +588,7 @@ static void reset(CO(Actor, this))
 	S->poisoned = false;
 	S->measured = false;
 
-	memset(&S->elements, '\0', sizeof(struct actor_identity));
+	memset(&S->character, '\0', sizeof(struct coe_characteristics));
 
 	S->identity->reset(S->identity);
 
@@ -596,14 +599,14 @@ static void reset(CO(Actor, this))
 /**
  * External public method.
  *
- * This method implements output of the characteristis of the actor
- * identity represented by the object.
+ * This method implements output of the characteristics of a context
+ * of execution.
  *
- * \param this	A pointer to the object whose identity state is to be
+ * \param this	A pointer to the object whose characteristics are to be
  *		dumped.
  */
 
-static void dump(CO(Actor, this))
+static void dump(CO(COE, this))
 
 {
 	STATE(S);
@@ -611,16 +614,16 @@ static void dump(CO(Actor, this))
 
 	if ( S->poisoned )
 		fputs("*Poisoned.\n", stdout);
-	fprintf(stdout, "uid:   %lu\n", (unsigned long int) S->elements.uid);
-	fprintf(stdout, "euid:  %lu\n", (unsigned long int) S->elements.euid);
-	fprintf(stdout, "suid:  %lu\n", (unsigned long int) S->elements.suid);
-	fprintf(stdout, "gid:   %lu\n", (unsigned long int) S->elements.gid);
-	fprintf(stdout, "egid:  %lu\n", (unsigned long int) S->elements.egid);
-	fprintf(stdout, "sgid:  %lu\n", (unsigned long int) S->elements.sgid);
-	fprintf(stdout, "fsuid: %lu\n", (unsigned long int) S->elements.fsuid);
-	fprintf(stdout, "fsgid: %lu\n", (unsigned long int) S->elements.fsgid);
+	fprintf(stdout, "uid:   %lu\n", (unsigned long int) S->character.uid);
+	fprintf(stdout, "euid:  %lu\n", (unsigned long int) S->character.euid);
+	fprintf(stdout, "suid:  %lu\n", (unsigned long int) S->character.suid);
+	fprintf(stdout, "gid:   %lu\n", (unsigned long int) S->character.gid);
+	fprintf(stdout, "egid:  %lu\n", (unsigned long int) S->character.egid);
+	fprintf(stdout, "sgid:  %lu\n", (unsigned long int) S->character.sgid);
+	fprintf(stdout, "fsuid: %lu\n", (unsigned long int) S->character.fsuid);
+	fprintf(stdout, "fsgid: %lu\n", (unsigned long int) S->character.fsgid);
 	fprintf(stdout, "caps:  %llx\n", \
-		(unsigned long long int) S->elements.capability);
+		(unsigned long long int) S->character.capability);
 
 	fputs("measurement: ", stdout);
 	S->identity->print(S->identity);
@@ -632,12 +635,12 @@ static void dump(CO(Actor, this))
 /**
  * External public method.
  *
- * This method implements a destructor for a Actor object.
+ * This method implements a destructor for a COE object.
  *
  * \param this	A pointer to the object which is to be destroyed.
  */
 
-static void whack(CO(Actor, this))
+static void whack(CO(COE, this))
 
 {
 	STATE(S);
@@ -652,18 +655,18 @@ static void whack(CO(Actor, this))
 /**
  * External constructor call.
  *
- * This function implements a constructor call for a Actor object.
+ * This function implements a constructor call for a COE object.
  *
- * \return	A pointer to the initialized Actor.  A null value
+ * \return	A pointer to the initialized COE.  A null value
  *		indicates an error was encountered in object generation.
  */
 
-extern Actor NAAAIM_Actor_Init(void)
+extern COE NAAAIM_COE_Init(void)
 
 {
 	auto Origin root;
 
-	auto Actor this = NULL;
+	auto COE this = NULL;
 
 	auto struct HurdLib_Origin_Retn retn;
 
@@ -672,9 +675,9 @@ extern Actor NAAAIM_Actor_Init(void)
 	root = HurdLib_Origin_Init();
 
 	/* Allocate the object and internal state. */
-	retn.object_size  = sizeof(struct NAAAIM_Actor);
-	retn.state_size   = sizeof(struct NAAAIM_Actor_State);
-	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_Actor_OBJID, &retn) )
+	retn.object_size  = sizeof(struct NAAAIM_COE);
+	retn.state_size   = sizeof(struct NAAAIM_COE_State);
+	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_COE_OBJID, &retn) )
 		return NULL;
 	this	    	  = retn.object;
 	this->state 	  = retn.state;
@@ -687,7 +690,7 @@ extern Actor NAAAIM_Actor_Init(void)
 	INIT(NAAAIM, Sha256, this->state->identity, ERR(goto fail));
 
 	/* Method initialization. */
-	this->set_identity_elements = set_identity_elements;
+	this->set_characteristics   = set_characteristics;
 	this->parse		    = parse;
 	this->measure		    = measure;
 	this->get_measurement	    = get_measurement;

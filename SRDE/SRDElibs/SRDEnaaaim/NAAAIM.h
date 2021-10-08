@@ -75,7 +75,7 @@
 #define NAAAIM_SRDEenclave_OBJID	39
 #define NAAAIM_SRDEsigstruct_OBJID	40
 
-#define NAAAIM_Actor_OBJID		41
+#define NAAAIM_COE_OBJID		41
 #define NAAAIM_Subject_OBJID		42
 #define NAAAIM_SecurityEvent_OBJID	43
 #define NAAAIM_TSEM_OBJID		44

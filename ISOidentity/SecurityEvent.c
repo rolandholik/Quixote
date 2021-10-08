@@ -28,7 +28,7 @@
 #include "NAAAIM.h"
 #include "SHA256.h"
 #include "SecurityEvent.h"
-#include "Actor.h"
+#include "COE.h"
 #include "Subject.h"
 
 #if !defined(REG_OK)
@@ -69,8 +69,8 @@ struct NAAAIM_SecurityEvent_State
 	/* Event description .*/
 	String event;
 
-	/* Actor identity. */
-	Actor actor;
+	/* COE characteristics. */
+	COE coe;
 
 	/* Subject identity. */
 	Subject subject;
@@ -102,7 +102,7 @@ static void _init_state(CO(SecurityEvent_State, S))
 	S->pid = 0;
 
 	S->event       = NULL;
-	S->actor       = NULL;
+	S->coe	       = NULL;
 	S->subject     = NULL;
 	S->identity    = NULL;
 
@@ -260,7 +260,7 @@ static _Bool _parse_event(CO(SecurityEvent_State, S), CO(String, event))
  * External public method.
  *
  * This method the parsing of an information interaction event in ASCII
- * form.  This method uses the Actor and Subject objects to parse
+ * form.  This method uses the COE and Subject objects to parse
  * and aggregate those components of the event.
  *
  * \param this	A pointer to the security interaction event object which
@@ -298,8 +298,8 @@ static _Bool parse(CO(SecurityEvent, this), CO(String, event))
 	if ( !_parse_pid(S, event) )
 		ERR(goto done);
 
-	/* Parse the actor and subject components. */
-	if ( !S->actor->parse(S->actor, event) )
+	/* Parse the COE and subject components. */
+	if ( !S->coe->parse(S->coe, event) )
 		ERR(goto done);
 	if ( !S->subject->parse(S->subject, event) )
 		ERR(goto done);
@@ -318,7 +318,7 @@ static _Bool parse(CO(SecurityEvent, this), CO(String, event))
  * External public method.
  *
  * This method the parsing of an security interaction event in ASCII
- * form.  This method uses the Actor and Subject objects to parse
+ * form.  This method uses the COE and Subject objects to parse
  * and aggregate those components of the event.
  *
  * \param this	A pointer to the security interaction event object which
@@ -352,7 +352,7 @@ static _Bool measure(CO(SecurityEvent, this))
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 
 	/* Measure the individual components. */
-	if ( !S->actor->measure(S->actor) )
+	if ( !S->coe->measure(S->coe) )
 		ERR(goto done);
 	if ( !S->subject->measure(S->subject) )
 		ERR(goto done);
@@ -361,7 +361,7 @@ static _Bool measure(CO(SecurityEvent, this))
 	if ( !bufr->add(bufr, (unsigned char * ) &length, \
 			sizeof(length)) )
 		ERR(goto done);
-	if ( !S->actor->get_measurement(S->actor, bufr) )
+	if ( !S->coe->get_measurement(S->coe, bufr) )
 		ERR(goto done);
 
 	if ( !bufr->add(bufr, (unsigned char *) &length, \
@@ -394,8 +394,8 @@ static _Bool measure(CO(SecurityEvent, this))
  * considered to be a terminal error for the object for this function
  * to be called without previously calling the ->measurement method.
  *
- * \param this	A pointer to the actor identity whose identity is
- *		to be retrieved.
+ * \param this	A pointer to the COE whose characteristics are to be
+ *		retrieved.
  *
  * \param bufr	The object which the identity is to be loaded into.
  *
@@ -439,11 +439,11 @@ static _Bool get_identity(CO(SecurityEvent, this), CO(Buffer, bufr))
  *
  * This method implements an accessor function for retrieving the
  * description of a security interaction event.  This is the name of
- * the actor process and subject which are involved in the interaction
+ * the COE and subject which are involved in the interaction
  * event.
  *
- * \param this	A pointer to the actor identity whose identity is
- *		to be retrieved.
+ * \param this	A pointer to the COE whose characteristics are to be
+ *		retrieved.
  *
  * \param bufr	The object which the event is to be loaded into.
  *
@@ -544,12 +544,12 @@ static _Bool format(CO(SecurityEvent, this), CO(String, event))
 		ERR(goto done);
 
 
-	/* Add the event description, actor and subject elements. */
+	/* Add the event description, COE and subject elements. */
 	event->add(event, "event{");
 	event->add(event, S->event->get(S->event));
 	event->add(event, "} ");
 
-	S->actor->format(S->actor, event);
+	S->coe->format(S->coe, event);
 
 	if ( !S->subject->format(S->subject, event) )
 		ERR(goto done);
@@ -579,7 +579,7 @@ static void reset(CO(SecurityEvent, this))
 
 	S->poisoned = false;
 
-	S->actor->reset(S->actor);
+	S->coe->reset(S->coe);
 	S->subject->reset(S->subject);
 	S->identity->reset(S->identity);
 
@@ -611,8 +611,8 @@ static void dump(CO(SecurityEvent, this))
 	fputs("type:\t", stdout);
 	S->event->print(S->event);
 
-	fputs("\nActor:\n", stdout);
-	S->actor->dump(S->actor);
+	fputs("\COE:\n", stdout);
+	S->coe->dump(S->coe);
 
 	fputs("\nSubject:\n", stdout);
 	S->subject->dump(S->subject);
@@ -635,7 +635,7 @@ static void whack(CO(SecurityEvent, this))
 	STATE(S);
 
 	WHACK(S->event);
-	WHACK(S->actor);
+	WHACK(S->coe);
 	WHACK(S->subject);
 	WHACK(S->identity);
 
@@ -681,7 +681,7 @@ extern SecurityEvent NAAAIM_SecurityEvent_Init(void)
 
 	/* Initialize aggregate objects. */
 	INIT(HurdLib, String, this->state->event, goto fail);
-	INIT(NAAAIM, Actor, this->state->actor, goto fail);
+	INIT(NAAAIM, COE, this->state->coe, goto fail);
 	INIT(NAAAIM, Subject, this->state->subject, goto fail);
 	INIT(NAAAIM, Sha256, this->state->identity, goto fail);
 
@@ -703,7 +703,7 @@ extern SecurityEvent NAAAIM_SecurityEvent_Init(void)
 
 fail:
 	WHACK(this->state->event);
-	WHACK(this->state->actor);
+	WHACK(this->state->coe);
 	WHACK(this->state->subject);
 	WHACK(this->state->identity);
 

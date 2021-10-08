@@ -78,7 +78,7 @@ endif
 LIBS	= ${NAAAIMLIB} ${HURDLIB} ${LIBCAP} ${SSL_CRYPTO}
 LIBDEPS = ${HURD_LIBRARY} ${NAAAIM_LIBRARY}
 
-MODELDEPS = ../ISOidentity/Actor.o ../ISOidentity/Subject.o	      \
+MODELDEPS = ../ISOidentity/COE.o ../ISOidentity/Subject.o	      \
 	../ISOidentity/SecurityPoint.o ../ISOidentity/SecurityEvent.o \
 	../ISOidentity/TSEM.o
 

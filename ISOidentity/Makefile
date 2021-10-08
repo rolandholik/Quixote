@@ -10,7 +10,7 @@ INSTPATH       = ${DESTDIR}/opt/ESD
 
 SANCHODIR = ../Sancho/SGX
 
-CSRC = Actor.c Subject.c SecurityEvent.c SecurityPoint.c TSEM.c cboot.c \
+CSRC = COE.c Subject.c SecurityEvent.c SecurityPoint.c TSEM.c cboot.c \
 	cboot-mgr.c compute-aggregate.c
 
 TOOLS = test-actor test-subject test-event generate-contours sha-tool	  \
@@ -86,23 +86,23 @@ all: ${COBJS} tools
 
 tools: ${TOOLS}
 
-test-actor: test-actor.o Actor.o
+test-actor: test-actor.o COE.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 test-subject: test-subject.o Subject.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
-test-event: test-event.o SecurityEvent.o Actor.o Subject.o
+test-event: test-event.o SecurityEvent.o COE.o Subject.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 test-ISOidentity: test-ISOidentity.o TSEM.o SecurityPoint.o SecurityEvent.o \
-	Actor.o Subject.o
+	COE.o Subject.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
-generate-contours: generate-contours.o SecurityEvent.o Actor.o Subject.o
+generate-contours: generate-contours.o SecurityEvent.o COE.o Subject.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
-compute-measurement: compute-measurement.o Actor.o Subject.o
+compute-measurement: compute-measurement.o COE.o Subject.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 compute-aggregate: compute-aggregate.o
@@ -117,12 +117,12 @@ sha-tool: sha-tool.o
 set-behavior: set-behavior.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS}
 
-cboot: cboot.o ${SANCHODIR}/SanchoSGX.o TSEM.o SecurityPoint.o		   \
-	SecurityEvent.o Actor.o Subject.o ${RDK_LIBRARY} ${NAAAIM_LIBRARY} \
+cboot: cboot.o ${SANCHODIR}/SanchoSGX.o TSEM.o SecurityPoint.o		 \
+	SecurityEvent.o COE.o Subject.o ${RDK_LIBRARY} ${NAAAIM_LIBRARY} \
 	${HURD_LIBRARY}
-	${CC} ${LDFLAGS} -o $@ $< TSEM.o SecurityPoint.o	   	   \
-		SecurityEvent.o Actor.o Subject.o ${SANCHODIR}/SanchoSGX.o \
-		${RDKLIB} ${LIBS} ${LIBCAP} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $< TSEM.o SecurityPoint.o COE.o Subject.o   \
+		SecurityEvent.o ${SANCHODIR}/SanchoSGX.o ${RDKLIB} ${LIBS} \
+		${LIBCAP} ${SSL_CRYPTO};
 
 cboot-mgr: cboot-mgr.o ${SANCHODIR}/ISOmanager.o ${RDK_LIBRARY} \
 	${NAAAIM_LIBRARY} ${HURD_LIBRARY}
@@ -149,7 +149,7 @@ clean:
 # srde-metadata.o: SGX.h
 # srde-load.o: SGXenclave.h
 
-Actor.o: Actor.h
+COE.o: COE.h
 SecurityPoint.o: SecurityPoint.h
 SecurityEvent.o: SecurityEvent.h
 TSEM.o: TSEM.h
