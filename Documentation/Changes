@@ -63,3 +63,18 @@ Version 0.9:
 
 Version 1.0:
 	* Update to version 2.7.1 of Intel libraries and enclave.
+
+Version 1.1:
+	* Implement Quixote Trust Orchestration System.
+
+	* Implement Sancho Trusted Modeling Agents.
+
+		- Kernel based.
+
+		- Process based.
+
+		- MCU based.
+
+		- SGX based.
+
+	* Support Linux kernel 5.4.
