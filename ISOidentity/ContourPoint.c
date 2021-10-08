@@ -33,7 +33,7 @@
 #error Library identifier not defined.
 #endif
 
-#if !defined(NAAAIM_ISOidentity_OBJID)
+#if !defined(NAAAIM_ContourPoint_OBJID)
 #error Object identifier not defined.
 #endif
 
