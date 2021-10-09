@@ -84,7 +84,7 @@
 #define NAAAIM_SRDEepid_OBJID		45
 
 #define NAAAIM_COE_OBJID		46
-#define NAAAIM_Subject_OBJID		47
+#define NAAAIM_Cell_OBJID		47
 #define NAAAIM_SecurityEvent_OBJID	48
 #define NAAAIM_TSEM_OBJID		49
 #define NAAAIM_SecurityPoint_OBJID	50

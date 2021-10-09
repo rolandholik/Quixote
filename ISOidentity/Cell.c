@@ -1,9 +1,8 @@
 /** \file
  * This file contains the implementation of an object which represents
- * a subject identity in the Turing event modeling system.
- * The purpose of this object is to consolidate all of the identity
- * characteristics of a subject node for the purposes of computing
- * its measured identity.
+ * a cell (data sync or source) in the Turing event modeling system.
+ * The purpose of this object is to consolidate all of the characteristics
+ * of a cell for the purposes of computing its value.
  */
 
 /**************************************************************************
@@ -30,7 +29,7 @@
 
 #include "NAAAIM.h"
 #include "SHA256.h"
-#include "Subject.h"
+#include "Cell.h"
 
 #if !defined(REG_OK)
 #define REG_OK REG_NOERROR
@@ -38,20 +37,20 @@
 
 
 /* Object state extraction macro. */
-#define STATE(var) CO(Subject_State, var) = this->state
+#define STATE(var) CO(Cell_State, var) = this->state
 
 /* Verify library/object header file inclusions. */
 #if !defined(NAAAIM_LIBID)
 #error Library identifier not defined.
 #endif
 
-#if !defined(NAAAIM_Subject_OBJID)
+#if !defined(NAAAIM_Cell_OBJID)
 #error Object identifier not defined.
 #endif
 
 
-/* Subject identity elements. */
-struct subject_identity {
+/* Cell characteristics. */
+struct cell_characteristics {
 	uint32_t uid;
 	uint32_t gid;
 	uint16_t mode;
@@ -66,8 +65,8 @@ struct subject_identity {
 };
 
 
-/** Subject private state information. */
-struct NAAAIM_Subject_State
+/** Cell private state information. */
+struct NAAAIM_Cell_State
 {
 	/* The root object. */
 	Origin root;
@@ -80,8 +79,8 @@ struct NAAAIM_Subject_State
 	/* Object status. */
 	_Bool poisoned;
 
-	/* Subject identity elements. */
-	struct subject_identity elements;
+	/* Cell identity elements. */
+	struct cell_characteristics character;
 
 	/* Measured identity. */
 	_Bool measured;
@@ -92,22 +91,22 @@ struct NAAAIM_Subject_State
 /**
  * Internal private method.
  *
- * This method is responsible for initializing the NAAAIM_Subject_State
+ * This method is responsible for initializing the NAAAIM_Cell_State
  * structure which holds state information for each instantiated object.
  *
  * \param S	A pointer to the object containing the state information
  *		which is to be initialized.
  */
 
-static void _init_state(CO(Subject_State, S))
+static void _init_state(CO(Cell_State, S))
 
 {
 	S->libid = NAAAIM_LIBID;
-	S->objid = NAAAIM_Subject_OBJID;
+	S->objid = NAAAIM_Cell_OBJID;
 
 	S->poisoned = false;
 
-	memset(&S->elements, '\0', sizeof(struct subject_identity));
+	memset(&S->character, '\0', sizeof(struct cell_characteristics));
 
 	S->measured = false;
 	S->identity = NULL;
@@ -127,7 +126,7 @@ static void _init_state(CO(Subject_State, S))
  *		are being set.
  */
 
-static void set_identity_elements(CO(Subject, this), const uint32_t uid,     \
+static void set_identity_elements(CO(Cell, this), const uint32_t uid,     \
 				  const uint32_t euid, const uint32_t suid,  \
 				  const uint32_t gid, const uint32_t egid,   \
 				  const uint32_t sgid, const uint32_t fsuid, \
@@ -228,7 +227,7 @@ static _Bool _get_field(CO(char *, field), CO(char *, fd), uint32_t *value)
 /**
  * Internal private function.
  *
- * This method parses a digest field a subject definition field.  A
+ * This method parses a digest field from a cell characteristic field.  A
  * digest field is assumed to have a size equal to the operative
  * identity size.
  *
@@ -304,7 +303,7 @@ static _Bool _get_digest(CO(char *, field), CO(char *, fd), uint8_t *fb, \
 /**
  * Internal private function.
  *
- * This method parses a test entry from a subject definition field.
+ * This method parses a test entry from a cell characteristic field.
  *
  * \param fp	A character pointer to the field which is to be
  *		parsed.
@@ -374,10 +373,10 @@ static _Bool _get_text(CO(char *, field), CO(char *, fd), uint8_t *fb, \
 /**
  * External public method.
  *
- * This method implements parsing of a trajectory entry for the
- * characteristcis of a subject identity.
+ * This method implements parsing of a security state event for the
+ * characteristics of a cell
  *
- * \param this	A pointer to the subject object whose trajectory entry
+ * \param this	A pointer to the cell whose trajectory entry
  *		is to be parsed.
  *
  * \param entry	A pointer to the object which contains the trajectory
@@ -390,7 +389,7 @@ static _Bool _get_text(CO(char *, field), CO(char *, fd), uint8_t *fb, \
  *		populated.
  */
 
-static _Bool parse(CO(Subject, this), CO(String, entry))
+static _Bool parse(CO(Cell, this), CO(String, entry))
 
 {
 	STATE(S);
@@ -415,7 +414,7 @@ static _Bool parse(CO(Subject, this), CO(String, entry))
 	if ( entry->poisoned(entry) )
 		ERR(goto done);
 
-	/* Extract subject field. */
+	/* Extract cell field. */
 	INIT(HurdLib, Buffer, field, ERR(goto done));
 
 	if ( regcomp(&regex, "subject\\{[^}]*\\}", REG_EXTENDED) != 0 )
@@ -434,34 +433,34 @@ static _Bool parse(CO(Subject, this), CO(String, entry))
 
 	/* Parse field entries. */
 	fp = (char *) field->get(field);
-	if ( !_get_field(fp, "uid=([^,]*)", &S->elements.uid) )
+	if ( !_get_field(fp, "uid=([^,]*)", &S->character.uid) )
 		ERR(goto done);
 
-	if ( !_get_field(fp, "gid=([^,]*)", &S->elements.gid) )
+	if ( !_get_field(fp, "gid=([^,]*)", &S->character.gid) )
 
 		ERR(goto done);
 
 	if ( !_get_field(fp, "mode=([^,]*)", &value) )
 		ERR(goto done);
-	S->elements.mode = value;
+	S->character.mode = value;
 
-	if ( !_get_field(fp, "name_length=([^,]*)", &S->elements.name_length) )
+	if ( !_get_field(fp, "name_length=([^,]*)", &S->character.name_length) )
 		ERR(goto done);
 
-	if ( !_get_digest(fp, "name=([^,]*)", (uint8_t *) S->elements.name, \
+	if ( !_get_digest(fp, "name=([^,]*)", (uint8_t *) S->character.name, \
 			  NAAAIM_IDSIZE) )
 		ERR(goto done);
 
-	if ( !_get_text(fp, "s_id=([^,]*)", (uint8_t *) S->elements.s_id, \
-			sizeof(S->elements.s_id)) )
+	if ( !_get_text(fp, "s_id=([^,]*)", (uint8_t *) S->character.s_id, \
+			sizeof(S->character.s_id)) )
 		ERR(goto done);
 
-	if ( !_get_digest(fp, "s_uuid=([^,]*)", S->elements.s_uuid, \
-			sizeof(S->elements.s_uuid)) )
+	if ( !_get_digest(fp, "s_uuid=([^,]*)", S->character.s_uuid, \
+			sizeof(S->character.s_uuid)) )
 		ERR(goto done);
 
 	if ( !_get_digest(fp, "digest=([^}]*)", \
-			  (uint8_t *) S->elements.digest, NAAAIM_IDSIZE) )
+			  (uint8_t *) S->character.digest, NAAAIM_IDSIZE) )
 		ERR(goto done);
 
 	retn = true;
@@ -481,19 +480,18 @@ static _Bool parse(CO(Subject, this), CO(String, entry))
 /**
  * External public method.
  *
- * This method implements computing of the measurement of a subject
- * identity.  This involves the computation of the digest over the
- * structure which defines the identity characteristics of the subject
- * node
+ * This method implements computing of the measurement of a cell.
+ * This involves the computation of the digest over the
+ * structure which defines the characteristics of the cell.
  *
- * \param this	A pointer to the subject which is to be measured.
+ * \param this	A pointer to the object which is to be measured.
  *
  * \return	A boolean value is used to indicate whether or not
  *		the measurement has succeeded.  A false value
  *		indicates failure while a true value indicates success.
  */
 
-static _Bool measure(CO(Subject, this))
+static _Bool measure(CO(Cell, this))
 
 {
 	STATE(S);
@@ -511,17 +509,17 @@ static _Bool measure(CO(Subject, this))
 
 
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	bufr->add(bufr, (void *) &S->elements.uid, sizeof(S->elements.uid));
-	bufr->add(bufr, (void *) &S->elements.gid, sizeof(S->elements.gid));
-	bufr->add(bufr, (void *) &S->elements.mode, sizeof(S->elements.mode));
-	bufr->add(bufr, (void *) &S->elements.name_length, \
-		  sizeof(S->elements.name_length));
-	bufr->add(bufr, (void *) S->elements.name, sizeof(S->elements.name));
-	bufr->add(bufr, (void *) S->elements.s_id, sizeof(S->elements.s_id));
-	bufr->add(bufr, (void *) S->elements.s_uuid, \
-		  sizeof(S->elements.s_uuid));
-	if ( !bufr->add(bufr, (void *) S->elements.digest, \
-			sizeof(S->elements.digest)) )
+	bufr->add(bufr, (void *) &S->character.uid, sizeof(S->character.uid));
+	bufr->add(bufr, (void *) &S->character.gid, sizeof(S->character.gid));
+	bufr->add(bufr, (void *) &S->character.mode, sizeof(S->character.mode));
+	bufr->add(bufr, (void *) &S->character.name_length, \
+		  sizeof(S->character.name_length));
+	bufr->add(bufr, (void *) S->character.name, sizeof(S->character.name));
+	bufr->add(bufr, (void *) S->character.s_id, sizeof(S->character.s_id));
+	bufr->add(bufr, (void *) S->character.s_uuid, \
+		  sizeof(S->character.s_uuid));
+	if ( !bufr->add(bufr, (void *) S->character.digest, \
+			sizeof(S->character.digest)) )
 		ERR(goto done);
 
 	if ( !S->identity->add(S->identity, bufr) )
@@ -545,12 +543,12 @@ static _Bool measure(CO(Subject, this))
  * External public method.
  *
  * This method implements an accessor function for retrieving the
- * measurement of a subject object.  It is considered to be a terminal
- * error for the object for this function to be called without
- * previously calling the ->measurement method.
+ * measurement of a cell object.  It is considered to be a terminal
+ * error for this method function to be called without having previously
+ * called the ->measurement method.
  *
- * \param this	A pointer to the subject identity whose measurement is
- *		to be retrieved.
+ * \param this	A pointer to the object whose measurement is to be
+ *		retrieved.
  *
  * \param bufr	The object which the measurement is to be loaded into.
  *
@@ -563,7 +561,7 @@ static _Bool measure(CO(Subject, this))
  *		measurement.
  */
 
-static _Bool get_measurement(CO(Subject, this), CO(Buffer, bufr))
+static _Bool get_measurement(CO(Cell, this), CO(Buffer, bufr))
 
 {
 	STATE(S);
@@ -593,18 +591,18 @@ static _Bool get_measurement(CO(Subject, this), CO(Buffer, bufr))
  * External public method.
  *
  * This method implements the generation of an ASCII formatted
- * representation of the subject identity elements.  The string
+ * representation of the characteristics of a call.  The string
  * generated is in the same format that is interpreted by the
  * ->parse method.
  *
- * \param this	A pointer to the subject object containing the
- *		identity elements which are to be formatted.
+ * \param this	A pointer to the object containing the characteristics
+ *		which are to be formatted.
  *
  * \param event	The object into which the formatted string is to
  *		be copied.
  */
 
-static _Bool format(CO(Subject, this), CO(String, event))
+static _Bool format(CO(Cell, this), CO(String, event))
 
 {
 	STATE(S);
@@ -627,34 +625,34 @@ static _Bool format(CO(Subject, this), CO(String, event))
 
 	/* Write the formatted string to the String object. */
 	used = snprintf(bufr, sizeof(bufr), "subject{uid=%lu, gid=%lu, mode=0%lo, name_length=%lu, name=",				       \
-			(unsigned long int) S->elements.uid,	\
-			(unsigned long int) S->elements.gid,	\
-			(unsigned long int) S->elements.mode,	\
-			(unsigned long int) S->elements.name_length);
+			(unsigned long int) S->character.uid,	\
+			(unsigned long int) S->character.gid,	\
+			(unsigned long int) S->character.mode,	\
+			(unsigned long int) S->character.name_length);
 	if ( used >= sizeof(bufr) )
 		ERR(goto done);
 	if ( !event->add(event, bufr) )
 		ERR(goto done);
 
 	/* name=%*phN, s_id=%s */
-	for (lp= 0; lp < sizeof(S->elements.name); ++lp) {
+	for (lp= 0; lp < sizeof(S->character.name); ++lp) {
 		snprintf(bufr, sizeof(bufr), "%02x", \
-			 (unsigned char) S->elements.name[lp]);
+			 (unsigned char) S->character.name[lp]);
 		if ( !event->add(event, bufr) )
 			ERR(goto done);
 	}
 
 	/* , s_uuid=%*phN */
 	used = snprintf(bufr, sizeof(bufr), ", s_id=%s, s_uuid=", \
-			S->elements.s_id);
+			S->character.s_id);
 	if ( used >= sizeof(bufr) )
 		ERR(goto done);
 	if ( !event->add(event, bufr) )
 		ERR(goto done);
 
-	for (lp= 0; lp < sizeof(S->elements.s_uuid); ++lp) {
+	for (lp= 0; lp < sizeof(S->character.s_uuid); ++lp) {
 		snprintf(bufr, sizeof(bufr), "%02x", \
-			 (unsigned char) S->elements.s_uuid[lp]);
+			 (unsigned char) S->character.s_uuid[lp]);
 		if ( !event->add(event, bufr) )
 			ERR(goto done);
 	}
@@ -666,9 +664,9 @@ static _Bool format(CO(Subject, this), CO(String, event))
 	if ( !event->add(event, bufr) )
 		ERR(goto done);
 
-	for (lp= 0; lp < sizeof(S->elements.digest); ++lp) {
+	for (lp= 0; lp < sizeof(S->character.digest); ++lp) {
 		snprintf(bufr, sizeof(bufr), "%02x",
-			 (unsigned char) S->elements.digest[lp]);
+			 (unsigned char) S->character.digest[lp]);
 		if ( !event->add(event, bufr) )
 			ERR(goto done);
 	}
@@ -690,13 +688,13 @@ static _Bool format(CO(Subject, this), CO(String, event))
 /**
  * External public method.
  *
- * This method implements the reset of the Subject object to a state
- * which would allow the generation of a new subject identity.
+ * This method implements the reset of the Cell object to a state
+ * which would allow the generation of a new set of cell characteritics.
  *
- * \param this	A pointer to the subject object which is to be reset.
+ * \param this	A pointer to the object which is to be reset.
  */
 
-static void reset(CO(Subject, this))
+static void reset(CO(Cell, this))
 
 {
 	STATE(S);
@@ -704,7 +702,7 @@ static void reset(CO(Subject, this))
 	S->poisoned = false;
 	S->measured = false;
 
-	memset(&S->elements, '\0', sizeof(struct subject_identity));
+	memset(&S->character, '\0', sizeof(struct cell_characteristics));
 
 	S->identity->reset(S->identity);
 
@@ -715,14 +713,14 @@ static void reset(CO(Subject, this))
 /**
  * External public method.
  *
- * This method implements output of the characteristis of the subject
- * identity represented by the object.
+ * This method implements output of the characteristis of the cell
+ * represented by the object.
  *
  * \param this	A pointer to the object whose identity state is to be
  *		dumped.
  */
 
-static void dump(CO(Subject, this))
+static void dump(CO(Cell, this))
 
 {
 	STATE(S);
@@ -735,30 +733,30 @@ static void dump(CO(Subject, this))
 	if ( S->poisoned )
 		fputs("*Poisoned.\n", stdout);
 
-	fprintf(stdout, "uid:  %lu\n", (unsigned long int) S->elements.uid);
-	fprintf(stdout, "gid:  %lu\n", (unsigned long int) S->elements.gid);
-	fprintf(stdout, "mode: 0%lo\n",(unsigned long int) S->elements.mode);
+	fprintf(stdout, "uid:  %lu\n", (unsigned long int) S->character.uid);
+	fprintf(stdout, "gid:  %lu\n", (unsigned long int) S->character.gid);
+	fprintf(stdout, "mode: 0%lo\n",(unsigned long int) S->character.mode);
 	fprintf(stdout, "name length: %lu\n", \
-		(unsigned long int) S->elements.name_length);
+		(unsigned long int) S->character.name_length);
 
-	if ( !bufr->add(bufr, (unsigned char *) S->elements.name,
-			sizeof(S->elements.name)) )
+	if ( !bufr->add(bufr, (unsigned char *) S->character.name,
+			sizeof(S->character.name)) )
 		ERR(goto done);
 	fputs("name digest: ", stdout);
 	bufr->print(bufr);
 	bufr->reset(bufr);
 
-	fprintf(stdout, "s_id:   %s\n", S->elements.s_id);
+	fprintf(stdout, "s_id:   %s\n", S->character.s_id);
 
-	if ( !bufr->add(bufr, (unsigned char *) S->elements.s_uuid,
-			sizeof(S->elements.s_uuid)) )
+	if ( !bufr->add(bufr, (unsigned char *) S->character.s_uuid,
+			sizeof(S->character.s_uuid)) )
 		ERR(goto done);
 	fputs("s_uuid: ", stdout);
 	bufr->print(bufr);
 	bufr->reset(bufr);
 
-	if ( !bufr->add(bufr, (unsigned char *) S->elements.digest,
-			sizeof(S->elements.digest)) )
+	if ( !bufr->add(bufr, (unsigned char *) S->character.digest,
+			sizeof(S->character.digest)) )
 		ERR(goto done);
 	fputs("subj digest: ", stdout);
 	bufr->print(bufr);
@@ -776,12 +774,12 @@ static void dump(CO(Subject, this))
 /**
  * External public method.
  *
- * This method implements a destructor for a Subject object.
+ * This method implements a destructor for a Cell object.
  *
  * \param this	A pointer to the object which is to be destroyed.
  */
 
-static void whack(CO(Subject, this))
+static void whack(CO(Cell, this))
 
 {
 	STATE(S);
@@ -796,29 +794,29 @@ static void whack(CO(Subject, this))
 /**
  * External constructor call.
  *
- * This function implements a constructor call for a Subject object.
+ * This function implements a constructor call for a Cell object.
  *
- * \return	A pointer to the initialized Subject.  A null value
+ * \return	A pointer to the initialized Cell.  A null value
  *		indicates an error was encountered in object generation.
  */
 
-extern Subject NAAAIM_Subject_Init(void)
+extern Cell NAAAIM_Cell_Init(void)
 
 {
-	auto Origin root;
+	Origin root;
 
-	auto Subject this = NULL;
+	Cell this = NULL;
 
-	auto struct HurdLib_Origin_Retn retn;
+	struct HurdLib_Origin_Retn retn;
 
 
 	/* Get the root object. */
 	root = HurdLib_Origin_Init();
 
 	/* Allocate the object and internal state. */
-	retn.object_size  = sizeof(struct NAAAIM_Subject);
-	retn.state_size   = sizeof(struct NAAAIM_Subject_State);
-	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_Subject_OBJID, &retn) )
+	retn.object_size  = sizeof(struct NAAAIM_Cell);
+	retn.state_size   = sizeof(struct NAAAIM_Cell_State);
+	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_Cell_OBJID, &retn) )
 		return NULL;
 	this	    	  = retn.object;
 	this->state 	  = retn.state;
@@ -832,7 +830,7 @@ extern Subject NAAAIM_Subject_Init(void)
 
 	/* Method initialization. */
 #if 0
-	this->set_identity_elements = set_identity_elements;
+	this->set_identity_character = set_identity_character;
 #endif
 	this->parse		    = parse;
 	this->measure		    = measure;

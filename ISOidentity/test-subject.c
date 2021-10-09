@@ -32,7 +32,7 @@
 
 #include <NAAAIM.h>
 
-#include "Subject.h"
+#include "Cell.h"
 
 
 /*
@@ -48,7 +48,7 @@ extern int main(int argc, char *argv[])
 
 	Buffer bufr = NULL;
 
-	Subject subject = NULL;
+	Cell cell = NULL;
 
 
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
@@ -61,27 +61,27 @@ extern int main(int argc, char *argv[])
 	fputc('\n', stdout);
 
 
-	INIT(NAAAIM, Subject, subject, ERR(goto done));
-	if ( !subject->parse(subject, entry) )
+	INIT(NAAAIM, Cell, cell, ERR(goto done));
+	if ( !cell->parse(cell, entry) )
 		ERR(goto done);
-	if ( !subject->measure(subject) )
+	if ( !cell->measure(cell) )
 		ERR(goto done);
-	if ( !subject->get_measurement(subject, bufr) )
+	if ( !cell->get_measurement(cell, bufr) )
 		ERR(goto done);
-	subject->dump(subject);
+	cell->dump(cell);
 
 
-	subject->reset(subject);
-	if ( !subject->parse(subject, entry) )
+	cell->reset(cell);
+	if ( !cell->parse(cell, entry) )
 		ERR(goto done);
-	if ( !subject->measure(subject) )
+	if ( !cell->measure(cell) )
 		ERR(goto done);
 	fputs("\nMeasurement after reset:\n", stdout);
 	bufr->print(bufr);
 
 	fputs("\nIdentity elements:\n", stdout);
 	entry->reset(entry);
-	if ( !subject->format(subject, entry) )
+	if ( !cell->format(cell, entry) )
 		ERR(goto done);
 	entry->print(entry);
 
@@ -91,7 +91,7 @@ extern int main(int argc, char *argv[])
  done:
 	WHACK(bufr);
 	WHACK(entry);
-	WHACK(subject);
+	WHACK(cell);
 
 	return retn;
 }

@@ -11,19 +11,19 @@
  * the source tree for copyright and licensing information.
  **************************************************************************/
 
-#ifndef NAAAIM_Subject_HEADER
-#define NAAAIM_Subject_HEADER
+#ifndef NAAAIM_Cell_HEADER
+#define NAAAIM_Cell_HEADER
 
 
 /* Object type definitions. */
-typedef struct NAAAIM_Subject * Subject;
+typedef struct NAAAIM_Cell * Cell;
 
-typedef struct NAAAIM_Subject_State * Subject_State;
+typedef struct NAAAIM_Cell_State * Cell_State;
 
 /**
  * External Actor object representation.
  */
-struct NAAAIM_Subject
+struct NAAAIM_Cell
 {
 	/* External methods. */
 #if 0
@@ -31,21 +31,21 @@ struct NAAAIM_Subject
 				      uint32_t, uint32_t, uint32_t, uint32_t, \
 				      uint32_t, uint32_t, uint64_t);
 #endif
-	_Bool (*parse)(const Subject, const String);
-	_Bool (*measure)(const Subject);
-	_Bool (*get_measurement)(const Subject, const Buffer);
+	_Bool (*parse)(const Cell, const String);
+	_Bool (*measure)(const Cell);
+	_Bool (*get_measurement)(const Cell, const Buffer);
 
-	_Bool (*format)(const Subject, const String);
+	_Bool (*format)(const Cell, const String);
 
-	void (*reset)(const Subject);
-	void (*dump)(const Subject);
-	void (*whack)(const Subject);
+	void (*reset)(const Cell);
+	void (*dump)(const Cell);
+	void (*whack)(const Cell);
 
 	/* Private state. */
-	Subject_State state;
+	Cell_State state;
 };
 
 
 /* Actor constructor call. */
-extern HCLINK Subject NAAAIM_Subject_Init(void);
+extern HCLINK Cell NAAAIM_Cell_Init(void);
 #endif

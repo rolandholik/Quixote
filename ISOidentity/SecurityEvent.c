@@ -29,7 +29,7 @@
 #include "SHA256.h"
 #include "SecurityEvent.h"
 #include "COE.h"
-#include "Subject.h"
+#include "Cell.h"
 
 #if !defined(REG_OK)
 #define REG_OK REG_NOERROR
@@ -72,8 +72,8 @@ struct NAAAIM_SecurityEvent_State
 	/* COE characteristics. */
 	COE coe;
 
-	/* Subject identity. */
-	Subject subject;
+	/* Cell characteristics. */
+	Cell cell;
 
 	/* Event identity/measurement. */
 	Sha256 identity;
@@ -103,7 +103,7 @@ static void _init_state(CO(SecurityEvent_State, S))
 
 	S->event       = NULL;
 	S->coe	       = NULL;
-	S->subject     = NULL;
+	S->cell	       = NULL;
 	S->identity    = NULL;
 
 	return;
@@ -260,8 +260,8 @@ static _Bool _parse_event(CO(SecurityEvent_State, S), CO(String, event))
  * External public method.
  *
  * This method the parsing of an information interaction event in ASCII
- * form.  This method uses the COE and Subject objects to parse
- * and aggregate those components of the event.
+ * form.  This method uses the COE and Cell objects to parse and aggregate
+ * those components of the event.
  *
  * \param this	A pointer to the security interaction event object which
  *		is to be parsed.
@@ -298,10 +298,10 @@ static _Bool parse(CO(SecurityEvent, this), CO(String, event))
 	if ( !_parse_pid(S, event) )
 		ERR(goto done);
 
-	/* Parse the COE and subject components. */
+	/* Parse the COE and Cell components. */
 	if ( !S->coe->parse(S->coe, event) )
 		ERR(goto done);
-	if ( !S->subject->parse(S->subject, event) )
+	if ( !S->cell->parse(S->cell, event) )
 		ERR(goto done);
 
 	retn = true;
@@ -318,11 +318,11 @@ static _Bool parse(CO(SecurityEvent, this), CO(String, event))
  * External public method.
  *
  * This method the parsing of an security interaction event in ASCII
- * form.  This method uses the COE and Subject objects to parse
- * and aggregate those components of the event.
+ * form.  This method uses the COE and Cell objects to parse and
+ * aggregate those components of the event.
  *
  * \param this	A pointer to the security interaction event object which
- *		is tobe parsed.
+ *		is to be parsed.
  *
  * \param event	The object containing the string which is to be
  *
@@ -354,7 +354,7 @@ static _Bool measure(CO(SecurityEvent, this))
 	/* Measure the individual components. */
 	if ( !S->coe->measure(S->coe) )
 		ERR(goto done);
-	if ( !S->subject->measure(S->subject) )
+	if ( !S->cell->measure(S->cell) )
 		ERR(goto done);
 
 	/* Compute the intersection identity/measurement. */
@@ -367,7 +367,7 @@ static _Bool measure(CO(SecurityEvent, this))
 	if ( !bufr->add(bufr, (unsigned char *) &length, \
 			sizeof(length)) )
 		ERR(goto done);
-	if ( !S->subject->get_measurement(S->subject, bufr) )
+	if ( !S->cell->get_measurement(S->cell, bufr) )
 		ERR(goto done);
 
 	S->identity->add(S->identity, bufr);
@@ -439,7 +439,7 @@ static _Bool get_identity(CO(SecurityEvent, this), CO(Buffer, bufr))
  *
  * This method implements an accessor function for retrieving the
  * description of a security interaction event.  This is the name of
- * the COE and subject which are involved in the interaction
+ * the COE and Cell which are involved in the interaction
  * event.
  *
  * \param this	A pointer to the COE whose characteristics are to be
@@ -544,14 +544,14 @@ static _Bool format(CO(SecurityEvent, this), CO(String, event))
 		ERR(goto done);
 
 
-	/* Add the event description, COE and subject elements. */
+	/* Add the event description, COE and Cell elements. */
 	event->add(event, "event{");
 	event->add(event, S->event->get(S->event));
 	event->add(event, "} ");
 
 	S->coe->format(S->coe, event);
 
-	if ( !S->subject->format(S->subject, event) )
+	if ( !S->cell->format(S->cell, event) )
 		ERR(goto done);
 
 	retn = true;
@@ -580,7 +580,7 @@ static void reset(CO(SecurityEvent, this))
 	S->poisoned = false;
 
 	S->coe->reset(S->coe);
-	S->subject->reset(S->subject);
+	S->cell->reset(S->cell);
 	S->identity->reset(S->identity);
 
 	return;
@@ -614,8 +614,8 @@ static void dump(CO(SecurityEvent, this))
 	fputs("COE:\n", stdout);
 	S->coe->dump(S->coe);
 
-	fputs("\nSubject:\n", stdout);
-	S->subject->dump(S->subject);
+	fputs("\nCell:\n", stdout);
+	S->cell->dump(S->cell);
 
  	return;
 }
@@ -636,7 +636,7 @@ static void whack(CO(SecurityEvent, this))
 
 	WHACK(S->event);
 	WHACK(S->coe);
-	WHACK(S->subject);
+	WHACK(S->cell);
 	WHACK(S->identity);
 
 	S->root->whack(S->root, this, S);
@@ -682,7 +682,7 @@ extern SecurityEvent NAAAIM_SecurityEvent_Init(void)
 	/* Initialize aggregate objects. */
 	INIT(HurdLib, String, this->state->event, goto fail);
 	INIT(NAAAIM, COE, this->state->coe, goto fail);
-	INIT(NAAAIM, Subject, this->state->subject, goto fail);
+	INIT(NAAAIM, Cell, this->state->cell, goto fail);
 	INIT(NAAAIM, Sha256, this->state->identity, goto fail);
 
 	/* Method initialization. */
@@ -704,7 +704,7 @@ extern SecurityEvent NAAAIM_SecurityEvent_Init(void)
 fail:
 	WHACK(this->state->event);
 	WHACK(this->state->coe);
-	WHACK(this->state->subject);
+	WHACK(this->state->cell);
 	WHACK(this->state->identity);
 
 	root->whack(root, this, this->state);
