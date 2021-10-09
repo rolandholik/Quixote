@@ -13,7 +13,7 @@ SANCHODIR = ../Sancho/SGX
 CSRC = COE.c Cell.c SecurityEvent.c SecurityPoint.c TSEM.c cboot.c \
 	cboot-mgr.c compute-aggregate.c
 
-TOOLS = test-coe test-subject test-event generate-contours sha-tool	  \
+TOOLS = test-coe test-cell test-event generate-contours sha-tool	  \
 	compute-measurement set-behavior cboot cboot-mgr test-ISOidentity \
 	compute-aggregate bad-actor
 INSTALLBIN  = generate-contours sha-tool cboot-mgr
@@ -89,7 +89,7 @@ tools: ${TOOLS}
 test-coe: test-coe.o COE.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
-test-subject: test-subject.o Cell.o
+test-cell: test-cell.o Cell.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 test-event: test-event.o SecurityEvent.o COE.o Cell.o

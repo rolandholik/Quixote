@@ -1,7 +1,7 @@
 /** \file
- * This file implements a test driver for the Subject object which is
- * used to model a Subject identity in the Linux iso-identity behavior
- * modeling system.
+ * This file implements a test driver for the Cell object which is
+ * used to model the characteristics of a  cell in the Turing Security
+ * Event Model.
  */
 
 /**************************************************************************
