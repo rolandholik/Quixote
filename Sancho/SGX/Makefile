@@ -30,7 +30,7 @@ include ${SGXDIR}/Make.enclave
 SGX_SSL = /opt/intel/sgxssl
 
 SGX_INCLUDE = -I $(SGX_SDK)/include -I $(SGX_SDK)/include/tlibc		  \
-	-I $(SGX_SDK)/include/stlport -I ../../ISOidentity		  \
+	-I $(SGX_SDK)/include/stlport -I ../../SecurityModel		  \
 	-I ${SGXDIR}/SRDElibs/SRDEfusion -I ${SGXDIR}/SRDElibs/SRDEnaaaim \
 	-I ../../lib  -I ${SGXDIR}
 
@@ -64,7 +64,7 @@ ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles   \
 CC = musl-gcc
 
 CFLAGS = -Wall -O2 -fomit-frame-pointer -march=core2 -I ../.. -I ${SGXDIR} \
-	-I ../../HurdLib -I ../../ISOidentity -I ../../lib ${TYPE}
+	-I ../../HurdLib -I ../../SecurityModel -I ../../lib ${TYPE}
 
 LDFLAGS = -g
 
@@ -98,7 +98,7 @@ LIBS		= ${RDKLIB} ${ELFLIB} ${NAAAIMLIB} ${HURDLIB}
 %.o: %.c
 	$(ENCLAVE_CC) $(ENCLAVE_CFLAGS) -c $< -o $@;
 
-%.o: ../../ISOidentity/%.c
+%.o: ../../SecurityModel/%.c
 	$(ENCLAVE_CC) $(ENCLAVE_CFLAGS) -c $< -o $@;
 
 

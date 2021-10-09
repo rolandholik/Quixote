@@ -78,11 +78,11 @@ endif
 LIBS	= ${NAAAIMLIB} ${HURDLIB} ${LIBCAP} ${SSL_CRYPTO}
 LIBDEPS = ${HURD_LIBRARY} ${NAAAIM_LIBRARY}
 
-MODELDEPS = ../ISOidentity/COE.o ../ISOidentity/Cell.o		      \
-	../ISOidentity/SecurityPoint.o ../ISOidentity/SecurityEvent.o \
-	../ISOidentity/TSEM.o
+MODELDEPS = ../SecurityModel/COE.o ../SecurityModel/Cell.o		  \
+	../SecurityModel/SecurityPoint.o ../SecurityModel/SecurityEvent.o \
+	../SecurityModel/TSEM.o
 
-CFLAGS := ${CFLAGS} -I .. -I ../ISOidentity -I ../lib -I ../HurdLib \
+CFLAGS := ${CFLAGS} -I .. -I ../SecurityModel -I ../lib -I ../HurdLib \
 	-I ${SGXDIR} -I ${SANCHOSGX}
 
 

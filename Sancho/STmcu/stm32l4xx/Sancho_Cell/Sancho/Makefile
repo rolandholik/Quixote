@@ -18,7 +18,7 @@ include ${MCUCFGDIR}/STmcu.mk
 DEMODIR = ${STMDIR}/Projects/32L496GDISCOVERY/Demonstrations/Cellular
 
 CINCLUDE = -I . -I ../../../../../HurdLib -I ../../../include		\
-	-I ../../../../../Quixote -I ../../../../../ISOidentity		\
+	-I ../../../../../Quixote -I ../../../../../SecurityModel	\
 	-I ../../../../../						\
 	-I ${STMDIR}/Drivers/CMSIS/Device/ST/STM32L4xx/Include		\
 	-I ${STMDIR}/Drivers/CMSIS/Include				\
@@ -114,7 +114,7 @@ LDFLAGS = ${PLATFORM} -Wl,--script=sancho.ld -lc -lm ${LIBS}
 %.o: ${DEMODIR}/IDE/STM32CubeIDE/DiscoL496_BG96/Application/User/%.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
-%.o: ../../../../../ISOidentity/%.c
+%.o: ../../../../../SecurityModel/%.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
 %.o: ${DEMODIR}/IDE/STM32CubeIDE/DiscoL496_BG96/Application/Startup/%.s

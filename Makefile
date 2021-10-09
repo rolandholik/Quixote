@@ -12,7 +12,7 @@ HURDINC = HurdLib/Buffer.h HurdLib/Config.h HurdLib/Fibsequence.h \
 	HurdLib/Origin.h HurdLib/String.h
 HURDLIB = HurdLib/libHurdLib.a
 
-SUBDIRS	    = utils SRDE Sancho ISOidentity Quixote
+SUBDIRS	    = utils SRDE Sancho SecurityModel Quixote
 DEV_SUBDIRS = lib SRDE
 
 CC = musl-gcc
@@ -47,7 +47,7 @@ utils:
 SRDE:
 	${MAKE} -C $@;
 
-ISOidentity:
+SecurityModel:
 	${MAKE} -C $@;
 
 Quixote:
