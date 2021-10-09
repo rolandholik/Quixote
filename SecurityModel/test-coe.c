@@ -1,7 +1,7 @@
 /** \file
- * This file implements a test driver for the Actor object which is
- * used to model an actor identity in the Linux iso-identity behavior
- * modeling system.  using the Linux SGX kernel driver.
+ * This file implements a test driver for the COE object which is
+ * used to model a context of execution in the Turing Security Event
+ * Model.
  */
 
 /**************************************************************************
