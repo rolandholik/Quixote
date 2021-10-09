@@ -611,7 +611,7 @@ static void dump(CO(SecurityEvent, this))
 	fputs("type:\t", stdout);
 	S->event->print(S->event);
 
-	fputs("\COE:\n", stdout);
+	fputs("COE:\n", stdout);
 	S->coe->dump(S->coe);
 
 	fputs("\nSubject:\n", stdout);
