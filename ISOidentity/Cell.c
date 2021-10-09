@@ -115,45 +115,6 @@ static void _init_state(CO(Cell_State, S))
 }
 
 
-#if 0
-/**
- * External public method.
- *
- * This method implements a method for setting all of the identity
- * characteristics for a subject identity.
- *
- * \param this	A pointer to the subject object whose identity elements
- *		are being set.
- */
-
-static void set_identity_elements(CO(Cell, this), const uint32_t uid,     \
-				  const uint32_t euid, const uint32_t suid,  \
-				  const uint32_t gid, const uint32_t egid,   \
-				  const uint32_t sgid, const uint32_t fsuid, \
-				  const uint32_t fsgid, 		     \
-				  const uint64_t capability)
-
-{
-	STATE(S);
-
-	S->elements.uid  = uid;
-	S->elements.euid = euid;
-	S->elements.suid = suid;
-
-	S->elements.gid  = gid;
-	S->elements.egid = egid;
-	S->elements.sgid = sgid;
-
-	S->elements.fsuid = fsuid;
-	S->elements.fsgid = fsgid;
-
-	S->elements.capability = capability;
-
-	return;
-}
-#endif
-
-
 /**
  * Internal private function.
  *
@@ -829,9 +790,6 @@ extern Cell NAAAIM_Cell_Init(void)
 	INIT(NAAAIM, Sha256, this->state->identity, ERR(goto fail));
 
 	/* Method initialization. */
-#if 0
-	this->set_identity_character = set_identity_character;
-#endif
 	this->parse		    = parse;
 	this->measure		    = measure;
 	this->get_measurement	    = get_measurement;

@@ -26,11 +26,6 @@ typedef struct NAAAIM_Cell_State * Cell_State;
 struct NAAAIM_Cell
 {
 	/* External methods. */
-#if 0
-	void (*set_identity_elements)(const Actor, uint32_t, uint32_t,	      \
-				      uint32_t, uint32_t, uint32_t, uint32_t, \
-				      uint32_t, uint32_t, uint64_t);
-#endif
 	_Bool (*parse)(const Cell, const String);
 	_Bool (*measure)(const Cell);
 	_Bool (*get_measurement)(const Cell, const Buffer);
