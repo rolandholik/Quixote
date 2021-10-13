@@ -338,7 +338,7 @@ static _Bool parse(CO(COE, this), CO(String, entry))
 	/* Extract coe field. */
 	INIT(HurdLib, Buffer, field, ERR(goto done));
 
-	if ( regcomp(&regex, "actor\\{[^}]*\\}", REG_EXTENDED) != 0 )
+	if ( regcomp(&regex, "COE\\{[^}]*\\}", REG_EXTENDED) != 0 )
 		ERR(goto done);
 	have_regex = true;
 
@@ -546,7 +546,7 @@ static _Bool format(CO(COE, this), CO(String, event))
 
 
 	/* Generate the coe string and add it. */
-	used = snprintf(bufr, sizeof(bufr), "actor{uid=%lu, euid=%lu, suid=%lu, gid=%lu, egid=%lu, sgid=%lu, fsuid=%lu, fsgid=%lu, cap=0x%llx} ",      \
+	used = snprintf(bufr, sizeof(bufr), "COE{uid=%lu, euid=%lu, suid=%lu, gid=%lu, egid=%lu, sgid=%lu, fsuid=%lu, fsgid=%lu, cap=0x%llx} ",      \
 		       (unsigned long int) S->character.uid,		\
 		       (unsigned long int) S->character.euid,		\
 		       (unsigned long int) S->character.suid,		\
