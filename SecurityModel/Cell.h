@@ -1,7 +1,7 @@
 /** \file
  * This file contains the header and API definitions for an object
- * which is used to manage and manipulate a subject identity in the
- * Turing event modeling system.
+ * which is used to manage and manipulate the parameters of a cell
+ * in the Turing Event Modeling System.
  */
 
 /**************************************************************************

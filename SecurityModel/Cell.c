@@ -378,7 +378,7 @@ static _Bool parse(CO(Cell, this), CO(String, entry))
 	/* Extract cell field. */
 	INIT(HurdLib, Buffer, field, ERR(goto done));
 
-	if ( regcomp(&regex, "subject\\{[^}]*\\}", REG_EXTENDED) != 0 )
+	if ( regcomp(&regex, "cell\\{[^}]*\\}", REG_EXTENDED) != 0 )
 		ERR(goto done);
 	have_regex = true;
 
@@ -585,7 +585,7 @@ static _Bool format(CO(Cell, this), CO(String, event))
 
 
 	/* Write the formatted string to the String object. */
-	used = snprintf(bufr, sizeof(bufr), "subject{uid=%lu, gid=%lu, mode=0%lo, name_length=%lu, name=",				       \
+	used = snprintf(bufr, sizeof(bufr), "cell{uid=%lu, gid=%lu, mode=0%lo, name_length=%lu, name=",				       \
 			(unsigned long int) S->character.uid,	\
 			(unsigned long int) S->character.gid,	\
 			(unsigned long int) S->character.mode,	\
