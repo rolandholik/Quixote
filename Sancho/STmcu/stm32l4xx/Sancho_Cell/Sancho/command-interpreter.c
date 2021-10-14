@@ -327,7 +327,7 @@ static void add_security(CO(TTYduct, duct), CO(TSEM, model), CO(Buffer, bufr))
 
 	INIT(HurdLib, String, event, ERR(goto done));
 	event->add(event, (char *) bufr->get(bufr));
-	if ( model->add_ai_event(model, event) )
+	if ( model->add_TE_event(model, event) )
 		send_ok(duct, bufr);
 
 
@@ -569,7 +569,7 @@ static void send_events(CO(TTYduct, duct), CO(TSEM, model), CO(Buffer, bufr))
 
 
 	/* Get the number of elements in the security list. */
-	cnt = model->ai_events_size(model);
+	cnt = model->TE_events_size(model);
 
 	bufr->reset(bufr);
 	bufr->add(bufr, (unsigned char *) &cnt, sizeof(cnt));
@@ -578,10 +578,10 @@ static void send_events(CO(TTYduct, duct), CO(TSEM, model), CO(Buffer, bufr))
 
 
 	/* Send each event. */
-	model->ai_rewind_event(model);
+	model->TE_rewind_event(model);
 
 	for (lp= 0; lp < cnt; ++lp) {
-		if ( !model->get_ai_event(model, &event) )
+		if ( !model->get_TE_event(model, &event) )
 				ERR(goto done);
 		if ( event == NULL )
 				continue;
@@ -705,7 +705,7 @@ static void interpreter(const void *arg)
 				send_ok(Host, bufr);
 				break;
 
-			case ai_event:
+			case TE_event:
 				add_security(duct, model, bufr);
 				break;
 

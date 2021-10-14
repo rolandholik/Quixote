@@ -94,9 +94,9 @@ struct NAAAIM_TSEM_State
 	size_t forensics_cursor;
 	Buffer forensics;
 
-	/* AI events. */
-	size_t ai_events_cursor;
-	Buffer ai_events;
+	/* TE events. */
+	size_t TE_events_cursor;
+	Buffer TE_events;
 };
 
 
@@ -135,8 +135,8 @@ static void _init_state(CO(TSEM_State, S))
 	S->contours	   = NULL;
 	S->contours_cursor = 0;
 
-	S->ai_events	    = NULL;
-	S->ai_events_cursor = 0;
+	S->TE_events	    = NULL;
+	S->TE_events_cursor = 0;
 
 	return;
 }
@@ -504,8 +504,7 @@ static _Bool set_aggregate(CO(TSEM, this), CO(Buffer, bufr))
 /**
  * External public method.
  *
- * This method implements adding an AI event to the current behavioral
- * description.
+ * This method implements adding a TE event to the current model.
  *
  * \param this	A pointer to the canister to which an event is to be
  *		added.
@@ -520,7 +519,7 @@ static _Bool set_aggregate(CO(TSEM, this), CO(Buffer, bufr))
  *		measurement.
  */
 
-static _Bool add_ai_event(CO(TSEM, this), CO(String, event))
+static _Bool add_TE_event(CO(TSEM, this), CO(String, event))
 
 {
 	STATE(S);
@@ -534,7 +533,7 @@ static _Bool add_ai_event(CO(TSEM, this), CO(String, event))
 	if ( event->poisoned(event) )
 		ERR(goto done);
 
-	if ( !S->ai_events->add(S->ai_events, (unsigned char *) &event, \
+	if ( !S->TE_events->add(S->TE_events, (unsigned char *) &event, \
 			sizeof(String)) )
 		ERR(goto done);
 	retn = true;
@@ -548,12 +547,12 @@ static _Bool add_ai_event(CO(TSEM, this), CO(String, event))
 /**
  * External public method.
  *
- * This method is an accessor method for retrieving the AI events which
+ * This method is an accessor method for retrieving the TE events which
  * have been injected into the model.  This method is designed to be
- * called repeatedly until the list of AI events is completely traversed.
- * The traversal can be reset by calling the ->rewind_ai_event method.
+ * called repeatedly until the list of TE events is completely traversed.
+ * The traversal can be reset by calling the ->rewind_TE_event method.
  *
- * \param this	A pointer to the canister whose AI events are to be
+ * \param this	A pointer to the canister whose TE events are to be
  *		retrieved.
  *
  * \param event	The object which the event will be copied to.
@@ -568,7 +567,7 @@ static _Bool add_ai_event(CO(TSEM, this), CO(String, event))
  *		event object being set.
  */
 
-static _Bool get_ai_event(CO(TSEM, this), String * const event)
+static _Bool get_TE_event(CO(TSEM, this), String * const event)
 
 {
 	STATE(S);
@@ -587,16 +586,16 @@ static _Bool get_ai_event(CO(TSEM, this), String * const event)
 
 
 	/* Get and verify cursor position. */
-	size = S->ai_events->size(S->ai_events) / sizeof(String);
-	if ( S->ai_events_cursor >= size ) {
+	size = S->TE_events->size(S->TE_events) / sizeof(String);
+	if ( S->TE_events_cursor >= size ) {
 		retn = true;
 		goto done;
 	}
 
-	event_ptr  = (String *) S->ai_events->get(S->ai_events);
-	event_ptr += S->ai_events_cursor;
+	event_ptr  = (String *) S->TE_events->get(S->TE_events);
+	event_ptr += S->TE_events_cursor;
 	return_event = *event_ptr;
-	++S->ai_events_cursor;
+	++S->TE_events_cursor;
 	retn = true;
 
  done:
@@ -612,8 +611,8 @@ static _Bool get_ai_event(CO(TSEM, this), String * const event)
 /**
  * External public method.
  *
- * This method implements returning the number of AI events in the
- * current behavioral model.
+ * This method implements returning the number of TE events in the
+ * current security model.
  *
  * \param this	A pointer to the object whose IA event size is to
  *		be returned.
@@ -622,10 +621,10 @@ static _Bool get_ai_event(CO(TSEM, this), String * const event)
  *
  */
 
-static void ai_rewind_event(CO(TSEM, this))
+static void TE_rewind_event(CO(TSEM, this))
 
 {
-	this->state->ai_events_cursor = 0;
+	this->state->TE_events_cursor = 0;
 	return;
 }
 
@@ -633,22 +632,22 @@ static void ai_rewind_event(CO(TSEM, this))
 /**
  * External public method.
  *
- * This method implements returning the number of AI events in the
- * current behavioral model.
+ * This method implements returning the number of TE events in the
+ * current security model
  *
- * \param this	A pointer to the object whose IA event size is to
+ * \param this	A pointer to the object whose event size is to
  *		be returned.
  *
- * \return	The size of the AI events list.
+ * \return	The size of the events list.
  *
  */
 
-static size_t ai_events_size(CO(TSEM, this))
+static size_t TE_events_size(CO(TSEM, this))
 
 {
 	STATE(S);
 
-	return S->ai_events->size(S->ai_events) / sizeof(String);
+	return S->TE_events->size(S->TE_events) / sizeof(String);
 }
 
 
@@ -1377,8 +1376,8 @@ static void whack(CO(TSEM, this))
 	GWHACK(SecurityPoint, S->contours);
 	WHACK(S->contours);
 
-	GWHACK(String, S->ai_events);
-	WHACK(S->ai_events);
+	GWHACK(String, S->TE_events);
+	WHACK(S->TE_events);
 
 	S->root->whack(S->root, this, S);
 	return;
@@ -1424,7 +1423,7 @@ extern TSEM NAAAIM_TSEM_Init(void)
 	INIT(HurdLib, Buffer, this->state->trajectory, goto fail);
 	INIT(HurdLib, Buffer, this->state->contours, goto fail);
 	INIT(HurdLib, Buffer, this->state->forensics, goto fail);
-	INIT(HurdLib, Buffer, this->state->ai_events, goto fail);
+	INIT(HurdLib, Buffer, this->state->TE_events, goto fail);
 
 	/* Method initialization. */
 	this->update	 = update;
@@ -1432,10 +1431,10 @@ extern TSEM NAAAIM_TSEM_Init(void)
 
 	this->set_aggregate   = set_aggregate;
 
-	this->add_ai_event    = add_ai_event;
-	this->get_ai_event    = get_ai_event;
-	this->ai_events_size  = ai_events_size;
-	this->ai_rewind_event = ai_rewind_event;
+	this->add_TE_event    = add_TE_event;
+	this->get_TE_event    = get_TE_event;
+	this->TE_events_size  = TE_events_size;
+	this->TE_rewind_event = TE_rewind_event;
 
 	this->get_measurement = get_measurement;
 	this->get_state	      = get_state;

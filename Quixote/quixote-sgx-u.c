@@ -577,7 +577,7 @@ static _Bool process_event(const char *event)
 			Sealed = true;
 			break;
 
-		case ai_event:
+		case TE_event:
 			retn = add_TE_event(event_arg);
 			break;
 

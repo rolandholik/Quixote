@@ -652,7 +652,7 @@ static _Bool add_TE_event(CO(char *, TE_event))
 
 	INIT(HurdLib, String, event, ERR(goto done));
 	event->add(event, TE_event);
-	if ( !Model->add_ai_event(Model, event) )
+	if ( !Model->add_TE_event(Model, event) )
 		ERR(goto done);
 
 	retn = true;
@@ -740,7 +740,7 @@ static _Bool process_event(const char *event)
 			Sealed = true;
 			break;
 
-		case ai_event:
+		case TE_event:
 			retn = add_TE_event(event_arg);
 			break;
 
@@ -1098,7 +1098,7 @@ static _Bool send_events(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	 * Compute the number of elements in the AI list and send it to
 	 * the client.
 	 */
-	cnt = Model->ai_events_size(Model);
+	cnt = Model->TE_events_size(Model);
 
 	cmdbufr->reset(cmdbufr);
 	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
@@ -1109,10 +1109,10 @@ static _Bool send_events(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 
 	/* Send each event. */
-	Model->ai_rewind_event(Model);
+	Model->TE_rewind_event(Model);
 
 	for (lp= 0; lp < cnt; ++lp) {
-		if ( !Model->get_ai_event(Model, &event) )
+		if ( !Model->get_TE_event(Model, &event) )
 			ERR(goto done);
 		if ( event == NULL )
 			continue;

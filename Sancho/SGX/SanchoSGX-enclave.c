@@ -299,7 +299,7 @@ size_t get_size(int type)
 			size = Model->trajectory_size(Model);
 			break;
 		case TE_EVENTS:
-			size = Model->ai_events_size(Model);
+			size = Model->TE_events_size(Model);
 			break;
 	}
 
@@ -422,7 +422,7 @@ _Bool add_ai_event(struct ISOidentity_ecall14 *ecall14)
 	if ( !event->add(event, (char *) ecall14->ai_event) )
 		ERR(goto done);
 
-	if ( !Model->add_ai_event(Model, event) )
+	if ( !Model->add_TE_event(Model, event) )
 		ERR(goto done);
 	retn = true;
 
@@ -553,7 +553,7 @@ void rewind(int type)
 			Model->rewind_contours(Model);
 			break;
 		case TE_EVENTS:
-			Model->ai_rewind_event(Model);
+			Model->TE_rewind_event(Model);
 			break;
 	}
 
@@ -608,7 +608,7 @@ _Bool get_event(char type, char *update, size_t size)
 
 
 	if ( type == TE_EVENTS ) {
-		if ( !Model->get_ai_event(Model, &es) )
+		if ( !Model->get_TE_event(Model, &es) )
 			ERR(goto done);
 		if ( es == NULL ) {
 			retn = true;

@@ -378,7 +378,7 @@ static _Bool process_event(CO(TTYduct, duct), const char * const event)
 		fprintf(stderr, "Unknown event: %s\n", event);
 		goto done;
 	}
-	if ( cp->command > ai_event ) {
+	if ( cp->command > TE_event ) {
 		fprintf(stderr, "Unexpected event: %s\n", event);
 		goto done;
 	}

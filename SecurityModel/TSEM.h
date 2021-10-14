@@ -32,10 +32,10 @@ struct NAAAIM_TSEM
 
 	_Bool (*set_aggregate)(const TSEM, const Buffer);
 
-	_Bool (*add_ai_event)(const TSEM, const String);
-	_Bool (*get_ai_event)(const TSEM, String *);
-	size_t (*ai_events_size)(const TSEM);
-	void (*ai_rewind_event)(const TSEM);
+	_Bool (*add_TE_event)(const TSEM, const String);
+	_Bool (*get_TE_event)(const TSEM, String *);
+	size_t (*TE_events_size)(const TSEM);
+	void (*TE_rewind_event)(const TSEM);
 
 	_Bool (*get_measurement)(const TSEM, const Buffer);
 	_Bool (*get_state)(const TSEM, const Buffer);

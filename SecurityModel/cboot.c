@@ -693,8 +693,8 @@ static _Bool add_aggregate(CO(char *, inbufr))
 /**
  * Private function.
  *
- * This function carries out the addition of an autonomous introspection
- * event to the current canister model.
+ * This function carries out the addition of a Turing security model
+ * event to the current security model.
  *
  * \param ai_event	A pointer to the character buffer containing
  *			the ASCII encoded event.
@@ -705,7 +705,7 @@ static _Bool add_aggregate(CO(char *, inbufr))
  *			the addition succeeded.
  */
 
-static _Bool add_ai_event(CO(char *, ai_event))
+static _Bool add_TE_event(CO(char *, TE_event))
 
 {
 	_Bool retn = false;
@@ -714,12 +714,12 @@ static _Bool add_ai_event(CO(char *, ai_event))
 
 
 	INIT(HurdLib, String, event, ERR(goto done));
-	event->add(event, ai_event);
+	event->add(event, TE_event);
 	if ( Mode == internal ) {
-		if ( !Model->add_ai_event(Model, event) )
+		if ( !Model->add_TE_event(Model, event) )
 			ERR(goto done);
 	} else {
-		if ( !Enclave->add_ai_event(Enclave, event) )
+		if ( !Enclave->add_TE_event(Enclave, event) )
 			ERR(goto done);
 	}
 
