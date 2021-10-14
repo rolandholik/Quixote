@@ -10,14 +10,12 @@ INSTPATH       = ${DESTDIR}/opt/ESD
 
 SANCHODIR = ../Sancho/SGX
 
-CSRC = COE.c Cell.c SecurityEvent.c SecurityPoint.c TSEM.c cboot.c \
-	cboot-mgr.c compute-aggregate.c
+CSRC = COE.c Cell.c SecurityEvent.c SecurityPoint.c TSEM.c compute-aggregate.c
 
-TOOLS = test-COE test-cell test-event generate-contours sha-tool	\
-	compute-measurement set-behavior cboot cboot-mgr test-TSEM	\
-	compute-aggregate bad-actor
-INSTALLBIN  = generate-contours sha-tool cboot-mgr
-INSTALLSBIN = set-behavior cboot
+TOOLS = test-COE test-cell test-event generate-contours sha-tool \
+	compute-measurement set-behavior test-TSEM compute-aggregate bad-actor
+INSTALLBIN  = generate-contours sha-tool
+INSTALLSBIN = set-behavior
 
 CC = musl-gcc
 
@@ -116,18 +114,6 @@ sha-tool: sha-tool.o
 set-behavior: set-behavior.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS}
 
-cboot: cboot.o ${SANCHODIR}/SanchoSGX.o TSEM.o SecurityPoint.o		\
-	SecurityEvent.o COE.o Cell.o ${RDK_LIBRARY} ${NAAAIM_LIBRARY}	\
-	${HURD_LIBRARY}
-	${CC} ${LDFLAGS} -o $@ $< TSEM.o SecurityPoint.o COE.o Cell.o	   \
-		SecurityEvent.o ${SANCHODIR}/SanchoSGX.o ${RDKLIB} ${LIBS} \
-		${LIBCAP} ${SSL_CRYPTO};
-
-cboot-mgr: cboot-mgr.o ${SANCHODIR}/ISOmanager.o ${RDK_LIBRARY} \
-	${NAAAIM_LIBRARY} ${HURD_LIBRARY}
-	${CC} ${LDFLAGS} -o $@ $< ${SANCHODIR}/ISOmanager.o ${RDKLIB} \
-		${LIBS} ${SSL_CRYPTO};
-
 tags:
 	/opt/emacs/bin/etags *.{h,c};
 
@@ -157,7 +143,3 @@ TSEM.o: TSEM.h
 # SRDEloader.o: SRDE.h SRDEloader.h
 # SGXenclave.o: SRDE.h SRDEenclave.h SRDEmetadata.h SRDEloader.h
 # SRDEsigstruct.o: SRDE.h SRDEsigstruct.h
-
-cboot.o: cboot.h
-
-cboot-mgr.o: cboot.h
