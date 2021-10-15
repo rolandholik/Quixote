@@ -270,7 +270,7 @@ static _Bool send_contours(CO(PossumPipe, mgmt), CO(Buffer, cmdbufr))
 	 * Compute the number of elements in the list and send it to
 	 * the client.
 	 */
-	cnt = Model->contours_size(Model);
+	cnt = Model->points_size(Model);
 
 	cmdbufr->reset(cmdbufr);
 	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
@@ -281,9 +281,9 @@ static _Bool send_contours(CO(PossumPipe, mgmt), CO(Buffer, cmdbufr))
 
 
 	/* Send each trajectory point. */
-	Model->rewind_contours(Model);
+	Model->rewind_points(Model);
 	for (lp= 0; lp < cnt; ++lp ) {
-		if ( !Model->get_contour(Model, &cp) )
+		if ( !Model->get_point(Model, &cp) )
 			ERR(goto done);
 		if ( cp == NULL )
 			continue;

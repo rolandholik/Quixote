@@ -86,9 +86,9 @@ struct NAAAIM_TSEM_State
 	size_t trajectory_cursor;
 	Buffer trajectory;
 
-	/* Behavioral contour map. */
-	size_t contours_cursor;
-	Buffer contours;
+	/* Security state point list. */
+	size_t points_cursor;
+	Buffer points;
 
 	/* Forensics event map. */
 	size_t forensics_cursor;
@@ -132,8 +132,8 @@ static void _init_state(CO(TSEM_State, S))
 	S->trajectory	     = NULL;
 	S->trajectory_cursor = 0;
 
-	S->contours	   = NULL;
-	S->contours_cursor = 0;
+	S->points	   = NULL;
+	S->points_cursor = 0;
 
 	S->TE_events	    = NULL;
 	S->TE_events_cursor = 0;
@@ -148,14 +148,14 @@ static void _init_state(CO(TSEM_State, S))
  * This method is responsible for searching the current behavior map
  * to determine if this event has already been registerd.
  *
- * \param map	The object containing the current behavioral contour
- *		map.
+ * \param map	The object containing the current security state point
+ *		list.
  *
- * \param point	The object containing the contour point which is to
+ * \param point	The object containing the security point that is to
  *		be checked.
  *
  * \return	A boolean value is used to indicate whether or not
- *		the point was in the current behavioral map.  A false
+ *		the point was in the current securitye model.  A false
  *		false value indicates the point was not found while
  *		a true value indicated the point was present.
  */
@@ -315,7 +315,7 @@ static _Bool update(CO(TSEM, this), CO(SecurityEvent, event), _Bool *status, \
 
 	/*
 	 * Get the current information exchange event identity which is
-	 * the behavioral map contour point which will be processed.
+	 * the security state point that will be processed.
 	 */
 	if ( !event->get_identity(event, point) )
 		ERR(goto done);
@@ -326,8 +326,8 @@ static _Bool update(CO(TSEM, this), CO(SecurityEvent, event), _Bool *status, \
 	cp->add(cp, point);
 
 
-	/* Register the contour point. */
-	if ( _is_mapped(S->contours, cp) ) {
+	/* Register the security state point. */
+	if ( _is_mapped(S->points, cp) ) {
 		retn	   = true;
 		*status	   = false;
 		goto done;
@@ -339,8 +339,8 @@ static _Bool update(CO(TSEM, this), CO(SecurityEvent, event), _Bool *status, \
 		ERR(goto done);
 
 
-	/* Add the contour point. */
-	if ( !S->contours->add(S->contours, (unsigned char *) &cp, \
+	/* Add the security state point. */
+	if ( !S->points->add(S->points, (unsigned char *) &cp, \
 			       sizeof(Buffer)) )
 		ERR(goto done);
 	release_point = false;
@@ -384,15 +384,15 @@ static _Bool update(CO(TSEM, this), CO(SecurityEvent, event), _Bool *status, \
  * External public method.
  *
  * This method implements updating the currently maintained behavioral
- * model with a specific contour point.
+ * model with a specific security state point.
  *
  * \param this	A pointer to the object that is being modeled.
  *
- * \param point	An object containing the binary contour point that is
+ * \param point	An object containing the security state point that is
  *		is to be added to the behavioral map.
  *
  * \return	A boolean value is used to indicate whether or not
- *		the the point was registered.  A false value indicates
+ *		the security point was registered.  A false value indicates
  *		a failure while a true value indicates the model
  *		was updated.
  */
@@ -418,11 +418,11 @@ static _Bool update_map(CO(TSEM, this), CO(Buffer, bpoint))
 		ERR(goto done);
 
 
-	/* Register the binary contour point. */
+	/* Register the security state point. */
 	INIT(NAAAIM, SecurityPoint, cp, ERR(goto done));
 
 	cp->add(cp, bpoint);
-	if ( _is_mapped(S->contours, cp) ) {
+	if ( _is_mapped(S->points, cp) ) {
 		retn = true;
 		goto done;
 	}
@@ -433,8 +433,8 @@ static _Bool update_map(CO(TSEM, this), CO(Buffer, bpoint))
 		ERR(goto done);
 
 
-	/* Add the contour point. */
-	if ( !S->contours->add(S->contours, (unsigned char *) &cp, \
+	/* Add the security state point. */
+	if ( !S->points->add(S->points, (unsigned char *) &cp, \
 			       sizeof(SecurityPoint)) )
 		ERR(goto done);
 	retn = true;
@@ -769,9 +769,9 @@ static _Bool get_state(CO(TSEM, this), CO(Buffer, out))
 		      event;
 
 
-	/* Sort a copy of the event points. */
+	/* Sort a copy of the security state points. */
 	INIT(HurdLib, Buffer, points, ERR(goto done));
-	if ( !points->add_Buffer(points, S->contours) )
+	if ( !points->add_Buffer(points, S->points) )
 		ERR(goto done);
 
 	cnt = points->size(points) / sizeof(SecurityPoint);
@@ -951,28 +951,28 @@ static size_t trajectory_size(CO(TSEM, this))
 /**
  * External public method.
  *
- * This method is an accessor method for retrieving the contour points
- * which comprise the behavior model implemented in an object.  This
- * method is designed to be called repeatedly until the list of events
+ * This method is an accessor method for retrieving the security points
+ * which comprise the security model implemented in an object.  This
+ * method is designed to be called repeatedly until the list of points
  * is completely traversed.  The traversal can be reset by calling the
- * ->rewind_contours method.
+ * ->rewind_points method.
  *
- * \param this	A pointer to the canister whose contours are to be
+ * \param this	A pointer to the object whose points are to be
  *		retrieved.
  *
- * \param event	The object which the contour will be copied to.
+ * \param event	The object which the point will be copied to.
  *
  * \return	A boolean value is used to indicate whether or not
- *		a contour event was returned.  A false value
- *		indicates a failure occurred and a valid conour is
- *		not available.  A true value indicates the contour
+ *		a security state point was returned.  A false value
+ *		indicates a failure occurred and a valid point is
+ *		not available.  A true value indicates the point
  *		object contains a valid value.
  *
- *		The end of the contour list is signified by a NULL
- *		contour object being set.
+ *		The end of the point list is signified by a NULL
+ *		point object being set.
  */
 
-static _Bool get_contour(CO(TSEM, this), SecurityPoint * const contour)
+static _Bool get_point(CO(TSEM, this), SecurityPoint * const point)
 
 {
 	STATE(S);
@@ -981,8 +981,8 @@ static _Bool get_contour(CO(TSEM, this), SecurityPoint * const contour)
 
 	size_t size;
 
-	SecurityPoint *contour_ptr,
-		      return_contour = NULL;
+	SecurityPoint *point_ptr,
+		      return_point = NULL;
 
 
 	/* Check object status. */
@@ -991,23 +991,23 @@ static _Bool get_contour(CO(TSEM, this), SecurityPoint * const contour)
 
 
 	/* Get and verify cursor position. */
-	size = S->contours->size(S->contours) / sizeof(SecurityPoint);
-	if ( S->contours_cursor >= size ) {
+	size = S->points->size(S->points) / sizeof(SecurityPoint);
+	if ( S->points_cursor >= size ) {
 		retn = true;
 		goto done;
 	}
 
-	contour_ptr  = (SecurityPoint *) S->contours->get(S->contours);
-	contour_ptr += S->contours_cursor;
-	return_contour = *contour_ptr;
-	++S->contours_cursor;
+	point_ptr  = (SecurityPoint *) S->points->get(S->points);
+	point_ptr += S->points_cursor;
+	return_point = *point_ptr;
+	++S->points_cursor;
 	retn = true;
 
  done:
 	if ( !retn )
 		S->poisoned = true;
 	else
-		*contour = return_contour;
+		*point = return_point;
 
 	return retn;
 }
@@ -1016,18 +1016,18 @@ static _Bool get_contour(CO(TSEM, this), SecurityPoint * const contour)
 /**
  * External public method.
  *
- * This method resets the contour retrieval cursor.
+ * This method resets the security state point retrieval cursor.
  *
- * \param this	A pointer to the canister whose contours are to be
+ * \param this	A pointer to the canister whose points are to be
  *		retrieved.
  *
  * \return	No return value is defined.
  */
 
-static void rewind_contours(CO(TSEM, this))
+static void rewind_points(CO(TSEM, this))
 
 {
-	this->state->contours_cursor = 0;
+	this->state->points_cursor = 0;
 	return;
 }
 
@@ -1045,12 +1045,12 @@ static void rewind_contours(CO(TSEM, this))
  *
  */
 
-static size_t contours_size(CO(TSEM, this))
+static size_t points_size(CO(TSEM, this))
 
 {
 	STATE(S);
 
-	return S->contours->size(S->contours) / sizeof(Buffer);
+	return S->points->size(S->points) / sizeof(Buffer);
 }
 
 
@@ -1262,14 +1262,14 @@ static void dump_forensics(CO(TSEM, this))
  *		dumped.
  */
 
-static void dump_contours(CO(TSEM, this))
+static void dump_points(CO(TSEM, this))
 
 {
 	STATE(S);
 
 	Buffer bufr = NULL;
 
-	SecurityPoint contour;
+	SecurityPoint point;
 
 
 	/* Verify object status. */
@@ -1279,22 +1279,22 @@ static void dump_contours(CO(TSEM, this))
 	}
 
 
-	/* Traverse and dump the contours. */
+	/* Traverse and dump the points. */
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	rewind_contours(this);
+	rewind_points(this);
 	do {
-		if ( !get_contour(this, &contour) ) {
+		if ( !get_point(this, &point) ) {
 			fputs("Error retrieving event.\n", stdout);
 			return;
 		}
-		if ( contour != NULL ) {
-			if ( !bufr->add(bufr, contour->get(contour), \
+		if ( point != NULL ) {
+			if ( !bufr->add(bufr, point->get(point), \
 					NAAAIM_IDSIZE) )
 				ERR(goto done);
 			bufr->print(bufr);
 			bufr->reset(bufr);
 		}
-	} while ( contour != NULL );
+	} while ( point != NULL );
 
 
  done:
@@ -1373,8 +1373,8 @@ static void whack(CO(TSEM, this))
 	GWHACK(SecurityEvent, S->forensics);
 	WHACK(S->forensics);
 
-	GWHACK(SecurityPoint, S->contours);
-	WHACK(S->contours);
+	GWHACK(SecurityPoint, S->points);
+	WHACK(S->points);
 
 	GWHACK(String, S->TE_events);
 	WHACK(S->TE_events);
@@ -1421,7 +1421,7 @@ extern TSEM NAAAIM_TSEM_Init(void)
 
 	/* Initialize aggregate objects. */
 	INIT(HurdLib, Buffer, this->state->trajectory, goto fail);
-	INIT(HurdLib, Buffer, this->state->contours, goto fail);
+	INIT(HurdLib, Buffer, this->state->points, goto fail);
 	INIT(HurdLib, Buffer, this->state->forensics, goto fail);
 	INIT(HurdLib, Buffer, this->state->TE_events, goto fail);
 
@@ -1444,16 +1444,16 @@ extern TSEM NAAAIM_TSEM_Init(void)
 	this->rewind_event     = rewind_event;
 	this->trajectory_size  = trajectory_size;
 
-	this->get_contour     = get_contour;
-	this->rewind_contours = rewind_contours;
-	this->contours_size   = contours_size;
+	this->get_point     = get_point;
+	this->rewind_points = rewind_points;
+	this->points_size   = points_size;
 
 	this->get_forensics	= get_forensics;
 	this->rewind_forensics	= rewind_forensics;
 	this->forensics_size	= forensics_size;
 
 	this->dump_events    = dump_events;
-	this->dump_contours  = dump_contours;
+	this->dump_points  = dump_points;
 	this->dump_forensics = dump_forensics;
 
 	this->seal  = seal;
@@ -1464,7 +1464,7 @@ extern TSEM NAAAIM_TSEM_Init(void)
 
 fail:
 	WHACK(this->state->trajectory);
-	WHACK(this->state->contours);
+	WHACK(this->state->points);
 
 	root->whack(root, this, this->state);
 	return NULL;

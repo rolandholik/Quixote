@@ -372,7 +372,7 @@ static void send_points(CO(TTYduct, duct), CO(TSEM, model), CO(Buffer, bufr))
 	 * Compute the number of elements in the list and send it to
 	 * the client.
 	 */
-	cnt = model->contours_size(model);
+	cnt = model->points_size(model);
 
 
 	bufr->reset(bufr);
@@ -382,10 +382,10 @@ static void send_points(CO(TTYduct, duct), CO(TSEM, model), CO(Buffer, bufr))
 
 
 	/* Send each trajectory point. */
-	model->rewind_contours(model);
+	model->rewind_points(model);
 
 	for (lp= 0; lp < cnt; ++lp ) {
-		if ( !model->get_contour(model, &cp) )
+		if ( !model->get_point(model, &cp) )
 			ERR(goto done);
 		if ( cp == NULL )
 			continue;

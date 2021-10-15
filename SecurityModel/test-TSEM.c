@@ -45,7 +45,7 @@ extern int main(int argc, char *argv[])
 	      dump_measurement	= false,
 	      dump_state	= false,
 	      dump_events	= false,
-	      dump_contours	= false,
+	      dump_points	= false,
 	      dump_forensics	= false;
 
 	char *aggregate  = NULL,
@@ -69,7 +69,7 @@ extern int main(int argc, char *argv[])
 	while ( (opt = getopt(argc, argv, "CEFMSa:fi:v")) != EOF )
 		switch ( opt ) {
 			case 'C':
-				dump_contours = true;
+				dump_points = true;
 				break;
 			case 'E':
 				dump_events = true;
@@ -177,10 +177,10 @@ extern int main(int argc, char *argv[])
 	if ( dump_forensics )
 		model->dump_forensics(model);
 
-	if ( dump_contours ) {
+	if ( dump_points ) {
 		if ( verbose )
-			fputs("Contours:\n", stdout);
-		model->dump_contours(model);
+			fputs("Points:\n", stdout);
+		model->dump_points(model);
 	}
 
 	if ( dump_measurement ) {

@@ -45,16 +45,16 @@ struct NAAAIM_TSEM
 	_Bool (*get_event)(const TSEM, SecurityEvent *);
 	size_t (*trajectory_size)(const TSEM);
 
-	void (*rewind_contours)(const TSEM);
-	_Bool (*get_contour)(const TSEM, SecurityPoint *);
-	size_t (*contours_size)(const TSEM);
+	void (*rewind_points)(const TSEM);
+	_Bool (*get_point)(const TSEM, SecurityPoint *);
+	size_t (*points_size)(const TSEM);
 
 	void (*rewind_forensics)(const TSEM);
 	_Bool (*get_forensics)(const TSEM, SecurityEvent *);
 	size_t (*forensics_size)(const TSEM);
 
 	void (*dump_events)(const TSEM);
-	void (*dump_contours)(const TSEM);
+	void (*dump_points)(const TSEM);
 	void (*dump_forensics)(const TSEM);
 
 	void (*seal)(const TSEM);

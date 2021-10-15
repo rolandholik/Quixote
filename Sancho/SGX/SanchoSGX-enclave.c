@@ -290,7 +290,7 @@ size_t get_size(int type)
 	/* Return the requested model size. */
 	switch ( type ) {
 		case ISO_IDENTITY_EVENT:
-			size = Model->contours_size(Model);
+			size = Model->points_size(Model);
 			break;
 		case ISO_IDENTITY_FORENSICS:
 			size = Model->forensics_size(Model);
@@ -323,8 +323,8 @@ void dump_model(void)
 	fputs("Events:\n", stdout);
 	Model->dump_events(Model);
 
-	fputs("Contours:\n", stdout);
-	Model->dump_contours(Model);
+	fputs("Points:\n", stdout);
+	Model->dump_points(Model);
 	fputc('\n', stdout);
 
 	fputs("Forensics:\n", stdout);
@@ -550,7 +550,7 @@ void rewind(int type)
 			Model->rewind_forensics(Model);
 			break;
 		case DOMAIN_POINTS:
-			Model->rewind_contours(Model);
+			Model->rewind_points(Model);
 			break;
 		case TE_EVENTS:
 			Model->TE_rewind_event(Model);
@@ -686,7 +686,7 @@ _Bool get_point(unsigned char *pt)
 	SecurityPoint cp = NULL;
 
 
-	if ( !Model->get_contour(Model, &cp) )
+	if ( !Model->get_point(Model, &cp) )
 		ERR(goto done);
 	if ( cp == NULL )
 		ERR(goto done);
