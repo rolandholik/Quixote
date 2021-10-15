@@ -438,7 +438,7 @@ static void send_trajectory(CO(TTYduct, duct), CO(TSEM, model), \
 
 
 	/* Return the number of trajectory items. */
-	cnt = model->size(model);
+	cnt = model->trajectory_size(model);
 
 	bufr->reset(bufr);
 	bufr->add(bufr, (unsigned char *) &cnt, sizeof(cnt));

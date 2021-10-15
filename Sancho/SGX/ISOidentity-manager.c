@@ -112,7 +112,7 @@ static _Bool send_trajectory(CO(PossumPipe, mgmt), CO(Buffer, cmdbufr))
 	 * Compute the number of elements in the list and send it to
 	 * the client.
 	 */
-	cnt = Model->size(Model);
+	cnt = Model->trajectory_size(Model);
 
 	cmdbufr->reset(cmdbufr);
 	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));

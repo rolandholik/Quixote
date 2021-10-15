@@ -58,7 +58,6 @@ struct NAAAIM_TSEM
 	void (*dump_forensics)(const TSEM);
 
 	void (*seal)(const TSEM);
-	size_t (*size)(const TSEM);
 	void (*whack)(const TSEM);
 
 	/* Private state. */

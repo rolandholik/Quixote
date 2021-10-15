@@ -79,9 +79,6 @@ struct NAAAIM_TSEM_State
 	/* Canister measurement. */
 	unsigned char measurement[NAAAIM_IDSIZE];
 
-	/* The size of the behavior map. */
-	size_t size;
-
 	/* Trajectory map. */
 	size_t trajectory_cursor;
 	Buffer trajectory;
@@ -126,8 +123,6 @@ static void _init_state(CO(TSEM_State, S))
 	memset(S->hostid, '\0', sizeof(S->hostid));
 	memset(S->domain_aggregate, '\0', sizeof(S->domain_aggregate));
 	memset(S->measurement, '\0', sizeof(S->measurement));
-
-	S->size = 0;
 
 	S->trajectory	     = NULL;
 	S->trajectory_cursor = 0;
@@ -351,10 +346,8 @@ static _Bool update(CO(TSEM, this), CO(SecurityEvent, event), _Bool *status, \
 		if ( !event->get_pid(event, &S->discipline_pid) )
 			ERR(goto done);
 	}
-	else {
-		++S->size;
+	else
 		list = S->trajectory;
-	}
 
 	if ( !list->add(list, (unsigned char *) &event, \
 			sizeof(SecurityEvent)) )
@@ -1337,25 +1330,6 @@ static void seal(CO(TSEM, this))
 /**
  * External public method.
  *
- * This method implements returning the number of points in the
- * behavioral map.
- *
- * \param this	A pointer to the object which is to be destroyed.
- *
- * \return	The size of the behavioral map.
- *
- */
-
-static size_t size(CO(TSEM, this))
-
-{
-	return this->state->size;
-}
-
-
-/**
- * External public method.
- *
  * This method implements a destructor for an ExchangeEvent object.
  *
  * \param this	A pointer to the object which is to be destroyed.
@@ -1457,7 +1431,6 @@ extern TSEM NAAAIM_TSEM_Init(void)
 	this->dump_forensics = dump_forensics;
 
 	this->seal  = seal;
-	this->size  = size;
 	this->whack = whack;
 
 	return this;
