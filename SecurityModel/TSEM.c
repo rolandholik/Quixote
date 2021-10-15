@@ -21,6 +21,7 @@
 #include <Origin.h>
 #include <HurdLib.h>
 #include <Buffer.h>
+#include <Gaggle.h>
 #include <String.h>
 
 #include "NAAAIM.h"
@@ -79,21 +80,17 @@ struct NAAAIM_TSEM_State
 	/* Canister measurement. */
 	unsigned char measurement[NAAAIM_IDSIZE];
 
-	/* Trajectory map. */
-	size_t trajectory_cursor;
-	Buffer trajectory;
+	/* Execution trajectory list. */
+	Gaggle trajectory;
 
 	/* Security state point list. */
-	size_t points_cursor;
-	Buffer points;
+	Gaggle points;
 
-	/* Forensics event map. */
-	size_t forensics_cursor;
-	Buffer forensics;
+	/* Forensics trajectory list. */
+	Gaggle forensics;
 
-	/* TE events. */
-	size_t TE_events_cursor;
-	Buffer TE_events;
+	/* TE events list. */
+	Gaggle TE_events;
 };
 
 
@@ -124,14 +121,10 @@ static void _init_state(CO(TSEM_State, S))
 	memset(S->domain_aggregate, '\0', sizeof(S->domain_aggregate));
 	memset(S->measurement, '\0', sizeof(S->measurement));
 
-	S->trajectory	     = NULL;
-	S->trajectory_cursor = 0;
-
-	S->points	   = NULL;
-	S->points_cursor = 0;
-
-	S->TE_events	    = NULL;
-	S->TE_events_cursor = 0;
+	S->trajectory	= NULL;
+	S->points	= NULL;
+	S->forensics	= NULL;
+	S->TE_events	= NULL;
 
 	return;
 }
@@ -150,28 +143,33 @@ static void _init_state(CO(TSEM_State, S))
  *		be checked.
  *
  * \return	A boolean value is used to indicate whether or not
- *		the point was in the current securitye model.  A false
+ *		the point was in the current security model.  A false
  *		false value indicates the point was not found while
  *		a true value indicated the point was present.
  */
 
-static _Bool _is_mapped(CO(Buffer, map), CO(SecurityPoint, point))
+static _Bool _is_mapped(CO(Gaggle, map), CO(SecurityPoint, point))
 
 {
 	_Bool retn = false;
 
-	size_t cnt = map->size(map) / sizeof(SecurityPoint);
+	size_t size = map->size(map);
 
-	SecurityPoint *cp = (SecurityPoint *) map->get(map);
+	SecurityPoint cp;
 
 
-	while ( cnt-- ) {
-		if ( point->equal(point, *cp) ) {
-			if ( !(*cp)->is_valid((*cp)) )
+	/* Verify the list contains elements and then traverse it. */
+	if ( size == 0 )
+		retn = false;
+	map->reset(map);
+
+	while ( size-- ) {
+		cp = GGET(map, cp);
+		if ( point->equal(point, cp) ) {
+			if ( !cp->is_valid(cp) )
 				point->set_invalid(point);
 			return true;
 		}
-		cp += 1;
 	}
 
 	return retn;
@@ -282,8 +280,9 @@ static _Bool update(CO(TSEM, this), CO(SecurityEvent, event), _Bool *status, \
 	      added	    = false,
 	      release_point = true;
 
-	Buffer list,
-	       point = NULL;
+	Buffer point = NULL;
+
+	Gaggle list;
 
 	SecurityPoint cp = NULL;
 
@@ -335,8 +334,7 @@ static _Bool update(CO(TSEM, this), CO(SecurityEvent, event), _Bool *status, \
 
 
 	/* Add the security state point. */
-	if ( !S->points->add(S->points, (unsigned char *) &cp, \
-			       sizeof(Buffer)) )
+	if ( !GADD(S->points, cp) )
 		ERR(goto done);
 	release_point = false;
 
@@ -349,8 +347,7 @@ static _Bool update(CO(TSEM, this), CO(SecurityEvent, event), _Bool *status, \
 	else
 		list = S->trajectory;
 
-	if ( !list->add(list, (unsigned char *) &event, \
-			sizeof(SecurityEvent)) )
+	if ( !GADD(list, event) )
 		ERR(goto done);
 
 	retn  = true;
@@ -427,8 +424,7 @@ static _Bool update_map(CO(TSEM, this), CO(Buffer, bpoint))
 
 
 	/* Add the security state point. */
-	if ( !S->points->add(S->points, (unsigned char *) &cp, \
-			       sizeof(SecurityPoint)) )
+	if ( !GADD(S->points, cp) )
 		ERR(goto done);
 	retn = true;
 
@@ -526,8 +522,7 @@ static _Bool add_TE_event(CO(TSEM, this), CO(String, event))
 	if ( event->poisoned(event) )
 		ERR(goto done);
 
-	if ( !S->TE_events->add(S->TE_events, (unsigned char *) &event, \
-			sizeof(String)) )
+	if ( !GADD(S->TE_events, event) )
 		ERR(goto done);
 	retn = true;
 
@@ -567,10 +562,9 @@ static _Bool get_TE_event(CO(TSEM, this), String * const event)
 
 	_Bool retn = true;
 
-	size_t size;
+	void *p;
 
-	String *event_ptr,
-	       return_event = NULL;
+	String return_event = NULL;
 
 
 	/* Check object status. */
@@ -578,18 +572,15 @@ static _Bool get_TE_event(CO(TSEM, this), String * const event)
 		goto done;
 
 
-	/* Get and verify cursor position. */
-	size = S->TE_events->size(S->TE_events) / sizeof(String);
-	if ( S->TE_events_cursor >= size ) {
+	/* Verify that we are in the bounds of the list. */
+	if ( (p = S->TE_events->get(S->TE_events)) == NULL ) {
 		retn = true;
 		goto done;
 	}
 
-	event_ptr  = (String *) S->TE_events->get(S->TE_events);
-	event_ptr += S->TE_events_cursor;
-	return_event = *event_ptr;
-	++S->TE_events_cursor;
+	return_event = GPTR(p, return_event);
 	retn = true;
+
 
  done:
 	if ( !retn )
@@ -617,7 +608,9 @@ static _Bool get_TE_event(CO(TSEM, this), String * const event)
 static void TE_rewind_event(CO(TSEM, this))
 
 {
-	this->state->TE_events_cursor = 0;
+	STATE(S);
+
+	S->TE_events->reset(S->TE_events);
 	return;
 }
 
@@ -640,7 +633,7 @@ static size_t TE_events_size(CO(TSEM, this))
 {
 	STATE(S);
 
-	return S->TE_events->size(S->TE_events) / sizeof(String);
+	return S->TE_events->size(S->TE_events);
 }
 
 
@@ -756,18 +749,29 @@ static _Bool get_state(CO(TSEM, this), CO(Buffer, out))
 
 	size_t cnt;
 
+	void *p;
+
 	Buffer points = NULL;
 
 	SecurityPoint *ep,
 		      event;
 
 
-	/* Sort a copy of the security state points. */
+	/* Clone the list of security state points. */
 	INIT(HurdLib, Buffer, points, ERR(goto done));
-	if ( !points->add_Buffer(points, S->points) )
-		ERR(goto done);
 
-	cnt = points->size(points) / sizeof(SecurityPoint);
+	cnt = S->points->size(S->points);
+	S->points->reset(S->points);
+
+	while ( cnt-- ) {
+		p = S->points->get(S->points);
+		if ( !points->add(points, p, sizeof(void *)) )
+			ERR(goto done);
+	}
+
+
+	/* Sort the points. */
+	cnt = S->points->size(S->points);
 	qsort(points->get(points), cnt, sizeof(SecurityPoint), _state_sort);
 
 	ep = (SecurityPoint *) points->get(points);
@@ -867,10 +871,9 @@ static _Bool get_event(CO(TSEM, this), SecurityEvent * const event)
 
 	_Bool retn = true;
 
-	size_t size;
+	void *p;
 
-	SecurityEvent *event_ptr,
-		      return_event = NULL;
+	SecurityEvent return_event = NULL;
 
 
 	/* Check object status. */
@@ -878,18 +881,15 @@ static _Bool get_event(CO(TSEM, this), SecurityEvent * const event)
 		goto done;
 
 
-	/* Get and verify cursor position. */
-	size = S->trajectory->size(S->trajectory) / sizeof(SecurityEvent);
-	if ( S->trajectory_cursor >= size ) {
+	/* Verify that we are in the bounds of the list. */
+	if ( (p = S->trajectory->get(S->trajectory)) == NULL ) {
 		retn = true;
 		goto done;
 	}
 
-	event_ptr  = (SecurityEvent *) S->trajectory->get(S->trajectory);
-	event_ptr += S->trajectory_cursor;
-	return_event = *event_ptr;
-	++S->trajectory_cursor;
+	return_event = GPTR(p, return_event);
 	retn = true;
+
 
  done:
 	if ( !retn )
@@ -915,7 +915,9 @@ static _Bool get_event(CO(TSEM, this), SecurityEvent * const event)
 static void rewind_event(CO(TSEM, this))
 
 {
-	this->state->trajectory_cursor = 0;
+	STATE(S);
+
+	S->trajectory->reset(S->trajectory);
 	return;
 }
 
@@ -937,7 +939,7 @@ static size_t trajectory_size(CO(TSEM, this))
 {
 	STATE(S);
 
-	return S->trajectory->size(S->trajectory) / sizeof(Buffer);
+	return S->trajectory->size(S->trajectory);
 }
 
 
@@ -972,10 +974,9 @@ static _Bool get_point(CO(TSEM, this), SecurityPoint * const point)
 
 	_Bool retn = true;
 
-	size_t size;
+	void *p;
 
-	SecurityPoint *point_ptr,
-		      return_point = NULL;
+	SecurityPoint return_point = NULL;
 
 
 	/* Check object status. */
@@ -983,18 +984,15 @@ static _Bool get_point(CO(TSEM, this), SecurityPoint * const point)
 		goto done;
 
 
-	/* Get and verify cursor position. */
-	size = S->points->size(S->points) / sizeof(SecurityPoint);
-	if ( S->points_cursor >= size ) {
+	/* Verify that we are in the bounds of the list. */
+	if ( (p = S->points->get(S->points)) == NULL ) {
 		retn = true;
 		goto done;
 	}
 
-	point_ptr  = (SecurityPoint *) S->points->get(S->points);
-	point_ptr += S->points_cursor;
-	return_point = *point_ptr;
-	++S->points_cursor;
+	return_point = GPTR(p, return_point);
 	retn = true;
+
 
  done:
 	if ( !retn )
@@ -1020,7 +1018,9 @@ static _Bool get_point(CO(TSEM, this), SecurityPoint * const point)
 static void rewind_points(CO(TSEM, this))
 
 {
-	this->state->points_cursor = 0;
+	STATE(S);
+
+	S->points->reset(S->points);
 	return;
 }
 
@@ -1043,7 +1043,7 @@ static size_t points_size(CO(TSEM, this))
 {
 	STATE(S);
 
-	return S->points->size(S->points) / sizeof(Buffer);
+	return S->points->size(S->points);
 }
 
 
@@ -1078,10 +1078,9 @@ static _Bool get_forensics(CO(TSEM, this), SecurityEvent * const event)
 
 	_Bool retn = true;
 
-	size_t size;
+	void *p;
 
-	SecurityEvent *event_ptr,
-		      return_event = NULL;
+	SecurityEvent return_event = NULL;
 
 
 	/* Check object status. */
@@ -1089,18 +1088,14 @@ static _Bool get_forensics(CO(TSEM, this), SecurityEvent * const event)
 		goto done;
 
 
-	/* Get and verify cursor position. */
-	size = S->forensics->size(S->forensics) / sizeof(SecurityEvent);
-	if ( S->forensics_cursor >= size ) {
+	/* Verify that we are in the bounds of the list. */
+	if ( (p = S->forensics->get(S->forensics)) == NULL ) {
 		retn = true;
 		goto done;
 	}
-
-	event_ptr  = (SecurityEvent *) S->forensics->get(S->forensics);
-	event_ptr += S->forensics_cursor;
-	return_event = *event_ptr;
-	++S->forensics_cursor;
+	return_event = GPTR(p, return_event);
 	retn = true;
+
 
  done:
 	if ( !retn )
@@ -1126,7 +1121,9 @@ static _Bool get_forensics(CO(TSEM, this), SecurityEvent * const event)
 static void rewind_forensics(CO(TSEM, this))
 
 {
-	this->state->forensics_cursor = 0;
+	STATE(S);
+
+	S->forensics->reset(S->forensics);
 	return;
 }
 
@@ -1149,7 +1146,7 @@ static size_t forensics_size(CO(TSEM, this))
 {
 	STATE(S);
 
-	return S->forensics->size(S->forensics) / sizeof(SecurityEvent);
+	return S->forensics->size(S->forensics);
 }
 
 
@@ -1317,16 +1314,6 @@ static void seal(CO(TSEM, this))
 }
 
 
-#define GWHACK(type, var) {			\
-	size_t i=var->size(var) / sizeof(type);	\
-	type *o=(type *) var->get(var);		\
-	while ( i-- ) {				\
-		(*o)->whack((*o));		\
-		o+=1;				\
-	}					\
-}
-
-
 /**
  * External public method.
  *
@@ -1341,16 +1328,16 @@ static void whack(CO(TSEM, this))
 	STATE(S);
 
 
-	GWHACK(SecurityEvent, S->trajectory);
+	GWHACK(S->trajectory, SecurityEvent);
 	WHACK(S->trajectory);
 
-	GWHACK(SecurityEvent, S->forensics);
+	GWHACK(S->forensics, SecurityEvent);
 	WHACK(S->forensics);
 
-	GWHACK(SecurityPoint, S->points);
+	GWHACK(S->points, SecurityPoint);
 	WHACK(S->points);
 
-	GWHACK(String, S->TE_events);
+	GWHACK(S->TE_events, String);
 	WHACK(S->TE_events);
 
 	S->root->whack(S->root, this, S);
@@ -1394,10 +1381,10 @@ extern TSEM NAAAIM_TSEM_Init(void)
 	_init_state(this->state);
 
 	/* Initialize aggregate objects. */
-	INIT(HurdLib, Buffer, this->state->trajectory, goto fail);
-	INIT(HurdLib, Buffer, this->state->points, goto fail);
-	INIT(HurdLib, Buffer, this->state->forensics, goto fail);
-	INIT(HurdLib, Buffer, this->state->TE_events, goto fail);
+	INIT(HurdLib, Gaggle, this->state->trajectory, goto fail);
+	INIT(HurdLib, Gaggle, this->state->points, goto fail);
+	INIT(HurdLib, Gaggle, this->state->forensics, goto fail);
+	INIT(HurdLib, Gaggle, this->state->TE_events, goto fail);
 
 	/* Method initialization. */
 	this->update	 = update;

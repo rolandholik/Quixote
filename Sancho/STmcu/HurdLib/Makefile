@@ -19,7 +19,7 @@ include ${MCUCFGDIR}/STmcu.mk
 #
 # Object and source file definitions.
 #
-CSRC = Origin.c Fibsequence.c Buffer.c String.c
+CSRC = Origin.c Fibsequence.c Buffer.c String.c Gaggle.c
 
 COBJS = ${CSRC:.c=.o}
 
@@ -60,3 +60,4 @@ clobber: clean
 # Source dependencies.
 Origin.o: ../../../HurdLib/${LIBNAME}.h ../../../HurdLib/Origin.h
 Buffer.o: ../../../HurdLib/${LIBNAME}.h ../../../HurdLib/Origin.h ../../../HurdLib/Fibsequence.h
+Gaggle.o: ../../../HurdLib/${LIBNAME}.h ../../../HurdLib/Origin.h ../../../HurdLib/Buffer.h ../../../HurdLib/Gaggle.h

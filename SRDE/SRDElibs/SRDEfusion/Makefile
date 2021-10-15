@@ -11,7 +11,7 @@ INSTPATH       = ${DESTDIR}/opt/ESD
 INSTALLENCLAVE = test-fusion.signed.so
 INSTINCLUDE    = Buffer.h Fibsequence.h HurdLib.h Origin.h SRDEfusion.h	   \
 	String.h alltypes.h features.h fusion-shim.h reg-support.h regex.h \
-	File.h
+	File.h Gaggle.h
 
 ifdef SRDE_PRODUCTION
 TYPE = -DSRDE_PRODUCTION
@@ -21,7 +21,7 @@ CSRC   = test-fusion.c
 ENCSRC = test-fusion-enclave.c test-fusion-interface.c
 LIBSRC = fusion-shim.c fusion-time.c regcomp.c regexec.c regerror.c tre-mem.c \
 	reg-support.c inet.c Origin.c Fibsequence.c Buffer.c String.c File.c  \
-	keys.c
+	Gaggle.c keys.c
 ASRC   = enclu_ereport.s enclu_egetkey.s
 
 LIBNAME = SRDEfusion
@@ -178,3 +178,4 @@ Origin.o: HurdLib.h Origin.h
 Fibsequence.o: HurdLib.h Origin.h Fibsequence.h
 Buffer.o: HurdLib.h Origin.h Fibsequence.h Buffer.h
 File.o: HurdLib.h Origin.h Buffer.h String.h File.h
+Gaggle.o: HurdLib.h Origin.h Gaggle.h Buffer.h

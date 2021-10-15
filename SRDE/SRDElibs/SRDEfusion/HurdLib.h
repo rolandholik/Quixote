@@ -66,5 +66,6 @@
 #define HurdLib_String_OBJID		4
 #define HurdLib_Config_OBJID		5
 #define HurdLib_File_OBJID		6
+#define HurdLib_Gaggle_OBJID		7
 
 #endif
