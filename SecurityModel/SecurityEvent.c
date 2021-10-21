@@ -579,6 +579,7 @@ static void reset(CO(SecurityEvent, this))
 
 	S->poisoned = false;
 
+	S->event->reset(S->event);
 	S->coe->reset(S->coe);
 	S->cell->reset(S->cell);
 	S->identity->reset(S->identity);
