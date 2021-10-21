@@ -389,6 +389,71 @@ static _Bool measure(CO(SecurityEvent, this))
 /**
  * External public method.
  *
+ * This method evaluates whether or not the event evaluates to a
+ * known pseudonym.  If so it sets the digest value to all nulls.
+ *
+ * \param this		The event which is to have its pseudonym
+ *			status verified.
+ *
+ * \parm pseudonym	The pseudonym the event is to be evaluated
+ *			for.
+ *
+ * \return	A boolean value is used to indicate the success or
+ *		failure of pseudonym processing.  A false value indicates
+ *		the processing encountered an error while a true value
+ *		indicates the pseudonym processing was completed with
+ *		no issues.
+ */
+
+static _Bool evaluate_pseudonym(CO(SecurityEvent, this), CO(Buffer, pseudonym))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	uint8_t digest[NAAAIM_IDSIZE];
+
+	Buffer bufr = NULL;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+
+
+	/* Retrieve the pseudonym value for the event. */
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+
+	if ( !S->cell->get_pseudonym(S->cell, bufr) )
+		ERR(goto done);;
+
+
+	/* If the event matches set the digest value. */
+	if ( pseudonym->equal(pseudonym, bufr) ) {
+		memset(digest, '\0', sizeof(digest));
+		bufr->reset(bufr);
+		if ( !bufr->add(bufr, digest, sizeof(digest)) )
+			ERR(goto done);
+		S->cell->set_digest(S->cell, bufr);
+	}
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	WHACK(bufr);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements an accessor function for retrieving the
  * identity/measurement of an security interaction event.  It is
  * considered to be a terminal error for the object for this function
@@ -687,8 +752,9 @@ extern SecurityEvent NAAAIM_SecurityEvent_Init(void)
 	INIT(NAAAIM, Sha256, this->state->identity, goto fail);
 
 	/* Method initialization. */
-	this->parse	   = parse;
-	this->measure	   = measure;
+	this->parse		 = parse;
+	this->measure		 = measure;
+	this->evaluate_pseudonym = evaluate_pseudonym;
 
 	this->get_identity = get_identity;
 	this->get_event	   = get_event;

@@ -10,7 +10,8 @@ INSTPATH       = ${DESTDIR}/opt/ESD
 
 SANCHODIR = ../Sancho/SGX
 
-CSRC = COE.c Cell.c SecurityEvent.c SecurityPoint.c TSEM.c compute-aggregate.c
+CSRC = COE.c Cell.c SecurityEvent.c SecurityPoint.c TSEM.c EventModel.c \
+	compute-aggregate.c
 
 TOOLS = test-COE test-cell test-event generate-contours sha-tool \
 	compute-measurement set-behavior test-TSEM compute-aggregate bad-actor
@@ -90,7 +91,7 @@ test-COE: test-COE.o COE.o
 test-cell: test-cell.o Cell.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
-test-event: test-event.o SecurityEvent.o COE.o Cell.o
+test-event: test-event.o SecurityEvent.o COE.o Cell.o EventModel.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 test-TSEM: test-TSEM.o TSEM.o SecurityPoint.o SecurityEvent.o COE.o Cell.o
@@ -138,6 +139,7 @@ COE.o: COE.h
 SecurityPoint.o: SecurityPoint.h
 SecurityEvent.o: SecurityEvent.h
 TSEM.o: TSEM.h
+EventModel.o: EventModel.h SecurityEvent.h
 
 # SRDEmetadata.o: SGX.h SRDEmetadata.h
 # SRDEloader.o: SRDE.h SRDEloader.h

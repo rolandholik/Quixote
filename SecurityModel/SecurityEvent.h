@@ -28,6 +28,7 @@ struct NAAAIM_SecurityEvent
 	/* External methods. */
 	_Bool (*parse)(const SecurityEvent, const String);
 	_Bool (*measure)(const SecurityEvent);
+	_Bool (*evaluate_pseudonym)(const SecurityEvent, const Buffer);
 
 	_Bool (*get_identity)(const SecurityEvent, const Buffer);
 	_Bool (*get_event)(const SecurityEvent, const String);

@@ -28,7 +28,11 @@ struct NAAAIM_Cell
 	/* External methods. */
 	_Bool (*parse)(const Cell, const String);
 	_Bool (*measure)(const Cell);
+
 	_Bool (*get_measurement)(const Cell, const Buffer);
+	_Bool (*get_pseudonym)(const Cell, const Buffer);
+
+	_Bool (*set_digest)(const Cell, const Buffer);
 
 	_Bool (*format)(const Cell, const String);
 

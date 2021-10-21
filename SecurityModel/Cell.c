@@ -551,6 +551,141 @@ static _Bool get_measurement(CO(Cell, this), CO(Buffer, bufr))
 /**
  * External public method.
  *
+ * This method implements an accessor function for retrieving the
+ * pseudonym value of a cell object.  This value is composed of the
+ * followin hash:
+ *
+ * pseudonym = SHA256(NAME_LENGTH || NAME)
+ *
+ * Where:
+ *	NAME_LENGTH: The length of the name, not including a null byte
+ *		     as a 32-bit unsigned integer (uint32_t).
+ *
+ *	NAME:	     The characters comprising the name of the
+ *		     data sync/source that may have a measurement value
+ *		     associated with it.
+ *
+ * \param this	A pointer to the object whose pseudonym is to be
+ *		retrieved.
+ *
+ * \param bufr The object which the pseudonym value is to be loaded
+ *	       into.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the supplied object has a pseudonym value copied into
+ *		it.  A false value indicates the object does not have
+ *		a valid pseudonym and that the current object is now
+ *		in a poisoned state.  A true value indicates the
+ *		supplied object has a valid copy of this object's
+ *		pseudonym.
+ */
+
+static _Bool get_pseudonym(CO(Cell, this), CO(Buffer, bufr))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	Buffer b;
+
+	Sha256 pseudonym = NULL;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( bufr->poisoned(bufr) )
+		ERR(goto done);
+
+
+	/* Collect the pseduonym components. */
+	bufr->reset(bufr);
+
+	bufr->add(bufr, (void *) &S->character.name_length, \
+		  sizeof(S->character.name_length));
+	if ( !bufr->add(bufr, (void *) S->character.name, \
+			sizeof(S->character.name)) )
+		ERR(goto done);
+
+
+	/* Hash the pseudonym components. */
+	INIT(NAAAIM, Sha256, pseudonym, ERR(goto done));
+
+	if ( !pseudonym->add(pseudonym, bufr) )
+		ERR(goto done);
+	if ( !pseudonym->compute(pseudonym) )
+		ERR(goto done);
+	b = pseudonym->get_Buffer(pseudonym);
+
+	bufr->reset(bufr);
+	if ( !bufr->add_Buffer(bufr, b) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	WHACK(pseudonym);
+
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements the setting of the digest value of the
+ * event to a given value.
+ *
+ * \param this		A pointer to the Cell whose digest value is
+ *			to be set.
+
+ * \param digest	The object containing the value which the
+ *	       		digest value is to be set to.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the digest value was successfully set.  A true value
+ *		indicates it was set while a false value indicates
+ *		the digest value is in potentially indeterminate state.
+ */
+
+static _Bool set_digest(CO(Cell, this), CO(Buffer, bufr))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Verify object status and argument. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( bufr->size(bufr) != sizeof(S->character.digest) )
+		ERR(goto done);
+
+
+	/* Update the digest value. */
+	memcpy(S->character.digest, bufr->get(bufr), \
+	       sizeof(S->character.digest));
+
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements the generation of an ASCII formatted
  * representation of the characteristics of a call.  The string
  * generated is in the same format that is interpreted by the
@@ -564,7 +699,6 @@ static _Bool get_measurement(CO(Cell, this), CO(Buffer, bufr))
  */
 
 static _Bool format(CO(Cell, this), CO(String, event))
-
 {
 	STATE(S);
 
@@ -725,6 +859,7 @@ static void dump(CO(Cell, this))
 	fputs("measurement: ", stdout);
 	S->identity->print(S->identity);
 
+
  done:
 	WHACK(bufr);
 
@@ -793,6 +928,10 @@ extern Cell NAAAIM_Cell_Init(void)
 	this->parse		    = parse;
 	this->measure		    = measure;
 	this->get_measurement	    = get_measurement;
+
+	this->get_pseudonym = get_pseudonym;
+
+	this->set_digest = set_digest;
 
 	this->format = format;
 	this->reset  = reset;

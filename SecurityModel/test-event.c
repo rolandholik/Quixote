@@ -33,6 +33,14 @@
 #include <NAAAIM.h>
 
 #include "SecurityEvent.h"
+#include "EventModel.h"
+
+
+static uint8_t pseudonym[32] = {
+	0x90, 0x95, 0x68, 0x80, 0x09, 0xb4, 0x15, 0xfa, \
+	0xa8, 0x97, 0x63, 0x23, 0x1b, 0x82, 0xf2, 0x59, \
+	0x56, 0xe7, 0x55, 0x28, 0x78, 0x94, 0xba, 0xb2, \
+	0x32, 0x87, 0x64, 0xe1, 0xa8, 0x6d, 0x64, 0xf8 };
 
 
 /*
@@ -50,6 +58,8 @@ extern int main(int argc, char *argv[])
 	Buffer bufr = NULL;
 
 	SecurityEvent event = NULL;
+
+	EventModel event_model = NULL;
 
 
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
@@ -93,6 +103,40 @@ extern int main(int argc, char *argv[])
 	fputs("\nMeasurement after re-parse:\n", stdout);
 	bufr->print(bufr);
 
+
+	/* Pseudonym processing. */
+	INIT(NAAAIM, EventModel, event_model, ERR(goto done));
+
+	bufr->reset(bufr);
+	if ( !bufr->add(bufr, pseudonym, sizeof(pseudonym)) )
+		ERR(goto done);
+
+	fputs("\nTesting pseudonym:\n", stdout);
+	bufr->print(bufr);
+
+	if ( !event_model->add_pseudonym(event_model, bufr) )
+		ERR(goto done);
+	if ( !event_model->evaluate(event_model, event) )
+		ERR(goto done);
+
+	fputs("\nEvent elements after pseudonym processing:\n", stdout);
+	entry->reset(entry);
+	if ( !event->format(event, entry) )
+		ERR(goto done);
+	entry->print(entry);
+
+	event->reset(event);
+	if ( !event->parse(event, entry) )
+		ERR(goto done);
+	if ( !event->measure(event) )
+		ERR(goto done);
+
+	bufr->reset(bufr);
+	if ( !event->get_identity(event, bufr) )
+		ERR(goto done);
+	fputs("\nMeasurement after digest processing:\n", stdout);
+	bufr->print(bufr);
+
 	retn = 0;
 
 
@@ -100,6 +144,7 @@ extern int main(int argc, char *argv[])
 	WHACK(bufr);
 	WHACK(entry);
 	WHACK(event);
+	WHACK(event_model);
 
 	return retn;
 }
