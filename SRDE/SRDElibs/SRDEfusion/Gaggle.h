@@ -28,7 +28,7 @@
 #define GWHACK(gaggle, type) {			\
 	typeof(type) o;				\
 	size_t i = gaggle->size(gaggle);	\
-	gaggle->reset(gaggle);			\
+	gaggle->rewind_cursor(gaggle);		\
 	while ( i-- ) {				\
 		o = GGET(gaggle, type);		\
 		o->whack(o);			\
@@ -52,8 +52,8 @@ struct HurdLib_Gaggle
 	void * (*get)(const Gaggle);
 
 	size_t (*size)(const Gaggle);
+	void (*rewind_cursor)(const Gaggle);
 
-	void (*reset)(const Gaggle);
 	void (*whack)(const Gaggle);
 
 	/* Private state. */

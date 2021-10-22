@@ -206,7 +206,7 @@ static size_t size(CO(Gaggle, this))
  * \param this	A pointer to the object whose cursor is to be reset.
  */
 
-static void reset(CO(Gaggle, this))
+static void rewind_cursor(CO(Gaggle, this))
 
 {
 	STATE(S);
@@ -236,7 +236,7 @@ static void whack(CO(Gaggle, this))
 	return;
 }
 
-
+	
 /**
  * External constructor call.
  *
@@ -278,9 +278,9 @@ extern Gaggle HurdLib_Gaggle_Init(void)
 	this->add = add;
 	this->get = get;
 
-	this->size = size;
+	this->size	    = size;
+	this->rewind_cursor = rewind_cursor;
 
-	this->reset = reset;
 	this->whack = whack;
 
 	return this;

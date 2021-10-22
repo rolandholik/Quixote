@@ -161,7 +161,7 @@ static _Bool _is_mapped(CO(Gaggle, map), CO(SecurityPoint, point))
 	/* Verify the list contains elements and then traverse it. */
 	if ( size == 0 )
 		retn = false;
-	map->reset(map);
+	map->rewind_cursor(map);
 
 	while ( size-- ) {
 		cp = GGET(map, cp);
@@ -610,7 +610,7 @@ static void TE_rewind_event(CO(TSEM, this))
 {
 	STATE(S);
 
-	S->TE_events->reset(S->TE_events);
+	S->TE_events->rewind_cursor(S->TE_events);
 	return;
 }
 
@@ -761,7 +761,7 @@ static _Bool get_state(CO(TSEM, this), CO(Buffer, out))
 	INIT(HurdLib, Buffer, points, ERR(goto done));
 
 	cnt = S->points->size(S->points);
-	S->points->reset(S->points);
+	S->points->rewind_cursor(S->points);
 
 	while ( cnt-- ) {
 		p = S->points->get(S->points);
@@ -917,7 +917,7 @@ static void rewind_event(CO(TSEM, this))
 {
 	STATE(S);
 
-	S->trajectory->reset(S->trajectory);
+	S->trajectory->rewind_cursor(S->trajectory);
 	return;
 }
 
@@ -1020,7 +1020,7 @@ static void rewind_points(CO(TSEM, this))
 {
 	STATE(S);
 
-	S->points->reset(S->points);
+	S->points->rewind_cursor(S->points);
 	return;
 }
 
@@ -1123,7 +1123,7 @@ static void rewind_forensics(CO(TSEM, this))
 {
 	STATE(S);
 
-	S->forensics->reset(S->forensics);
+	S->forensics->rewind_cursor(S->forensics);
 	return;
 }
 
