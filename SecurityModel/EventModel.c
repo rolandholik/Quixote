@@ -194,6 +194,8 @@ static _Bool _evaluate_pseudonyms(CO(Gaggle, pseudonyms), \
 
 
 	/* Loop over the list of pseudonyms and evaluate the event. */
+	pseudonyms->rewind_cursor(pseudonyms);
+
 	while ( cnt-- ) {
 		pseudonym = GGET(pseudonyms, pseudonym);
 		if ( !event->evaluate_pseudonym(event, pseudonym) )
