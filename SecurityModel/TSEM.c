@@ -29,6 +29,7 @@
 #include "SecurityPoint.h"
 #include "SecurityEvent.h"
 #include "TSEM.h"
+#include "EventModel.h"
 
 
 /* Default aggregate value. */
@@ -48,6 +49,34 @@
 #endif
 
 
+/** The numerical definitions for the security model load commands. */
+enum {
+	model_cmd_comment=1,
+	model_cmd_aggregate,
+	model_cmd_state,
+	model_cmd_pseudonym,
+	model_cmd_seal,
+	model_cmd_end
+} security_load_commands;
+
+/** The structure used to equate strings to numerical load commands. */
+struct security_load_definition {
+	int command;
+	char *syntax;
+	_Bool has_arg;
+};
+
+/** The list of security load commands. */
+struct security_load_definition Security_cmd_list[] = {
+	{model_cmd_comment,	"#",		false},
+	{model_cmd_aggregate,	"aggregate ",	true},
+	{model_cmd_state,	"state ",	true},
+	{model_cmd_pseudonym,	"pseudonym ",	true},
+	{model_cmd_seal,	"seal",		false},
+	{model_cmd_end,		"end",		false}
+};
+
+
 /** ExchangeEvent private state information. */
 struct NAAAIM_TSEM_State
 {
@@ -64,6 +93,9 @@ struct NAAAIM_TSEM_State
 
 	/* Flag to indicate aggregate measurement. */
 	_Bool have_aggregate;
+
+	/* Flag to indicate that a security model is being loaded. */
+	_Bool loading;
 
 	/* Flag to indicate the measurement domain has been sealed. */
 	_Bool sealed;
@@ -91,6 +123,9 @@ struct NAAAIM_TSEM_State
 
 	/* TE events list. */
 	Gaggle TE_events;
+
+	/* An optional security event model. */
+	EventModel model;
 };
 
 
@@ -113,6 +148,7 @@ static void _init_state(CO(TSEM_State, S))
 
 	S->poisoned	  = false;
 	S->have_aggregate = false;
+	S->loading	  = false;
 	S->sealed	  = false;
 
 	S->discipline_pid = 0;
@@ -125,6 +161,7 @@ static void _init_state(CO(TSEM_State, S))
 	S->points	= NULL;
 	S->forensics	= NULL;
 	S->TE_events	= NULL;
+	S->model	= NULL;
 
 	return;
 }
@@ -287,8 +324,10 @@ static _Bool update(CO(TSEM, this), CO(SecurityEvent, event), _Bool *status, \
 	SecurityPoint cp = NULL;
 
 
-	/* Verify object status and input. */
+	/* Verify object status. */
 	if ( S->poisoned )
+		ERR(goto done);
+	if ( S->loading )
 		ERR(goto done);
 
 
@@ -307,10 +346,19 @@ static _Bool update(CO(TSEM, this), CO(SecurityEvent, event), _Bool *status, \
 	}
 
 
+	/* Evaluate the event in the contex of the current security model. */
+	if ( S->model != NULL ) {
+		if ( !S->model->evaluate(S->model, event) )
+			ERR(goto done);
+	}
+
+
 	/*
-	 * Get the current information exchange event identity which is
-	 * the security state point that will be processed.
+	 * Measure the current security exchange event to obtain the
+	 * security state point that will be added to the model.
 	 */
+	if ( !event->measure(event) )
+		ERR(goto done);
 	if ( !event->get_identity(event, point) )
 		ERR(goto done);
 	if ( !event->get_pid(event, &S->discipline_pid) )
@@ -432,6 +480,114 @@ static _Bool update_map(CO(TSEM, this), CO(Buffer, bpoint))
  done:
 	if ( !retn )
 		WHACK(cp);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements the loading of entries into a security model.
+ *
+ * \param this		A pointer to the object that is being modeled.
+ *
+ * \param entry		An object that contains the description of the
+ *			entry that is to be entered into the security
+ *			model.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the entry was successfully loaded into the security
+ *		model.  A false value indicates a failure occurred while
+ *		a true value indicates the security model was
+ *		successfully updated.
+ */
+
+static _Bool load(CO(TSEM, this), CO(String, entry))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	char *arg = NULL;
+
+	struct security_load_definition *dp;
+
+	Buffer bufr = NULL;
+
+
+	/* Verify object status. */
+	if ( S->poisoned )
+		ERR(goto done);
+
+	if ( !S->loading )
+		S->loading = true;
+
+
+	/* Locate the load command being requested. */
+	for (dp= Security_cmd_list; dp->command <= model_cmd_end; ++dp) {
+		if ( strncmp(dp->syntax, entry->get(entry), \
+			     strlen(dp->syntax)) == 0 )
+			break;
+	}
+	if ( dp->command > model_cmd_end )
+		ERR(goto done);
+
+
+	/* Get the start of command argument. */
+	if ( dp->has_arg ) {
+		arg = entry->get(entry) + strlen(dp->syntax);
+		if ( *arg == '\0' )
+			ERR(goto done);
+	}
+
+
+	/* Implement the command. */
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+
+	switch ( dp->command ) {
+		case model_cmd_comment:
+			break;
+
+		case model_cmd_aggregate:
+			if ( !bufr->add_hexstring(bufr, arg) )
+				ERR(goto done);
+			if ( !this->set_aggregate(this, bufr) )
+				ERR(goto done);
+			break;
+
+		case model_cmd_state:
+			if ( !bufr->add_hexstring(bufr, arg) )
+				ERR(goto done);
+			if ( !this->update_map(this, bufr) )
+				ERR(goto done);
+			break;
+
+		case model_cmd_pseudonym:
+			if ( S->model == NULL )
+				INIT(NAAAIM, EventModel, S->model, \
+				     ERR(goto done));
+			if ( !bufr->add_hexstring(bufr, arg) )
+				ERR(goto done);
+			if ( !S->model->add_pseudonym(S->model, bufr) )
+				ERR(goto done);
+			break;
+
+		case model_cmd_seal:
+			this->seal(this);
+			break;
+
+		case model_cmd_end:
+			S->loading = false;
+			break;
+	}
+
+	retn = true;
+
+
+ done:
+	WHACK(bufr);
 
 	return retn;
 }
@@ -1340,6 +1496,8 @@ static void whack(CO(TSEM, this))
 	GWHACK(S->TE_events, String);
 	WHACK(S->TE_events);
 
+	WHACK(S->model);
+
 	S->root->whack(S->root, this, S);
 	return;
 }
@@ -1389,6 +1547,7 @@ extern TSEM NAAAIM_TSEM_Init(void)
 	/* Method initialization. */
 	this->update	 = update;
 	this->update_map = update_map;
+	this->load	 = load;
 
 	this->set_aggregate   = set_aggregate;
 

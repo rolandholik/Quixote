@@ -524,8 +524,6 @@ static _Bool add_event(CO(char *, inbufr))
 
 
 	/* Proceed with modeling the event. */
-	if ( !event->measure(event) )
-		ERR(goto done);
 	if ( !Model->update(Model, event, &status, &discipline) )
 		ERR(goto done);
 
@@ -1271,52 +1269,54 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 /**
  * Private function.
  *
- * This function implements the initialization of a behavioral map
- * for the cartridge being executed.
+ * This function implements the initialization of a security model from
+ * a file.
  *
- * \param mapfile	The name of the file containing the behavioral
- *			model.  The model is expected to consist of
- *			model events.
+ * \param model_file	The name of the file containing the security
+ *			model.
  *
  * \return		A boolean value is returned to indicate whether
- *			or not the command was processed.  A false value
- *			indicates the processing of commands should be
- *			terminated while a true value indicates an
- *			additional command cycle should be processed.
+ *			or not the model was loaded.  A false value
+ *			indicates the load of the model failed while
+ *			a true value indicates the model was successfully
+ *			loaded.
  */
 
-static _Bool initialize_state(char *mapfile)
+static _Bool load_model(char *model_file)
 
 {
 	_Bool retn = false;
 
-	char *p,
-	     inbufr[256];
+	String str = NULL;
 
-	FILE *bmap = NULL;
+	File model = NULL;
 
 
 	/* Open the behavioral map and initialize the binary point object. */
-	if ( (bmap = fopen(mapfile, "r")) == NULL )
+	INIT(HurdLib, String, str, ERR(goto done));
+
+	INIT(HurdLib, File, model, ERR(goto done));
+	if ( !model->open_ro(model, model_file) )
 		ERR(goto done);
 
 
 	/* Loop over the mapfile. */
-	while ( fgets(inbufr, sizeof(inbufr), bmap) != NULL ) {
-		if ( (p = strchr(inbufr, '\n')) != 0 )
-			*p = '\0';
-
+	while ( model->read_String(model, str) ) {
 		if ( Debug )
-			fprintf(Debug, "Initialize: %s\n", inbufr);
+			fprintf(Debug, "Model entry: %s\n", str->get(str));
 
-		if ( !process_event(inbufr) )
+		if ( !Model->load(Model, str) )
 			ERR(goto done);
+		str->reset(str);
 	}
 
 	retn = true;
 
 
  done:
+	WHACK(str);
+	WHACK(model);
+
 	return retn;
 }
 
@@ -1748,7 +1748,7 @@ extern int main(int argc, char *argv[])
 
 	char *p,
 	     *debug	= NULL,
-	     *map	= NULL,
+	     *model	= NULL,
 	     *cartridge	= NULL,
 	     bufr[1024];
 
@@ -1790,7 +1790,7 @@ extern int main(int argc, char *argv[])
 				debug = optarg;
 				break;
 			case 'm':
-				map = optarg;
+				model = optarg;
 				break;
 		}
 
@@ -1847,13 +1847,13 @@ extern int main(int argc, char *argv[])
 	INIT(NAAAIM, TSEM, Model, ERR(goto done));
 
 
-	/* Load and seal a behavior map if specified. */
-	if ( map != NULL ) {
+	/* Load and seal a security model if specified. */
+	if ( model != NULL ) {
 		if ( Debug )
-			fprintf(Debug, "Loading security state: %s\n", map);
+			fprintf(Debug, "Loading security model: %s\n", model);
 
-		if ( !initialize_state(map) ) {
-			fputs("Cannot initialize security state.\n", stderr);
+		if ( !load_model(model) ) {
+			fputs("Cannot initialize security model.\n", stderr);
 			goto done;
 		}
 	}

@@ -80,7 +80,7 @@ LIBDEPS = ${HURD_LIBRARY} ${NAAAIM_LIBRARY}
 
 MODELDEPS = ../SecurityModel/COE.o ../SecurityModel/Cell.o		  \
 	../SecurityModel/SecurityPoint.o ../SecurityModel/SecurityEvent.o \
-	../SecurityModel/TSEM.o
+	../SecurityModel/TSEM.o ../SecurityModel/EventModel.o
 
 CFLAGS := ${CFLAGS} -I .. -I ../SecurityModel -I ../lib -I ../HurdLib \
 	-I ${SGXDIR} -I ${SANCHOSGX}
@@ -96,13 +96,13 @@ all: ${COBJS} tools
 
 tools: ${TOOLS}
 
-quixote: quixote.o ${LIBDEPS}
+quixote: quixote.o ${LIBDEPS} ${MODELDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${MODELDEPS} ${LIBS};
 
-quixote-mcu: quixote-mcu.o ${LIBDEPS}
+quixote-mcu: quixote-mcu.o ${LIBDEPS} ${MODELDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${MODELDEPS} ${LIBS};
 
-quixote-us: quixote-us.o ${LIBDEPS}
+quixote-us: quixote-us.o ${LIBDEPS} ${MODELDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${MODELDEPS} ${LIBS};
 
 quixote-sgx: quixote-sgx.o ${SANCHOSGX}/SanchoSGX.o ${LIBDEPS}

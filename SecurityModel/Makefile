@@ -94,7 +94,8 @@ test-cell: test-cell.o Cell.o
 test-event: test-event.o SecurityEvent.o COE.o Cell.o EventModel.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
-test-TSEM: test-TSEM.o TSEM.o SecurityPoint.o SecurityEvent.o COE.o Cell.o
+test-TSEM: test-TSEM.o TSEM.o SecurityPoint.o SecurityEvent.o COE.o Cell.o \
+	EventModel.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 generate-contours: generate-contours.o SecurityEvent.o COE.o Cell.o
