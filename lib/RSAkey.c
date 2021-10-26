@@ -248,8 +248,6 @@ static _Bool get_public_key(CO(RSAkey, this), CO(Buffer, bufr))
 		ERR(goto done);
 	if ( S->type == no_key )
 		ERR(goto done);
-	if ( (S->type != generated) && (S->type != public_key) )
-		ERR(goto done);
 
 
 	/* Write the key to a memory based BIO.*/
