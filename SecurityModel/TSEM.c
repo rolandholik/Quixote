@@ -26,6 +26,8 @@
 
 #include "NAAAIM.h"
 #include "SHA256.h"
+#include "Base64.h"
+#include "RSAkey.h"
 #include "SecurityPoint.h"
 #include "SecurityEvent.h"
 #include "TSEM.h"
@@ -52,10 +54,12 @@
 /** The numerical definitions for the security model load commands. */
 enum {
 	model_cmd_comment=1,
+	model_cmd_key,
 	model_cmd_aggregate,
 	model_cmd_state,
 	model_cmd_pseudonym,
 	model_cmd_seal,
+	model_cmd_signature,
 	model_cmd_end
 } security_load_commands;
 
@@ -69,10 +73,12 @@ struct security_load_definition {
 /** The list of security load commands. */
 struct security_load_definition Security_cmd_list[] = {
 	{model_cmd_comment,	"#",		false},
+	{model_cmd_key,		"key ",		true},
 	{model_cmd_aggregate,	"aggregate ",	true},
 	{model_cmd_state,	"state ",	true},
 	{model_cmd_pseudonym,	"pseudonym ",	true},
 	{model_cmd_seal,	"seal",		false},
+	{model_cmd_signature,	"signature ",	true},
 	{model_cmd_end,		"end",		false}
 };
 
@@ -126,6 +132,10 @@ struct NAAAIM_TSEM_State
 
 	/* An optional security event model. */
 	EventModel model;
+
+	/* The key and signature of a loaded security model. */
+	Buffer key;
+	Buffer sigdata;
 };
 
 
@@ -162,6 +172,9 @@ static void _init_state(CO(TSEM_State, S))
 	S->forensics	= NULL;
 	S->TE_events	= NULL;
 	S->model	= NULL;
+
+	S->key		= NULL;
+	S->sigdata	= NULL;
 
 	return;
 }
@@ -486,6 +499,124 @@ static _Bool update_map(CO(TSEM, this), CO(Buffer, bpoint))
 
 
 /**
+ * Internal private function.
+ *
+ * This function encapsulates the addition of a line from a model file
+ * to the Buffer object that will be hashed to generate the signature
+ * for the model.
+ *
+ * \param bufr		The state information for the model object.
+ *
+ * \param line		The object containing the line to add to the
+ *			file.
+ *
+ * \return	A boolean value is used to indicate the status of the
+ *		addition of the line.  A false value indicates the
+ *		addition failed while a true value indicates the
+ *		contents of the line had been added to the buffer.
+ */
+
+static _Bool _add_entry(CO(Buffer, bufr), CO(String, line))
+
+{
+	_Bool retn = false;
+
+
+	if ( !bufr->add(bufr, (void *) line->get(line), line->size(line) + 1) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	return retn;
+
+}
+
+
+/**
+ * Internal private function.
+ *
+ * This function carries out the validation of a signed security model.
+ *
+ * \param key		The object containing
+ *			model over which the signature is generated.
+ *
+ * \param sigdata	The object containing the contents of the
+ *			security model in a form suitable for computing
+ *			the hash signature.
+ *
+ * \param sig		The Base64 encoded signature.
+ *
+ * \param valid		A pointer to the boolean value that will be
+ *			loaded with the result of the signature
+ *			validation.
+ *
+ * \return	A boolean value is used to indicate the status of the
+ *		computation of the signature.  A false value indicates
+ *		an error was encountered while computing the signature.
+ *		A true value indicates the signature was calculated
+ *		and the variable pointed to by the status variable
+ *		contains the status of the signature.
+ */
+
+static _Bool _verify_model(CO(Buffer, key), CO(Buffer, sigdata), char * sig, \
+			   _Bool *valid)
+
+{
+	_Bool retn = false;
+
+	Buffer signature = NULL;
+
+	String str = NULL;
+
+	Base64 base64 = NULL;
+
+	RSAkey rsakey = NULL;
+
+
+	/* Load the key that was provided. */
+	INIT(HurdLib, String, str, ERR(goto done));
+	if ( !str->add(str, (char *) key->get(key)) )
+		ERR(goto done);
+
+	INIT(NAAAIM, Base64, base64, ERR(goto done));
+	key->reset(key);
+	if ( !base64->decode(base64, str, key) )
+		ERR(goto done);
+
+	INIT(NAAAIM, RSAkey, rsakey, ERR(goto done));
+	if ( !rsakey->load_public(rsakey, key) )
+		ERR(goto done);
+
+
+	/* Decode and verify the signature. */
+	str->reset(str);
+	if ( !str->add(str, sig) )
+		ERR(goto done);
+
+	INIT(HurdLib, Buffer, signature, ERR(goto done));
+	if ( !base64->decode(base64, str, signature) )
+		ERR(goto done);
+
+	if ( !rsakey->verify(rsakey, signature, sigdata, valid) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	WHACK(signature);
+	WHACK(str);
+	WHACK(base64);
+	WHACK(rsakey);
+
+	return retn;
+
+}
+
+
+/**
  * External public method.
  *
  * This method implements the loading of entries into a security model.
@@ -508,7 +639,8 @@ static _Bool load(CO(TSEM, this), CO(String, entry))
 {
 	STATE(S);
 
-	_Bool retn = false;
+	_Bool retn	= false,
+	      sig_valid = false;
 
 	char *arg = NULL;
 
@@ -521,9 +653,6 @@ static _Bool load(CO(TSEM, this), CO(String, entry))
 	if ( S->poisoned )
 		ERR(goto done);
 
-	if ( !S->loading )
-		S->loading = true;
-
 
 	/* Locate the load command being requested. */
 	for (dp= Security_cmd_list; dp->command <= model_cmd_end; ++dp) {
@@ -533,6 +662,9 @@ static _Bool load(CO(TSEM, this), CO(String, entry))
 	}
 	if ( dp->command > model_cmd_end )
 		ERR(goto done);
+
+	if ( (dp->command != model_cmd_signature) && !S->loading )
+		S->loading = true;
 
 
 	/* Get the start of command argument. */
@@ -544,13 +676,33 @@ static _Bool load(CO(TSEM, this), CO(String, entry))
 
 
 	/* Implement the command. */
+	if ( S->sigdata == NULL )
+		INIT(HurdLib, Buffer, S->sigdata, ERR(goto done));
+
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 
 	switch ( dp->command ) {
 		case model_cmd_comment:
+			if ( !_add_entry(S->sigdata, entry) )
+				ERR(goto done);
+			break;
+
+		case model_cmd_key:
+			if ( !_add_entry(S->sigdata, entry) )
+				ERR(goto done);
+
+			if ( S->key != NULL )
+				ERR(goto done);
+			INIT(HurdLib, Buffer, S->key, ERR(goto done));
+			if ( !S->key->add(S->key, (void *) arg, \
+					  strlen(arg) + 1) )
+				ERR(goto done);
 			break;
 
 		case model_cmd_aggregate:
+			if ( !_add_entry(S->sigdata, entry) )
+				ERR(goto done);
+
 			if ( !bufr->add_hexstring(bufr, arg) )
 				ERR(goto done);
 			if ( !this->set_aggregate(this, bufr) )
@@ -558,6 +710,9 @@ static _Bool load(CO(TSEM, this), CO(String, entry))
 			break;
 
 		case model_cmd_state:
+			if ( !_add_entry(S->sigdata, entry) )
+				ERR(goto done);
+
 			if ( !bufr->add_hexstring(bufr, arg) )
 				ERR(goto done);
 			if ( !this->update_map(this, bufr) )
@@ -565,9 +720,13 @@ static _Bool load(CO(TSEM, this), CO(String, entry))
 			break;
 
 		case model_cmd_pseudonym:
+			if ( !_add_entry(S->sigdata, entry) )
+				ERR(goto done);
+
 			if ( S->model == NULL )
 				INIT(NAAAIM, EventModel, S->model, \
 				     ERR(goto done));
+
 			if ( !bufr->add_hexstring(bufr, arg) )
 				ERR(goto done);
 			if ( !S->model->add_pseudonym(S->model, bufr) )
@@ -575,10 +734,27 @@ static _Bool load(CO(TSEM, this), CO(String, entry))
 			break;
 
 		case model_cmd_seal:
+			if ( !_add_entry(S->sigdata, entry) )
+				ERR(goto done);
+
 			this->seal(this);
 			break;
 
+		case model_cmd_signature:
+			if ( (S->sigdata == NULL) || (S->key == NULL) )
+				ERR(goto done);
+
+			if ( !_verify_model(S->key, S->sigdata, arg, \
+					    &sig_valid) )
+				ERR(goto done);
+			if ( !sig_valid )
+				ERR(goto done);
+			break;
+
 		case model_cmd_end:
+			if ( !_add_entry(S->sigdata, entry) )
+				ERR(goto done);
+
 			S->loading = false;
 			break;
 	}
@@ -1497,6 +1673,9 @@ static void whack(CO(TSEM, this))
 	WHACK(S->TE_events);
 
 	WHACK(S->model);
+
+	WHACK(S->key);
+	WHACK(S->sigdata);
 
 	S->root->whack(S->root, this, S);
 	return;

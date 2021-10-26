@@ -31,6 +31,62 @@
 #include "TSEM.h"
 
 
+/**
+ * Private function.
+ *
+ * This function tests the loading of an security map into a model.
+ *
+ * \param model_input	The name of the file containing the model
+ *			to be loaded.
+ *
+ * \return		This function exits the process if an
+ *			error is encountered.
+ */
+
+static void model_load(CO(TSEM, model), CO(char *, model_input))
+
+{
+	_Bool retn = false;
+
+	String str = NULL;
+
+	File model_file = NULL;
+
+
+	/* Open the file containing the model to be loaded. */
+	INIT(HurdLib, File, model_file, ERR(goto done));
+	if ( !model_file->open_ro(model_file, model_input) ) {
+		fputs("Cannot open model file.\n", stderr);
+		goto done;
+	}
+
+
+	/* Load the model components into the model. */
+	INIT(HurdLib, String, str, ERR(goto done));
+
+	while ( model_file->read_String(model_file, str) ) {
+		if ( !model->load(model, str) ) {
+			fputs("Failed model element load: %s", stdout);
+			str->print(str);
+			goto done;
+		}
+		str->reset(str);
+	}
+
+	retn = true;
+
+
+ done:
+	WHACK(str);
+	WHACK(model_file);
+
+	if ( !retn )
+		exit(1);
+
+	return;
+}
+
+
 /*
  * Program entry point begins here.
  */
@@ -46,10 +102,12 @@ extern int main(int argc, char *argv[])
 	      dump_state	= false,
 	      dump_events	= false,
 	      dump_points	= false,
-	      dump_forensics	= false;
+	      dump_forensics	= false,
+	      load_model	= false;
 
 	char *aggregate  = NULL,
-	     *trajectory = NULL;
+	     *trajectory = NULL,
+	     *model_file = NULL;
 
 	int opt,
 	    retn = 1;
@@ -66,7 +124,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "CEFMSa:fi:v")) != EOF )
+	while ( (opt = getopt(argc, argv, "CEFLMSa:fm:i:v")) != EOF )
 		switch ( opt ) {
 			case 'C':
 				dump_points = true;
@@ -76,6 +134,9 @@ extern int main(int argc, char *argv[])
 				break;
 			case 'F':
 				dump_forensics = true;
+				break;
+			case 'L':
+				load_model = true;
 				break;
 			case 'M':
 				dump_measurement = true;
@@ -89,6 +150,9 @@ extern int main(int argc, char *argv[])
 			case 'f':
 				forensics = true;
 				break;
+			case 'm':
+				model_file = optarg;
+				break;
 			case 'i':
 				trajectory = optarg;
 				break;
@@ -98,8 +162,19 @@ extern int main(int argc, char *argv[])
 		}
 
 
+	/* Initialize the model to be used. */
+	INIT(NAAAIM, TSEM, model, ERR(goto done));
+
+
+	/* Test model loading. */
+	if ( load_model ) {
+		model_load(model, model_file);
+		goto done;
+	}
+
+
 	/* Open the trajectory file. */
-	if ( trajectory == NULL ) {
+	if ( !load_model && trajectory == NULL ) {
 		fputs("No trajectory file specified.\n", stderr);
 		goto done;
 	}
@@ -111,7 +186,6 @@ extern int main(int argc, char *argv[])
 
 	/* Set the aggregate value for the behavioral model. */
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	INIT(NAAAIM, TSEM, model, ERR(goto done));
 	if ( aggregate != NULL ) {
 		if ( strlen(aggregate) != NAAAIM_IDSIZE*2 ) {
 			fputs("Invalid aggregate value.\n", stderr);

@@ -13,8 +13,9 @@ SANCHODIR = ../Sancho/SGX
 CSRC = COE.c Cell.c SecurityEvent.c SecurityPoint.c TSEM.c EventModel.c \
 	compute-aggregate.c
 
-TOOLS = test-COE test-cell test-event generate-contours sha-tool \
-	compute-measurement set-behavior test-TSEM compute-aggregate bad-actor
+TOOLS = test-COE test-cell test-event generate-contours sha-tool	\
+	compute-measurement set-behavior test-TSEM compute-aggregate	\
+	bad-actor sign-model
 INSTALLBIN  = generate-contours sha-tool
 INSTALLSBIN = set-behavior
 
@@ -115,6 +116,9 @@ sha-tool: sha-tool.o
 
 set-behavior: set-behavior.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS}
+
+sign-model: sign-model.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};
