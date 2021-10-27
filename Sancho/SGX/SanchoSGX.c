@@ -388,6 +388,10 @@ static _Bool load_enclave_memory(CO(SanchoSGX, this), CO(uint8_t *, enclave), \
  *			the caller as to whether or not the update
  *			requires the process to be disciplined.
  *
+ * \param sealed	A poiner to a boolean value that is used to
+ *			advise the caller whether or not the model
+ *			was sealed.
+ *
  * \return	A boolean value is used to indicate whether or not
  *		the the event was registered.  A false value indicates
  *		a failure while a true value indicates the model
@@ -395,7 +399,7 @@ static _Bool load_enclave_memory(CO(SanchoSGX, this), CO(uint8_t *, enclave), \
  */
 
 static _Bool update(CO(SanchoSGX, this), CO(String, update), \
-		    _Bool *discipline)
+		    _Bool *discipline, _Bool *sealed)
 
 {
 	STATE(S);
@@ -433,6 +437,7 @@ static _Bool update(CO(SanchoSGX, this), CO(String, update), \
 		ERR(goto done);
 
 	*discipline = ecall1.discipline;
+	*sealed	    = ecall1.sealed;
 	retn	    = true;
 
 

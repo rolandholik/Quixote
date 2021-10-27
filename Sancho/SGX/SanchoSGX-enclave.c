@@ -171,12 +171,11 @@ _Bool update_model(struct ISOidentity_ecall1_interface *ecall1)
 	INIT(NAAAIM, SecurityEvent, event, ERR(goto done));
 	if ( !event->parse(event, input) )
 		ERR(goto done);
-	if ( !event->measure(event) )
-		ERR(goto done);
 
 
 	/* Update the model. */
-	if ( !Model->update(Model, event, &updated, &ecall1->discipline) )
+	if ( !Model->update(Model, event, &updated, &ecall1->discipline, \
+			    &ecall1->sealed) )
 		ERR(goto done);
 	if ( !updated )
 		WHACK(event);

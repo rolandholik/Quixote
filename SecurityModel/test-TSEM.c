@@ -96,6 +96,7 @@ extern int main(int argc, char *argv[])
 {
 	_Bool updated,
 	      discipline,
+	      sealed,
 	      forensics		= false,
 	      verbose		= false,
 	      dump_measurement	= false,
@@ -214,7 +215,8 @@ extern int main(int argc, char *argv[])
 		if ( !event->measure(event) )
 			ERR(goto done);
 
-		if ( !model->update(model, event, &updated, &discipline) )
+		if ( !model->update(model, event, &updated, &discipline, \
+				    &sealed) )
 			ERR(goto done);
 		if ( !updated )
 			WHACK(event);
@@ -237,7 +239,8 @@ extern int main(int argc, char *argv[])
 		}
 		if ( !event->measure(event) )
 			ERR(goto done);
-		if ( !model->update(model, event, &updated, &discipline) )
+		if ( !model->update(model, event, &updated, &discipline, \
+				    &sealed) )
 			ERR(goto done);
 		if ( !updated )
 			WHACK(event);

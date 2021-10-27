@@ -122,8 +122,10 @@ static sgx_status_t sgx_update_model(void *pms)
 
 	/* Call enclave function with local structure. */
 	ms->retn = update_model(&ecall1);
-	if ( ms->retn )
+	if ( ms->retn ) {
 		ms->discipline = ecall1.discipline;
+		ms->sealed     = ecall1.sealed;
+	}
 
 
  done:

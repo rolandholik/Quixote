@@ -314,6 +314,10 @@ static _Bool _extend_measurement(CO(TSEM_State, S),    \
  *			the caller as to whether or not the update
  *			requires the process to be disciplined.
  *
+ * \param sealed	A poiner to a boolean value that is used to
+ *			advise the caller whether or not the model
+ *			was sealed.
+ *
  * \return	A boolean value is used to indicate whether or not
  *		the the event was registered.  A false value indicates
  *		a failure while a true value indicates the model
@@ -321,7 +325,7 @@ static _Bool _extend_measurement(CO(TSEM_State, S),    \
  */
 
 static _Bool update(CO(TSEM, this), CO(SecurityEvent, event), _Bool *status, \
-		    _Bool *discipline)
+		    _Bool *discipline, _Bool *sealed)
 
 {
 	STATE(S);
@@ -418,6 +422,7 @@ static _Bool update(CO(TSEM, this), CO(SecurityEvent, event), _Bool *status, \
 	if ( retn ) {
 		*status	    = added;
 		*discipline = !cp->is_valid(cp);
+		*sealed	    = S->sealed;
 	}
 
 	WHACK(point);

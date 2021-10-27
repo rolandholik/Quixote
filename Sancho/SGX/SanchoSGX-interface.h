@@ -39,6 +39,7 @@ struct ISOidentity_ecall1_interface {
 	_Bool debug;
 
 	_Bool discipline;
+	_Bool sealed;
 	char *update;
 };
 

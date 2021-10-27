@@ -122,14 +122,6 @@ static pid_t Monitor_pid;
 static TSEM Model = NULL;
 
 /**
- * The seal status of the domain.  This variable is set by a
- * seal event for the domain.  Updates which are not in the
- * security state will cause disciplining requests to be generated
- * for the process initiating the event.
- */
-static _Bool Sealed = false;
-
-/**
  * This variable is used to signal that a modeling error has occurred
  * and signals the disciplining code to unilaterally release a process
  * rather then model is status in the security domain.
@@ -483,6 +475,7 @@ static _Bool add_event(CO(char *, inbufr))
 {
 	_Bool status,
 	      discipline,
+	      sealed,
 	      retn = false;
 
 	pid_t pid;
@@ -524,7 +517,7 @@ static _Bool add_event(CO(char *, inbufr))
 
 
 	/* Proceed with modeling the event. */
-	if ( !Model->update(Model, event, &status, &discipline) )
+	if ( !Model->update(Model, event, &status, &discipline, &sealed) )
 		ERR(goto done);
 
 	Model->discipline_pid(Model, &pid);
@@ -535,7 +528,7 @@ static _Bool add_event(CO(char *, inbufr))
 
 
 	/* Security domain is not being disciplined, release the process. */
-	if ( !Sealed ) {
+	if ( !sealed ) {
 		if ( Debug )
 			fputs("Unsealed, releasing actor.\n", Debug);
 		if ( sys_config_actor(pid, RELEASE_ACTOR) < 0 )
@@ -549,7 +542,7 @@ static _Bool add_event(CO(char *, inbufr))
 	 * that are not in the event map as bad actors and others as
 	 * good actors.
 	 */
-	if ( Sealed ) {
+	if ( sealed ) {
 		if ( discipline ) {
 			if ( Debug )
 				fputs("Sealed, releasing bad actor.\n", Debug);
@@ -735,7 +728,6 @@ static _Bool process_event(const char *event)
 
 			Model->seal(Model);
 			retn   = true;
-			Sealed = true;
 			break;
 
 		case TE_event:
@@ -1247,7 +1239,6 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 			break;
 
 		case seal_event:
-			Sealed = true;
 			Model->seal(Model);
 
 			cmdbufr->reset(cmdbufr);

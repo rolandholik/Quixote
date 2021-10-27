@@ -15,7 +15,7 @@ endif
 
 CSRC   = test-ISOidentity-enclave.c SanchoSGX.c ISOmanager.c
 ENCSRC = SanchoSGX-enclave.c SanchoSGX-interface.c ISOidentity-manager.c \
-	COE.c Cell.c SecurityPoint.c SecurityEvent.c TSEM.c
+	COE.c Cell.c SecurityPoint.c SecurityEvent.c TSEM.c EventModel.c
 
 MGRSRC = ISOmanager-enclave.c ISOmanager-interface.c
 

@@ -419,7 +419,7 @@ static _Bool add_event(CO(char *, inbufr))
 		ERR(goto done);
 
 
-	if ( !Model->update(Model, update, &discipline) )
+	if ( !Model->update(Model, update, &discipline, &Sealed) )
 		ERR(goto done);
 	retn = true;
 
@@ -570,7 +570,6 @@ static _Bool process_event(const char *event)
 
 			Model->seal(Model);
 			retn   = true;
-			Sealed = true;
 			break;
 
 		case TE_event:
@@ -1012,7 +1011,6 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 			break;
 
 		case seal_event:
-			Sealed = true;
 			Model->seal(Model);
 
 			cmdbufr->reset(cmdbufr);
