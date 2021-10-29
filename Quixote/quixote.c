@@ -884,8 +884,6 @@ static _Bool process_event(const char *event)
 {
 	_Bool retn = false;
 
-	const char *event_arg;
-
 	struct sancho_cmd_definition *cp;
 
 	Buffer bufr = NULL;
@@ -902,18 +900,13 @@ static _Bool process_event(const char *event)
 		goto done;
 	}
 
-	event_arg = event + strlen(cp->syntax);
-	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-
 
 	/* Dispatch the event. */
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+
 	switch ( cp->command ) {
 		case aggregate_event:
 			retn = true;
-			break;
-
-		case sancho_state:
-			retn = add_state(event_arg);
 			break;
 
 		case seal_event:

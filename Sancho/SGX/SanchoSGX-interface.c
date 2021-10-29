@@ -45,7 +45,7 @@ extern void rewind(int);
 extern _Bool get_event(int, char *, size_t);
 extern _Bool manager(struct ISOidentity_ecall10_interface *);
 extern _Bool generate_identity(uint8_t *);
-extern _Bool update_map(struct ISOidentity_ecall12_interface *);
+extern _Bool load(struct ISOidentity_ecall12_interface *);
 extern _Bool add_verifier(struct ISOidentity_ecall13 *);
 extern _Bool add_ai_event(struct ISOidentity_ecall14 *);
 extern _Bool get_point(uint8_t *);
@@ -439,35 +439,51 @@ static sgx_status_t sgx_generate_identity(void *pms)
 
 
 /* ECALL12 interface function. */
-static sgx_status_t sgx_update_map(void *pms)
+static sgx_status_t sgx_load(void *pms)
 
 {
-	sgx_status_t status = SGX_ERROR_INVALID_PARAMETER;
+	sgx_status_t retn = SGX_SUCCESS;
 
-	struct ISOidentity_ecall12_interface *ms,
+	size_t update_length = 0;
+
+	struct ISOidentity_ecall12_interface *ms, \
 					     ecall12;
 
 
-	/* Verify marshalled arguements and setup parameters. */
+	/* Setup enclave based marshalling structure. */
 	if ( !SGXidf_untrusted_region(pms, \
 			      sizeof(struct ISOidentity_ecall12_interface)) )
 		goto done;
 
 	ms = (struct ISOidentity_ecall12_interface *) pms;
 	memset(&ecall12, '\0', sizeof(struct ISOidentity_ecall12_interface));
-	memcpy(ecall12.point, ms->point, sizeof(ecall12.point));
 
-	__builtin_ia32_lfence();
+
+	/* Replicate security map entry into structure. */
+	update_length = strlen(ms->update) + 1;
+	if ( !SGXidf_untrusted_region(ms->update, update_length) ) {
+		retn = SGX_ERROR_INVALID_PARAMETER;
+		goto done;
+	}
+	if ( (ecall12.update = malloc(update_length)) == NULL ) {
+		retn = SGX_ERROR_OUT_OF_MEMORY;
+		goto done;
+	}
+	memcpy(ecall12.update, ms->update, update_length);
 
 
 	/* Call the trusted function. */
-	ms->retn = update_map(&ecall12);
-	status = SGX_SUCCESS;
+	__builtin_ia32_lfence();
+	ms->retn = load(&ecall12);
+	retn = SGX_SUCCESS;
 
 
  done:
+	if ( ecall12.update != NULL )
+		free(ecall12.update);
+
 	memset(&ecall12, '\0',  sizeof(struct ISOidentity_ecall12_interface));
-	return status;
+	return retn;
 }
 
 
@@ -615,7 +631,7 @@ SGX_EXTERNC const struct {
 		{(void*)(uintptr_t)sgx_get_event, 0},
 		{(void*)(uintptr_t)sgx_manager, 0},
 		{(void*)(uintptr_t)sgx_generate_identity, 0},
-		{(void*)(uintptr_t)sgx_update_map, 0},
+		{(void*)(uintptr_t)sgx_load, 0},
 		{(void*)(uintptr_t)sgx_add_verifier, 0},
 		{(void*)(uintptr_t)sgx_add_ai_event, 0},
 		{(void*)(uintptr_t)sgx_get_point, 0}

@@ -203,40 +203,39 @@ _Bool update_model(struct ISOidentity_ecall1_interface *ecall1)
 /**
  * External ECALL.
  *
- * This method implements adding a contour point to the ISOidentity
- * model implemented inside the enclave.
+ * This method implements adding entries into a security model.
  *
- * \param ecall12	A pointer to the structure which contains
- *			the inputs to this function.
+ * \param ecall12	A pointer to the structure that describes the
+ *			entry to be added.
  *
  * \return	A boolean value is used to indicate whether or not
- *		the update to the behavioral map succeeded.  A false
+ *		the entry was successfully added to the model.  A false
  *		value indicates the update had failed while a true
- *		value indicates the enclave model had been updated.
+ *		value indicates the model was updated.
  */
 
-_Bool update_map(struct ISOidentity_ecall12_interface *ecall12)
+_Bool load(struct ISOidentity_ecall12_interface *ecall12)
 
 {
 	_Bool retn = false;
 
-	Buffer bpoint = NULL;
+	String entry = NULL;
 
 
 	/* Initialize a Buffer object with the point. */
-	INIT(HurdLib, Buffer, bpoint, ERR(goto done));
-	if ( !bpoint->add(bpoint, ecall12->point, sizeof(ecall12->point)) )
+	INIT(HurdLib, String, entry, ERR(goto done));
+	if ( !entry->add(entry, ecall12->update) )
 		ERR(goto done);
 
 
 	/* Update the model. */
-	if ( !Model->update_map(Model, bpoint) )
+	if ( !Model->load(Model, entry) )
 		ERR(goto done);
 	retn = true;
 
 
  done:
-	WHACK(bpoint);
+	WHACK(entry);
 
 	return retn;
 }

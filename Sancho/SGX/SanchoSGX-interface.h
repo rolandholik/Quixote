@@ -99,7 +99,7 @@ struct ISOidentity_ecall11_interface {
 struct ISOidentity_ecall12_interface {
 	_Bool retn;
 
-	uint8_t point[32];
+	char *update;
 };
 
 struct ISOidentity_ecall13 {

@@ -437,7 +437,7 @@ static _Bool update(CO(TSEM, this), CO(SecurityEvent, event), _Bool *status, \
 
 
 /**
- * External public method.
+ * Internal public method.
  *
  * This method implements updating the currently maintained behavioral
  * model with a specific security state point.
@@ -453,7 +453,7 @@ static _Bool update(CO(TSEM, this), CO(SecurityEvent, event), _Bool *status, \
  *		was updated.
  */
 
-static _Bool update_map(CO(TSEM, this), CO(Buffer, bpoint))
+static _Bool _update_map(CO(TSEM, this), CO(Buffer, bpoint))
 
 {
 	STATE(S);
@@ -720,7 +720,7 @@ static _Bool load(CO(TSEM, this), CO(String, entry))
 
 			if ( !bufr->add_hexstring(bufr, arg) )
 				ERR(goto done);
-			if ( !this->update_map(this, bufr) )
+			if ( !_update_map(this, bufr) )
 				ERR(goto done);
 			break;
 
@@ -1730,7 +1730,6 @@ extern TSEM NAAAIM_TSEM_Init(void)
 
 	/* Method initialization. */
 	this->update	 = update;
-	this->update_map = update_map;
 	this->load	 = load;
 
 	this->set_aggregate   = set_aggregate;

@@ -194,7 +194,8 @@ static void add_event(CO(TTYduct, duct), CO(TSEM, model), CO(Buffer, bufr))
 	     msg[80];
 
 	_Bool updated,
-	      discipline;
+	      discipline,
+	      sealed;
 
 	int msg_size;
 
@@ -218,9 +219,7 @@ static void add_event(CO(TTYduct, duct), CO(TSEM, model), CO(Buffer, bufr))
 	INIT(NAAAIM, SecurityEvent, event, ERR(goto done));
 	if ( !event->parse(event, update) )
 		ERR(goto done);
-	if ( !event->measure(event) )
-		ERR(goto done);
-	if ( !model->update(model, event, &updated, &discipline) )
+	if ( !model->update(model, event, &updated, &discipline, &sealed) )
 		ERR(goto done);
 
 	/* Send response. */

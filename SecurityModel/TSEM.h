@@ -28,7 +28,6 @@ struct NAAAIM_TSEM
 	/* External methods. */
 	_Bool (*update)(const TSEM, const SecurityEvent, _Bool *, \
 			_Bool *, _Bool *);
-	_Bool (*update_map)(const TSEM, const Buffer);
 	_Bool (*load)(const TSEM, const String);
 
 	_Bool (*set_aggregate)(const TSEM, const Buffer);

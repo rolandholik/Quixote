@@ -70,6 +70,8 @@ extern int main(int argc, char *argv[])
 
 {
 	_Bool discipline,
+	      sealed,
+
 	      debug = true;
 
 	char *spid	   = NULL,
@@ -233,7 +235,7 @@ extern int main(int argc, char *argv[])
 	INIT(HurdLib, String, input, ERR(goto done));
 
 	while ( infile->read_String(infile, input) ) {
-		if ( !sancho->update(sancho, input, &discipline) )
+		if ( !sancho->update(sancho, input, &discipline, &sealed) )
 			ERR(goto done);
 		if ( discipline ) {
 			fputs("Model needs disciplining.\n", stdout);
@@ -256,7 +258,7 @@ extern int main(int argc, char *argv[])
 	if ( !input->add(input, violation) )
 		ERR(goto done);
 
-	if ( !sancho->update(sancho, input, &discipline) )
+	if ( !sancho->update(sancho, input, &discipline, &sealed) )
 		ERR(goto done);
 
 	fputs("\nForensics:\n", stdout);

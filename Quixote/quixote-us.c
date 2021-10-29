@@ -412,52 +412,6 @@ static _Bool add_measurement(CO(char *, bufr))
 /**
  * Private function.
  *
- * This function carries out the addition of a state value to the
- * current security model.
- *
- * \param bufr		A pointer to the character buffer containing
- *			the hexadecimally encoded state value.
- *
- * \return		A boolean value is returned to indicate whether
- *			or not addition of the state value succeeded.  A
- *			false value indicates the addition of the
- *			state failed while a true value indicates
- *			the state injection had succeeded.
- */
-
-static _Bool add_state(CO(char *, inbufr))
-
-{
-	_Bool retn = false;
-
-	Buffer bufr = NULL;
-
-
-	/* Convert the ASCII encoded state to a binary value. */
-	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-
-	if ( !bufr->add_hexstring(bufr, inbufr) )
-		ERR(goto done);
-	if ( bufr->size(bufr) != NAAAIM_IDSIZE )
-		ERR(goto done);
-
-
-	/* Add the state to the model. */
-	if ( !Model->update_map(Model, bufr) )
-			ERR(goto done);
-	retn = true;
-
-
- done:
-	WHACK(bufr);
-
-	return retn;
-}
-
-
-/**
- * Private function.
- *
  * This function carries out the addition of a security state event
  * to the current security state model.
  *
@@ -709,10 +663,6 @@ static _Bool process_event(const char *event)
 			retn = add_measurement(p);
 			break;
 #endif
-
-		case sancho_state:
-			retn = add_state(event_arg);
-			break;
 
 		case exchange_event:
 			retn = add_event(event_arg);

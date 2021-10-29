@@ -449,21 +449,22 @@ static _Bool update(CO(SanchoSGX, this), CO(String, update), \
 /**
  * External public method.
  *
- * This method implements updating the currently maintained behavioral
- * model a specific contour point.
+ * This method implements the loading of entries into a security model.
  *
- * \param this		A pointer to the object which is being modeled.
+ * \param this		A pointer to the object that is being modeled.
  *
- * \param bpoint	The object containing the binary contour point
- *			that is to be added to the model.
+ * \param entry		An object that contains the description of the
+ *			entry that is to be entered into the security
+ *			model.
  *
  * \return	A boolean value is used to indicate whether or not
- *		the the contour point was mapped.  A false value
- *		indicates a failure while a true value indicates the
- *		model was updated.
+ *		the entry was successfully loaded into the security
+ *		model.  A false value indicates a failure occurred while
+ *		a true value indicates the security model was
+ *		successfully updated.
  */
 
-static _Bool update_map(CO(SanchoSGX, this), CO(Buffer, bpoint))
+static _Bool load(CO(SanchoSGX, this), CO(String, entry))
 
 {
 	STATE(S);
@@ -480,17 +481,18 @@ static _Bool update_map(CO(SanchoSGX, this), CO(Buffer, bpoint))
 	/* Verify object status and inputs. */
 	if ( S->poisoned )
 		ERR(goto done);
-	if ( bpoint == NULL )
+	if ( entry == NULL )
 		ERR(goto done);
-	if ( bpoint->poisoned(bpoint) )
+	if ( entry->poisoned(entry) )
 		ERR(goto done);
 
 
-	/* Call ECALL slot 0 to initialize the ISOidentity model. */
+	/* Call ECALL slot 12 to add the entry to the TSEM model. */
+
 	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
 		ERR(goto done);
 
-	memcpy(ecall12.point, bpoint->get(bpoint), sizeof(ecall12.point));
+	ecall12.update = entry->get(entry);
 
 	if ( !S->enclave->boot_slot(S->enclave, 12, ocall_table, &ecall12, \
 				    &rc) ) {
@@ -2005,8 +2007,8 @@ extern SanchoSGX NAAAIM_SanchoSGX_Init(void)
 	this->load_enclave	  = load_enclave;
 	this->load_enclave_memory = load_enclave_memory;
 
-	this->update	 = update;
-	this->update_map = update_map;
+	this->update = update;
+	this->load   = load;
 
 	this->add_ai_event = add_ai_event;
 	this->get_te_event = get_te_event;

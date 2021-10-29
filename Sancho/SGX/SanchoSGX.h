@@ -32,7 +32,7 @@ struct NAAAIM_SanchoSGX
 				     size_t, const char *);
 
 	_Bool (*update)(const SanchoSGX, const String, _Bool *, _Bool *);
-	_Bool (*update_map)(const SanchoSGX, const Buffer);
+	_Bool (*load)(const SanchoSGX, const String);
 
 	_Bool (*set_aggregate)(const SanchoSGX, const Buffer);
 
