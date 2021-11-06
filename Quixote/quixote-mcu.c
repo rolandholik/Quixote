@@ -780,12 +780,17 @@ static _Bool process_command(CO(TTYduct, duct), CO(LocalDuct, mgmt), \
 /**
  * Private function.
  *
- * This function implements the initialization of a behavioral map
- * for the cartridge being executed.
+ * This function implements the initialization of a security model from
+ * a file.
  *
- * \param mapfile	The name of the file containing the behavioral
- *			model.  The model is expected to consist of
- *			model events.
+ * \param duct		The object that will be used to communicate
+ *			with the SanchoMCU instance.
+ *
+ * \param bufr		The object that will be used to hold the commands
+ *			sent to and the response from the co-processor.
+ *
+ * \param model_file	The name of the file containing the security
+ *			model.
  *
  * \param cmdbufr	The object containing the command to be
  *			processed.
@@ -797,38 +802,62 @@ static _Bool process_command(CO(TTYduct, duct), CO(LocalDuct, mgmt), \
  *			additional command cycle should be processed.
  */
 
-static _Bool initialize_state(CO(TTYduct, duct), char *mapfile)
+static _Bool load_model(CO(TTYduct, duct), CO(Buffer, bufr), char *model_file)
 
 {
 	_Bool retn = false;
 
-	char *p,
-	     inbufr[256];
+	String str = NULL;
 
-	FILE *bmap = NULL;
+	File model = NULL;
+
+	static const char *load_cmd = "load ";
 
 
-	/* Open the behavioral map and initialize the binary point object. */
-	if ( (bmap = fopen(mapfile, "r")) == NULL )
+	/* Open the file containing the security map. */
+	INIT(HurdLib, String, str, ERR(goto done));
+
+	INIT(HurdLib, File, model, ERR(goto done));
+	if ( !model->open_ro(model, model_file) )
 		ERR(goto done);
 
 
-	/* Loop over the mapfile. */
-	while ( fgets(inbufr, sizeof(inbufr), bmap) != NULL ) {
-		if ( (p = strchr(inbufr, '\n')) != 0 )
-			*p = '\0';
+	/* Load the security event descriptions into the model. */
+	if ( !str->add(str, load_cmd) )
+		ERR(goto done);
 
+	while ( model->read_String(model, str) ) {
 		if ( Debug )
-			fprintf(Debug, "Initialize: %s\n", inbufr);
+			fprintf(Debug, "Model entry: %s\n", str->get(str));
 
-		if ( !process_event(duct, inbufr) )
+		if ( !bufr->add(bufr, (void *) str->get(str), \
+				str->size(str) + 1) )
 			ERR(goto done);
+		if ( !duct->send_Buffer(duct, bufr) )
+			ERR(goto done);
+
+		bufr->reset(bufr);
+		if ( !duct->receive_Buffer(duct, bufr) )
+			ERR(goto done);
+		if ( Debug )
+			fprintf(Debug, "Sancho says: %s\n", bufr->get(bufr));
+
+		if ( strncmp((char *) bufr->get(bufr), "OK", 2) != 0 )
+			ERR(goto done);
+
+		str->reset(str);
+		if ( !str->add(str, load_cmd) )
+			ERR(goto done);
+		bufr->reset(bufr);
 	}
 
 	retn = true;
 
 
  done:
+	WHACK(str);
+	WHACK(model);
+
 	return retn;
 }
 
@@ -1394,13 +1423,15 @@ extern int main(int argc, char *argv[])
 	if ( !Duct->init_device(Duct, "/dev/ttyACM0") )
 		ERR(goto done);
 
+	INIT(HurdLib, Buffer, cmdbufr, ERR(goto done));
+
 
 	/* Load and seal a behavior map if specified. */
 	if ( map != NULL ) {
 		if ( Debug )
 			fprintf(Debug, "Loading security state: %s\n", map);
 
-		if ( !initialize_state(Duct, map) ) {
+		if ( !load_model(Duct, cmdbufr, map) ) {
 			fputs("Cannot initialize security state.\n", stderr);
 			goto done;
 		}
@@ -1435,8 +1466,6 @@ extern int main(int argc, char *argv[])
 		fprintf(Debug, "descriptor 1: %d, descriptor 2: %d\n", \
 			poll_data[0].fd, poll_data[1].fd);
 	}
-
-	INIT(HurdLib, Buffer, cmdbufr, ERR(goto done));
 
 	opt = 0;
 	while ( 1 ) {

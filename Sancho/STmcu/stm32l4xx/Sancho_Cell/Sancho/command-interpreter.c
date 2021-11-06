@@ -89,41 +89,6 @@ static void send_ok(CO(TTYduct, duct), CO(Buffer, bufr))
 }
 
 
-static _Bool add_state(TSEM model, Buffer cp)
-
-{
-	_Bool retn = false;
-
-	char *p;
-
-	Buffer bufr = NULL;
-
-
-	/* Parse event. */
-	p = (char *) cp->get(cp);
-	if ( (p = index(p, ' ')) == NULL )
-		ERR(goto done);
-
-	++p;
-	if ( strlen(p) != 64 )
-		ERR(goto done);
-
-	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	if ( !bufr->add_hexstring(bufr, p) )
-		ERR(goto done);
-
-	if ( !model->update_map(model, bufr) )
-		ERR(goto done);
-
-	retn = true;
-
- done:
-	WHACK(bufr);
-
-	return retn;
-}
-
-
 /**
  * Private function.
  *
@@ -333,6 +298,58 @@ static void add_security(CO(TTYduct, duct), CO(TSEM, model), CO(Buffer, bufr))
  done:
 
 	return;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function implements the loading of entries into a security
+ * model.
+ *
+ * \Param duct		The object used to implement communications
+ *			with the Quixote instance.
+ *
+ * \param model		The model instance that is to be updated.
+ *
+ * \param bufr		A Buffer object containing the entry to be
+ *			loaded into the security model.
+ *
+ * \return		No return value is defined.
+ */
+
+static void do_load(CO(TTYduct, duct), CO(TSEM, model), CO(Buffer, bufr))
+
+{
+	char *p,
+	     *load_start;
+
+	const static char error[] = "ERROR";
+
+	String entry = NULL;
+
+
+	load_start = (char *) bufr->get(bufr);
+	if ( (p = strchr(load_start, ' ')) == NULL )
+		goto done;
+	++p;
+
+	INIT(HurdLib, String, entry, ERR(goto done));
+	if ( !entry->add(entry, p) )
+		goto done;
+
+	if ( !model->load(model, entry) )
+		goto done;
+
+	send_ok(duct, bufr);
+	return;
+
+
+ done:
+	bufr->reset(bufr);
+	if ( !bufr->add(bufr, (unsigned char *) error, sizeof(error)) )
+		return;
+	duct->send_Buffer(duct, bufr);
 }
 
 
@@ -686,11 +703,6 @@ static void interpreter(const void *arg)
 		}
 
 		switch ( get_command(bufr) ) {
-			case sancho_state:
-				if ( add_state(model, bufr) )
-					send_ok(duct, bufr);
-				break;
-
 			case exchange_event:
 				add_event(Host, model, bufr);
 				break;
@@ -706,6 +718,10 @@ static void interpreter(const void *arg)
 
 			case TE_event:
 				add_security(duct, model, bufr);
+				break;
+
+			case sancho_load:
+				do_load(duct, model, bufr);
 				break;
 
 			case show_measurement:

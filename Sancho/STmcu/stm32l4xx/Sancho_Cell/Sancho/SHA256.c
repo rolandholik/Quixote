@@ -23,7 +23,7 @@
 
 #include "NAAAIM.h"
 #include "SHA256.h"
-#include "sha256.h"
+#include "sha256-conte.h"
 
 
 /* Object state extraction macro. */

@@ -41,12 +41,14 @@ CINCLUDE = -I . -I ../../../../../HurdLib -I ../../../include		\
 	-I ${STMDIR}/Projects/Misc/Samples/Cellular/Inc			\
 	-I ${STMDIR}/Projects/Misc/Cmd/Inc				\
 	-I ${DEMODIR}/STM32_Cellular/Config				\
-	-I ${DEMODIR}/Core/Inc
+	-I ${DEMODIR}/Core/Inc						\
+	-I ${MBEDDIR}/include
 
 DEFINES = -DUSE_HAL_DRIVER=1 -DHWREF_B_CELL_BG96_V2=1			      \
 	-DUSE_STM32L496G_DISCO=1					      \
 	-DAPPLICATION_CONFIG_FILE=\"plf_cellular_app_config.h\"		      \
-	-DAPPLICATION_THREAD_CONFIG_FILE=\"plf_cellular_app_thread_config.h\"
+	-DAPPLICATION_THREAD_CONFIG_FILE=\"plf_cellular_app_thread_config.h\" \
+	-DMBEDTLS_CONFIG_FILE=\"mbedtls_config.h\"
 
 CFLAGS = ${PLATFORM} ${DEFINES} ${CDEBUG} ${CINCLUDE} -fno-diagnostics-color \
 	-Wall
@@ -57,15 +59,19 @@ STMSRC = stm32l4xx_hal.c stm32l4xx_hal_rcc.c stm32l4xx_hal_rcc_ex.c	    \
 	stm32l4xx_hal_rtc_ex.c stm32l4xx_hal_uart.c stm32l4xx_hal_uart_ex.c \
 	stm32l4xx_hal_dma.c stm32l4xx_hal_tim.c stm32l4xx_hal_tim_ex.c
 
+MBEDSRC = base64.c rsa.c rsa_internal.c bignum.c oid.c platform_util.c \
+	pem.c pk.c pk_wrap.c pkparse.c asn1parse.c sha256.c md.c md_wrap.c
+
 MISCSRC = cmd.c
 
-APPSRC = sancho.c command-interpreter.c ip4_addr.c sha256.c SHA256.c	   \
-	Duct.c COE.c Cell.c SecurityEvent.c SecurityPoint.c		   \
-	TSEM.c TTYduct.c regcomp.c regexec.c regerror.c tre-mem.c	   \
-	reg-support.c gpio.c rng.c rtc.c usart.c stm32l4xx_hal_msp.c	   \
-	stm32l4xx_it.c stm32l4xx_hal_timebase_TIM.c system_stm32l4xx.c usart.c
+APPSRC = sancho.c ip4_addr.c sha256-conte.c SHA256.c Duct.c COE.c Cell.c    \
+	SecurityEvent.c SecurityPoint.c TSEM.c TTYduct.c EventModel.c	    \
+	regcomp.c regexec.c regerror.c tre-mem.c reg-support.c gpio.c rng.c \
+	rtc.c usart.c stm32l4xx_hal_msp.c stm32l4xx_it.c usart.c	    \
+	system_stm32l4xx.c stm32l4xx_hal_timebase_TIM.c Base64.c RSAkey.c
 
-CSRC = syscalls.c sysmem.c board_interrupts.c ${STMSRC} ${MISCSRC} ${APPSRC}
+CSRC = syscalls.c sysmem.c board_interrupts.c ${STMSRC} ${MISCSRC} ${APPSRC} \
+	${MBEDSRC}
 
 ASRC = startup_stm32l496agix.s
 
@@ -117,6 +123,9 @@ LDFLAGS = ${PLATFORM} -Wl,--script=sancho.ld -lc -lm ${LIBS}
 %.o: ../../../../../SecurityModel/%.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
+%.o: ${MBEDDIR}/library/%.c
+	${CC} ${CFLAGS} -c $< -o $@;
+
 %.o: ${DEMODIR}/IDE/STM32CubeIDE/DiscoL496_BG96/Application/Startup/%.s
 	${AS} $< -o $@;
 
@@ -131,18 +140,21 @@ AOBJS = ${ASRC:.s=.o}
 #
 # Target definitions.
 #
-all: link-script sancho.elf
+all: link-script sancho.elf sancho-term.elf
 
-sancho.elf: ${COBJS} ${AOBJS}
+sancho.elf: command-interpreter.o ${COBJS} ${AOBJS}
 	${CC} -specs ${LIBDIR}/nosys.specs -o $@ $^ ${LDFLAGS};
 
-sancho-term.elf: ${COBJS} ${AOBJS}
+sancho-term.elf: test-interpreter.o ${COBJS} ${AOBJS}
 	${CC} -specs ${LIBDIR}/nosys.specs -o $@ $^ ${LDFLAGS};
 
 link-script:
 	[ ! -e "sancho.ld" ] && ln -s ${DEMODIR}/IDE/STM32CubeIDE/DiscoL496_BG96/STM32L496AGIX_FLASH.ld sancho.ld || true;
 
 flash: sancho.elf
+	${PROGRAMMER} -c port=swd -w $^;
+
+flash-term: sancho-term.elf
 	${PROGRAMMER} -c port=swd -w $^;
 
 reset:
@@ -155,4 +167,4 @@ clean:
 	rm -f *.o;
 
 clobber: clean
-	rm -f sancho.ld sancho.elf;
+	rm -f sancho.ld sancho.elf sancho-term.elf;

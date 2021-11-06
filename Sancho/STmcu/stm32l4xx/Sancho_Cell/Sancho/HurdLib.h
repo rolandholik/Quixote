@@ -50,6 +50,8 @@
 #define HurdLib_Buffer_OBJID		3
 #define HurdLib_String_OBJID		4
 #define HurdLib_SHA256_OBJID		5
+#define HurdLib_Base64_OBJID		6
+#define HurdLib_RSAkey_OBJID		7
 
 extern void Error(const char *, const char *, int);
 #endif
