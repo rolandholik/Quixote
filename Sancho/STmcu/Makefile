@@ -11,7 +11,7 @@
 #
 export MCUCFGDIR=${shell pwd}
 
-SUBDIRS = HurdLib stm32l4xx
+SUBDIRS = HurdLib NAAAIM stm32l4xx
 
 
 #
@@ -26,6 +26,9 @@ all: ${SUBDIRS}
 # Subdirectory targets.
 #
 HurdLib:
+	${MAKE} -C $@;
+
+NAAAIM:
 	${MAKE} -C $@;
 
 stm32l4xx:

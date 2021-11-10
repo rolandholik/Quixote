@@ -24,23 +24,24 @@
 #include <Buffer.h>
 #include <String.h>
 
+#include "NAAAIM.h"
 #include "Base64.h"
 
 /* Object state extraction macro. */
 #define STATE(var) CO(Base64_State, var) = this->state
 
 /* Verify library/object header file inclusions. */
-#if !defined(HurdLib_LIBID)
+#if !defined(NAAAIM_LIBID)
 #error Library identifier not defined.
 #endif
 
-#if !defined(HurdLib_Base64_OBJID)
+#if !defined(NAAAIM_Base64_OBJID)
 #error Object identifier not defined.
 #endif
 
 
 /** Base64 private state information. */
-struct HurdLib_Base64_State
+struct NAAAIM_Base64_State
 {
 	/* The root object. */
 	Origin root;
@@ -68,8 +69,8 @@ struct HurdLib_Base64_State
 
 static void _init_state(CO(Base64_State, S)) {
 
-	S->libid = HurdLib_LIBID;
-	S->objid = HurdLib_Base64_OBJID;
+	S->libid = NAAAIM_LIBID;
+	S->objid = NAAAIM_Base64_OBJID;
 
 	S->poisoned  = false;
 
@@ -247,9 +248,9 @@ extern Base64 NAAAIM_Base64_Init(void)
 	root = HurdLib_Origin_Init();
 
 	/* Allocate the object and internal state. */
-	retn.object_size  = sizeof(struct HurdLib_Base64);
-	retn.state_size   = sizeof(struct HurdLib_Base64_State);
-	if ( !root->init(root, HurdLib_LIBID, HurdLib_Base64_OBJID, &retn) )
+	retn.object_size  = sizeof(struct NAAAIM_Base64);
+	retn.state_size   = sizeof(struct NAAAIM_Base64_State);
+	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_Base64_OBJID, &retn) )
 		return NULL;
 	this	    	  = retn.object;
 	this->state 	  = retn.state;

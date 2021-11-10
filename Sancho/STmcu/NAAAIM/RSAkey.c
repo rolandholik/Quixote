@@ -25,7 +25,7 @@
 #include <HurdLib.h>
 #include <Buffer.h>
 
-#include "HurdLib.h"
+#include "NAAAIM.h"
 #include "SHA256.h"
 #include "RSAkey.h"
 
@@ -34,17 +34,17 @@
 #define STATE(var) CO(RSAkey_State, var) = this->state
 
 /* Verify library/object header file inclusions. */
-#if !defined(HurdLib_LIBID)
+#if !defined(NAAAIM_LIBID)
 #error Library identifier not defined.
 #endif
 
-#if !defined(HurdLib_RSAkey_OBJID)
+#if !defined(NAAAIM_RSAkey_OBJID)
 #error Object identifier not defined.
 #endif
 
 
 /** RSAkey private state information. */
-struct HurdLib_RSAkey_State
+struct NAAAIM_RSAkey_State
 {
 	/* The root object. */
 	Origin root;
@@ -94,8 +94,8 @@ v */
 static void _init_state(CO(RSAkey_State, S))
 
 {
-	S->libid = HurdLib_LIBID;
-	S->objid = HurdLib_RSAkey_OBJID;
+	S->libid = NAAAIM_LIBID;
+	S->objid = NAAAIM_RSAkey_OBJID;
 
 	S->poisoned = false;
 
@@ -304,8 +304,6 @@ static _Bool load_public(CO(RSAkey, this), CO(Buffer, bufr))
 
 	unsigned char *p;
 
-	int rc;
-
 	_Bool retn = false;
 
 
@@ -320,7 +318,7 @@ static _Bool load_public(CO(RSAkey, this), CO(Buffer, bufr))
 
 	/* Verify that the buffer is null-terminated. */
 	p = bufr->get(bufr) + bufr->size(bufr) - 1;
-	if ( *p != NULL ) {
+	if ( *p != '\0' ) {
 		if ( !bufr->add(bufr, (void *) "\0", 1) )
 			goto done;
 	}
@@ -986,9 +984,9 @@ extern RSAkey NAAAIM_RSAkey_Init(void)
 	root = HurdLib_Origin_Init();
 
 	/* Allocate the object and internal state. */
-	retn.object_size  = sizeof(struct HurdLib_RSAkey);
-	retn.state_size   = sizeof(struct HurdLib_RSAkey_State);
-	if ( !root->init(root, HurdLib_LIBID, HurdLib_RSAkey_OBJID, &retn) )
+	retn.object_size  = sizeof(struct NAAAIM_RSAkey);
+	retn.state_size   = sizeof(struct NAAAIM_RSAkey_State);
+	if ( !root->init(root, NAAAIM_LIBID, NAAAIM_RSAkey_OBJID, &retn) )
 		return NULL;
 	this	    	  = retn.object;
 	this->state 	  = retn.state;
