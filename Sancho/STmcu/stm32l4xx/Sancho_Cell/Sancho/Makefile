@@ -17,9 +17,9 @@ include ${MCUCFGDIR}/STmcu.mk
 #
 DEMODIR = ${STMDIR}/Projects/32L496GDISCOVERY/Demonstrations/Cellular
 
-CINCLUDE = -I . -I ../../../../../HurdLib -I ../../../../../lib		\
-	-I ../../../../../Quixote -I ../../../../../SecurityModel	\
-	-I ../../../../../						\
+CINCLUDE = -I . -I ../../../HurdLib -I ../../../../../HurdLib 		\
+	-I ../../../../../lib -I ../../../../../Quixote			\
+	-I ../../../../../SecurityModel	 -I ../../../../../		\
 	-I ${STMDIR}/Drivers/CMSIS/Device/ST/STM32L4xx/Include		\
 	-I ${STMDIR}/Drivers/CMSIS/Include				\
 	-I ${STMDIR}/Drivers/STM32L4xx_HAL_Driver/Inc			\
