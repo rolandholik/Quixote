@@ -25,7 +25,7 @@ DEFINES = -DMBEDTLS_CONFIG_FILE=\"mbedtls_config.h\"
 #
 # Object and source file definitions.
 #
-LIBSRC = Base64.c RSAkey.c
+LIBSRC = Base64.c RSAkey.c SHA256.c sha256-conte.c
 
 MBEDSRC = base64.c rsa.c rsa_internal.c bignum.c oid.c platform_util.c \
 	pem.c pk.c pk_wrap.c pkparse.c asn1parse.c sha256.c md.c md_wrap.c
@@ -81,3 +81,4 @@ clobber: clean
 # Source dependencies.
 Base64.o: ${LIBNAME}.h ../../../lib/Base64.h
 RSAkey.o: ${LIBNAME}.h ../../../lib/SHA256.h ../../../lib/RSAkey.h
+SHA256.o: ${LIBNAME}.h ../../../lib/SHA256.h sha256-conte.h
