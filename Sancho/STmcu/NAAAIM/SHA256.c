@@ -17,13 +17,14 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+#include <mbedtls/sha256.h>
+
 #include <Origin.h>
 #include "HurdLib.h"
 #include <Buffer.h>
 
 #include "NAAAIM.h"
 #include "SHA256.h"
-#include "sha256-conte.h"
 
 
 /* Object state extraction macro. */
@@ -31,11 +32,11 @@
 
 
 /* Verify library/object header file inclusions. */
-#if !defined(HurdLib_LIBID)
+#if !defined(NAAAIM_LIBID)
 #error Library identifier not defined.
 #endif
 
-#if !defined(HurdLib_SHA256_OBJID)
+#if !defined(NAAAIM_SHA256_OBJID)
 #error Object identifier not defined.
 #endif
 
@@ -62,7 +63,7 @@ struct NAAAIM_SHA256_State
 	_Bool computed;
 
 	/* The digest context. */
-	SHA256_CTX context;
+	mbedtls_sha256_context context;
 
 	/* The output of the hash. */
 	Buffer buffer;
@@ -109,10 +110,6 @@ static void _init_state(CO(SHA256_State, S)) {
 static _Bool _init_crypto(CO(SHA256_State, S))
 
  {
-#if 0
-	 static _Bool initialized = false;
-#endif
-
 	 _Bool retn = true;
 
 
@@ -160,7 +157,7 @@ static _Bool _compute_digest(CO(SHA256_State, S))
 		ERR(goto done);
 	S->computed = true;
 
-	sha256_final(&S->context, buffer);
+	mbedtls_sha256_finish_ret(&S->context, buffer);
 	if ( !S->buffer->add(S->buffer, buffer, size) )
 		ERR(goto done);
 	retn = true;
@@ -213,12 +210,13 @@ static _Bool add(CO(Sha256, this), CO(Buffer, bf))
 
 	/* Initialize the digest if necessary. */
 	if ( !S->initialized ) {
-		sha256_init(&S->context);
+		mbedtls_sha256_init(&S->context);
+		mbedtls_sha256_starts_ret(&S->context, false);
 		S->initialized = true;
 	}
 
 	/* Add the buffer contents. */
-	sha256_update(&S->context, bf->get(bf), bf->size(bf));
+	mbedtls_sha256_update_ret(&S->context, bf->get(bf), bf->size(bf));
 	retn = true;
 
 
@@ -291,9 +289,10 @@ static _Bool rehash(CO(Sha256, this), const unsigned int cnt)
 
 
 	for (lp= 0; lp < cnt; ++lp) {
-		sha256_init(&S->context);
-		sha256_update(&S->context, b->get(b), b->size(b));
-		sha256_final(&S->context, buffer);
+		mbedtls_sha256_init(&S->context);
+		mbedtls_sha256_starts_ret(&S->context, false);
+		mbedtls_sha256_update_ret(&S->context, b->get(b), b->size(b));
+		mbedtls_sha256_finish_ret(&S->context, buffer);
 
 		b->reset(b);
 		if ( !b->add(b, buffer, size) )
@@ -353,9 +352,11 @@ static _Bool extend(CO(Sha256, this), CO(Buffer, bufr))
 
 
 	/* Hash the supplied material. */
-	sha256_init(&S->context);
-	sha256_update(&S->context, bufr->get(bufr), bufr->size(bufr));
-	sha256_final(&S->context, buffer);
+	mbedtls_sha256_init(&S->context);
+	mbedtls_sha256_starts_ret(&S->context, false);
+	mbedtls_sha256_update_ret(&S->context, bufr->get(bufr), \
+				  bufr->size(bufr));
+	mbedtls_sha256_finish_ret(&S->context, buffer);
 
 	if ( !S->buffer->add(S->buffer, buffer, size) )
 		ERR(goto done);
@@ -507,9 +508,7 @@ static void whack(CO(Sha256, this))
 	STATE(S);
 
 
-#if 0
-	EVP_MD_CTX_free(S->context);
-#endif
+	mbedtls_sha256_free(&S->context);
 
 	if ( S->buffer != NULL )
 		S->buffer->whack(S->buffer);
