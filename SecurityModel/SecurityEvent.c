@@ -10,6 +10,16 @@
  * the source tree for copyright and licensing information.
  **************************************************************************/
 
+/* Local definitions. */
+
+/**
+ * The following definition is the ASCII hexadecimal value the digest
+ * of a zero length file.  This value is used for the default digest
+ * value of an event that involves a pseudonym.
+ */
+#define ZERO_LENGTH_FILE "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+
 /* Include files. */
 #include <stdio.h>
 #include <stdint.h>
@@ -412,8 +422,6 @@ static _Bool evaluate_pseudonym(CO(SecurityEvent, this), CO(Buffer, pseudonym))
 
 	_Bool retn = false;
 
-	uint8_t digest[NAAAIM_IDSIZE];
-
 	Buffer bufr = NULL;
 
 
@@ -431,9 +439,8 @@ static _Bool evaluate_pseudonym(CO(SecurityEvent, this), CO(Buffer, pseudonym))
 
 	/* If the event matches set the digest value. */
 	if ( pseudonym->equal(pseudonym, bufr) ) {
-		memset(digest, '\0', sizeof(digest));
 		bufr->reset(bufr);
-		if ( !bufr->add(bufr, digest, sizeof(digest)) )
+		if ( !bufr->add_hexstring(bufr, ZERO_LENGTH_FILE) )
 			ERR(goto done);
 		S->cell->set_digest(S->cell, bufr);
 	}
