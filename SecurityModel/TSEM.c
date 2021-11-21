@@ -113,7 +113,7 @@ struct NAAAIM_TSEM_State
 	unsigned char hostid[NAAAIM_IDSIZE];
 
 	/* Event domain instance aggregate. */
-	unsigned char domain_aggregate[NAAAIM_IDSIZE];
+	Buffer aggregate;
 
 	/* Canister measurement. */
 	unsigned char measurement[NAAAIM_IDSIZE];
@@ -164,9 +164,9 @@ static void _init_state(CO(TSEM_State, S))
 	S->discipline_pid = 0;
 
 	memset(S->hostid, '\0', sizeof(S->hostid));
-	memset(S->domain_aggregate, '\0', sizeof(S->domain_aggregate));
 	memset(S->measurement, '\0', sizeof(S->measurement));
 
+	S->aggregate	= NULL;
 	S->trajectory	= NULL;
 	S->points	= NULL;
 	S->forensics	= NULL;
@@ -349,17 +349,20 @@ static _Bool update(CO(TSEM, this), CO(SecurityEvent, event), _Bool *status, \
 
 
 	/* Use a default aggregate measurement if not specified. */
-	INIT(HurdLib, Buffer, point, ERR(goto done));
 	if ( !S->have_aggregate ) {
-		if ( !point->add_hexstring(point, DEFAULT_AGGREGATE) )
+		if ( !S->aggregate->add_hexstring(S->aggregate, \
+						  DEFAULT_AGGREGATE) )
 			ERR(goto done);
-		if ( !_extend_measurement(S, point->get(point), \
+		if ( !_extend_measurement(S, S->aggregate->get(S->aggregate), \
 					  S->measurement) )
 			ERR(goto done);
-		memcpy(S->domain_aggregate, S->measurement, \
-		       sizeof(S->domain_aggregate));
+
+		S->aggregate->reset(S->aggregate);
+		if ( !S->aggregate->add(S->aggregate, S->measurement, \
+					sizeof(S->measurement)) )
+			ERR(goto done);
+
 		S->have_aggregate = true;
-		point->reset(point);
 	}
 
 
@@ -374,6 +377,8 @@ static _Bool update(CO(TSEM, this), CO(SecurityEvent, event), _Bool *status, \
 	 * Measure the current security exchange event to obtain the
 	 * security state point that will be added to the model.
 	 */
+	INIT(HurdLib, Buffer, point, ERR(goto done));
+
 	if ( !event->measure(event) )
 		ERR(goto done);
 	if ( !event->get_identity(event, point) )
@@ -814,8 +819,9 @@ static _Bool set_aggregate(CO(TSEM, this), CO(Buffer, bufr))
 
 	if ( !_extend_measurement(S, bufr->get(bufr), S->measurement) )
 		ERR(goto done);
-	memcpy(S->domain_aggregate, S->measurement, \
-	       sizeof(S->domain_aggregate));
+	if ( !S->aggregate->add(S->aggregate, S->measurement, \
+				sizeof(S->measurement)) )
+		ERR(goto done);
 
 	retn		  = true;
 	S->have_aggregate = true;
@@ -1112,7 +1118,7 @@ static _Bool get_state(CO(TSEM, this), CO(Buffer, out))
 	qsort(points->get(points), cnt, sizeof(SecurityPoint), _state_sort);
 
 	ep = (SecurityPoint *) points->get(points);
-	memcpy(state, S->domain_aggregate, sizeof(state));
+	memcpy(state, S->aggregate->get(S->aggregate), sizeof(state));
 
 	while ( cnt-- ) {
 		event = *ep;
@@ -1665,6 +1671,8 @@ static void whack(CO(TSEM, this))
 	STATE(S);
 
 
+	WHACK(S->aggregate);
+
 	GWHACK(S->trajectory, SecurityEvent);
 	WHACK(S->trajectory);
 
@@ -1723,6 +1731,7 @@ extern TSEM NAAAIM_TSEM_Init(void)
 	_init_state(this->state);
 
 	/* Initialize aggregate objects. */
+	INIT(HurdLib, Buffer, this->state->aggregate, goto fail);
 	INIT(HurdLib, Gaggle, this->state->trajectory, goto fail);
 	INIT(HurdLib, Gaggle, this->state->points, goto fail);
 	INIT(HurdLib, Gaggle, this->state->forensics, goto fail);
@@ -1765,6 +1774,7 @@ extern TSEM NAAAIM_TSEM_Init(void)
 	return this;
 
 fail:
+	WHACK(this->state->aggregate);
 	WHACK(this->state->trajectory);
 	WHACK(this->state->points);
 
