@@ -806,19 +806,33 @@ static _Bool set_aggregate(CO(TSEM, this), CO(Buffer, bufr))
 
 	_Bool retn = false;
 
+	uint8_t measurement[NAAAIM_IDSIZE];
 
-	/* Verify object status. */
+
+	/* Verify object status and aggregate state. */
 	if ( S->poisoned )
 		ERR(goto done);
-	if ( S->sealed && S->have_aggregate ) {
+	if ( S->sealed ) {
 		retn = true;
 		goto done;
 	}
-	if ( S->have_aggregate )
+
+
+	/* Compute the host specific aggregate value. */
+	memset(measurement, '\0', sizeof(measurement));
+	if ( !_extend_measurement(S, bufr->get(bufr), measurement) )
 		ERR(goto done);
 
-	if ( !_extend_measurement(S, bufr->get(bufr), S->measurement) )
-		ERR(goto done);
+	if ( S->have_aggregate ) {
+		if ( memcmp(S->aggregate->get(S->aggregate), measurement, \
+			    sizeof(measurement)) == 0 ) {
+			retn = true;
+			goto done;
+		}
+		S->aggregate->reset(S->aggregate);
+	}
+
+	memcpy(S->measurement, measurement, sizeof(S->measurement));
 	if ( !S->aggregate->add(S->aggregate, S->measurement, \
 				sizeof(S->measurement)) )
 		ERR(goto done);
@@ -826,9 +840,13 @@ static _Bool set_aggregate(CO(TSEM, this), CO(Buffer, bufr))
 	retn		  = true;
 	S->have_aggregate = true;
 
+
  done:
 	if ( !retn )
 		S->poisoned = true;
+
+	memset(measurement, '\0', sizeof(measurement));
+
 	return retn;
 }
 
