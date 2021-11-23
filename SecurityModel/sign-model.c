@@ -39,6 +39,11 @@ extern int main(int argc, char *argv[])
 	char *key_file   	= NULL,
 	     *model_file	= NULL;
 
+	enum {
+		sign_mode,
+		generate_mode,
+	} mode = sign_mode;
+
 	Buffer bufr	 = NULL,
 	       signature = NULL;
 
@@ -48,12 +53,16 @@ extern int main(int argc, char *argv[])
 
 	Base64 encoder = NULL;
 
-	File model = NULL;
+	File output = NULL;
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "k:m:")) != EOF )
+	while ( (opt = getopt(argc, argv, "Gk:m:")) != EOF )
 		switch ( opt ) {
+			case 'G':
+				mode = generate_mode;
+				break;
+
 			case 'k':
 				key_file = optarg;
 				break;
@@ -70,16 +79,34 @@ extern int main(int argc, char *argv[])
 		fputs("No key specified.\n", stderr);
 		goto done;
 	}
-	if ( model_file == NULL ) {
+	if ( (mode == sign_mode) && model_file == NULL ) {
 		fputs("No model specified.\n", stderr);
+		goto done;
+	}
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	INIT(HurdLib, File, output, ERR(goto done));
+	INIT(NAAAIM, RSAkey, rsakey, ERR(goto done));
+
+
+	/* Create a signing key. */
+	if ( mode == generate_mode ) {
+		if ( !rsakey->generate_key(rsakey, 2048) )
+			ERR(goto done);
+		if ( !rsakey->get_private_key(rsakey, bufr) )
+			ERR(goto done);
+
+		if ( !output->open_rw(output, key_file) )
+			ERR(goto done);
+
+		if ( !output->write_Buffer(output, bufr) )
+			ERR(goto done);
+
 		goto done;
 	}
 
 
 	/* Load and emit the public signing key. */
-	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-
-	INIT(NAAAIM, RSAkey, rsakey, ERR(goto done));
 	if ( !rsakey->load_private_key(rsakey, key_file, NULL) )
 		ERR(goto done);
 	if ( !rsakey->get_public_key(rsakey, bufr) )
@@ -105,12 +132,11 @@ extern int main(int argc, char *argv[])
 	 * to the Buffer object that the signature will be generated
 	 * over.
 	 */
-	INIT(HurdLib, File, model, ERR(goto done));
-	if ( !model->open_ro(model, model_file) )
+	if ( !output->open_ro(output, model_file) )
 		ERR(goto done);
 
 	str->reset(str);
-	while ( model->read_String(model, str) ) {
+	while ( output->read_String(output, str) ) {
 		if ( !bufr->add(bufr, (void *) str->get(str), \
 				str->size(str) + 1) )
 			ERR(goto done);
@@ -139,7 +165,7 @@ extern int main(int argc, char *argv[])
 	WHACK(rsakey);
 	WHACK(str);
 	WHACK(encoder);
-	WHACK(model);
+	WHACK(output);
 
 	return retn;
 }
