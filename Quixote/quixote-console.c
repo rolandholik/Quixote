@@ -500,6 +500,7 @@ static _Bool receive_map(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	}
 	fputs("seal\n", stdout);
 
+	fputs("end\n", stdout);
 	cmdbufr->reset(cmdbufr);
 	retn = true;
 
