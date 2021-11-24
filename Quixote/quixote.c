@@ -82,10 +82,11 @@
 #include "TTYduct.h"
 #include "LocalDuct.h"
 #include "SHA256.h"
+#include "Base64.h"
+#include "RSAkey.h"
 
 #include "SecurityPoint.h"
 #include "SecurityEvent.h"
-#include "TSEM.h"
 
 
 /**
@@ -98,15 +99,6 @@ static FILE *Debug = NULL;
  * The process id of the cartridge monitor process.
  */
 static pid_t Cartridge_pid;
-
-
-/**
- * The seal status of the domain.  This variable is set by a
- * seal event for the domain.  Updates which are not in the
- * security state will cause disciplining requests to be generated
- * for the process initiating the event.
- */
-static _Bool Sealed = false;
 
 /**
  * The following variable holds booleans which describe signals
@@ -131,6 +123,37 @@ struct {
 	 process_mode,
 	 cartridge_mode,
 } Mode = cartridge_mode;
+
+/** The numerical definitions for the security model load commands. */
+enum {
+	model_cmd_comment=1,
+	model_cmd_key,
+	model_cmd_aggregate,
+	model_cmd_state,
+	model_cmd_pseudonym,
+	model_cmd_seal,
+	model_cmd_signature,
+	model_cmd_end
+} security_load_commands;
+
+/** The structure used to equate strings to numerical load commands. */
+struct security_load_definition {
+	int command;
+	char *syntax;
+	_Bool has_arg;
+};
+
+/** The list of security load commands. */
+struct security_load_definition Security_cmd_list[] = {
+	{model_cmd_comment,	"#",		false},
+	{model_cmd_key,		"key ",		true},
+	{model_cmd_aggregate,	"aggregate ",	true},
+	{model_cmd_state,	"state ",	true},
+	{model_cmd_pseudonym,	"pseudonym ",	true},
+	{model_cmd_seal,	"seal",		false},
+	{model_cmd_signature,	"signature ",	true},
+	{model_cmd_end,		"end",		false}
+};
 
 
 /**
@@ -305,68 +328,6 @@ static _Bool setup_management(CO(LocalDuct, mgmt), const char *cartridge)
 
 	return retn;
 }
-
-
-#if 0
-/**
- * Private function.
- *
- * This function is responsible for returning a list from the
- * co-processor to a management client.
- *
- * \param mgmt	The socket object used to communicate with
- *		the cartridge management instance.
- *
- * \param bufr	The object which will be used to hold the
- *			information which will be transmitted.
- *
- * \return		A boolean value is returned to indicate whether
- *			or not the command was processed.  A false value
- *			indicates the processing of commands should be
- *			terminated while a true value indicates an
- *			additional command cycle should be processed.
- */
-
-static _Bool send_list(CO(TTYduct, duct), CO(LocalDuct, mgmt), \
-		       CO(Buffer, bufr), CO(char *, cmd))
-
-{
-	_Bool retn = false;
-
-	uint32_t cnt;
-
-
-	/* Send the specified listing command. */
-	bufr->reset(bufr);
-	if ( !bufr->add(bufr, (unsigned char *) cmd, strlen(cmd)) )
-		ERR(goto done);
-	if ( !duct->send_Buffer(duct, bufr) )
-		ERR(goto done);
-
-
-	/* Return the result stream to the client. */
-	bufr->reset(bufr);
-	if ( !duct->receive_Buffer(duct, bufr) )
-		ERR(goto done);
-
-	cnt = *(unsigned int *) bufr->get(bufr);
-	if ( !mgmt->send_Buffer(mgmt, bufr) )
-		ERR(goto done);
-
-	while ( cnt-- > 0 ) {
-		bufr->reset(bufr);
-		if ( !duct->receive_Buffer(duct, bufr) )
-			ERR(goto done);
-		if ( !mgmt->send_Buffer(mgmt, bufr) )
-			ERR(goto done);
-	}
-
-	retn = true;
-
- done:
-	return retn;
-}
-#endif
 
 
 /**
@@ -704,6 +665,52 @@ static _Bool seal_domain(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 /**
  * Private function.
  *
+ * This function is responsible for returning the current security state
+ * event map to the caller.  This map can be used to define the desired
+ * security state by feeding this map into the quixote utility with the
+ * -m command-line switch.
+ *
+ * \param mgmt		The socket object used to communicate with
+ *			the quixote-console management instance.
+ *
+ * \param cmdbufr	The object which will be used to hold the
+ *			information which will be transmitted.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not the command was processed.  A false value
+ *			indicates an error was encountered while sending
+ *			the event list while a true value indicates the
+ *			event list was succesfully sent.
+ */
+
+static _Bool send_map(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
+
+{
+	_Bool retn = false;
+
+	uint8_t aggregate[NAAAIM_IDSIZE];
+
+
+	/* Send the domain aggregate. */
+	memset(aggregate, '\0', sizeof(aggregate));
+	cmdbufr->reset(cmdbufr);
+	cmdbufr->add(cmdbufr, aggregate, sizeof(aggregate));
+	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
+		ERR(goto done);
+
+
+	/* Send each point in the model. */
+	retn = send_points(mgmt, cmdbufr);
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
  * This function implements the processing of a management command from
  * the quixote-console utility.
  *
@@ -796,6 +803,10 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 		case seal_event:
 			retn = seal_domain(mgmt, cmdbufr);
 			break;
+
+		case show_map:
+			retn = send_map(mgmt, cmdbufr);
+			break;
 	}
 
 
@@ -864,65 +875,253 @@ static _Bool add_state(CO(char *, inbufr))
 
 
 /**
- * Private function.
+ * Internal private function.
  *
- * This function is responsible for processing security domain definitions
- * that are to be programed into a kernel disciplined namespace.
+ * This function encapsulates the addition of a line from a model file
+ * to the Buffer object that will be hashed to generate the signature
+ * for the model.
  *
- * \param bufr		A pointer to the character buffer containing
- *			the ASCII encoded event.
+ * \param bufr		The state information for the model object.
  *
- * \return		A boolean value is returned to indicate whether
- *			or not processing of the event was successful.  A
- *			false value indicates a failure in event
- *			processing while a true value indicates that
- *			event processing has succeeded.
+ * \param line		The object containing the line to add to the
+ *			file.
+ *
+ * \return	A boolean value is used to indicate the status of the
+ *		addition of the line.  A false value indicates the
+ *		addition failed while a true value indicates the
+ *		contents of the line had been added to the buffer.
  */
 
-static _Bool process_event(const char *event)
+static _Bool _add_entry(CO(Buffer, bufr), CO(String, line))
 
 {
 	_Bool retn = false;
 
-	struct sancho_cmd_definition *cp;
+
+	if ( bufr == NULL )
+		return true;
+
+	if ( !bufr->add(bufr, (void *) line->get(line), line->size(line) + 1) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	return retn;
+
+}
+
+
+/**
+ * Internal private function.
+ *
+ * This function carries out the validation of a signed security model.
+ *
+ * \param key		The object containing
+ *			model over which the signature is generated.
+ *
+ * \param sigdata	The object containing the contents of the
+ *			security model in a form suitable for computing
+ *			the hash signature.
+ *
+ * \param sig		The Base64 encoded signature.
+ *
+ * \param valid		A pointer to the boolean value that will be
+ *			loaded with the result of the signature
+ *			validation.
+ *
+ * \return	A boolean value is used to indicate the status of the
+ *		computation of the signature.  A false value indicates
+ *		an error was encountered while computing the signature.
+ *		A true value indicates the signature was calculated
+ *		and the variable pointed to by the status variable
+ *		contains the status of the signature.
+ */
+
+static _Bool _verify_model(CO(Buffer, key), CO(Buffer, sigdata), char * sig, \
+			   _Bool *valid)
+
+{
+	_Bool retn = false;
+
+	Buffer signature = NULL;
+
+	String str = NULL;
+
+	Base64 base64 = NULL;
+
+	RSAkey rsakey = NULL;
+
+
+	/* Load the key that was provided. */
+	INIT(HurdLib, String, str, ERR(goto done));
+	if ( !str->add(str, (char *) key->get(key)) )
+		ERR(goto done);
+
+	INIT(NAAAIM, Base64, base64, ERR(goto done));
+	key->reset(key);
+	if ( !base64->decode(base64, str, key) )
+		ERR(goto done);
+
+	INIT(NAAAIM, RSAkey, rsakey, ERR(goto done));
+	if ( !rsakey->load_public(rsakey, key) )
+		ERR(goto done);
+
+
+	/* Decode and verify the signature. */
+	str->reset(str);
+	if ( !str->add(str, sig) )
+		ERR(goto done);
+
+	INIT(HurdLib, Buffer, signature, ERR(goto done));
+	if ( !base64->decode(base64, str, signature) )
+		ERR(goto done);
+
+	if ( !rsakey->verify(rsakey, signature, sigdata, valid) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	WHACK(signature);
+	WHACK(str);
+	WHACK(base64);
+	WHACK(rsakey);
+
+	return retn;
+
+}
+
+
+/**
+ * Internal public functioin.
+ *
+ * This method implements the initialization of an in-kernel security
+ * model.
+ *
+ * \param entry		An object that contains the description of the
+ *			entry that is to be entered into the security
+ *			model.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the entry was successfully loaded into the kernel.
+ *		A false value indicates a failure occurred while
+ *		a true value indicates the security model was
+ *		successfully updated.
+ */
+
+static _Bool load(CO(String, entry))
+
+{
+	_Bool retn	= false,
+	      sig_valid = false;
+
+	char *arg = NULL;
+
+	struct security_load_definition *dp;
 
 	Buffer bufr = NULL;
 
+	static _Bool loading = false;
 
-	/* Locate the event type. */
-	for (cp= Sancho_cmd_list; cp->syntax != NULL; ++cp) {
-		if ( strncmp(cp->syntax, event, strlen(cp->syntax)) == 0 )
+	static Buffer key     = NULL,
+		      sigdata = NULL;
+
+
+	/* Locate the load command being requested. */
+	for (dp= Security_cmd_list; dp->command <= model_cmd_end; ++dp) {
+		if ( strncmp(dp->syntax, entry->get(entry), \
+			     strlen(dp->syntax)) == 0 )
 			break;
 	}
+	if ( dp->command > model_cmd_end )
+		ERR(goto done);
 
-	if ( cp->syntax == NULL ) {
-		fprintf(stderr, "Unknown event: %s\n", event);
-		goto done;
+	if ( (dp->command != model_cmd_signature) && !loading )
+		loading = true;
+
+
+	/* Get the start of command argument. */
+	if ( dp->has_arg ) {
+		arg = entry->get(entry) + strlen(dp->syntax);
+		if ( *arg == '\0' )
+			ERR(goto done);
 	}
 
 
-	/* Dispatch the event. */
+	/* Implement the command. */
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 
-	switch ( cp->command ) {
-		case aggregate_event:
-			retn = true;
-			break;
-
-		case seal_event:
-			if ( !seal(bufr) )
+	switch ( dp->command ) {
+		case model_cmd_comment:
+			if ( !_add_entry(sigdata, entry) )
 				ERR(goto done);
-			if ( Debug )
-				fputs("Sealed domain.\n", Debug);
-
-			retn   = true;
-			Sealed = true;
 			break;
 
-		default:
-			fprintf(stderr, "Unknown event: %s\n", event);
+		case model_cmd_key:
+			INIT(HurdLib, Buffer, sigdata, ERR(goto done));
+
+			if ( !_add_entry(sigdata, entry) )
+				ERR(goto done);
+
+			if ( key != NULL )
+				ERR(goto done);
+			INIT(HurdLib, Buffer, key, ERR(goto done));
+			if ( !key->add(key, (void *) arg, strlen(arg) + 1) )
+				ERR(goto done);
+			break;
+
+		case model_cmd_aggregate:
+			if ( !_add_entry(sigdata, entry) )
+				ERR(goto done);
+			break;
+
+		case model_cmd_state:
+			if ( !_add_entry(sigdata, entry) )
+				ERR(goto done);
+
+			if ( !bufr->add_hexstring(bufr, arg) )
+				ERR(goto done);
+			if ( !add_state(arg) )
+				ERR(goto done);
+			break;
+
+		case model_cmd_pseudonym:
+			if ( !_add_entry(sigdata, entry) )
+				ERR(goto done);
+			break;
+
+		case model_cmd_seal:
+			if ( !_add_entry(sigdata, entry) )
+				ERR(goto done);
+
+			seal(bufr);
+			break;
+
+		case model_cmd_signature:
+			if ( (sigdata == NULL) || (key == NULL) )
+				ERR(goto done);
+
+			if ( !_verify_model(key, sigdata, arg, &sig_valid) )
+				ERR(goto done);
+			if ( !sig_valid )
+				ERR(goto done);
+
+			WHACK(key);
+			WHACK(sigdata);
+			break;
+
+		case model_cmd_end:
+			if ( !_add_entry(sigdata, entry) )
+				ERR(goto done);
+
+			loading = false;
 			break;
 	}
+
+	retn = true;
 
 
  done:
@@ -935,45 +1134,47 @@ static _Bool process_event(const char *event)
 /**
  * Private function.
  *
- * This function implements the initialization of a behavioral map
- * for the cartridge being executed.
+ * This function implements the initialization of a security model from
+ * a file.
  *
- * \param mapfile	The name of the file containing the behavioral
- *			model.  The model is expected to consist of
- *			model events.
+ * \param model		The object that will be used to read the security
+ *			model file.
  *
  * \return		A boolean value is returned to indicate whether
- *			or not the command was processed.  A false value
- *			indicates the processing of commands should be
- *			terminated while a true value indicates an
- *			additional command cycle should be processed.
+ *			or not the model was loaded.  A false value
+ *			indicates the load of the model failed while
+ *			a true value indicates the model was successfully
+ *			loaded.
  */
 
-static _Bool initialize_state(FILE *mapfile)
+static _Bool load_model(CO(File, model))
 
 {
 	_Bool retn = false;
 
-	char *p,
-	     inbufr[256];
+	String str = NULL;
 
 
-	/* Loop over the mapfile and process directives. */
-	while ( fgets(inbufr, sizeof(inbufr), mapfile) != NULL ) {
-		if ( (p = strchr(inbufr, '\n')) != 0 )
-			*p = '\0';
+	/* Open the security map file. */
+	INIT(HurdLib, String, str, ERR(goto done));
 
+
+	/* Loop over the contents of the map.. */
+	while ( model->read_String(model, str) ) {
 		if ( Debug )
-			fprintf(Debug, "Initialize: %s\n", inbufr);
+			fprintf(Debug, "Model entry: %s\n", str->get(str));
 
-		if ( !process_event(inbufr) )
+		if ( !load(str) )
 			ERR(goto done);
+		str->reset(str);
 	}
 
 	retn = true;
 
 
  done:
+	WHACK(str);
+
 	return retn;
 }
 
@@ -1135,8 +1336,8 @@ static void show_magazine(CO(char *, root))
  *		was successfully launched.
  */
 
-static _Bool fire_cartridge(CO(char *, cartridge), FILE *map, int *endpoint, \
-			    _Bool enforce)
+static _Bool fire_cartridge(CO(char *, cartridge), CO(File, map), \
+			    int *endpoint, _Bool enforce)
 
 {
 	_Bool retn = false;
@@ -1167,7 +1368,7 @@ static _Bool fire_cartridge(CO(char *, cartridge), FILE *map, int *endpoint, \
 
 	/* Load the state map if one has been specified. */
 	if ( map != NULL ) {
-		if ( !initialize_state(map) )
+		if ( !load_model(map) )
 			ERR(goto done);
 	}
 
@@ -1316,9 +1517,8 @@ extern int main(int argc, char *argv[])
 
 	LocalDuct mgmt = NULL;
 
-	File infile = NULL;
-
-	FILE *state = NULL;
+	File state  = NULL,
+	     infile = NULL;
 
 
 	while ( (opt = getopt(argc, argv, "CPSec:d:m:")) != EOF )
@@ -1398,7 +1598,9 @@ extern int main(int argc, char *argv[])
 
 	/* Load and seal a behavior map if specified. */
 	if ( map != NULL ) {
-		if ( (state = fopen(map, "r")) == NULL )
+		INIT(HurdLib, File, state, ERR(goto done));
+
+		if ( !state->open_ro(state, map) )
 			ERR(goto done);
 		if ( Debug )
 			fprintf(Debug, "Opened state map: %s\n", map);
@@ -1497,6 +1699,7 @@ extern int main(int argc, char *argv[])
  done:
 	WHACK(cmdbufr);
 	WHACK(mgmt);
+	WHACK(state);
 	WHACK(infile);
 
 	if ( fd > 0 )

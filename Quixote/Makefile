@@ -96,8 +96,8 @@ all: ${COBJS} tools
 
 tools: ${TOOLS}
 
-quixote: quixote.o ${LIBDEPS} ${MODELDEPS}
-	${CC} ${LDFLAGS} -o $@ $< ${MODELDEPS} ${LIBS};
+quixote: quixote.o ${LIBDEPS}
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
 
 quixote-mcu: quixote-mcu.o ${LIBDEPS} ${MODELDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${MODELDEPS} ${LIBS};
