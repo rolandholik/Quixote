@@ -1104,13 +1104,16 @@ static _Bool load(CO(String, entry))
 			if ( (sigdata == NULL) || (key == NULL) )
 				ERR(goto done);
 
-			if ( !_verify_model(key, sigdata, arg, &sig_valid) )
-				ERR(goto done);
-			if ( !sig_valid )
-				ERR(goto done);
-
+			retn = _verify_model(key, sigdata, arg, &sig_valid);
 			WHACK(key);
 			WHACK(sigdata);
+
+			if ( !retn )
+				ERR(goto done);
+			if ( !sig_valid ) {
+				retn = false;
+				ERR(goto done);
+			}
 			break;
 
 		case model_cmd_end:
