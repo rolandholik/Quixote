@@ -101,6 +101,14 @@ static FILE *Debug = NULL;
 static pid_t Cartridge_pid;
 
 /**
+ * The seal status of the domain.  This variable is set by a
+ * seal event for the domain.  Updates which are not in the
+ * security state will cause disciplining requests to be generated
+ * for the process initiating the event.
+ */
+static _Bool Sealed = false;
+
+/**
  * The following variable holds booleans which describe signals
  * which were received.
  */
@@ -363,6 +371,18 @@ static _Bool send_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	File ef = NULL;
 
 
+	/* Hande a sealed model. */
+	if ( Sealed ) {
+		cmdbufr->reset(cmdbufr);
+		cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
+		if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
+			ERR(goto done);
+
+		retn = true;
+		goto done;
+	}
+
+
 	/*
 	 * Compute the number of lines in the trajectory.
 	 */
@@ -444,6 +464,18 @@ static _Bool send_points(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	File ef = NULL;
 
 
+	/* Hande a sealed model. */
+	if ( Sealed ) {
+		cmdbufr->reset(cmdbufr);
+		cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
+		if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
+			ERR(goto done);
+
+		retn = true;
+		goto done;
+	}
+
+
 	/*
 	 * Compute the number of lines in the trajectory.
 	 */
@@ -522,6 +554,18 @@ static _Bool send_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	String es = NULL;
 
 	File ef = NULL;
+
+
+	/* Hande a sealed model. */
+	if ( Sealed ) {
+		cmdbufr->reset(cmdbufr);
+		cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
+		if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
+			ERR(goto done);
+
+		retn = true;
+		goto done;
+	}
 
 
 	/*
@@ -607,7 +651,8 @@ static _Bool seal(CO(Buffer, bufr))
 	if ( !sf->write_Buffer(sf, bufr) )
 		ERR(goto done);
 
-	retn = true;
+	retn   = true;
+	Sealed = true;
 
 
  done:
@@ -644,9 +689,11 @@ static _Bool seal_domain(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 
 	/* Seal the domain. */
-	cmdbufr->reset(cmdbufr);
-	if ( !seal(cmdbufr) )
-		ERR(goto done);
+	if ( !Sealed ) {
+		cmdbufr->reset(cmdbufr);
+		if ( !seal(cmdbufr) )
+			ERR(goto done);
+	}
 
 	/* Send response to caller. */
 	cmdbufr->reset(cmdbufr);
@@ -736,6 +783,8 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 	int *cp;
 
+	uint8_t sealed[NAAAIM_IDSIZE] = {0};
+
 	String estr = NULL;
 
 	File efile = NULL;
@@ -762,6 +811,17 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	switch ( *cp ) {
 		case show_measurement:
 			cmdbufr->reset(cmdbufr);
+
+			if ( Sealed ) {
+				if ( !cmdbufr->add(cmdbufr, sealed, \
+						   sizeof(sealed)) )
+					ERR(goto done);
+				if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
+					ERR(goto done);
+				retn = true;
+				goto done;
+			}
+
 			if ( !efile->open_ro(efile, MEASUREMENT_FILE) )
 				ERR(goto done);
 			if ( !efile->read_String(efile, estr) )
@@ -776,6 +836,19 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 		case show_state:
 			cmdbufr->reset(cmdbufr);
+
+			if ( Sealed ) {
+				if ( Debug )
+					fputs("Processing sealed.\n", Debug);
+				if ( !cmdbufr->add(cmdbufr, sealed, \
+						   sizeof(sealed)) )
+					ERR(goto done);
+				if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
+					ERR(goto done);
+				retn = true;
+				goto done;
+			}
+
 			if ( !efile->open_ro(efile, STATE_FILE) )
 				ERR(goto done);
 			if ( !efile->read_String(efile, estr) )
