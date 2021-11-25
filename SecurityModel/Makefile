@@ -17,7 +17,7 @@ TOOLS = test-COE test-cell test-event generate-states sha-tool		\
 	compute-measurement set-behavior test-TSEM compute-aggregate	\
 	bad-actor sign-model generate-pseudonym
 
-INSTALLBIN  = generate-states generate-pseudonym sha-tool
+INSTALLBIN  = generate-states generate-pseudonym sign-model
 INSTALLSBIN = set-behavior
 
 CC = musl-gcc
