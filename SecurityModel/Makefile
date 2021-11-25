@@ -6,7 +6,7 @@
 # **************************************************************************/
 
 # Variable declarations.
-INSTPATH       = ${DESTDIR}/opt/ESD
+INSTPATH       = ${DESTDIR}/opt/Quixote
 
 SANCHODIR = ../Sancho/SGX
 
