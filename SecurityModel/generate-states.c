@@ -43,7 +43,8 @@
 extern int main(int argc, char *argv[])
 
 {
-	_Bool verbose = false;
+	_Bool prefix  = false,
+	      verbose = false;
 
 	char *input_file = NULL;
 
@@ -60,8 +61,11 @@ extern int main(int argc, char *argv[])
 
 
 	/* Parse and verify arguements. */
-	while ( (opt = getopt(argc, argv, "vi:")) != EOF )
+	while ( (opt = getopt(argc, argv, "pvi:")) != EOF )
 		switch ( opt ) {
+			case 'p':
+				prefix = true;
+				break;
 			case 'v':
 				verbose = true;
 				break;
@@ -103,6 +107,8 @@ extern int main(int argc, char *argv[])
 
 		bufr->reset(bufr);
 		event->get_identity(event, bufr);
+		if ( prefix )
+			fputs("state ", stdout);
 		bufr->print(bufr);
 		if ( verbose)
 			fputs("\n\n", stdout);
