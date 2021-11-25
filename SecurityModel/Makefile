@@ -122,7 +122,7 @@ sign-model: sign-model.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 generate-pseudonym: generate-pseudonym.o Cell.o
-	${CC} ${LDFflags} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};
