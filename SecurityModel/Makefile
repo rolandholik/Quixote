@@ -11,12 +11,13 @@ INSTPATH       = ${DESTDIR}/opt/ESD
 SANCHODIR = ../Sancho/SGX
 
 CSRC = COE.c Cell.c SecurityEvent.c SecurityPoint.c TSEM.c EventModel.c \
-	compute-aggregate.c generate-pseudonym.c
+	compute-aggregate.c generate-pseudonym.c generate-states.c
 
-TOOLS = test-COE test-cell test-event generate-contours sha-tool	\
+TOOLS = test-COE test-cell test-event generate-states sha-tool		\
 	compute-measurement set-behavior test-TSEM compute-aggregate	\
 	bad-actor sign-model generate-pseudonym
-INSTALLBIN  = generate-contours generate-pseudonym sha-tool
+
+INSTALLBIN  = generate-states generate-pseudonym sha-tool
 INSTALLSBIN = set-behavior
 
 CC = musl-gcc
@@ -99,7 +100,7 @@ test-TSEM: test-TSEM.o TSEM.o SecurityPoint.o SecurityEvent.o COE.o Cell.o \
 	EventModel.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
-generate-contours: generate-contours.o SecurityEvent.o COE.o Cell.o
+generate-states: generate-states.o SecurityEvent.o COE.o Cell.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 compute-measurement: compute-measurement.o COE.o Cell.o

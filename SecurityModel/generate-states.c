@@ -1,7 +1,7 @@
 /** \file
- * This file implements tracing of an execution trajectory path to
- * generate a behavioral contour map of the final state of the
- * modeled system.
+ * This file implements the generation of the security states represented
+ * by an execution trajectory of security interaction events.  The generated
+ * states represent the final state of a security domain.
  */
 
 /**************************************************************************
@@ -98,7 +98,7 @@ extern int main(int argc, char *argv[])
 			fputc('\n', stdout);
 			event->dump(event);
 			fputc('\n', stdout);
-			fputs("Contour: ", stdout);
+			fputs("State: ", stdout);
 		}
 
 		bufr->reset(bufr);
