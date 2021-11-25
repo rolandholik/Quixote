@@ -11,12 +11,12 @@ INSTPATH       = ${DESTDIR}/opt/ESD
 SANCHODIR = ../Sancho/SGX
 
 CSRC = COE.c Cell.c SecurityEvent.c SecurityPoint.c TSEM.c EventModel.c \
-	compute-aggregate.c
+	compute-aggregate.c generate-pseudonym.c
 
 TOOLS = test-COE test-cell test-event generate-contours sha-tool	\
 	compute-measurement set-behavior test-TSEM compute-aggregate	\
-	bad-actor sign-model
-INSTALLBIN  = generate-contours sha-tool
+	bad-actor sign-model generate-pseudonym
+INSTALLBIN  = generate-contours generate-pseudonym sha-tool
 INSTALLSBIN = set-behavior
 
 CC = musl-gcc
@@ -119,6 +119,9 @@ set-behavior: set-behavior.o
 
 sign-model: sign-model.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
+
+generate-pseudonym: generate-pseudonym.o Cell.o
+	${CC} ${LDFflags} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};
