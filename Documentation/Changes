@@ -78,3 +78,30 @@ Version 1.1:
 		- SGX based.
 
 	* Support Linux kernel 5.4.
+
+Version 1.2:
+	* Code cleanups and renaming including dropping of unused code.
+
+	* Convert to TSEM nomenclature for security model code.
+
+	* Updated HurdLib implementation.
+
+	* Implement TSEM arrays with Gaggle object.
+
+	* Implement event modeling architecture.
+
+	* Implement pseudonyms with event modeling architecture.
+
+	* Implemented loading of security models.
+
+	* Implement signed security models.
+
+	* Convert SanchoMCU to use mbedtls for cryptographic primitives.
+
+	* Implement NAAAIM library for SanchoMCU.
+
+	* Implement pseudonym generation utility.
+
+	* Implement model signing utility.
+
+	* Validated functionality in Ubuntu 20.
