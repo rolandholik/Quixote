@@ -3,11 +3,15 @@
 # *
 # * Please refer to the file named Documentation/COPYRIGHT in the top of
 # * the source tree for copyright and licensing information.
-# **************************************************************************/
+# **************************************************************************
 
 
+#
 # Variable declarations.
-SUBDIRS	    = STmcu Nordic SGX
+#
+export MCUCFGDIR=${shell pwd}
+
+SUBDIRS = NRF52840-DK
 
 
 #
@@ -15,16 +19,19 @@ SUBDIRS	    = STmcu Nordic SGX
 #
 .PHONY: ${SUBDIRS}
 
+all: ${SUBDIRS}
+
 
 #
 # Subdirectory targets.
 #
-all: ${SUBDIRS}
-
-STmcu:
+HurdLib:
 	${MAKE} -C $@;
 
-SGX:
+NAAAIM:
+	${MAKE} -C $@;
+
+NRF52840-DK:
 	${MAKE} -C $@;
 
 

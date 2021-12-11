@@ -3,11 +3,10 @@
 # *
 # * Please refer to the file named Documentation/COPYRIGHT in the top of
 # * the source tree for copyright and licensing information.
-# **************************************************************************/
-
+# **************************************************************************
 
 # Variable declarations.
-SUBDIRS	    = STmcu Nordic SGX
+SUBDIRS = Sancho
 
 
 #
@@ -16,15 +15,13 @@ SUBDIRS	    = STmcu Nordic SGX
 .PHONY: ${SUBDIRS}
 
 
-#
-# Subdirectory targets.
-#
+# Targets
 all: ${SUBDIRS}
 
-STmcu:
-	${MAKE} -C $@;
 
-SGX:
+#
+# Subdirectory targets
+Sancho:
 	${MAKE} -C $@;
 
 
@@ -32,7 +29,7 @@ SGX:
 # Utility targets.
 #
 clean:
-	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i clean; done;
+	set -e; for dir in ${SUBDIRS}; do ${MAKE} -C $$dir clean; done;
 
-clobber:
-	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i clobber; done;
+clobber: clean
+	set -e; for dir in ${SUBDIRS}; do ${MAKE} -C $$dir clobber; done;
