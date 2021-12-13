@@ -2,12 +2,15 @@
 /** \file
  *
  * This file implements a utility for managing a quixote co-processor
- * implement.  It connects to the quixote management process through a
- * UNIX domain socket created in the following location:
+ * implement.  It connects to the quixote management process through
+ * UNIX domain sockets created in the following locations:
  *
- * /var/run/quixote-mgmt.CARTRIDGE
+ * /var/lib/Quixote/mgmt/cartridges
  *
- * Where CARTRIDGE is the software cartridge being run.
+ * /var/lib/Quixote/mgmt/processes
+ *
+ * Depending on whether the security domain is running in cartridge or
+ * process mode.
  */
 
 /**************************************************************************

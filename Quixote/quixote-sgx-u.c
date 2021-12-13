@@ -23,9 +23,9 @@
  * The domain is managed through a UNIX domain socket that is created
  * in one of the the following locations:
  *
- * /var/run/Quixote/cartridges
+ * /var/lib/Quixote/mgmt/cartridges
  *
- * /var/run/Quixote/processes
+ * /var/lib/Quixote/mgmt/processes
  *
  * Depending on whether or not a runc based cartridge or a simple
  * process was run by the utility.

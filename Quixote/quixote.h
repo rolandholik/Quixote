@@ -9,5 +9,5 @@
  **************************************************************************/
 
 /* Basename for the management socket. */
-#define QUIXOTE_PROCESS_MGMT_DIR	"/var/run/Quixote/processes"
-#define QUIXOTE_CARTRIDGE_MGMT_DIR	"/var/run/Quixote/cartridges"
+#define QUIXOTE_PROCESS_MGMT_DIR	"/var/lib/Quixote/mgmt/processes"
+#define QUIXOTE_CARTRIDGE_MGMT_DIR	"/var/lib/Quixote/mgmt/cartridges"
