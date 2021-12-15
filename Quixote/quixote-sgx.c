@@ -279,8 +279,6 @@ static _Bool setup_management(CO(LocalDuct, mgmt), const char *cartridge)
 	_Bool rc,
 	      retn = false;
 
-	char pid[11];
-
 	mode_t mask;
 
 	String sockpath = NULL;
@@ -302,10 +300,8 @@ static _Bool setup_management(CO(LocalDuct, mgmt), const char *cartridge)
 
 		case process_mode:
 			sockpath->add(sockpath, QUIXOTE_PROCESS_MGMT_DIR);
-			if ( snprintf(pid, sizeof(pid), "/pid-%u", \
-				      getpid()) >=  sizeof(pid) )
-				ERR(goto done);
-			if ( !sockpath->add(sockpath, pid) )
+			if ( !sockpath->add_sprintf(sockpath, "/pid-%u", \
+						    getpid()) )
 				ERR(goto done);
 			break;
 
