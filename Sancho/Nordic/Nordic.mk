@@ -16,6 +16,7 @@ MBEDDIR	  = ${NORDICDIR}/external/mbedtls
 CC	= ${TOOLDIR}/bin/arm-none-eabi-gcc
 AS	= ${TOOLDIR}/bin/arm-none-eabi-as
 RANLIB	= ${TOOLDIR}/bin/arm-none-eabi-ranlib
+OBJCOPY = ${TOOLDIR}/bin/arm-none-eabi-objcopy
 
 LIBDIR = ${TOOLDIR}/arm-none-eabi/lib
 INCDIR = ${TOOLDIR}/arm-none-eabi/include

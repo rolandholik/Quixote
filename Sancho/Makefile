@@ -24,6 +24,9 @@ all: ${SUBDIRS}
 STmcu:
 	${MAKE} -C $@;
 
+Nordic:
+	${MAKE} -C $@;
+
 SGX:
 	${MAKE} -C $@;
 
