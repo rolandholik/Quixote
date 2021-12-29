@@ -35,6 +35,15 @@
 #include <nrf_log_default_backends.h>
 
 
+/* Function declarations. */
+static void acm_event_handler(app_usbd_class_inst_t const * p_inst, \
+			      app_usbd_cdc_acm_user_event_t event);
+
+extern int __io_putchar(int ch) __attribute__((weak));
+
+
+/* Static variable definitions. */
+
 /** Flag to indicate that the USB port has been opened. */
 static _Bool Port_Open = false;
 
@@ -55,10 +64,6 @@ NRF_CLI_DEF(sancho_console,
             &sancho_console_uart.transport,
             '\r',
             4);
-
-			
-static void acm_event_handler(app_usbd_class_inst_t const * p_inst, \
-			      app_usbd_cdc_acm_user_event_t event);
 
 
 APP_USBD_CDC_ACM_GLOBAL_DEF(cmd_cdc_acm,			\
@@ -300,4 +305,20 @@ int main(void)
 		NRF_LOG_PROCESS();
 		__WFE();
 	}
+}
+
+
+__attribute__((weak)) int _write(int file, char *ptr, int len)
+
+{
+	int cnt;
+
+	nrf_cli_t const *cp = &sancho_console;
+
+
+	for (cnt= 0; cnt < len; ++cnt)
+		nrf_cli_fprintf(cp, NRF_CLI_NORMAL, "%c", ptr[cnt]);
+
+
+	return len;
 }

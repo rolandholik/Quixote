@@ -18,7 +18,7 @@ include ${MCUCFGDIR}/Nordic.mk
 #
 # Variable definitions.
 #
-CINCLUDE = -I . -I ../../../HurdLib -I ../../../../../HurdLib 		  \
+CINCLUDE = -I . -I ../../HurdLib -I ../../../../HurdLib 		  \
 	-I ../../../../../lib -I ../../../../../Quixote			  \
 	-I ../../../../../SecurityModel	 -I ../../../../../		  \
 	-I ${NORDICDIR}/components/boards				  \
@@ -82,10 +82,10 @@ CSRC = ${NORDICSRC} ${APPSRC}
 
 ASRC = gcc_startup_nrf52840.S
 
-# LIBS =  -L ../../../HurdLib -l HurdLib				  \
+LIBS =  -L ../../HurdLib -l HurdLib
 # 	-L ../../../NAAAIM -l NAAAIM
 
-LDFLAGS = ${PLATFORM} -Wl,--script=sancho.ld -lc -lm ${LIBS}
+LDFLAGS = ${PLATFORM} -Wl,--script=sancho.ld ${LIBS}
 
 
 #
@@ -191,8 +191,7 @@ AOBJS = ${ASRC:.S=.o}
 all: link-script sancho.elf
 
 sancho.elf: ${COBJS} ${AOBJS}
-	${CC} -specs ${LIBDIR}/nano.specs -o $@ $^ ${LDFLAGS};
-
+	${CC} -specs ${LIBDIR}/nosys.specs -o $@ $^ ${LDFLAGS};
 link-script:
 	[ ! -e "sancho.ld" ] && \
 		ln -s ${NORDICDIR}/examples/peripheral/usbd_cdc_acm/pca10056/blank/armgcc/usbd_cdc_acm_gcc_nrf52.ld sancho.ld || true;
