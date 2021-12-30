@@ -322,3 +322,19 @@ __attribute__((weak)) int _write(int file, char *ptr, int len)
 
 	return len;
 }
+
+
+void Error(const char *file, const char *function, int line)
+
+{
+	char bufr[80];
+
+
+	memset(bufr, '\0', sizeof(bufr));
+	snprintf(bufr, sizeof(bufr), "T[%s,%s,%d]: Error location.", file, \
+		 function, line);
+
+	NRF_LOG_INFO(bufr);
+
+	return;
+}
