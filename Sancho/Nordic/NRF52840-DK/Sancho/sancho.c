@@ -39,8 +39,6 @@
 static void acm_event_handler(app_usbd_class_inst_t const * p_inst, \
 			      app_usbd_cdc_acm_user_event_t event);
 
-extern int __io_putchar(int ch) __attribute__((weak));
-
 
 /* Static variable definitions. */
 
