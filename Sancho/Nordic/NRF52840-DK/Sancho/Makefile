@@ -18,7 +18,7 @@ include ${MCUCFGDIR}/Nordic.mk
 #
 # Variable definitions.
 #
-CINCLUDE = -I . -I ../../HurdLib -I ../../../../HurdLib 		  \
+CINCLUDE = -I . -I ../../HurdLib -I ../../../../HurdLib -I ../../NAAAIM	  \
 	-I ../../../../../lib -I ../../../../../Quixote			  \
 	-I ../../../../../SecurityModel	 -I ../../../../../		  \
 	-I ${NORDICDIR}/components/boards				  \
@@ -76,7 +76,7 @@ NORDICSRC = system_nrf52840.c nrf_drv_clock.c nrfx_clock.c nrfx_power.c	 \
 	nrf_log_frontend.c nrf_log_str_formatter.c app_error_weak.c \
 	app_error_handler_gcc.c
 
-APPSRC = sancho.c
+APPSRC = sancho.c TTYduct.c
 
 CSRC = ${NORDICSRC} ${APPSRC}
 
