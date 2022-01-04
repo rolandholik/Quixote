@@ -11,7 +11,7 @@
 #
 export MCUCFGDIR=${shell pwd}
 
-SUBDIRS = HurdLib NRF52840-DK
+SUBDIRS = HurdLib NAAAIM NRF52840-DK
 
 
 #
