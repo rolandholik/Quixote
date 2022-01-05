@@ -33,6 +33,8 @@
 #include <NAAAIM.h>
 #include <TTYduct.h>
 
+#include "sancho.h"
+
 
 /* Static variable definitions. */
 
@@ -107,27 +109,13 @@ int main(void)
 	}
 
 
-	NRF_LOG_INFO("Starting connection loop.");
-	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-
-	while ( true ) {
-		if ( !duct->receive_Buffer(duct, bufr) )
-			ERR(goto done);
-
-		printf("Received buffer:\n");
-		bufr->hprint(bufr);
-
-		if ( !duct->send_Buffer(duct, bufr) )
-			ERR(goto done);
-		bufr->reset(bufr);
-
-		nrf_cli_process(&sancho_console);
-		NRF_LOG_PROCESS();
-	}
+	/* Invoke command interpreter, this should not return. */
+	NRF_LOG_INFO("Starting interpreter.");
+	sancho_interpreter(duct);
 
 
  done:
-	NRF_LOG_INFO("Done.");
+	NRF_LOG_INFO("Error loop.");
 
 	while ( true ) {
 		nrf_cli_process(&sancho_console);

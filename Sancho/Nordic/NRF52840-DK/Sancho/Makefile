@@ -19,8 +19,8 @@ include ${MCUCFGDIR}/Nordic.mk
 # Variable definitions.
 #
 CINCLUDE = -I . -I ../../HurdLib -I ../../../../HurdLib -I ../../NAAAIM	  \
-	-I ../../../../../lib -I ../../../../../Quixote			  \
-	-I ../../../../../SecurityModel	 -I ../../../../../		  \
+	-I ../../../../lib -I ../../../../Quixote			  \
+	-I ../../../../SecurityModel	 -I ../../../../../		  \
 	-I ${NORDICDIR}/components/boards				  \
 	-I ${NORDICDIR}/components/toolchain/cmsis/include		  \
 	-I ${NORDICDIR}/components/libraries/log			  \
@@ -76,14 +76,15 @@ NORDICSRC = system_nrf52840.c nrf_drv_clock.c nrfx_clock.c nrfx_power.c	 \
 	nrf_log_frontend.c nrf_log_str_formatter.c app_error_weak.c \
 	app_error_handler_gcc.c
 
-APPSRC = sancho.c TTYduct.c
+APPSRC = sancho.c sancho-interpreter.c regcomp.c regexec.c regerror.c  \
+	tre-mem.c reg-support.c TTYduct.c COE.c Cell.c SecurityEvent.c \
+	SecurityPoint.c TSEM.c EventModel.c
 
 CSRC = ${NORDICSRC} ${APPSRC}
 
 ASRC = gcc_startup_nrf52840.S
 
-LIBS =  -L ../../HurdLib -l HurdLib
-# 	-L ../../../NAAAIM -l NAAAIM
+LIBS =  -L ../../HurdLib -l HurdLib -L ../../NAAAIM -l NAAAIM
 
 LDFLAGS = ${PLATFORM} -Wl,--script=sancho.ld ${LIBS}
 
@@ -94,7 +95,7 @@ LDFLAGS = ${PLATFORM} -Wl,--script=sancho.ld ${LIBS}
 %.o: %.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
-%.o: ../../../../../SecurityModel/%.c
+%.o: ../../../../SecurityModel/%.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
 %.o: ${NORDICDIR}/modules/nrfx/mdk/%.S
@@ -129,8 +130,6 @@ LDFLAGS = ${PLATFORM} -Wl,--script=sancho.ld ${LIBS}
 
 %.o: ${NORDICDIR}/components/libraries/usbd/class/cdc/acm/%.c
 	${CC} ${CFLAGS} -c $< -o $@;
-
-# Code to get example working.
 
 %.o: ${NORDICDIR}/components/boards/%.c
 	${CC} ${CFLAGS} -c $< -o $@;

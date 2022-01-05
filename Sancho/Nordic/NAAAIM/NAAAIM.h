@@ -24,3 +24,9 @@
 #define NAAAIM_RSAkey_OBJID		3
 #define NAAAIM_Base64_OBJID		31
 #define NAAAIM_TTYduct_OBJID		33
+#define NAAAIM_COE_OBJID		46
+#define NAAAIM_Cell_OBJID		47
+#define NAAAIM_SecurityEvent_OBJID	48
+#define NAAAIM_TSEM_OBJID		49
+#define NAAAIM_SecurityPoint_OBJID	50
+#define NAAAIM_EventModel_OBJID		51
