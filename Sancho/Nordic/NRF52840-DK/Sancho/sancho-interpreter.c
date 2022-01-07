@@ -652,10 +652,8 @@ extern void sancho_interpreter(const TTYduct duct)
 	INIT(NAAAIM, TSEM, model, ERR(goto done));
 
 	while ( true ) {
-		if ( !duct->receive_Buffer(duct, bufr) ) {
-			bufr->reset(bufr);
-			continue;
-		}
+		if ( !duct->receive_Buffer(duct, bufr) )
+			goto done;
 
 		switch ( get_command(bufr) ) {
 			case exchange_event:
@@ -712,7 +710,6 @@ extern void sancho_interpreter(const TTYduct duct)
 				break;
 
 			case sancho_reset:
-				NVIC_SystemReset();
 				break;
 		}
 
@@ -722,5 +719,8 @@ extern void sancho_interpreter(const TTYduct duct)
 
 
  done:
+	WHACK(bufr);
+	WHACK(model);
+
 	return;
 }

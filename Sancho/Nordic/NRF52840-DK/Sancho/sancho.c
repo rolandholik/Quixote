@@ -77,8 +77,6 @@ void console_init(void)
 int main(void)
 
 {
-	Buffer bufr = NULL;
-
 	TTYduct duct = NULL;
 
 
@@ -101,17 +99,21 @@ int main(void)
 	if ( !duct->init_device(duct, NULL) )
 		ERR(goto done);
 
-	NRF_LOG_INFO("Waiting for connection.");
-	while ( !duct->accept_connection(duct) ) {
-		nrf_cli_process(&sancho_console);
-		NRF_LOG_PROCESS();
-		__WFE();
+
+	/* Invoke the interpreter on each connection. */
+	while ( true ) {
+		NRF_LOG_INFO("Waiting for connection.");
+		while ( !duct->accept_connection(duct) ) {
+			nrf_cli_process(&sancho_console);
+			NRF_LOG_PROCESS();
+			__WFE();
+		}
+
+
+		/* Invoke command interpreter, return on port closure. */
+		NRF_LOG_INFO("Starting interpreter.");
+		sancho_interpreter(duct);
 	}
-
-
-	/* Invoke command interpreter, this should not return. */
-	NRF_LOG_INFO("Starting interpreter.");
-	sancho_interpreter(duct);
 
 
  done:

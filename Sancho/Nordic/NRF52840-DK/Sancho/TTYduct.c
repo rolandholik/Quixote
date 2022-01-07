@@ -83,6 +83,9 @@ struct NAAAIM_TTYduct_State
 /** Flag variable indicating the USB port has been opened. */
 static _Bool Port_Open = false;
 
+/** Flag variable indicating the USB port has been closed. */
+static _Bool Port_Close = false;
+
 /** Flag variable indicating that a read has completed. */
 static _Bool Have_Read = false;
 
@@ -133,20 +136,13 @@ static app_usbd_class_inst_t const * USB_cdc_acm_class;
 static void _acm_event_read(app_usbd_cdc_acm_t const * acm)
 
 {
-#if 0
-	ret_code_t rc;
+	size_t read_size = app_usbd_cdc_acm_rx_size(acm);
 
-	size_t available,
-	       read_size;
-
-	read_size = app_usbd_cdc_acm_rx_size(acm);
-	available = app_usbd_cdc_acm_bytes_stored(acm);
-	NRF_LOG_INFO("%s: Called, read=%lu, available=%lu", __func__, \
-		     read_size, available);
-#endif
 
 	app_usbd_cdc_acm_read(&USB_cdc_acm, &Input_Byte, \
 			      sizeof(Input_Byte));
+	if ( read_size > 0 )
+		Have_Read = true;
 #if 0
 	NRF_LOG_INFO("%s: rc=%d, Input=%c/%02x", __func__, rc, Input_Byte, \
 		     Input_Byte);
@@ -169,7 +165,8 @@ static void acm_event_handler(app_usbd_class_inst_t const * p_inst, \
 #if 1
 			NRF_LOG_INFO("PORT OPEN");
 #endif
-			Port_Open = true;
+			Port_Open  = true;
+			Port_Close = false;
 			_acm_event_read(p_cdc_acm);
 			break;
 
@@ -177,7 +174,6 @@ static void acm_event_handler(app_usbd_class_inst_t const * p_inst, \
 #if 1
 			NRF_LOG_INFO("RX_DONE");
 #endif
-			Have_Read = true;
 			_acm_event_read(p_cdc_acm);
 			break;
 
@@ -192,6 +188,8 @@ static void acm_event_handler(app_usbd_class_inst_t const * p_inst, \
 #if 1
 			NRF_LOG_INFO("PORT CLOSE");
 #endif
+			Port_Open  = false;
+			Port_Close = true;
 			break;
 	}
 
@@ -295,12 +293,17 @@ static void receive_handler(void)
 {
 	static uint8_t sync_char = '@';
 
+
 	switch ( Receive_State ) {
 		case receiving_sync:
 			if ( Input_Byte == '\n' ) {
+				TX_Done = false;
 				app_usbd_cdc_acm_write(&USB_cdc_acm, \
 						       &sync_char,   \
 						       sizeof(sync_char));
+				while ( !TX_Done ) {
+					app_usbd_event_queue_process();
+				}
 				Receive_State = receiving_size;
 				goto done;
 			}
@@ -425,18 +428,17 @@ static _Bool accept_connection(CO(TTYduct, this))
 
 {
 	if ( Receive_State == receiving_sync ) {
-		while ( Receive_State == receiving_sync ) {
-			if ( app_usbd_event_queue_process() ) {
-				if ( Have_Read ) {
-					receive_handler();
-					Have_Read = false;
-				}
+		if ( app_usbd_event_queue_process() ) {
+			if ( Have_Read ) {
+				receive_handler();
+				Have_Read = false;
 			}
-			__WFE();
 		}
+		return false;
 	}
 
-
+	NRF_LOG_INFO("%s: Returning port open, state = %d", __func__, \
+		     Receive_State);
 	return Port_Open;
 }
 
@@ -460,10 +462,6 @@ static _Bool send_Buffer(CO(TTYduct, this), CO(Buffer, bf))
 	STATE(S);
 
 	uint8_t *sp;
-
-#if 0
-	uint8_t tx_bufr[NRF_DRV_USBD_EPSIZE];
-#endif
 
 	uint32_t blocks,
 		 residual;
@@ -570,6 +568,8 @@ static _Bool receive_Buffer(CO(TTYduct, this), CO(Buffer, bf))
 	/* Block until USB receive handler has a size. */
 	while ( Receive_State == receiving_size ) {
 		if ( app_usbd_event_queue_process() ) {
+			if ( Port_Close )
+				goto closed;
 			if ( Have_Read ) {
 				receive_handler();
 				Have_Read = false;
@@ -583,6 +583,8 @@ static _Bool receive_Buffer(CO(TTYduct, this), CO(Buffer, bf))
 	/* Block until the USB receive handler has the packet being sent. */
 	while ( Receive_State == receiving_buffer ) {
 		if ( app_usbd_event_queue_process() ) {
+			if ( Port_Close )
+				goto closed;
 			if ( Have_Read ) {
 				receive_handler();
 				Have_Read = false;
@@ -592,7 +594,6 @@ static _Bool receive_Buffer(CO(TTYduct, this), CO(Buffer, bf))
 	}
 	NRF_LOG_INFO("Have buffer.");
 	
-
 
 	/* Load the buffer with the input stream and reset input. */
 	if ( !bf->add(bf, Input_Buffer, Receive_Size) )
@@ -611,6 +612,18 @@ static _Bool receive_Buffer(CO(TTYduct, this), CO(Buffer, bf))
 		S->poisoned = true;
 
 	return retn;
+
+
+ closed:
+	NRF_LOG_INFO("Port closed.");
+
+	Input_Size = 0;
+	memset(Input_Buffer, '\0', sizeof(Input_Buffer));
+
+	Receive_Size  = 0;
+	Receive_State = receiving_sync;
+
+	return false;
 }
 
 
