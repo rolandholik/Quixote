@@ -8,6 +8,11 @@
  * (C)Copyright 2021, Enjellic Systems Development, LLC. All rights reserved.
  **************************************************************************/
 
+
+/** Define to enable console logging. */
+#define CONSOLE_LOGGING 0
+
+
 /* Include files. */
 #include <stdint.h>
 #include <stdio.h>
@@ -92,20 +97,20 @@ static _Bool Have_Read = false;
 /** Flag variable indicating that a transmit is complete. */
 static _Bool TX_Done = false;
 
-/* Amount of data to be received. */
-static uint32_t Receive_Size;
+/** Total number of blocks and residual data to receive. */
+static uint32_t Receive_Blocks	 = 0;
+static uint32_t Receive_Residual = 0;
 
 /* Amount of receiver buffer occupied. */
-static uint32_t Input_Size;
-static uint8_t Input_Byte;
-static uint8_t Input_Buffer[MAX_RECEIVE_SIZE];
+static uint8_t Input_Buffer[NRF_DRV_USBD_EPSIZE];
+static uint8_t Receive_Buffer[NRF_DRV_USBD_EPSIZE];
 
 /* Input state. */
 static enum {
 	receiving_sync=0,
 	receiving_size,
-	receiving_buffer,
-	received_buffer
+	receiving_block,
+	receiving_residual,
 } Receive_State = receiving_sync;
 
 
@@ -133,20 +138,143 @@ static app_usbd_config_t USB_config = {
 
 static app_usbd_class_inst_t const * USB_cdc_acm_class;
 
-static void _acm_event_read(app_usbd_cdc_acm_t const * acm)
+
+/* Replacements for byte swapping functions. */
+static inline uint32_t htonl(uint32_t value)
 
 {
-	size_t read_size = app_usbd_cdc_acm_rx_size(acm);
+	return value >> 24 | (value >> 8 & 0xff00) | \
+		(value << 8 & 0xff0000) | value << 24;
+}
+
+static inline uint32_t ntohl(uint32_t value)
+
+{
+	return value >> 24 | (value >> 8 & 0xff00) | \
+		(value << 8 & 0xff0000) | value << 24;
+}
 
 
-	app_usbd_cdc_acm_read(&USB_cdc_acm, &Input_Byte, \
-			      sizeof(Input_Byte));
-	if ( read_size > 0 )
-		Have_Read = true;
-#if 0
-	NRF_LOG_INFO("%s: rc=%d, Input=%c/%02x", __func__, rc, Input_Byte, \
-		     Input_Byte);
+/**
+ * Internal static function.
+ *
+ * This function manages the incoming USB TTYduct receive state.
+ *
+ * \return	No return value is defined.
+ */
+
+static void receive_handler(app_usbd_cdc_acm_t const * acm)
+
+{
+	uint32_t read_size,
+		 receive_size,
+		 request_size = 1;
+
+	static uint8_t sync_char = '@';
+
+
+	read_size = app_usbd_cdc_acm_rx_size(acm);
+	Have_Read = (read_size > 0 );
+
+#if CONSOLE_LOGGING
+	NRF_LOG_INFO("%s: Called state=%d, stored=%d, read size=%d, read=%s", \
+		     __func__, Receive_State,				      \
+		     app_usbd_cdc_acm_bytes_stored(acm), read_size,	      \
+		     Have_Read ? "YES" : "NO");
 #endif
+
+	if ( !Have_Read )
+		return;
+
+	memset(Input_Buffer, '\0', sizeof(Input_Buffer));
+	memcpy(Input_Buffer, Receive_Buffer, read_size);
+
+#if CONSOLE_LOGGING
+	NRF_LOG_INFO("%s: ib[0]=%02x, ib[1]=%02x, ib[2]=%02x, ib[3]=%02x", \
+		     __func__, Input_Buffer[0], Input_Buffer[1],	   \
+		     Input_Buffer[2], Input_Buffer[3]);
+#endif
+
+
+	switch ( Receive_State ) {
+		case receiving_sync:
+#if CONSOLE_LOGGING
+			NRF_LOG_INFO("%s: Checking sync: %02x", __func__, \
+				     Input_Buffer[0]);
+#endif
+			if ( Have_Read && (Input_Buffer[0] == '\n') ) {
+#if CONSOLE_LOGGING
+				NRF_LOG_INFO("%s: Writing sync.", __func__);
+#endif
+				TX_Done = false;
+				app_usbd_cdc_acm_write(&USB_cdc_acm, \
+						       &sync_char,   \
+						       sizeof(sync_char));
+				while ( !TX_Done ) {
+					app_usbd_event_queue_process();
+				}
+
+				Receive_State = receiving_size;
+				request_size = 4;
+			}
+			break;
+
+		case receiving_size:
+			memcpy(&receive_size, Input_Buffer, \
+			       sizeof(receive_size));
+			receive_size  = ntohl(receive_size);
+			Receive_State = receiving_block;
+
+			Receive_Blocks   = receive_size / NRF_DRV_USBD_EPSIZE;
+			Receive_Residual = receive_size % NRF_DRV_USBD_EPSIZE;
+
+#if CONSOLE_LOGGING
+			NRF_LOG_INFO("%s: Receive size=%d, blocks=%d, "	    \
+				     "residual=%d", __func__, receive_size, \
+				     Receive_Blocks, Receive_Residual);
+#endif
+
+			if ( Receive_Blocks != 0 ) {
+				--Receive_Blocks;
+				request_size  = NRF_DRV_USBD_EPSIZE;
+				Receive_State = receiving_block;
+			}
+			else {
+				request_size  = Receive_Residual;
+				Receive_State = receiving_residual;
+			}
+			break;
+
+		case receiving_block:
+			if ( Receive_Blocks == 0 ) {
+				if ( Receive_Residual == 0 ) {
+					request_size  = 1;
+					Receive_State = receiving_size;
+				} else {
+					request_size  = Receive_Residual;
+					Receive_State = receiving_residual;
+				}
+			}
+			else {
+				request_size = NRF_DRV_USBD_EPSIZE;
+				--Receive_Blocks;
+			}
+			break;
+
+		case receiving_residual:
+			request_size  = 4;
+			Receive_State = receiving_size;
+			break;
+	}
+
+
+#if CONSOLE_LOGGING
+	NRF_LOG_INFO("%s: Scheduling read, state=%d, request=%d", __func__, \
+		     Receive_State, request_size);
+#endif
+
+	memset(Receive_Buffer, '\0', sizeof(Receive_Buffer));
+	app_usbd_cdc_acm_read(&USB_cdc_acm, Receive_Buffer, request_size);
 
 	return;
 }
@@ -162,30 +290,30 @@ static void acm_event_handler(app_usbd_class_inst_t const * p_inst, \
 
 	switch ( event ) {
 		case APP_USBD_CDC_ACM_USER_EVT_PORT_OPEN:
-#if 1
+#if CONSOLE_LOGGING
 			NRF_LOG_INFO("PORT OPEN");
 #endif
 			Port_Open  = true;
 			Port_Close = false;
-			_acm_event_read(p_cdc_acm);
+			app_usbd_cdc_acm_read(&USB_cdc_acm, Receive_Buffer, 1);
 			break;
 
 		case APP_USBD_CDC_ACM_USER_EVT_RX_DONE:
-#if 1
+#if CONSOLE_LOGGING
 			NRF_LOG_INFO("RX_DONE");
 #endif
-			_acm_event_read(p_cdc_acm);
+			receive_handler(p_cdc_acm);
 			break;
 
 		case APP_USBD_CDC_ACM_USER_EVT_TX_DONE:
 			TX_Done = true;
-#if 1
+#if CONSOLE_LOGGING
 			NRF_LOG_INFO("TX_DONE");
 #endif
 			break;
 
 		case APP_USBD_CDC_ACM_USER_EVT_PORT_CLOSE:
-#if 1
+#if CONSOLE_LOGGING
 			NRF_LOG_INFO("PORT CLOSE");
 #endif
 			Port_Open  = false;
@@ -195,7 +323,7 @@ static void acm_event_handler(app_usbd_class_inst_t const * p_inst, \
 
 	return;
 }
-			
+
 
 static void usb_event_handler(app_usbd_event_type_t event)
 
@@ -264,81 +392,6 @@ static void usb_event_handler(app_usbd_event_type_t event)
 }
 
 
-/* Replacements for byte swapping functions. */
-static inline uint32_t htonl(uint32_t value)
-
-{
-	return value >> 24 | (value >> 8 & 0xff00) | \
-		(value << 8 & 0xff0000) | value << 24;
-}
-
-static inline uint32_t ntohl(uint32_t value)
-
-{
-	return value >> 24 | (value >> 8 & 0xff00) | \
-		(value << 8 & 0xff0000) | value << 24;
-}
-
-
-/**
- * Internal static function.
- *
- * This function manages the USB incoming state.
- *
- * \return	No return value is defined.
- */
-
-static void receive_handler(void)
-
-{
-	static uint8_t sync_char = '@';
-
-
-	switch ( Receive_State ) {
-		case receiving_sync:
-			if ( Input_Byte == '\n' ) {
-				TX_Done = false;
-				app_usbd_cdc_acm_write(&USB_cdc_acm, \
-						       &sync_char,   \
-						       sizeof(sync_char));
-				while ( !TX_Done ) {
-					app_usbd_event_queue_process();
-				}
-				Receive_State = receiving_size;
-				goto done;
-			}
-			break;
-
-		case receiving_size:
-		        Input_Buffer[Input_Size] = Input_Byte;
-			if ( ++Input_Size < sizeof(uint32_t) )
-				goto done;
-
-			memcpy(&Receive_Size, Input_Buffer, \
-			       sizeof(Receive_Size));
-			Receive_Size  = ntohl(Receive_Size);
-			Receive_State = receiving_buffer;
-
-			memset(Input_Buffer, '\0', Input_Size);
-			Input_Size = 0;
-			break;
-
-		case receiving_buffer:
-		        Input_Buffer[Input_Size] = Input_Byte;
-			if ( ++Input_Size == Receive_Size )
-				Receive_State = received_buffer;
-			break;
-
-		case received_buffer:
-			break;
-	}
-
-
- done:
-	return;
-}
-
-
 /**
  * Internal private method.
  *
@@ -397,11 +450,10 @@ static _Bool init_device(CO(TTYduct, this), CO(char *, path))
 	app_usbd_enable();
 	app_usbd_start();
 
-	/* Clear the input buffer. */
-	Input_Size    = 0;
-	memset(Input_Buffer, '\0', sizeof(Input_Buffer));
+	/* Clear the receive buffers buffer. */
+	memset(Input_Buffer,   '\0', sizeof(Input_Buffer));
+	memset(Receive_Buffer, '\0', sizeof(Receive_Buffer));
 
-	Receive_Size  = 0;
 	Receive_State = receiving_sync;
 
 	retn = true;
@@ -428,17 +480,14 @@ static _Bool accept_connection(CO(TTYduct, this))
 
 {
 	if ( Receive_State == receiving_sync ) {
-		if ( app_usbd_event_queue_process() ) {
-			if ( Have_Read ) {
-				receive_handler();
-				Have_Read = false;
-			}
-		}
+		app_usbd_event_queue_process();
 		return false;
 	}
 
+#if CONSOLE_LOGGING
 	NRF_LOG_INFO("%s: Returning port open, state = %d", __func__, \
 		     Receive_State);
+#endif
 	return Port_Open;
 }
 
@@ -494,7 +543,7 @@ static _Bool send_Buffer(CO(TTYduct, this), CO(Buffer, bf))
 	/* Calculate blocks and residuals based on USB packet size. */
 	blocks	 = bufr->size(bufr) / NRF_DRV_USBD_EPSIZE;
 	residual = bufr->size(bufr) % NRF_DRV_USBD_EPSIZE;
-#if 1
+#if CONSOLE_LOGGING
 	NRF_LOG_INFO("%s: sending blocks=%u, residual=%u", __func__, blocks, \
 		     residual);
 #endif
@@ -563,50 +612,71 @@ static _Bool receive_Buffer(CO(TTYduct, this), CO(Buffer, bf))
 		ERR(goto done);
 
 
-	NRF_LOG_INFO("Waiting for size.");
+#if CONSOLE_LOGGING
+	NRF_LOG_INFO("%s: Waiting for size.", __func__);
+#endif
 
 	/* Block until USB receive handler has a size. */
 	while ( Receive_State == receiving_size ) {
 		if ( app_usbd_event_queue_process() ) {
 			if ( Port_Close )
 				goto closed;
-			if ( Have_Read ) {
-				receive_handler();
-				Have_Read = false;
-			}
 		}
 		__WFE();
 	}
-	NRF_LOG_INFO("Have size: %lu", Receive_Size);
+#if CONSOLE_LOGGING
+	NRF_LOG_INFO("%s: Have size.", __func__);
+#endif
 
 
-	/* Block until the USB receive handler has the packet being sent. */
-	while ( Receive_State == receiving_buffer ) {
+	Have_Read = false;
+	while ( Receive_State == receiving_block ) {
 		if ( app_usbd_event_queue_process() ) {
 			if ( Port_Close )
 				goto closed;
 			if ( Have_Read ) {
-				receive_handler();
 				Have_Read = false;
+				if ( !bf->add(bf, Input_Buffer, \
+					      NRF_DRV_USBD_EPSIZE) )
+					ERR(goto done);
 			}
 		}
 		__WFE();
 	}
-	NRF_LOG_INFO("Have buffer.");
-	
+#if CONSOLE_LOGGING
+	NRF_LOG_INFO("%s: Received blocks.", __func__);
+#endif
 
-	/* Load the buffer with the input stream and reset input. */
-	if ( !bf->add(bf, Input_Buffer, Receive_Size) )
-		ERR(goto done);
+
+	/* Receive the residual data. */
+	Have_Read = false;
+	while ( Receive_State == receiving_residual ) {
+		if ( app_usbd_event_queue_process() ) {
+			if ( Port_Close )
+				goto closed;
+			if ( Have_Read ) {
+				Have_Read = false;
+				if ( !bf->add(bf, Input_Buffer, \
+					      Receive_Residual) )
+					ERR(goto done);
+			}
+		}
+		__WFE();
+	}
+
+#if CONSOLE_LOGGING
+	NRF_LOG_INFO("%s: Received residual, size=%lu, bufr size=%lu", \
+		     __func__, Receive_Residual, bf->size(bf));
+#endif
 	retn = true;
 
 
  done:
-	Input_Size = 0;
-	memset(Input_Buffer, '\0', sizeof(Input_Buffer));
+	memset(Input_Buffer,   '\0', sizeof(Input_Buffer));
+	memset(Receive_Buffer, '\0', sizeof(Receive_Buffer));
 
-	Receive_Size  = 0;
-	Receive_State = receiving_size;
+	Receive_Blocks	 = 0;
+	Receive_Residual = 0;
 
 	if ( !retn )
 		S->poisoned = true;
@@ -615,13 +685,15 @@ static _Bool receive_Buffer(CO(TTYduct, this), CO(Buffer, bf))
 
 
  closed:
+#if CONSOLE_LOGGING
 	NRF_LOG_INFO("Port closed.");
+#endif
+	memset(Input_Buffer,   '\0', sizeof(Input_Buffer));
+	memset(Receive_Buffer, '\0', sizeof(Receive_Buffer));
 
-	Input_Size = 0;
-	memset(Input_Buffer, '\0', sizeof(Input_Buffer));
-
-	Receive_Size  = 0;
-	Receive_State = receiving_sync;
+	Receive_Blocks 	 = 0;
+	Receive_Residual = 0;
+	Receive_State	 = receiving_sync;
 
 	return false;
 }

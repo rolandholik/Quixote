@@ -319,7 +319,6 @@ static _Bool send_Buffer(CO(TTYduct, this), CO(Buffer, bf))
 	size = bufr->size(bufr);
 	while ( size-- ) {
 		write(S->fd, p++, 1);
-		usleep(300);
 	}
 #else
 	sent = writev(S->fd, vector, 2);
