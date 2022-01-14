@@ -248,7 +248,7 @@ static void receive_handler(app_usbd_cdc_acm_t const * acm)
 		case receiving_block:
 			if ( Receive_Blocks == 0 ) {
 				if ( Receive_Residual == 0 ) {
-					request_size  = 1;
+					request_size  = 4;
 					Receive_State = receiving_size;
 				} else {
 					request_size  = Receive_Residual;
