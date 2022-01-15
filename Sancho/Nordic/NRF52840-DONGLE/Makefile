@@ -5,13 +5,8 @@
 # * the source tree for copyright and licensing information.
 # **************************************************************************
 
-
-#
 # Variable declarations.
-#
-export MCUCFGDIR=${shell pwd}
-
-SUBDIRS = HurdLib NAAAIM NRF52840-DK NRF52840-DONGLE
+SUBDIRS = Sancho
 
 
 #
@@ -19,22 +14,14 @@ SUBDIRS = HurdLib NAAAIM NRF52840-DK NRF52840-DONGLE
 #
 .PHONY: ${SUBDIRS}
 
+
+# Targets
 all: ${SUBDIRS}
 
 
 #
-# Subdirectory targets.
-#
-HurdLib:
-	${MAKE} -C $@;
-
-NAAAIM:
-	${MAKE} -C $@;
-
-NRF52840-DK:
-	${MAKE} -C $@;
-
-NRF52840-DONGLE:
+# Subdirectory targets
+Sancho:
 	${MAKE} -C $@;
 
 
@@ -42,7 +29,7 @@ NRF52840-DONGLE:
 # Utility targets.
 #
 clean:
-	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i clean; done;
+	set -e; for dir in ${SUBDIRS}; do ${MAKE} -C $$dir clean; done;
 
-clobber:
-	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i clobber; done;
+clobber: clean
+	set -e; for dir in ${SUBDIRS}; do ${MAKE} -C $$dir clobber; done;
