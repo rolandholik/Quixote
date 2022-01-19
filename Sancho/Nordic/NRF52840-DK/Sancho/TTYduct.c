@@ -622,7 +622,6 @@ static _Bool receive_Buffer(CO(TTYduct, this), CO(Buffer, bf))
 			if ( Port_Close )
 				goto closed;
 		}
-		__WFE();
 	}
 #if CONSOLE_LOGGING
 	NRF_LOG_INFO("%s: Have size.", __func__);
@@ -641,7 +640,6 @@ static _Bool receive_Buffer(CO(TTYduct, this), CO(Buffer, bf))
 					ERR(goto done);
 			}
 		}
-		__WFE();
 	}
 #if CONSOLE_LOGGING
 	NRF_LOG_INFO("%s: Received blocks.", __func__);
@@ -661,7 +659,6 @@ static _Bool receive_Buffer(CO(TTYduct, this), CO(Buffer, bf))
 					ERR(goto done);
 			}
 		}
-		__WFE();
 	}
 
 #if CONSOLE_LOGGING
