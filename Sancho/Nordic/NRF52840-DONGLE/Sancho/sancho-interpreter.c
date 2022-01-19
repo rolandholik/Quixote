@@ -35,11 +35,6 @@
 #include "sancho.h"
 
 
-/**
- * Flag variable to indicate that cellular notification is available.
- */
-static _Bool Cellular_Enabled = false;
-
 /* Communications object to be used by all functions. */
 TTYduct Host;
 
@@ -80,25 +75,6 @@ static void send_ok(CO(TTYduct, duct), CO(Buffer, bufr))
 
 	bufr->reset(bufr);
 
-	return;
-}
-
-
-/**
- * Private function.
- *
- * This function implements the indication that a security event that is
- * invoking discipline of the system has been processed.
- *
- * \param event		The object containing the representation of
- *			the event.
- *
- * \return		No return value is defined.
- */
-
-static void _send_event(CO(String, event))
-
-{
 	return;
 }
 
