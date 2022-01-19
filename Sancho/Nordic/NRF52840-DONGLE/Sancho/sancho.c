@@ -46,6 +46,8 @@ static void bsp_event_callback(bsp_event_t ev)
 int main(void)
 
 {
+	unsigned int cnt;
+
 	TTYduct duct = NULL;
 
 
@@ -66,6 +68,13 @@ int main(void)
 	if ( !duct->init_device(duct, NULL) )
 		ERR(goto done);
 
+	/* Signal that the device is activated. */
+	for (cnt= 0; cnt < 3; ++cnt) {
+		bsp_board_led_on(ACTIVITY_LED);
+		nrf_delay_ms(750);
+		bsp_board_led_off(ACTIVITY_LED);
+		nrf_delay_ms(750);
+	}
 
 	/* Invoke the interpreter on each connection. */
 	while ( true ) {
