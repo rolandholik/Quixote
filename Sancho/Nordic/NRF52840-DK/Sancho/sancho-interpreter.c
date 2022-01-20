@@ -654,6 +654,8 @@ extern void sancho_interpreter(const TTYduct duct)
 	INIT(NAAAIM, TSEM, model, ERR(goto done));
 
 	while ( connected ) {
+		__WFE();
+
 		if ( !duct->receive_Buffer(duct, bufr) )
 			goto done;
 
