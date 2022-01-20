@@ -178,7 +178,7 @@ static _Bool init_device(CO(TTYduct, this), CO(char *, path))
 #endif
 
 	tcsetattr(S->fd, TCSANOW, &options);
-	fputs("Synchronizing: ", stdout);
+	fputs("Connecting: ", stdout);
 	fflush(stdout);
 	sleep(2);
 #if 0
