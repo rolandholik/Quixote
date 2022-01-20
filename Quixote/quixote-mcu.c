@@ -1319,6 +1319,7 @@ extern int main(int argc, char *argv[])
 	     *debug	= NULL,
 	     *map	= NULL,
 	     *cartridge	= NULL,
+	     *device	= "/dev/ttyACM0",
 	     bufr[1024];
 
 	int opt,
@@ -1338,7 +1339,7 @@ extern int main(int argc, char *argv[])
 	TTYduct Duct = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "CPSec:d:m:")) != EOF )
+	while ( (opt = getopt(argc, argv, "CPSec:d:m:t:")) != EOF )
 		switch ( opt ) {
 			case 'C':
 				Mode = cartridge_mode;
@@ -1361,6 +1362,9 @@ extern int main(int argc, char *argv[])
 				break;
 			case 'm':
 				map = optarg;
+				break;
+			case 't':
+				device = optarg;
 				break;
 		}
 
@@ -1416,8 +1420,12 @@ extern int main(int argc, char *argv[])
 
 	/* Open a connection to the co-processor. */
 	INIT(NAAAIM, TTYduct, Duct, ERR(goto done));
-	if ( !Duct->init_device(Duct, "/dev/ttyACM0") )
-		ERR(goto done);
+	if ( !Duct->init_device(Duct, device) ) {
+		WHACK(Duct);
+		fprintf(stderr, "quixote-mcu: Cannot connect to Sancho " \
+			"instance via %s.\n", device);
+		goto done;
+	}
 
 	INIT(HurdLib, Buffer, cmdbufr, ERR(goto done));
 
