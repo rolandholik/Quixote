@@ -593,6 +593,8 @@ static int get_command(CO(Buffer, bufr))
 extern void sancho_interpreter(const TTYduct duct)
 
 {
+	_Bool connected = true;
+
 	Buffer bufr = NULL;
 
 	TSEM model = NULL;
@@ -603,7 +605,7 @@ extern void sancho_interpreter(const TTYduct duct)
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 	INIT(NAAAIM, TSEM, model, ERR(goto done));
 
-	while ( true ) {
+	while ( connected ) {
 		__WFE();
 
 		if ( !duct->receive_Buffer(duct, bufr) )
@@ -667,6 +669,7 @@ extern void sancho_interpreter(const TTYduct duct)
 				break;
 
 			case sancho_reset:
+				connected = false;
 				break;
 		}
 
