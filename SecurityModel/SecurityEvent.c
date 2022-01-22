@@ -59,6 +59,19 @@
 #endif
 
 
+/** Variable to indicate the parsing expressions have been compiled. */
+static _Bool Regex_compiled = false;
+
+/** Array of field descriptions and compiled regular expressions. */
+static struct regex_description {
+	char *fd;
+	regex_t regex;
+} Fields[3] = {
+	{.fd="event\\{([^}]*)\\}"},
+	{.fd="pid\\{([^}]*)\\}"},
+	{.fd=NULL}
+};
+
 /** SecurityEvent private state information. */
 struct NAAAIM_SecurityEvent_State
 {
@@ -132,9 +145,11 @@ static void _init_state(CO(SecurityEvent_State, S))
  * Where NN is the numeric identifier of the process which executed
  * the information interaction event.
  *
- *
  * \param S	A pointer to the state information for the information
  *		interaction event.
+ *
+ * \param regex	A pointer to the compiled regular expression that will
+ *		extract the process id.
  *
  * \param event	The object containing the event.
  *
@@ -145,11 +160,11 @@ static void _init_state(CO(SecurityEvent_State, S))
  *		populated.
  */
 
-static _Bool _parse_pid(CO(SecurityEvent_State, S), CO(String, event))
+static _Bool _parse_pid(CO(SecurityEvent_State, S), regex_t *regex, \
+			CO(String, event))
 
 {
-	_Bool retn       = false,
-	      have_regex = false;
+	_Bool retn = false;
 
 	char *fp,
 	     match[11];
@@ -158,17 +173,11 @@ static _Bool _parse_pid(CO(SecurityEvent_State, S), CO(String, event))
 
 	size_t len;
 
-	regex_t regex;
-
 	regmatch_t regmatch[2];
 
 
-	if ( regcomp(&regex, "pid\\{([^}]*)\\}", REG_EXTENDED) != 0 )
-		ERR(goto done);
-	have_regex = true;
-
 	fp = event->get(event);
-	if ( regexec(&regex, fp, 2, regmatch, 0) == REG_NOMATCH ) {
+	if ( regexec(regex, fp, 2, regmatch, 0) == REG_NOMATCH ) {
 		retn = true;
 		goto done;
 	}
@@ -189,9 +198,6 @@ static _Bool _parse_pid(CO(SecurityEvent_State, S), CO(String, event))
 	retn = true;
 
  done:
-	if ( have_regex )
-		regfree(&regex);
-
 	return retn;
 }
 
@@ -203,11 +209,14 @@ static _Bool _parse_pid(CO(SecurityEvent_State, S), CO(String, event))
  * information interaction event.  The event description is in the the
  * following clause of the event:
  *
- *	evant{proc=process_name, path=pathname, pid=PID}
+ *	event{proc=process_name, path=pathname, pid=PID}
  *
  *
  * \param S	A pointer to the state information for the information
  *		interaction event.
+ *
+ * \param regex	A pointer to the compiled regular expression that will
+ *		extract the process id.
  *
  * \param event	The object containing the event.
  *
@@ -218,11 +227,11 @@ static _Bool _parse_pid(CO(SecurityEvent_State, S), CO(String, event))
  *		populated.
  */
 
-static _Bool _parse_event(CO(SecurityEvent_State, S), CO(String, event))
+static _Bool _parse_event(CO(SecurityEvent_State, S), regex_t *regex, \
+			  CO(String, event))
 
 {
-	_Bool retn	 = false,
-	      have_regex = false;
+	_Bool retn = false;
 
 	char *fp,
 	     bufr[2];
@@ -230,18 +239,12 @@ static _Bool _parse_event(CO(SecurityEvent_State, S), CO(String, event))
 	size_t lp,
 	       len;
 
-	regex_t regex;
-
 	regmatch_t regmatch[2];
 
 
 	/* Extract the field itself. */
-	if ( regcomp(&regex, "event\\{([^}]*)\\}", REG_EXTENDED) != 0 )
-		ERR(goto done);
-	have_regex = true;
-
 	fp = event->get(event);
-	if ( regexec(&regex, fp, 2, regmatch, 0) != REG_OK )
+	if ( regexec(regex, fp, 2, regmatch, 0) != REG_OK )
 		ERR(goto done);
 
 	fp += regmatch[1].rm_so;
@@ -258,10 +261,8 @@ static _Bool _parse_event(CO(SecurityEvent_State, S), CO(String, event))
 		ERR(goto done);
 	retn = true;
 
- done:
-	if ( have_regex )
-		regfree(&regex);
 
+ done:
 	return retn;
 }
 
@@ -290,6 +291,8 @@ static _Bool parse(CO(SecurityEvent, this), CO(String, event))
 {
 	STATE(S);
 
+	unsigned int cnt;
+
 	_Bool retn = false;
 
 
@@ -300,12 +303,22 @@ static _Bool parse(CO(SecurityEvent, this), CO(String, event))
 		ERR(goto done);
 
 
+	/* Compile the regular expressions once. */
+	if ( !Regex_compiled ) {
+		for (cnt= 0; Fields[cnt].fd != NULL; ++cnt) {
+			if ( regcomp(&Fields[cnt].regex, Fields[cnt].fd, \
+				     REG_EXTENDED) != 0 )
+				ERR(goto done);
+		}
+	}
+	Regex_compiled = true;
+
 	/* Parse the event definition. */
-	if ( !_parse_event(S, event) )
+	if ( !_parse_event(S, &Fields[0].regex, event) )
 		ERR(goto done);
 
 	/* Parse the process id. */
-	if ( !_parse_pid(S, event) )
+	if ( !_parse_pid(S, &Fields[1].regex, event) )
 		ERR(goto done);
 
 	/* Parse the COE and Cell components. */
@@ -315,6 +328,7 @@ static _Bool parse(CO(SecurityEvent, this), CO(String, event))
 		ERR(goto done);
 
 	retn = true;
+
 
  done:
 	if ( !retn )

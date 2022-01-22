@@ -49,6 +49,27 @@
 #endif
 
 
+/** Variable to indicate the parsing expressions have been compiled. */
+static _Bool Regex_compiled = false;
+
+/** Array of field descriptions and compiled regular expressions. */
+static struct regex_description {
+	char *fd;
+	regex_t regex;
+} Fields[10] = {
+	{.fd="cell\\{[^}]*\\}"},
+	{.fd="uid=([^,]*)"},
+	{.fd="gid=([^,]*)"},
+	{.fd="mode=([^,]*)"},
+	{.fd="name_length=([^,]*)"},
+	{.fd="name=([^,]*)"},
+	{.fd="s_id=([^,]*)"},
+	{.fd="s_uuid=([^,]*)"},
+	{.fd="digest=([^}]*)"},
+	{.fd=NULL}
+};
+
+
 /* Cell characteristics. */
 struct cell_characteristics {
 	uint32_t uid;
@@ -121,11 +142,11 @@ static void _init_state(CO(Cell_State, S))
  * This method parses a single numeric entry specified by a regular
  * expression and returns the integer value of the field arguement.
  *
- * \param fp	A character pointer to the field which is to be
- *		parsed.
- *
  * \param regex	A regular expression which extracts the desired
  *		field.
+ *
+ * \param field	A character pointer to the field which is to be
+ *		parsed.
  *
  * \param value	A pointer to the variable which will be loaded with
  *		the parsed value.
@@ -138,11 +159,10 @@ static void _init_state(CO(Cell_State, S))
  *		variable contains a legitimate value.
  */
 
-static _Bool _get_field(CO(char *, field), CO(char *, fd), uint32_t *value)
+static _Bool _get_field(regex_t *regex, CO(char *, field), uint32_t *value)
 
 {
-	_Bool retn       = false,
-	      have_regex = false;
+	_Bool retn = false;
 
 	char match[32];
 
@@ -150,16 +170,10 @@ static _Bool _get_field(CO(char *, field), CO(char *, fd), uint32_t *value)
 
 	size_t len;
 
-	regex_t regex;
-
 	regmatch_t regmatch[2];
 
 
-	if ( regcomp(&regex, fd, REG_EXTENDED) != 0 )
-		ERR(goto done);
-	have_regex = true;
-
-	if ( regexec(&regex, field, 2, regmatch, 0) != REG_OK )
+	if ( regexec(regex, field, 2, regmatch, 0) != REG_OK )
 		ERR(goto done);
 
 	len = regmatch[1].rm_eo - regmatch[1].rm_so;
@@ -177,10 +191,8 @@ static _Bool _get_field(CO(char *, field), CO(char *, fd), uint32_t *value)
 	*value = vl;
 	retn = true;
 
- done:
-	if ( have_regex )
-		regfree(&regex);
 
+ done:
 	return retn;
 }
 
@@ -192,14 +204,17 @@ static _Bool _get_field(CO(char *, field), CO(char *, fd), uint32_t *value)
  * digest field is assumed to have a size equal to the operative
  * identity size.
  *
- * \param fp	A character pointer to the field which is to be
- *		parsed.
- *
  * \param regex	A regular expression which extracts the desired
  *		field.
  *
+ * \param field	A character pointer to the field which is to be
+ *		parsed.
+ *
  * \param value	A pointer to the character area which the field
  *		will be loaded into.
+ *
+ * \param fb	A pointer to buffer that the field is to be copied
+ *		into.
  *
  * \param size	The length of the digest field to be populated.
  *
@@ -211,16 +226,13 @@ static _Bool _get_field(CO(char *, field), CO(char *, fd), uint32_t *value)
  *		variable contains a legitimate value.
  */
 
-static _Bool _get_digest(CO(char *, field), CO(char *, fd), uint8_t *fb, \
+static _Bool _get_digest(regex_t *regex, CO(char *, field), uint8_t *fb, \
 			 size_t size)
 
 {
-	_Bool retn       = false,
-	      have_regex = false;
+	_Bool retn = false;
 
 	size_t len;
-
-	regex_t regex;
 
 	regmatch_t regmatch[2];
 
@@ -228,11 +240,7 @@ static _Bool _get_digest(CO(char *, field), CO(char *, fd), uint8_t *fb, \
 	       match = NULL;
 
 
-	if ( regcomp(&regex, fd, REG_EXTENDED) != 0 )
-		ERR(goto done);
-	have_regex = true;
-
-	if ( regexec(&regex, field, 2, regmatch, 0) != REG_OK )
+	if ( regexec(regex, field, 2, regmatch, 0) != REG_OK )
 		ERR(goto done);
 
 	INIT(HurdLib, Buffer, match, ERR(goto done));
@@ -250,10 +258,8 @@ static _Bool _get_digest(CO(char *, field), CO(char *, fd), uint8_t *fb, \
 
 	retn = true;
 
- done:
-	if ( have_regex )
-		regfree(&regex);
 
+ done:
 	WHACK(bufr);
 	WHACK(match);
 
@@ -266,11 +272,10 @@ static _Bool _get_digest(CO(char *, field), CO(char *, fd), uint8_t *fb, \
  *
  * This method parses a test entry from a cell characteristic field.
  *
- * \param fp	A character pointer to the field which is to be
- *		parsed.
- *
  * \param regex	A regular expression which extracts the desired
  *		field.
+ *
+ * \param field A pointer to the field that is to be parsed.
  *
  * \param fb	A pointer to the buffer area which is to be loaded
  *		with the text field.
@@ -285,27 +290,20 @@ static _Bool _get_digest(CO(char *, field), CO(char *, fd), uint8_t *fb, \
  *		variable contains a legitimate value.
  */
 
-static _Bool _get_text(CO(char *, field), CO(char *, fd), uint8_t *fb, \
+static _Bool _get_text(regex_t *regex, CO(char *, field), uint8_t *fb, \
 		       size_t fblen)
 
 {
-	_Bool retn       = false,
-	      have_regex = false;
+	_Bool retn = false;
 
 	size_t len;
-
-	regex_t regex;
 
 	regmatch_t regmatch[2];
 
 	Buffer bufr = NULL;
 
 
-	if ( regcomp(&regex, fd, REG_EXTENDED) != 0 )
-		ERR(goto done);
-	have_regex = true;
-
-	if ( regexec(&regex, field, 2, regmatch, 0) != REG_OK )
+	if ( regexec(regex, field, 2, regmatch, 0) != REG_OK )
 		ERR(goto done);
 
 	len = regmatch[1].rm_eo - regmatch[1].rm_so;
@@ -322,9 +320,6 @@ static _Bool _get_text(CO(char *, field), CO(char *, fd), uint8_t *fb, \
 	retn = true;
 
  done:
-	if ( have_regex )
-		regfree(&regex);
-
 	WHACK(bufr);
 
 	return retn;
@@ -355,14 +350,13 @@ static _Bool parse(CO(Cell, this), CO(String, entry))
 {
 	STATE(S);
 
-	_Bool have_regex = false,
-	      retn = false;
+	_Bool retn = false;
+
+	unsigned int cnt;
 
 	uint32_t value;
 
 	char *fp;
-
-	regex_t regex;
 
 	regmatch_t regmatch;
 
@@ -375,15 +369,23 @@ static _Bool parse(CO(Cell, this), CO(String, entry))
 	if ( entry->poisoned(entry) )
 		ERR(goto done);
 
+
+	/* Compile the regular expressions once. */
+	if ( !Regex_compiled ) {
+		for (cnt= 0; Fields[cnt].fd != NULL; ++cnt) {
+			if ( regcomp(&Fields[cnt].regex, Fields[cnt].fd, \
+				     REG_EXTENDED) != 0 )
+				ERR(goto done);
+		}
+	}
+	Regex_compiled = true;
+
+
 	/* Extract cell field. */
 	INIT(HurdLib, Buffer, field, ERR(goto done));
 
-	if ( regcomp(&regex, "cell\\{[^}]*\\}", REG_EXTENDED) != 0 )
-		ERR(goto done);
-	have_regex = true;
-
 	fp = entry->get(entry);
-	if ( regexec(&regex, fp, 1, &regmatch, 0) != REG_OK )
+	if ( regexec(&Fields[0].regex, fp, 1, &regmatch, 0) != REG_OK )
 		ERR(goto done);
 
 	field->add(field, (unsigned char *) (fp + regmatch.rm_so),
@@ -394,41 +396,39 @@ static _Bool parse(CO(Cell, this), CO(String, entry))
 
 	/* Parse field entries. */
 	fp = (char *) field->get(field);
-	if ( !_get_field(fp, "uid=([^,]*)", &S->character.uid) )
+	if ( !_get_field(&Fields[1].regex, fp, &S->character.uid) )
 		ERR(goto done);
 
-	if ( !_get_field(fp, "gid=([^,]*)", &S->character.gid) )
-
+	if ( !_get_field(&Fields[2].regex, fp, &S->character.gid) )
 		ERR(goto done);
 
-	if ( !_get_field(fp, "mode=([^,]*)", &value) )
+	if ( !_get_field(&Fields[3].regex, fp, &value) )
 		ERR(goto done);
 	S->character.mode = value;
 
-	if ( !_get_field(fp, "name_length=([^,]*)", &S->character.name_length) )
+	if ( !_get_field(&Fields[4].regex, fp, &S->character.name_length) )
 		ERR(goto done);
 
-	if ( !_get_digest(fp, "name=([^,]*)", (uint8_t *) S->character.name, \
-			  NAAAIM_IDSIZE) )
+	if ( !_get_digest(&Fields[5].regex, fp, \
+			  (uint8_t *) S->character.name, NAAAIM_IDSIZE) )
 		ERR(goto done);
 
-	if ( !_get_text(fp, "s_id=([^,]*)", (uint8_t *) S->character.s_id, \
+	if ( !_get_text(&Fields[6].regex, fp, (uint8_t *) S->character.s_id, \
 			sizeof(S->character.s_id)) )
 		ERR(goto done);
 
-	if ( !_get_digest(fp, "s_uuid=([^,]*)", S->character.s_uuid, \
-			sizeof(S->character.s_uuid)) )
+	if ( !_get_digest(&Fields[7].regex, fp, S->character.s_uuid, \
+			  sizeof(S->character.s_uuid)) )
 		ERR(goto done);
 
-	if ( !_get_digest(fp, "digest=([^}]*)", \
+	if ( !_get_digest(&Fields[8].regex, fp, \
 			  (uint8_t *) S->character.digest, NAAAIM_IDSIZE) )
 		ERR(goto done);
 
 	retn = true;
 
+
  done:
-	if ( have_regex )
-		regfree(&regex);
 	if ( !retn )
 		S->poisoned = true;
 

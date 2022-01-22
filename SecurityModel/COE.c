@@ -48,6 +48,28 @@
 #endif
 
 
+/** Variable to indicate the parsing expressions have been compiled. */
+static _Bool Regex_compiled = false;
+
+/** Array of field descriptions and compiled regular expressions. */
+static struct regex_description {
+	char *fd;
+	regex_t regex;
+} Fields[11] = {
+	{.fd="COE\\{[^}]*\\}"},
+	{.fd="uid=([^,]*)"},
+	{.fd="euid=([^,]*)"},
+	{.fd="suid=([^,]*)"},
+	{.fd="gid=([^,]*)"},
+	{.fd="egid=([^,]*)"},
+	{.fd="sgid=([^,]*)"},
+	{.fd="fsuid=([^,]*)"},
+	{.fd="fsgid=([^,]*)"},
+	{.fd="cap=([^}]*)"},
+	{.fd=NULL}
+};
+
+
 /* COE identity elements. */
 struct coe_characteristics {
 	uint32_t uid;
@@ -158,11 +180,11 @@ static void set_characteristics(CO(COE, this), const uint32_t uid,	     \
  * This method parses a single numeric entry specified by a regular
  * expression and returns the integer value of the field arguement.
  *
- * \param fp	A character pointer to the field which is to be
- *		parsed.
- *
  * \param regex	A regular expression which extracts the desired
  *		field.
+ *
+ * \param field	A character pointer to the field which is to be
+ *		parsed.
  *
  * \param value	A pointer to the variable which will be loaded with
  *		the parsed value.
@@ -175,11 +197,10 @@ static void set_characteristics(CO(COE, this), const uint32_t uid,	     \
  *		variable contains a legitimate value.
  */
 
-static _Bool _get_field(CO(char *, field), CO(char *, fd), uint32_t *value)
+static _Bool _get_field(regex_t *regex, CO(char *, field), uint32_t *value)
 
 {
-	_Bool retn       = false,
-	      have_regex = false;
+	_Bool retn = false;
 
 	char match[32];
 
@@ -187,16 +208,10 @@ static _Bool _get_field(CO(char *, field), CO(char *, fd), uint32_t *value)
 
 	size_t len;
 
-	regex_t regex;
-
 	regmatch_t regmatch[2];
 
 
-	if ( regcomp(&regex, fd, REG_EXTENDED) != 0 )
-		ERR(goto done);
-	have_regex = true;
-
-	if ( regexec(&regex, field, 2, regmatch, 0) != REG_OK )
+	if ( regexec(regex, field, 2, regmatch, 0) != REG_OK )
 		ERR(goto done);
 
 	len = regmatch[1].rm_eo - regmatch[1].rm_so;
@@ -214,10 +229,8 @@ static _Bool _get_field(CO(char *, field), CO(char *, fd), uint32_t *value)
 	*value = vl;
 	retn = true;
 
- done:
-	if ( have_regex )
-		regfree(&regex);
 
+ done:
 	return retn;
 }
 
@@ -229,11 +242,11 @@ static _Bool _get_field(CO(char *, field), CO(char *, fd), uint32_t *value)
  * field.  This is special cased since the capability field is a
  * 64-bit entry.
  *
- * \param fp	A character pointer to the field which is to be
- *		parsed.
- *
  * \param regex	A regular expression which extracts the desired
  *		field.
+ *
+ * \param field	A character pointer to the field which is to be
+ *		parsed.
  *
  * \param value	A pointer to the variable which will be loaded with
  *		the parsed value.
@@ -246,11 +259,10 @@ static _Bool _get_field(CO(char *, field), CO(char *, fd), uint32_t *value)
  *		variable contains a legitimate value.
  */
 
-static _Bool _get_caps(CO(char *, field), CO(char *, fd), uint64_t *value)
+static _Bool _get_caps(regex_t *regex, CO(char *, field), uint64_t *value)
 
 {
-	_Bool retn       = false,
-	      have_regex = false;
+	_Bool retn = false;
 
 	char match[32];
 
@@ -258,16 +270,10 @@ static _Bool _get_caps(CO(char *, field), CO(char *, fd), uint64_t *value)
 
 	size_t len;
 
-	regex_t regex;
-
 	regmatch_t regmatch[2];
 
 
-	if ( regcomp(&regex, fd, REG_EXTENDED) != 0 )
-		ERR(goto done);
-	have_regex = true;
-
-	if ( regexec(&regex, field, 2, regmatch, 0) != REG_OK )
+	if ( regexec(regex, field, 2, regmatch, 0) != REG_OK )
 		ERR(goto done);
 
 	len = regmatch[1].rm_eo - regmatch[1].rm_so;
@@ -285,10 +291,8 @@ static _Bool _get_caps(CO(char *, field), CO(char *, fd), uint64_t *value)
 	*value = vl;
 	retn = true;
 
- done:
-	if ( have_regex )
-		regfree(&regex);
 
+ done:
 	return retn;
 }
 
@@ -317,12 +321,11 @@ static _Bool parse(CO(COE, this), CO(String, entry))
 {
 	STATE(S);
 
-	_Bool have_regex = false,
-	      retn = false;
+	_Bool retn = false;
+
+	unsigned int cnt;
 
 	char *fp;
-
-	regex_t regex;
 
 	regmatch_t regmatch;
 
@@ -335,15 +338,23 @@ static _Bool parse(CO(COE, this), CO(String, entry))
 	if ( entry->poisoned(entry) )
 		ERR(goto done);
 
+
+	/* Compile the regular expressions once. */
+	if ( !Regex_compiled ) {
+		for (cnt= 0; Fields[cnt].fd != NULL; ++cnt) {
+			if ( regcomp(&Fields[cnt].regex, Fields[cnt].fd, \
+				     REG_EXTENDED) != 0 )
+				ERR(goto done);
+		}
+	}
+	Regex_compiled = true;
+
+
 	/* Extract coe field. */
 	INIT(HurdLib, Buffer, field, ERR(goto done));
 
-	if ( regcomp(&regex, "COE\\{[^}]*\\}", REG_EXTENDED) != 0 )
-		ERR(goto done);
-	have_regex = true;
-
 	fp = entry->get(entry);
-	if ( regexec(&regex, fp, 1, &regmatch, 0) != REG_OK )
+	if ( regexec(&Fields[0].regex, fp, 1, &regmatch, 0) != REG_OK )
 		ERR(goto done);
 
 	field->add(field, (unsigned char *) (fp + regmatch.rm_so),
@@ -354,38 +365,37 @@ static _Bool parse(CO(COE, this), CO(String, entry))
 
 	/* Parse field entries. */
 	fp = (char *) field->get(field);
-	if ( !_get_field(fp, "uid=([^,]*)", &S->character.uid) )
+	if ( !_get_field(&Fields[1].regex, fp, &S->character.uid) )
 		ERR(goto done);
 
-	if ( !_get_field(fp, "euid=([^,]*)", &S->character.euid) )
+	if ( !_get_field(&Fields[2].regex, fp, &S->character.euid) )
 		ERR(goto done);
 
-	if ( !_get_field(fp, "suid=([^,]*)", &S->character.suid) )
+	if ( !_get_field(&Fields[3].regex, fp, &S->character.suid) )
 		ERR(goto done);
 
-	if ( !_get_field(fp, "gid=([^,]*)", &S->character.gid) )
+	if ( !_get_field(&Fields[4].regex, fp, &S->character.gid) )
 		ERR(goto done);
 
-	if ( !_get_field(fp, "egid=([^,]*)", &S->character.egid) )
+	if ( !_get_field(&Fields[5].regex, fp, &S->character.egid) )
 		ERR(goto done);
 
-	if ( !_get_field(fp, "sgid=([^,]*)", &S->character.sgid) )
+	if ( !_get_field(&Fields[6].regex, fp, &S->character.sgid) )
 		ERR(goto done);
 
-	if ( !_get_field(fp, "fsuid=([^,]*)", &S->character.fsuid) )
+	if ( !_get_field(&Fields[7].regex, fp, &S->character.fsuid) )
 		ERR(goto done);
 
-	if ( !_get_field(fp, "fsgid=([^,]*)", &S->character.fsgid) )
+	if ( !_get_field(&Fields[8].regex, fp, &S->character.fsgid) )
 		ERR(goto done);
 
-	if ( !_get_caps(fp, "cap=([^}]*)", &S->character.capability) )
+	if ( !_get_caps(&Fields[9].regex, fp, &S->character.capability) )
 		ERR(goto done);
 
 	retn = true;
 
+
  done:
-	if ( have_regex )
-		regfree(&regex);
 	if ( !retn )
 		S->poisoned = true;
 
