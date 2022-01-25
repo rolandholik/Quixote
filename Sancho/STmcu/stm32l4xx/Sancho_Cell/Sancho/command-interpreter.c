@@ -677,26 +677,23 @@ static int get_command(CO(Buffer, bufr))
  * \return	No return value is defined.
  */
 
-static void interpreter(const void *arg)
+static void sancho_interpreter(const TTYduct duct)
 
 {
-	Buffer bufr = NULL;
+	_Bool connected = true;
 
-	TTYduct duct = NULL;
+	Buffer bufr = NULL;
 
 	TSEM model = NULL;
 
 
-	INIT(HurdLib, Buffer, bufr, (printf("init error.\n")));
-	INIT(NAAAIM, TTYduct, duct, (printf("init error.\n")));
-
-	duct->init_device(duct, NULL);
-
 	Host = duct;
 
-	INIT(NAAAIM, TSEM, model, (printf("Model init error.\n")));
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	INIT(NAAAIM, TSEM, model, ERR(goto done));
 
-	while ( true ) {
+
+	while ( connected ) {
 		if ( !duct->receive_Buffer(duct, bufr) ) {
 			bufr->reset(bufr);
 			continue;
@@ -757,7 +754,7 @@ static void interpreter(const void *arg)
 				break;
 
 			case sancho_reset:
-				NVIC_SystemReset();
+				connected = false;
 				break;
 		}
 
@@ -765,7 +762,46 @@ static void interpreter(const void *arg)
 		Have_Error = false;
 	}
 
+
+ done:
+	WHACK(bufr);
+	WHACK(model);
+
 	return;
+}
+
+
+
+/**
+ * External function call.
+ *
+ * This function implements the interpreter loop that waits for a
+ * TTYduct connection and for each connection invokes command
+ * interpreter handling.
+ *
+ * \return	No return value is defined.
+ */
+
+static void interpreter(const void *arg)
+
+{
+	TTYduct duct  = NULL;
+
+
+	INIT(NAAAIM, TTYduct, duct, ERR(goto done));
+
+
+	/* Invoke the interpreter on each connection. */
+	while ( true ) {
+		duct->init_device(duct, NULL);
+		sancho_interpreter(duct);
+	}
+
+
+ done:
+	while ( 1 )
+		continue;
+
 }
 
 
