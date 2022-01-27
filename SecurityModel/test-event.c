@@ -43,15 +43,97 @@ static uint8_t pseudonym[32] = {
 	0x32, 0x87, 0x64, 0xe1, 0xa8, 0x6d, 0x64, 0xf8 };
 
 
-/*
+/**
+ * Private function.
+ *
+ * This function is responsible for returning the current walltime
+ * in milliseconds.
+ *
+ * \return		The epoch time in milli-seconds.
+ */
 
+static double wall_time(void)
+
+{
+	struct timeval walltime;
+
+
+	if ( gettimeofday(&walltime, NULL) )
+		return 0;
+
+	return (double) (1000.0 * (double) walltime.tv_sec + \
+			 (double) walltime.tv_usec / 1000.0);
+}
+
+
+/**
+ * Private function.
+ *
+ * This function reads security interaction events from standard input
+ * and prints the time required to parse the event.
+ *
+ * \return	No return value is defined.
+ */
+
+void test_file(void)
+
+{
+	char *p,
+	     inbufr[1024];
+
+	double start,
+	       end;
+
+	String evstr = NULL;
+
+	SecurityEvent event = NULL;
+
+
+	INIT(HurdLib, String, evstr, ERR(goto done));
+	INIT(NAAAIM, SecurityEvent, event, ERR(goto done));
+
+	while ( true ) {
+		memset(inbufr, '\0', sizeof(inbufr));
+
+		if ( fgets(inbufr, sizeof(inbufr), stdin) == NULL )
+			goto done;
+		if ( (p = strchr(inbufr, '\n')) != NULL )
+			*p = '\0';
+		if ( !evstr->add(evstr, inbufr) )
+			ERR(goto done);
+
+		start = wall_time();
+		if ( !event->parse(event, evstr) )
+			ERR(goto done);
+
+		end = wall_time();
+		fprintf(stdout, "start=%.1f, end=%1.f, time=%.1f\n", start, \
+			end, end - start);
+
+		evstr->reset(evstr);
+		event->reset(event);
+	}
+
+
+ done:
+	WHACK(evstr);
+	WHACK(event);
+
+	return;
+}
+
+
+/*
  * Program entry point begins here.
  */
 
 extern int main(int argc, char *argv[])
 
 {
-	int retn = 1;
+	_Bool file_mode = false;
+
+	int opt,
+	    retn = 1;
 
 	String entry = NULL;
 
@@ -62,6 +144,22 @@ extern int main(int argc, char *argv[])
 	EventModel event_model = NULL;
 
 
+	while ( (opt = getopt(argc, argv, "F")) != EOF )
+		switch ( opt ) {
+			case 'F':
+				file_mode = true;
+				break;
+		}
+
+
+	/* Run utility in file mode. */
+	if ( file_mode ) {
+		test_file();
+		return 0;
+	}
+
+
+	/* Test an individual event. */
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 
 	INIT(HurdLib, String, entry, ERR(goto done));
