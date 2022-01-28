@@ -354,13 +354,13 @@ extern int main(int argc, char *argv[])
 
 
         /* Get operational mode. */
-        while ( (retn = getopt(argc, argv, "tc:")) != EOF )
+        while ( (retn = getopt(argc, argv, "Tt:")) != EOF )
                 switch ( retn ) {
-			case 't':
+			case 'T':
 				timing = true;
 				break;
 
-			case 'c':
+			case 't':
 				device = optarg;
 				break;
 		}
