@@ -23,3 +23,4 @@
 #define NAAAIM_SHA256_OBJID		1
 #define NAAAIM_RSAkey_OBJID		3
 #define NAAAIM_Base64_OBJID		31
+#define NAAAIM_TTYduct_OBJID		33
