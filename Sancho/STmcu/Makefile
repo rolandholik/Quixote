@@ -11,7 +11,7 @@
 #
 export MCUCFGDIR=${shell pwd}
 
-SUBDIRS = HurdLib NAAAIM stm32l4xx
+SUBDIRS = HurdLib NAAAIM stm32l4xx stm32l562
 
 
 #

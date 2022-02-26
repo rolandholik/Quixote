@@ -113,7 +113,7 @@ static _Bool _init_crypto(CO(SHA256_State, S))
 	 _Bool retn = true;
 
 
-	 if ( !retn )
+ 	 if ( !retn )
 		 S->poisoned = true;
 
 	 return true;

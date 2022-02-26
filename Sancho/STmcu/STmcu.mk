@@ -23,4 +23,9 @@ INCDIR = ${TOOLDIR}/arm-none-eabi/include
 PLATFORM = -mthumb -mcpu=cortex-m4 -mfloat-abi=hard -O2 -mfpu=fpv4-sp-d16 \
 	-DSTM32L496xx=1
 
+ifeq (${STMCU}, STM32L5)
+PLATFORM = -mthumb -mcpu=cortex-m33 -O2 -DSTM32L562xx=1
+endif
+
+
 PROGRAMMER = ${TOOLDIR}/bin/stm-programmer
