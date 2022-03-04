@@ -3,7 +3,7 @@
 # **************************************************************************/
 
 # Variable declarations.
-SUBDIRS = Sancho_Cell
+SUBDIRS = HurdLib NAAAIM Sancho_Cell
 
 
 #
@@ -18,6 +18,12 @@ all: ${SUBDIRS}
 
 #
 # Subdirectory targets
+HurdLib:
+	${MAKE} -C $@;
+
+NAAAIM:
+	${MAKE} -C $@;
+
 Sancho_Cell:
 	${MAKE} -C $@;
 

@@ -10,7 +10,7 @@
 # Include micro-controller build definitions.
 #
 ifndef MCUCFGDIR
-MCUCFGDIR=${shell cd ..; pwd}
+MCUCFGDIR=${shell cd ../..; pwd}
 endif
 
 include ${MCUCFGDIR}/STmcu.mk
@@ -30,7 +30,7 @@ LIBRARY = lib${LIBNAME}.a
 #
 # Build definitions.
 #
-CINCLUDE = -I ../../HurdLib
+CINCLUDE = -I ../../../../HurdLib
 
 CFLAGS = ${PLATFORM} ${CDEBUG} ${CINCLUDE} -fno-diagnostics-color -Wall
 
@@ -38,7 +38,7 @@ CFLAGS = ${PLATFORM} ${CDEBUG} ${CINCLUDE} -fno-diagnostics-color -Wall
 #
 # Compilation directives.
 #
-%.o: ../../../HurdLib/%.c
+%.o: ../../../../HurdLib/%.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
 
@@ -58,6 +58,6 @@ clobber: clean
 
 
 # Source dependencies.
-Origin.o: ../../../HurdLib/${LIBNAME}.h ../../../HurdLib/Origin.h
-Buffer.o: ../../../HurdLib/${LIBNAME}.h ../../../HurdLib/Origin.h ../../../HurdLib/Fibsequence.h
-Gaggle.o: ../../../HurdLib/${LIBNAME}.h ../../../HurdLib/Origin.h ../../../HurdLib/Buffer.h ../../../HurdLib/Gaggle.h
+Origin.o: ../../../../HurdLib/${LIBNAME}.h ../../../../HurdLib/Origin.h
+Buffer.o: ../../../../HurdLib/${LIBNAME}.h ../../../../HurdLib/Origin.h ../../../../HurdLib/Fibsequence.h
+Gaggle.o: ../../../../HurdLib/${LIBNAME}.h ../../../../HurdLib/Origin.h ../../../../HurdLib/Buffer.h ../../../../HurdLib/Gaggle.h

@@ -17,7 +17,7 @@ include ${MCUCFGDIR}/STmcu.mk
 #
 DEMODIR = ${STMDIR}/Projects/32L496GDISCOVERY/Demonstrations/Cellular
 
-CINCLUDE = -I . -I ../../../HurdLib -I ../../../../../HurdLib 		\
+CINCLUDE = -I . -I ../../HurdLib -I ../../../../../HurdLib 		\
 	-I ../../../../../lib -I ../../../../../Quixote			\
 	-I ../../../../../SecurityModel	 -I ../../../../../		\
 	-I ${STMDIR}/Drivers/CMSIS/Device/ST/STM32L4xx/Include		\
@@ -69,8 +69,8 @@ CSRC = syscalls.c sysmem.c board_interrupts.c ${STMSRC} ${MISCSRC} ${APPSRC}
 
 ASRC = startup_stm32l496agix.s
 
-LIBS =  -L ../../../HurdLib -l HurdLib				  \
-	-L ../../../NAAAIM -l NAAAIM				  \
+LIBS =  -L ../../HurdLib -l HurdLib				  \
+	-L ../../NAAAIM -l NAAAIM				  \
 	-L ../RTOS/ -l rtos					  \
 	-L ../STM32_Cellular/Cellular_Ctrl -l cellular_control	  \
 	-L ../STM32_Cellular/Error -l error_handler		  \

@@ -10,7 +10,7 @@
 # Include micro-controller build definitions.
 #
 ifndef MCUCFGDIR
-MCUCFGDIR=${shell cd ..; pwd}
+MCUCFGDIR=${shell cd ../..; pwd}
 endif
 
 include ${MCUCFGDIR}/STmcu.mk
@@ -41,8 +41,8 @@ LIBRARY = lib${LIBNAME}.a
 #
 # Build definitions.
 #
-CINCLUDE = -I . -I ../.. -I ../../../lib -I ../HurdLib -I ../../../HurdLib \
-	-I ${MBEDDIR}/include
+CINCLUDE = -I . -I ../.. -I ../../../../lib -I ../HurdLib \
+	-I ../../../../HurdLib -I ${MBEDDIR}/include
 
 
 CFLAGS = ${PLATFORM} ${DEFINES} ${CDEBUG} ${CINCLUDE} -fno-diagnostics-color \
@@ -79,6 +79,6 @@ clobber: clean
 
 
 # Source dependencies.
-Base64.o: ${LIBNAME}.h ../../../lib/Base64.h
-RSAkey.o: ${LIBNAME}.h ../../../lib/SHA256.h ../../../lib/RSAkey.h
-SHA256.o: ${LIBNAME}.h ../../../lib/SHA256.h
+Base64.o: ${LIBNAME}.h ../../../../lib/Base64.h
+RSAkey.o: ${LIBNAME}.h ../../../../lib/SHA256.h ../../../../lib/RSAkey.h
+SHA256.o: ${LIBNAME}.h ../../../../lib/SHA256.h
