@@ -28,6 +28,9 @@ all: ${SUBDIRS}
 stm32l4xx:
 	${MAKE} -C $@;
 
+stm32l562:
+	${MAKE} -C $@;
+
 
 #
 # Utility targets.

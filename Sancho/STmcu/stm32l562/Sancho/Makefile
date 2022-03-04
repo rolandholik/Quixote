@@ -19,7 +19,7 @@ include ${MCUCFGDIR}/STmcu.mk
 #
 STMDIR = /u/usr/sources/Development_STM/STM32CubeL5-1.2.0
 
-CINCLUDE = -I . -I ../../include -I ../../HurdLib -I ../../../../HurdLib \
+CINCLUDE = -I . -I ../../include -I ../HurdLib -I ../../../../HurdLib	 \
 	-I ../../../.. -I ../../../../lib -I ../../../../Quixote	 \
 	-I ../../../../SecurityModel					 \
 	-I ${STMDIR}/Drivers/BSP/STM32L562E-DK				 \
