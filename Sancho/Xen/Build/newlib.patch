@@ -1,0 +1,1149 @@
+diff -urNp v1.16.0/newlib-1.16.0/etc/Makefile.in newlib-1.16.0/etc/Makefile.in
+--- v1.16.0/newlib-1.16.0/etc/Makefile.in	2007-03-27 13:09:32.000000000 -0500
++++ newlib-1.16.0/etc/Makefile.in	2022-03-05 14:01:46.974943759 -0600
+@@ -63,8 +63,8 @@ DVIFILES = standards.dvi configure.dvi
+ PDFFILES = standards.pdf configure.pdf
+ HTMLFILES = standards.html configure.html
+ 
+-all: info
+-install: install-info
++all:
++install:
+ 
+ uninstall:
+ 
+diff -urNp v1.16.0/newlib-1.16.0/newlib/ChangeLog newlib-1.16.0/newlib/ChangeLog
+--- v1.16.0/newlib-1.16.0/newlib/ChangeLog	2007-12-19 16:36:26.000000000 -0600
++++ newlib-1.16.0/newlib/ChangeLog	2022-03-05 14:01:45.422941433 -0600
+@@ -3896,12 +3896,12 @@
+ 
+ 2005-02-23  Corinna Vinschen  <corinna@vinschen.de>
+ 
+-	* libc/include/time.h (_timezone): Change to long also for Cygwin.
++	* libc/include/time.h (timezone): Change to long also for Cygwin.
+ 	(timezone): Drop cast from definition.
+ 
+ 2005-02-23  Jeff Johnston  <jjohnstn@redhat.com>
+ 
+-	* libc/include/time.h [!CYGWIN](_timezone): Change to long.
++	* libc/include/time.h [!CYGWIN](timezone): Change to long.
+ 	(__tzrule_type, __tzinfo_type): New types.
+ 	(__gettzinfo): New function.
+ 	* libc/sys/linux/include/time.h: Ditto.
+@@ -3913,7 +3913,7 @@
+ 	* libc/time/mktm_r.c: Ditto.
+ 	* libc/time/strftime.c: Ditto.
+ 	* libc/time/tzset_r.c: Ditto.  Also remove definition
+-	of __tzrule which is now in gettzinfo.c.  Change _timezone
++	of __tzrule which is now in gettzinfo.c.  Change timezone
+ 	references to not cast to time_t.
+ 	* libc/time/gettzinfo.c: New file.
+ 
+@@ -4069,7 +4069,7 @@
+ 
+ 2005-01-19  Shaun Jackman  <sjackman@gmail.com>
+ 
+-	* tzset_r.c (_tzname): Add a comma.
++	* tzset_r.c (tzname): Add a comma.
+ 
+ 2005-01-18  Aldy Hernandez  <aldyh@redhat.com>
+ 
+@@ -9487,7 +9487,7 @@ Wed May  8 17:47:35 2002  J"orn Rennecke
+ 
+ 	* libc/include/time.h (tzset, _tzset_r): Added prototypes.
+ 	(strptime): Moved prototype to be within !__STRICT_ANSI__.
+-	(_tzname, _daylight, _timezone): No long __CYGWIN__ only.
++	(tzname, daylight, timezone): No long __CYGWIN__ only.
+ 	(tzname): Defined for all platforms.
+ 	(daylight, timezone): Defined only for CYGWIN.
+ 	* libc/sys/linux/machine/i386/crt0.c: Add call to tzset() after
+@@ -9699,7 +9699,7 @@ Tue Mar 26 17:17:10 2002  J"orn Rennecke
+ 
+ 	*  libc/include/time.h (tzset, _tzset_r): Added prototypes.
+ 	(strptime): Moved prototype to be within !__STRICT_ANSI__.
+-	(_tzname, _daylight, _timezone): No long __CYGWIN__ only.
++	(tzname, daylight, timezone): No long __CYGWIN__ only.
+ 	(tzname): Defined for all platforms.
+ 	(daylight, timezone): Defined only for CYGWIN.
+ 	*  libc/sys/linux/machine/i386/crt0.c: Add call to tzset() after
+@@ -10683,8 +10683,8 @@ Fri Apr 20 23:17:51 2001  Christopher Fa
+ 
+ 2001-04-19  Robert Collins  <rbtcollins@hotmail.com>
+ 
+-	* include/time.h[__CYGWIN__]:  Define tzname to _tzname if not defined.
+-	Define daylight to _daylight if it is not defined
++	* include/time.h[__CYGWIN__]:  Define tzname to tzname if not defined.
++	Define daylight to daylight if it is not defined
+ 	Prepare a variable export of timezone based on timezonevariable.
+ 	(Cannot be used with the timezone() function.)
+ 
+@@ -11544,7 +11544,7 @@ Fri Aug 25 13:37:11 2000  Christopher Fa
+ 	* libc/include/ctype.h (_ctype_): use __IMPORT
+ 	* libc/include/math.h (__infinity, signam, _LIB_VERSION): ditto
+ 	* libc/include/math.h (__mb_cur_max): ditto
+-	* libc/include/time.h (_timezone, _daylight, _tzname): ditto
++	* libc/include/time.h (timezone, daylight, tzname): ditto
+ 	* libc/include/unctrl.h (__unctrl, __unctrllen): ditto
+ 	* libc/include/errno.h (_sys_errlist, _sys_nerr): ditto
+ 	* libc/include/unistd.h (environ): ditto
+@@ -14149,7 +14149,7 @@ Fri Jun  6 14:07:59 1997  Ian Lance Tayl
+ 	strnicmp if they are not already defined.
+ 
+ 	* libc/include/time.h: If __CYGWIN32__, declare tzset and define
+-	_timezone, _daylight, and _tzname.
++	timezone, daylight, and tzname.
+ 
+ Wed Jun  4 12:51:16 1997  Doug Evans  <dje@canuck.cygnus.com>
+ 
+diff -urNp v1.16.0/newlib-1.16.0/newlib/configure.host newlib-1.16.0/newlib/configure.host
+--- v1.16.0/newlib-1.16.0/newlib/configure.host	2007-11-07 15:42:24.000000000 -0600
++++ newlib-1.16.0/newlib/configure.host	2022-03-05 14:01:46.922943680 -0600
+@@ -317,6 +317,8 @@ case "${host}" in
+     oext=lo
+     lpfx=
+     aext=la ;;
++  i[34567]86-xen-elf)
++    stdio64_dir=stdio64 ;;
+   *) ;; #shared library not supported for ${host}
+ esac
+ 
+diff -urNp v1.16.0/newlib-1.16.0/newlib/libc/include/_syslist.h newlib-1.16.0/newlib/libc/include/_syslist.h
+--- v1.16.0/newlib-1.16.0/newlib/libc/include/_syslist.h	2005-08-22 16:13:35.000000000 -0500
++++ newlib-1.16.0/newlib/libc/include/_syslist.h	2022-03-05 14:01:45.742941912 -0600
+@@ -14,6 +14,7 @@
+ #define _kill kill
+ #define _link link
+ #define _lseek lseek
++#define _lseek64 lseek64
+ #define _open open
+ #define _read read
+ #define _sbrk sbrk
+diff -urNp v1.16.0/newlib-1.16.0/newlib/libc/include/inttypes.h newlib-1.16.0/newlib/libc/include/inttypes.h
+--- v1.16.0/newlib-1.16.0/newlib/libc/include/inttypes.h	2005-12-16 13:03:12.000000000 -0600
++++ newlib-1.16.0/newlib/libc/include/inttypes.h	2022-03-05 14:01:45.742941912 -0600
+@@ -163,12 +163,12 @@
+ 
+ 
+ /* 64-bit types */
+-#if __have_longlong64
+-#define __PRI64(x) __STRINGIFY(ll##x)
+-#define __SCN64(x) __STRINGIFY(ll##x)
+-#elif __have_long64
++#if __have_long64
+ #define __PRI64(x) __STRINGIFY(l##x)
+ #define __SCN64(x) __STRINGIFY(l##x)
++#elif __have_longlong64
++#define __PRI64(x) __STRINGIFY(ll##x)
++#define __SCN64(x) __STRINGIFY(ll##x)
+ #else
+ #define __PRI64(x) __STRINGIFY(x)
+ #define __SCN64(x) __STRINGIFY(x)
+@@ -217,12 +217,12 @@
+ #endif
+ 
+ /* max-bit types */
+-#if __have_longlong64
+-#define __PRIMAX(x) __STRINGIFY(ll##x)
+-#define __SCNMAX(x) __STRINGIFY(ll##x)
+-#elif __have_long64
++#if __have_long64
+ #define __PRIMAX(x) __STRINGIFY(l##x)
+ #define __SCNMAX(x) __STRINGIFY(l##x)
++#elif __have_longlong64
++#define __PRIMAX(x) __STRINGIFY(ll##x)
++#define __SCNMAX(x) __STRINGIFY(ll##x)
+ #else
+ #define __PRIMAX(x) __STRINGIFY(x)
+ #define __SCNMAX(x) __STRINGIFY(x)
+@@ -242,12 +242,12 @@
+ #define SCNxMAX		__SCNMAX(x)
+ 
+ /* ptr types */
+-#if __have_longlong64
+-#define __PRIPTR(x) __STRINGIFY(ll##x)
+-#define __SCNPTR(x) __STRINGIFY(ll##x)
+-#elif __have_long64
++#if __have_long64
+ #define __PRIPTR(x) __STRINGIFY(l##x)
+ #define __SCNPTR(x) __STRINGIFY(l##x)
++#elif __have_longlong64
++#define __PRIPTR(x) __STRINGIFY(ll##x)
++#define __SCNPTR(x) __STRINGIFY(ll##x)
+ #else
+ #define __PRIPTR(x) __STRINGIFY(x)
+ #define __SCNPTR(x) __STRINGIFY(x)
+diff -urNp v1.16.0/newlib-1.16.0/newlib/libc/include/reent.h newlib-1.16.0/newlib/libc/include/reent.h
+--- v1.16.0/newlib-1.16.0/newlib/libc/include/reent.h	2007-07-06 11:56:30.000000000 -0500
++++ newlib-1.16.0/newlib/libc/include/reent.h	2022-03-05 14:01:45.730941895 -0600
+@@ -87,6 +87,9 @@ extern int _gettimeofday_r _PARAMS ((str
+ #if defined(__CYGWIN__) && defined(_COMPILING_NEWLIB)
+ #define stat64 __stat64
+ #endif
++#if defined(__MINIOS__)
++#define stat64 stat
++#endif
+ 
+ struct stat64;
+ 
+diff -urNp v1.16.0/newlib-1.16.0/newlib/libc/include/stdint.h newlib-1.16.0/newlib/libc/include/stdint.h
+--- v1.16.0/newlib-1.16.0/newlib/libc/include/stdint.h	2006-08-16 16:39:43.000000000 -0500
++++ newlib-1.16.0/newlib/libc/include/stdint.h	2022-03-05 14:01:45.730941895 -0600
+@@ -38,7 +38,7 @@ extern "C" {
+ #if __STDINT_EXP(LONG_MAX) > 0x7fffffff
+ #define __have_long64 1
+ #elif __STDINT_EXP(LONG_MAX) == 0x7fffffff && !defined(__SPU__)
+-#define __have_long32 1
++/* #define __have_long32 1 */
+ #endif
+ 
+ #if __STDINT_EXP(SCHAR_MAX) == 0x7f
+@@ -348,8 +348,11 @@ typedef unsigned long uintptr_t;
+ #endif
+ 
+ /* This must match size_t in stddef.h, currently long unsigned int */
+-#define SIZE_MIN (-__STDINT_EXP(LONG_MAX) - 1L)
+-#define SIZE_MAX __STDINT_EXP(LONG_MAX)
++#ifdef __SIZE_MAX__
++#define SIZE_MAX __SIZE_MAX__
++#else
++#define SIZE_MAX (__STDINT_EXP(LONG_MAX) * 2UL + 1)
++#endif
+ 
+ /* This must match sig_atomic_t in <signal.h> (currently int) */
+ #define SIG_ATOMIC_MIN (-__STDINT_EXP(INT_MAX) - 1)
+diff -urNp v1.16.0/newlib-1.16.0/newlib/libc/include/sys/_default_fcntl.h newlib-1.16.0/newlib/libc/include/sys/_default_fcntl.h
+--- v1.16.0/newlib-1.16.0/newlib/libc/include/sys/_default_fcntl.h	2007-12-19 12:49:17.000000000 -0600
++++ newlib-1.16.0/newlib/libc/include/sys/_default_fcntl.h	2022-03-05 14:01:45.734941900 -0600
+@@ -170,7 +170,11 @@ extern int fcntl _PARAMS ((int, int, ...
+ /* Provide _<systemcall> prototypes for functions provided by some versions
+    of newlib.  */
+ #ifdef _COMPILING_NEWLIB
+-extern int _open _PARAMS ((const char *, int, ...));
++extern int _open _PARAMS ((const char *, int, ...))
++#ifdef __MINIOS__
++    asm("open64")
++#endif
++    ;
+ extern int _fcntl _PARAMS ((int, int, ...));
+ #ifdef __LARGE64_FILES
+ extern int _open64 _PARAMS ((const char *, int, ...));
+diff -urNp v1.16.0/newlib-1.16.0/newlib/libc/include/sys/_types.h newlib-1.16.0/newlib/libc/include/sys/_types.h
+--- v1.16.0/newlib-1.16.0/newlib/libc/include/sys/_types.h	2007-09-18 15:05:17.000000000 -0500
++++ newlib-1.16.0/newlib/libc/include/sys/_types.h	2022-03-05 14:01:45.734941900 -0600
+@@ -13,8 +13,12 @@
+ #include <sys/lock.h>
+ 
+ #ifndef __off_t_defined
++#ifdef __MINIOS__
++typedef long long _off_t;
++#else
+ typedef long _off_t;
+ #endif
++#endif
+ 
+ #if defined(__rtems__)
+ /* device numbers are 32-bit major and and 32-bit minor */
+diff -urNp v1.16.0/newlib-1.16.0/newlib/libc/include/sys/config.h newlib-1.16.0/newlib/libc/include/sys/config.h
+--- v1.16.0/newlib-1.16.0/newlib/libc/include/sys/config.h	2007-03-15 16:32:12.000000000 -0500
++++ newlib-1.16.0/newlib/libc/include/sys/config.h	2022-03-05 14:01:45.734941900 -0600
+@@ -69,6 +69,14 @@
+ /* we use some glibc header files so turn on glibc large file feature */
+ #define _LARGEFILE64_SOURCE 1
+ #endif
++#ifdef __MINIOS__
++#define __LARGE64_FILES 1
++#define _LARGEFILE64_SOURCE 1
++#endif
++#endif
++
++#ifndef __DYNAMIC_REENT__
++#define __DYNAMIC_REENT__
+ #endif
+ 
+ #ifdef __mn10200__
+diff -urNp v1.16.0/newlib-1.16.0/newlib/libc/include/sys/stat.h newlib-1.16.0/newlib/libc/include/sys/stat.h
+--- v1.16.0/newlib-1.16.0/newlib/libc/include/sys/stat.h	2007-06-20 12:30:58.000000000 -0500
++++ newlib-1.16.0/newlib/libc/include/sys/stat.h	2022-03-05 14:01:45.734941900 -0600
+@@ -49,6 +49,9 @@ struct	stat
+   long	st_spare4[2];
+ #endif
+ };
++#ifdef __MINIOS__
++#define stat64 stat
++#endif
+ #endif
+ 
+ #define	_IFMT		0170000	/* type of file */
+@@ -132,7 +135,11 @@ int	_EXFUN(mknod,( const char *__path, m
+ /* Provide prototypes for most of the _<systemcall> names that are
+    provided in newlib for some compilers.  */
+ #ifdef _COMPILING_NEWLIB
+-int	_EXFUN(_fstat,( int __fd, struct stat *__sbuf ));
++int	_EXFUN(_fstat,( int __fd, struct stat *__sbuf ))
++#ifdef __MINIOS__
++    asm("fstat64")
++#endif
++    ;
+ int	_EXFUN(_stat,( const char *__path, struct stat *__sbuf ));
+ #ifdef __LARGE64_FILES
+ struct stat64;
+diff -urNp v1.16.0/newlib-1.16.0/newlib/libc/include/sys/unistd.h newlib-1.16.0/newlib/libc/include/sys/unistd.h
+--- v1.16.0/newlib-1.16.0/newlib/libc/include/sys/unistd.h	2007-11-08 10:20:12.000000000 -0600
++++ newlib-1.16.0/newlib/libc/include/sys/unistd.h	2022-03-05 14:01:45.738941907 -0600
+@@ -101,7 +101,11 @@ int     _EXFUN(lchown, (const char *__pa
+ int     _EXFUN(link, (const char *__path1, const char *__path2 ));
+ int	_EXFUN(nice, (int __nice_value ));
+ #if !defined(__INSIDE_CYGWIN__)
+-off_t   _EXFUN(lseek, (int __fildes, off_t __offset, int __whence ));
++off_t   _EXFUN(lseek, (int __fildes, off_t __offset, int __whence ))
++#ifdef __MINIOS__
++    asm("lseek64")
++#endif
++    ;
+ #endif
+ #if defined(__SPU__)
+ #define F_ULOCK	0
+diff -urNp v1.16.0/newlib-1.16.0/newlib/libc/include/time.h newlib-1.16.0/newlib/libc/include/time.h
+--- v1.16.0/newlib-1.16.0/newlib/libc/include/time.h	2005-11-18 09:57:24.000000000 -0600
++++ newlib-1.16.0/newlib/libc/include/time.h	2022-03-05 14:01:45.730941895 -0600
+@@ -79,7 +79,7 @@ typedef struct __tzrule_struct
+   int d;
+   int s;
+   time_t change;
+-  long offset; /* Match type of _timezone. */
++  long offset; /* Match type of timezone. */
+ } __tzrule_type;
+ 
+ typedef struct __tzinfo_struct
+@@ -115,13 +115,13 @@ int		_EXFUN(getdate_r, (const char *, st
+ #endif /* HAVE_GETDATE */
+ 
+ /* defines for the opengroup specifications Derived from Issue 1 of the SVID.  */
+-extern __IMPORT long _timezone;
+-extern __IMPORT int _daylight;
+-extern __IMPORT char *_tzname[2];
++extern __IMPORT long timezone;
++extern __IMPORT int daylight;
++extern __IMPORT char *tzname[2];
+ 
+ /* POSIX defines the external tzname being defined in time.h */
+ #ifndef tzname
+-#define tzname _tzname
++#define tzname tzname
+ #endif
+ #endif /* !__STRICT_ANSI__ */
+ 
+diff -urNp v1.16.0/newlib-1.16.0/newlib/libc/machine/i386/i386mach.h newlib-1.16.0/newlib/libc/machine/i386/i386mach.h
+--- v1.16.0/newlib-1.16.0/newlib/libc/machine/i386/i386mach.h	2000-08-28 12:50:06.000000000 -0500
++++ newlib-1.16.0/newlib/libc/machine/i386/i386mach.h	2022-03-05 14:01:46.838943555 -0600
+@@ -27,46 +27,46 @@
+  
+ #define REG(x) CONCAT1(__REG_PREFIX__, x)
+  
+-#define eax REG(eax)
+-#define ebx REG(ebx)
+-#define ecx REG(ecx)
+-#define edx REG(edx)
+-#define esi REG(esi)
+-#define edi REG(edi)
+-#define ebp REG(ebp)
+-#define esp REG(esp)
+-
+-#define st0 REG(st)
+-#define st1 REG(st(1))
+-#define st2 REG(st(2))
+-#define st3 REG(st(3))
+-#define st4 REG(st(4))
+-#define st5 REG(st(5))
+-#define st6 REG(st(6))
+-#define st7 REG(st(7))
+-
+-#define ax REG(ax)
+-#define bx REG(bx)
+-#define cx REG(cx)
+-#define dx REG(dx)
+-
+-#define ah REG(ah)
+-#define bh REG(bh)
+-#define ch REG(ch)
+-#define dh REG(dh)
+-
+-#define al REG(al)
+-#define bl REG(bl)
+-#define cl REG(cl)
+-#define dl REG(dl)
+-
+-#define mm1 REG(mm1)
+-#define mm2 REG(mm2)
+-#define mm3 REG(mm3)
+-#define mm4 REG(mm4)
+-#define mm5 REG(mm5)
+-#define mm6 REG(mm6)
+-#define mm7 REG(mm7)
++#define eax %eax
++#define ebx %ebx
++#define ecx %ecx
++#define edx %edx
++#define esi %esi
++#define edi %edi
++#define ebp %ebp
++#define esp %esp
++
++#define st0 %st
++#define st1 %st(1)
++#define st2 %st(2)
++#define st3 %st(3)
++#define st4 %st(4)
++#define st5 %st(5)
++#define st6 %st(6)
++#define st7 %st(7)
++
++#define ax %ax
++#define bx %bx
++#define cx %cx
++#define dx %dx
++
++#define ah %ah
++#define bh %bh
++#define ch %ch
++#define dh %dh
++
++#define al %al
++#define bl %bl
++#define cl %cl
++#define dl %dl
++
++#define mm1 %mm1
++#define mm2 %mm2
++#define mm3 %mm3
++#define mm4 %mm4
++#define mm5 %mm5
++#define mm6 %mm6
++#define mm7 %mm7
+ 
+ #ifdef _I386MACH_NEED_SOTYPE_FUNCTION
+ #define SOTYPE_FUNCTION(sym) .type SYM(sym),@function
+diff -urNp v1.16.0/newlib-1.16.0/newlib/libc/machine/x86_64/memcpy.S newlib-1.16.0/newlib/libc/machine/x86_64/memcpy.S
+--- v1.16.0/newlib-1.16.0/newlib/libc/machine/x86_64/memcpy.S	2007-08-28 16:56:49.000000000 -0500
++++ newlib-1.16.0/newlib/libc/machine/x86_64/memcpy.S	2022-03-05 14:01:46.722943381 -0600
+@@ -30,10 +30,18 @@ quadword_aligned:
+   cmpq    $256, rdx
+   jb      quadword_copy
+ 
++#if 1
++  subq    $32, rsp
++  movq    rax, 24 (rsp)
++  movq    r12, 16 (rsp)
++  movq    r13, 8  (rsp)
++  movq    r14, 0  (rsp)
++#else
+   movq    rax, -8  (rsp)
+   movq    r12, -16 (rsp)
+   movq    r13, -24 (rsp)
+   movq    r14, -32 (rsp)
++#endif
+ 
+   movq    rdx, rcx                /* Copy 128 bytes at a time with minimum cache polution */
+   shrq    $7, rcx
+@@ -52,14 +60,14 @@ loop:
+   movq    48 (rsi), r13
+   movq    56 (rsi), r14
+ 
+-  movntiq rax,    (rdi)
+-  movntiq r8 ,  8 (rdi)
+-  movntiq r9 , 16 (rdi)
+-  movntiq r10, 24 (rdi)
+-  movntiq r11, 32 (rdi)
+-  movntiq r12, 40 (rdi)
+-  movntiq r13, 48 (rdi)
+-  movntiq r14, 56 (rdi)
++  movnti rax,    (rdi)
++  movnti r8 ,  8 (rdi)
++  movnti r9 , 16 (rdi)
++  movnti r10, 24 (rdi)
++  movnti r11, 32 (rdi)
++  movnti r12, 40 (rdi)
++  movnti r13, 48 (rdi)
++  movnti r14, 56 (rdi)
+ 
+   movq     64 (rsi), rax
+   movq     72 (rsi), r8
+@@ -70,14 +78,14 @@ loop:
+   movq    112 (rsi), r13
+   movq    120 (rsi), r14
+ 
+-  movntiq rax,  64 (rdi)
+-  movntiq r8 ,  72 (rdi)
+-  movntiq r9 ,  80 (rdi)
+-  movntiq r10,  88 (rdi)
+-  movntiq r11,  96 (rdi)
+-  movntiq r12, 104 (rdi)
+-  movntiq r13, 112 (rdi)
+-  movntiq r14, 120 (rdi)
++  movnti rax,  64 (rdi)
++  movnti r8 ,  72 (rdi)
++  movnti r9 ,  80 (rdi)
++  movnti r10,  88 (rdi)
++  movnti r11,  96 (rdi)
++  movnti r12, 104 (rdi)
++  movnti r13, 112 (rdi)
++  movnti r14, 120 (rdi)
+ 
+   leaq    128 (rsi), rsi
+   leaq    128 (rdi), rdi
+@@ -89,10 +97,18 @@ loop:
+   movq    rdx, rcx
+   andq    $127, rcx
+   rep     movsb
++#if 1
++  movq    24 (rsp), rax
++  movq    16 (rsp), r12
++  movq    8  (rsp), r13
++  movq    0  (rsp), r14
++  addq    $32, rsp
++#else
+   movq    -8  (rsp), rax
+   movq    -16 (rsp), r12
+   movq    -24 (rsp), r13
+   movq    -32 (rsp), r14
++#endif
+   ret
+ 
+ 
+diff -urNp v1.16.0/newlib-1.16.0/newlib/libc/machine/x86_64/memset.S newlib-1.16.0/newlib/libc/machine/x86_64/memset.S
+--- v1.16.0/newlib-1.16.0/newlib/libc/machine/x86_64/memset.S	2007-08-28 16:56:49.000000000 -0500
++++ newlib-1.16.0/newlib/libc/machine/x86_64/memset.S	2022-03-05 14:01:46.722943381 -0600
+@@ -40,22 +40,22 @@ quadword_aligned:
+ 
+   .p2align 4
+ loop:
+-  movntiq rax,     (rdi)
+-  movntiq rax,   8 (rdi)
+-  movntiq rax,  16 (rdi)
+-  movntiq rax,  24 (rdi)
+-  movntiq rax,  32 (rdi)
+-  movntiq rax,  40 (rdi)
+-  movntiq rax,  48 (rdi)
+-  movntiq rax,  56 (rdi)
+-  movntiq rax,  64 (rdi)
+-  movntiq rax,  72 (rdi)
+-  movntiq rax,  80 (rdi)
+-  movntiq rax,  88 (rdi)
+-  movntiq rax,  96 (rdi)
+-  movntiq rax, 104 (rdi)
+-  movntiq rax, 112 (rdi)
+-  movntiq rax, 120 (rdi)
++  movnti rax,     (rdi)
++  movnti rax,   8 (rdi)
++  movnti rax,  16 (rdi)
++  movnti rax,  24 (rdi)
++  movnti rax,  32 (rdi)
++  movnti rax,  40 (rdi)
++  movnti rax,  48 (rdi)
++  movnti rax,  56 (rdi)
++  movnti rax,  64 (rdi)
++  movnti rax,  72 (rdi)
++  movnti rax,  80 (rdi)
++  movnti rax,  88 (rdi)
++  movnti rax,  96 (rdi)
++  movnti rax, 104 (rdi)
++  movnti rax, 112 (rdi)
++  movnti rax, 120 (rdi)
+ 
+   leaq    128 (rdi), rdi
+ 
+diff -urNp v1.16.0/newlib-1.16.0/newlib/libc/machine/x86_64/x86_64mach.h newlib-1.16.0/newlib/libc/machine/x86_64/x86_64mach.h
+--- v1.16.0/newlib-1.16.0/newlib/libc/machine/x86_64/x86_64mach.h	2007-08-28 16:56:50.000000000 -0500
++++ newlib-1.16.0/newlib/libc/machine/x86_64/x86_64mach.h	2022-03-05 14:01:46.722943381 -0600
+@@ -22,81 +22,81 @@
+ 
+ #define REG(x) CONCAT1(__REG_PREFIX__, x)
+ 
+-#define rax REG(rax)
+-#define rbx REG(rbx)
+-#define rcx REG(rcx)
+-#define rdx REG(rdx)
+-#define rsi REG(rsi)
+-#define rdi REG(rdi)
+-#define rbp REG(rbp)
+-#define rsp REG(rsp)
+-
+-#define r8  REG(r8)
+-#define r9  REG(r9)
+-#define r10 REG(r10)
+-#define r11 REG(r11)
+-#define r12 REG(r12)
+-#define r13 REG(r13)
+-#define r14 REG(r14)
+-#define r15 REG(r15)
+-
+-#define eax REG(eax)
+-#define ebx REG(ebx)
+-#define ecx REG(ecx)
+-#define edx REG(edx)
+-#define esi REG(esi)
+-#define edi REG(edi)
+-#define ebp REG(ebp)
+-#define esp REG(esp)
+-
+-#define st0 REG(st)
+-#define st1 REG(st(1))
+-#define st2 REG(st(2))
+-#define st3 REG(st(3))
+-#define st4 REG(st(4))
+-#define st5 REG(st(5))
+-#define st6 REG(st(6))
+-#define st7 REG(st(7))
+-
+-#define ax REG(ax)
+-#define bx REG(bx)
+-#define cx REG(cx)
+-#define dx REG(dx)
+-
+-#define ah REG(ah)
+-#define bh REG(bh)
+-#define ch REG(ch)
+-#define dh REG(dh)
+-
+-#define al REG(al)
+-#define bl REG(bl)
+-#define cl REG(cl)
+-#define dl REG(dl)
+-
+-#define sil REG(sil)
+-
+-#define mm1 REG(mm1)
+-#define mm2 REG(mm2)
+-#define mm3 REG(mm3)
+-#define mm4 REG(mm4)
+-#define mm5 REG(mm5)
+-#define mm6 REG(mm6)
+-#define mm7 REG(mm7)
+-
+-#define xmm0 REG(xmm0)
+-#define xmm1 REG(xmm1)
+-#define xmm2 REG(xmm2)
+-#define xmm3 REG(xmm3)
+-#define xmm4 REG(xmm4)
+-#define xmm5 REG(xmm5)
+-#define xmm6 REG(xmm6)
+-#define xmm7 REG(xmm7)
+-
+-#define cr0 REG(cr0)
+-#define cr1 REG(cr1)
+-#define cr2 REG(cr2)
+-#define cr3 REG(cr3)
+-#define cr4 REG(cr4)
++#define rax %rax
++#define rbx %rbx
++#define rcx %rcx
++#define rdx %rdx
++#define rsi %rsi
++#define rdi %rdi
++#define rbp %rbp
++#define rsp %rsp
++
++#define r8  %r8
++#define r9  %r9
++#define r10 %r10
++#define r11 %r11
++#define r12 %r12
++#define r13 %r13
++#define r14 %r14
++#define r15 %r15
++
++#define eax %eax
++#define ebx %ebx
++#define ecx %ecx
++#define edx %edx
++#define esi %esi
++#define edi %edi
++#define ebp %ebp
++#define esp %esp
++
++#define st0 %st
++#define st1 %st(1)
++#define st2 %st(2)
++#define st3 %st(3)
++#define st4 %st(4)
++#define st5 %st(5)
++#define st6 %st(6)
++#define st7 %st(7)
++
++#define ax %ax
++#define bx %bx
++#define cx %cx
++#define dx %dx
++
++#define ah %ah
++#define bh %bh
++#define ch %ch
++#define dh %dh
++
++#define al %al
++#define bl %bl
++#define cl %cl
++#define dl %dl
++
++#define sil %sil
++
++#define mm1 %mm1
++#define mm2 %mm2
++#define mm3 %mm3
++#define mm4 %mm4
++#define mm5 %mm5
++#define mm6 %mm6
++#define mm7 %mm7
++
++#define xmm0 %xmm0
++#define xmm1 %xmm1
++#define xmm2 %xmm2
++#define xmm3 %xmm3
++#define xmm4 %xmm4
++#define xmm5 %xmm5
++#define xmm6 %xmm6
++#define xmm7 %xmm7
++
++#define cr0 %cr0
++#define cr1 %cr1
++#define cr2 %cr2
++#define cr3 %cr3
++#define cr4 %cr4
+ 
+ #ifdef _I386MACH_NEED_SOTYPE_FUNCTION
+ #define SOTYPE_FUNCTION(sym) .type SYM(sym),@function
+diff -urNp v1.16.0/newlib-1.16.0/newlib/libc/reent/getreent.c newlib-1.16.0/newlib/libc/reent/getreent.c
+--- v1.16.0/newlib-1.16.0/newlib/libc/reent/getreent.c	2007-09-06 19:45:55.000000000 -0500
++++ newlib-1.16.0/newlib/libc/reent/getreent.c	2022-03-05 14:01:46.878943615 -0600
+@@ -3,12 +3,20 @@
+ #include <_ansi.h>
+ #include <reent.h>
+ 
++#define weak_alias(name, aliasname) \
++  extern __typeof (name) aliasname __attribute__ ((weak, alias (#name)));
++
+ #ifdef __getreent
+ #undef __getreent
+ #endif
++#ifdef __libc_getreent
++#undef __libc_getreent
++#endif
+ 
+ struct _reent *
+-_DEFUN_VOID(__getreent)
++__libc_getreent (void)
+ {
+   return _impure_ptr;
+ }
++weak_alias(__libc_getreent,__getreent)
++
+diff -urNp v1.16.0/newlib-1.16.0/newlib/libc/stdio/Makefile.am newlib-1.16.0/newlib/libc/stdio/Makefile.am
+--- v1.16.0/newlib-1.16.0/newlib/libc/stdio/Makefile.am	2007-08-02 15:23:06.000000000 -0500
++++ newlib-1.16.0/newlib/libc/stdio/Makefile.am	2022-03-05 14:01:46.046942369 -0600
+@@ -20,6 +20,7 @@ GENERAL_SOURCES = \
+ 	flags.c			\
+ 	fopen.c			\
+ 	fprintf.c			\
++	fprintf_chk.c		\
+ 	fputc.c			\
+ 	fputs.c			\
+ 	fread.c			\
+@@ -65,6 +66,7 @@ GENERAL_SOURCES = \
+ 	sniprintf.c			\
+ 	snprintf.c			\
+ 	sprintf.c			\
++	sprintf_chk.c			\
+ 	sscanf.c			\
+ 	stdio.c			\
+ 	tmpfile.c			\
+diff -urNp v1.16.0/newlib-1.16.0/newlib/libc/stdio/Makefile.in newlib-1.16.0/newlib/libc/stdio/Makefile.in
+--- v1.16.0/newlib-1.16.0/newlib/libc/stdio/Makefile.in	2007-12-19 16:36:38.000000000 -0600
++++ newlib-1.16.0/newlib/libc/stdio/Makefile.in	2022-03-05 14:01:46.038942357 -0600
+@@ -63,7 +63,8 @@ am__objects_1 = lib_a-clearerr.$(OBJEXT)
+ 	lib_a-fgets.$(OBJEXT) lib_a-fileno.$(OBJEXT) \
+ 	lib_a-findfp.$(OBJEXT) lib_a-fiprintf.$(OBJEXT) \
+ 	lib_a-flags.$(OBJEXT) lib_a-fopen.$(OBJEXT) \
+-	lib_a-fprintf.$(OBJEXT) lib_a-fputc.$(OBJEXT) \
++	lib_a-fprintf.$(OBJEXT) lib_a-fprintf_chk.$(OBJEXT) \
++	lib_a-fputc.$(OBJEXT) \
+ 	lib_a-fputs.$(OBJEXT) lib_a-fread.$(OBJEXT) \
+ 	lib_a-freopen.$(OBJEXT) lib_a-fscanf.$(OBJEXT) \
+ 	lib_a-fiscanf.$(OBJEXT) lib_a-fseek.$(OBJEXT) \
+@@ -86,6 +87,7 @@ am__objects_1 = lib_a-clearerr.$(OBJEXT)
+ 	lib_a-setvbuf.$(OBJEXT) lib_a-siprintf.$(OBJEXT) \
+ 	lib_a-siscanf.$(OBJEXT) lib_a-sniprintf.$(OBJEXT) \
+ 	lib_a-snprintf.$(OBJEXT) lib_a-sprintf.$(OBJEXT) \
++	lib_a-sprintf_chk.$(OBJEXT) \
+ 	lib_a-sscanf.$(OBJEXT) lib_a-stdio.$(OBJEXT) \
+ 	lib_a-tmpfile.$(OBJEXT) lib_a-tmpnam.$(OBJEXT) \
+ 	lib_a-ungetc.$(OBJEXT) lib_a-vdiprintf.$(OBJEXT) \
+@@ -122,15 +124,15 @@ lib_a_OBJECTS = $(am_lib_a_OBJECTS)
+ LTLIBRARIES = $(noinst_LTLIBRARIES)
+ am__objects_4 = clearerr.lo fclose.lo fdopen.lo feof.lo ferror.lo \
+ 	fflush.lo fgetc.lo fgetpos.lo fgets.lo fileno.lo findfp.lo \
+-	fiprintf.lo flags.lo fopen.lo fprintf.lo fputc.lo fputs.lo \
+-	fread.lo freopen.lo fscanf.lo fiscanf.lo fseek.lo fsetpos.lo \
++	fiprintf.lo flags.lo fopen.lo fprintf.lo fprintf_chk.lo fputc.lo \
++	fputs.lo fread.lo freopen.lo fscanf.lo fiscanf.lo fseek.lo fsetpos.lo \
+ 	ftell.lo fvwrite.lo fwalk.lo fwrite.lo getc.lo getchar.lo \
+ 	getc_u.lo getchar_u.lo getdelim.lo getline.lo gets.lo \
+ 	iprintf.lo iscanf.lo makebuf.lo perror.lo printf.lo putc.lo \
+ 	putchar.lo putc_u.lo putchar_u.lo puts.lo refill.lo remove.lo \
+ 	rename.lo rewind.lo rget.lo scanf.lo sccl.lo setbuf.lo \
+ 	setbuffer.lo setlinebuf.lo setvbuf.lo siprintf.lo siscanf.lo \
+-	sniprintf.lo snprintf.lo sprintf.lo sscanf.lo stdio.lo \
++	sniprintf.lo snprintf.lo sprintf.lo sprintf_chk.lo sscanf.lo stdio.lo \
+ 	tmpfile.lo tmpnam.lo ungetc.lo vdiprintf.lo vdprintf.lo \
+ 	viprintf.lo viscanf.lo vprintf.lo vscanf.lo vsiprintf.lo \
+ 	vsiscanf.lo vsnprintf.lo vsniprintf.lo vsprintf.lo vsscanf.lo \
+@@ -344,6 +346,7 @@ GENERAL_SOURCES = \
+ 	flags.c			\
+ 	fopen.c			\
+ 	fprintf.c			\
++	fprintf_chk.c			\
+ 	fputc.c			\
+ 	fputs.c			\
+ 	fread.c			\
+@@ -389,6 +392,7 @@ GENERAL_SOURCES = \
+ 	sniprintf.c			\
+ 	snprintf.c			\
+ 	sprintf.c			\
++	sprintf_chk.c			\
+ 	sscanf.c			\
+ 	stdio.c			\
+ 	tmpfile.c			\
+@@ -508,6 +512,7 @@ CHEWOUT_FILES = \
+ 	siprintf.def		\
+ 	siscanf.def		\
+ 	sprintf.def		\
++	sprintf_chk.def		\
+ 	sscanf.def		\
+ 	tmpfile.def		\
+ 	tmpnam.def		\
+@@ -678,6 +683,12 @@ lib_a-fprintf.o: fprintf.c
+ lib_a-fprintf.obj: fprintf.c
+ 	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(lib_a_CFLAGS) $(CFLAGS) -c -o lib_a-fprintf.obj `if test -f 'fprintf.c'; then $(CYGPATH_W) 'fprintf.c'; else $(CYGPATH_W) '$(srcdir)/fprintf.c'; fi`
+ 
++lib_a-fprintf_chk.o: fprintf_chk.c
++	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(lib_a_CFLAGS) $(CFLAGS) -c -o lib_a-fprintf_chk.o `test -f 'fprintf_chk.c' || echo '$(srcdir)/'`fprintf_chk.c
++
++lib_a-fprintf_chk.obj: fprintf_chk.c
++	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(lib_a_CFLAGS) $(CFLAGS) -c -o lib_a-fprintf_chk.obj `if test -f 'fprintf_chk.c'; then $(CYGPATH_W) 'fprintf_chk.c'; else $(CYGPATH_W) '$(srcdir)/fprintf_chk.c'; fi`
++
+ lib_a-fputc.o: fputc.c
+ 	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(lib_a_CFLAGS) $(CFLAGS) -c -o lib_a-fputc.o `test -f 'fputc.c' || echo '$(srcdir)/'`fputc.c
+ 
+@@ -948,6 +959,12 @@ lib_a-sprintf.o: sprintf.c
+ lib_a-sprintf.obj: sprintf.c
+ 	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(lib_a_CFLAGS) $(CFLAGS) -c -o lib_a-sprintf.obj `if test -f 'sprintf.c'; then $(CYGPATH_W) 'sprintf.c'; else $(CYGPATH_W) '$(srcdir)/sprintf.c'; fi`
+ 
++lib_a-sprintf_chk.o: sprintf_chk.c
++	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(lib_a_CFLAGS) $(CFLAGS) -c -o lib_a-sprintf_chk.o `test -f 'sprintf_chk.c' || echo '$(srcdir)/'`sprintf_chk.c
++
++lib_a-sprintf_chk.obj: sprintf_chk.c
++	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(lib_a_CFLAGS) $(CFLAGS) -c -o lib_a-sprintf_chk.obj `if test -f 'sprintf_chk.c'; then $(CYGPATH_W) 'sprintf_chk.c'; else $(CYGPATH_W) '$(srcdir)/sprintf_chk.c'; fi`
++
+ lib_a-sscanf.o: sscanf.c
+ 	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(lib_a_CFLAGS) $(CFLAGS) -c -o lib_a-sscanf.o `test -f 'sscanf.c' || echo '$(srcdir)/'`sscanf.c
+ 
+diff -urNp v1.16.0/newlib-1.16.0/newlib/libc/stdio/fprintf_chk.c newlib-1.16.0/newlib/libc/stdio/fprintf_chk.c
+--- v1.16.0/newlib-1.16.0/newlib/libc/stdio/fprintf_chk.c	1969-12-31 18:00:00.000000000 -0600
++++ newlib-1.16.0/newlib/libc/stdio/fprintf_chk.c	2022-03-05 14:01:46.038942357 -0600
+@@ -0,0 +1,21 @@
++#include <stdarg.h>
++#include <stdio.h>
++
++/*
++ * Stub implementation of __fprintf_chk adapted from glibc 2.7.  This 
++ * doesn't actually implement any buffer overflow protection.  It just makes
++ * the linker happy :)
++*/
++int
++__fprintf_chk (FILE *fp, int flag, const char *format, ...)
++{
++  va_list ap;
++  int done;
++
++  va_start (ap, format);
++  done = vfprintf (fp, format, ap);
++  va_end (ap);
++
++  return done;
++}
++
+diff -urNp v1.16.0/newlib-1.16.0/newlib/libc/stdio/sprintf_chk.c newlib-1.16.0/newlib/libc/stdio/sprintf_chk.c
+--- v1.16.0/newlib-1.16.0/newlib/libc/stdio/sprintf_chk.c	1969-12-31 18:00:00.000000000 -0600
++++ newlib-1.16.0/newlib/libc/stdio/sprintf_chk.c	2022-03-05 14:01:46.042942362 -0600
+@@ -0,0 +1,21 @@
++#include <stdarg.h>
++#include <stdio.h>
++
++/*
++ * Stub implementation of __sprintf_chk adapted from glibc 2.7.  This 
++ * doesn't actually implement any buffer overflow protection.  It just makes
++ * the linker happy :)
++*/
++int
++__sprintf_chk (char *s, int flags, size_t slen, const char *format, ...)
++{
++  va_list arg;
++  int done;
++
++  va_start (arg, format);
++  done = vsprintf (s, format, arg);
++  va_end (arg);
++
++  return done;
++}
++
+diff -urNp v1.16.0/newlib-1.16.0/newlib/libc/sys/linux/include/time.h newlib-1.16.0/newlib/libc/sys/linux/include/time.h
+--- v1.16.0/newlib-1.16.0/newlib/libc/sys/linux/include/time.h	2005-02-25 16:31:20.000000000 -0600
++++ newlib-1.16.0/newlib/libc/sys/linux/include/time.h	2022-03-05 14:01:46.226942638 -0600
+@@ -92,7 +92,7 @@ typedef struct __tzrule_struct
+   int d;
+   int s;
+   time_t change;
+-  long offset; /* Match type of _timezone. */
++  long offset; /* Match type of timezone. */
+ } __tzrule_type;
+ 
+ typedef struct __tzinfo_struct
+@@ -126,13 +126,13 @@ struct tm *	_EXFUN(getdate, (const char
+ int		_EXFUN(getdate_r, (const char *, struct tm *));
+ 
+ /* defines for the opengroup specifications Derived from Issue 1 of the SVID.  */
+-extern __IMPORT long _timezone;
+-extern __IMPORT int _daylight;
+-extern __IMPORT char *_tzname[2];
++extern __IMPORT long timezone;
++extern __IMPORT int daylight;
++extern __IMPORT char *tzname[2];
+ 
+ /* POSIX defines the external tzname being defined in time.h */
+ #ifndef tzname
+-#define tzname _tzname
++#define tzname tzname
+ #endif
+ 
+ #endif /* !__STRICT_ANSI__ */
+diff -urNp v1.16.0/newlib-1.16.0/newlib/libc/time/mktime.c newlib-1.16.0/newlib/libc/time/mktime.c
+--- v1.16.0/newlib-1.16.0/newlib/libc/time/mktime.c	2005-02-25 16:31:21.000000000 -0600
++++ newlib-1.16.0/newlib/libc/time/mktime.c	2022-03-05 14:01:46.886943626 -0600
+@@ -204,7 +204,7 @@ mktime (tim_p)
+ 
+   isdst = tim_p->tm_isdst;
+ 
+-  if (_daylight)
++  if (daylight)
+     {
+       int y = tim_p->tm_year + YEAR_BASE;
+       if (y == tz->__tzyear || __tzcalc_limits (y))
+diff -urNp v1.16.0/newlib-1.16.0/newlib/libc/time/mktm_r.c newlib-1.16.0/newlib/libc/time/mktm_r.c
+--- v1.16.0/newlib-1.16.0/newlib/libc/time/mktm_r.c	2005-02-25 16:31:21.000000000 -0600
++++ newlib-1.16.0/newlib/libc/time/mktm_r.c	2022-03-05 14:01:46.882943621 -0600
+@@ -99,7 +99,7 @@ _DEFUN (_mktm_r, (tim_p, res, is_gmtime)
+       int hours, mins, secs;
+ 
+       TZ_LOCK;
+-      if (_daylight)
++      if (daylight)
+ 	{
+ 	  if (y == tz->__tzyear || __tzcalc_limits (y))
+ 	    res->tm_isdst = (tz->__tznorth 
+diff -urNp v1.16.0/newlib-1.16.0/newlib/libc/time/strftime.c newlib-1.16.0/newlib/libc/time/strftime.c
+--- v1.16.0/newlib-1.16.0/newlib/libc/time/strftime.c	2005-02-25 16:31:21.000000000 -0600
++++ newlib-1.16.0/newlib/libc/time/strftime.c	2022-03-05 14:01:46.882943621 -0600
+@@ -762,7 +762,7 @@ _DEFUN (strftime, (s, maxsize, format, t
+ 		  __tzinfo_type *tz = __gettzinfo ();
+ 		  TZ_LOCK;
+ 		  /* The sign of this is exactly opposite the envvar TZ.  We
+-		     could directly use the global _timezone for tm_isdst==0,
++		     could directly use the global timezone for tm_isdst==0,
+ 		     but have to use __tzrule for daylight savings.  */
+ 		  offset = -tz->__tzrule[tim_p->tm_isdst > 0].offset;
+ 		  TZ_UNLOCK;
+@@ -779,11 +779,11 @@ _DEFUN (strftime, (s, maxsize, format, t
+ 	    {
+ 	      int size;
+ 	      TZ_LOCK;
+-	      size = strlen(_tzname[tim_p->tm_isdst > 0]);
++	      size = strlen(tzname[tim_p->tm_isdst > 0]);
+ 	      for (i = 0; i < size; i++)
+ 		{
+ 		  if (count < maxsize - 1)
+-		    s[count++] = _tzname[tim_p->tm_isdst > 0][i];
++		    s[count++] = tzname[tim_p->tm_isdst > 0][i];
+ 		  else
+ 		    {
+ 		      TZ_UNLOCK;
+diff -urNp v1.16.0/newlib-1.16.0/newlib/libc/time/tzset.c newlib-1.16.0/newlib/libc/time/tzset.c
+--- v1.16.0/newlib-1.16.0/newlib/libc/time/tzset.c	2002-04-17 16:23:31.000000000 -0500
++++ newlib-1.16.0/newlib/libc/time/tzset.c	2022-03-05 14:01:46.886943626 -0600
+@@ -18,9 +18,9 @@ TRAD_SYNOPSIS
+ 
+ DESCRIPTION
+ <<tzset>> examines the TZ environment variable and sets up the three
+-external variables: <<_timezone>>, <<_daylight>>, and <<tzname>>.  The
+-value of <<_timezone>> shall be the offset from the current time zone
+-to GMT.  The value of <<_daylight>> shall be 0 if there is no daylight
++external variables: <<timezone>>, <<daylight>>, and <<tzname>>.  The
++value of <<timezone>> shall be the offset from the current time zone
++to GMT.  The value of <<daylight>> shall be 0 if there is no daylight
+ savings time for the current time zone, otherwise it will be non-zero.
+ The <<tzname>> array has two entries: the first is the name of the
+ standard time zone, the second is the name of the daylight-savings time
+diff -urNp v1.16.0/newlib-1.16.0/newlib/libc/time/tzset_r.c newlib-1.16.0/newlib/libc/time/tzset_r.c
+--- v1.16.0/newlib-1.16.0/newlib/libc/time/tzset_r.c	2006-11-15 14:10:25.000000000 -0600
++++ newlib-1.16.0/newlib/libc/time/tzset_r.c	2022-03-05 14:01:46.886943626 -0600
+@@ -24,10 +24,10 @@ _DEFUN (_tzset_r, (reent_ptr),
+   if ((tzenv = _getenv_r (reent_ptr, "TZ")) == NULL)
+       {
+ 	TZ_LOCK;
+-	_timezone = 0;
+-	_daylight = 0;
+-	_tzname[0] = "GMT";
+-	_tzname[1] = "GMT";
++	timezone = 0;
++	daylight = 0;
++	tzname[0] = "GMT";
++	tzname[1] = "GMT";
+ 	TZ_UNLOCK;
+ 	return;
+       }
+@@ -76,17 +76,17 @@ _DEFUN (_tzset_r, (reent_ptr),
+     }
+   
+   tz->__tzrule[0].offset = sign * (ss + SECSPERMIN * mm + SECSPERHOUR * hh);
+-  _tzname[0] = __tzname_std;
++  tzname[0] = __tzname_std;
+   tzenv += n;
+   
+   if (sscanf (tzenv, "%10[^0-9,+-]%n", __tzname_dst, &n) <= 0)
+     {
+-      _tzname[1] = _tzname[0];
++      tzname[1] = tzname[0];
+       TZ_UNLOCK;
+       return;
+     }
+   else
+-    _tzname[1] = __tzname_dst;
++    tzname[1] = __tzname_dst;
+ 
+   tzenv += n;
+ 
+@@ -188,8 +188,8 @@ _DEFUN (_tzset_r, (reent_ptr),
+     }
+ 
+   __tzcalc_limits (tz->__tzyear);
+-  _timezone = tz->__tzrule[0].offset;  
+-  _daylight = tz->__tzrule[0].offset != tz->__tzrule[1].offset;
++  timezone = tz->__tzrule[0].offset;  
++  daylight = tz->__tzrule[0].offset != tz->__tzrule[1].offset;
+ 
+   TZ_UNLOCK;
+ }
+diff -urNp v1.16.0/newlib-1.16.0/newlib/libc/time/tzvars.c newlib-1.16.0/newlib/libc/time/tzvars.c
+--- v1.16.0/newlib-1.16.0/newlib/libc/time/tzvars.c	2005-11-08 16:44:16.000000000 -0600
++++ newlib-1.16.0/newlib/libc/time/tzvars.c	2022-03-05 14:01:46.882943621 -0600
+@@ -3,8 +3,8 @@
+ /* Global timezone variables.  */
+ 
+ /* Default timezone to GMT */
+-char *_tzname[2] = {"GMT", "GMT"};
+-int _daylight = 0;
+-long _timezone = 0;
++char *tzname[2] = {"GMT", "GMT"};
++int daylight = 0;
++long timezone = 0;
+ 
+ 
+diff -urNp v1.16.0/newlib-1.16.0/newlib/libm/machine/i386/i386mach.h newlib-1.16.0/newlib/libm/machine/i386/i386mach.h
+--- v1.16.0/newlib-1.16.0/newlib/libm/machine/i386/i386mach.h	2001-12-13 17:50:11.000000000 -0600
++++ newlib-1.16.0/newlib/libm/machine/i386/i386mach.h	2022-03-05 14:01:45.690941835 -0600
+@@ -27,46 +27,46 @@
+  
+ #define REG(x) CONCAT1(__REG_PREFIX__, x)
+  
+-#define eax REG(eax)
+-#define ebx REG(ebx)
+-#define ecx REG(ecx)
+-#define edx REG(edx)
+-#define esi REG(esi)
+-#define edi REG(edi)
+-#define ebp REG(ebp)
+-#define esp REG(esp)
+-
+-#define st0 REG(st)
+-#define st1 REG(st(1))
+-#define st2 REG(st(2))
+-#define st3 REG(st(3))
+-#define st4 REG(st(4))
+-#define st5 REG(st(5))
+-#define st6 REG(st(6))
+-#define st7 REG(st(7))
+-
+-#define ax REG(ax)
+-#define bx REG(bx)
+-#define cx REG(cx)
+-#define dx REG(dx)
+-
+-#define ah REG(ah)
+-#define bh REG(bh)
+-#define ch REG(ch)
+-#define dh REG(dh)
+-
+-#define al REG(al)
+-#define bl REG(bl)
+-#define cl REG(cl)
+-#define dl REG(dl)
+-
+-#define mm1 REG(mm1)
+-#define mm2 REG(mm2)
+-#define mm3 REG(mm3)
+-#define mm4 REG(mm4)
+-#define mm5 REG(mm5)
+-#define mm6 REG(mm6)
+-#define mm7 REG(mm7)
++#define eax %eax
++#define ebx %ebx
++#define ecx %ecx
++#define edx %edx
++#define esi %esi
++#define edi %edi
++#define ebp %ebp
++#define esp %esp
++
++#define st0 %st
++#define st1 %st(1)
++#define st2 %st(2)
++#define st3 %st(3)
++#define st4 %st(4)
++#define st5 %st(5)
++#define st6 %st(6)
++#define st7 %st(7)
++
++#define ax %ax
++#define bx %bx
++#define cx %cx
++#define dx %dx
++
++#define ah %ah
++#define bh %bh
++#define ch %ch
++#define dh %dh
++
++#define al %al
++#define bl %bl
++#define cl %cl
++#define dl %dl
++
++#define mm1 %mm1
++#define mm2 %mm2
++#define mm3 %mm3
++#define mm4 %mm4
++#define mm5 %mm5
++#define mm6 %mm6
++#define mm7 %mm7
+ 
+ #ifdef _I386MACH_NEED_SOTYPE_FUNCTION
+ #define SOTYPE_FUNCTION(sym) .type SYM(sym),@function
