@@ -19,13 +19,14 @@ SANCHODIR = ../Sancho
 SANCHOSGX = ${SANCHODIR}/SGX
 
 CSRC = quixote.c quixote-mcu.c quixote-sgx.c quixote-sgx-u.c \
-	quixote-console.c test-sancho.c
+	quixote-console.c quixote-xen.c test-sancho.c
 
 TOOLS = quixote quixote-mcu quixote-us quixote-sgx quixote-sgx-u \
 	quixote-console test-sancho test-thread
 
 INSTALLBIN  = quixote-console
-INSTALLSBIN = quixote quixote-mcu quixote-us quixote-sgx quixote-sgx-u
+INSTALLSBIN = quixote quixote-mcu quixote-us quixote-sgx quixote-sgx-u \
+	quixote-xen
 
 CC = musl-gcc
 
@@ -77,6 +78,11 @@ endif
 
 LIBS	= ${NAAAIMLIB} ${HURDLIB} ${LIBCAP} ${SSL_CRYPTO}
 LIBDEPS = ${HURD_LIBRARY} ${NAAAIM_LIBRARY}
+XENLIBS = ${shell pkg-config --libs xenstore}  \
+	${shell pkg-config --libs xengnttab}   \
+	${shell pkg-config --libs xentoolcore} \
+	${shell pkg-config --libs xentoollog}  \
+	${shell pkg-config --libs xenevtchn}
 
 MODELDEPS = ../SecurityModel/COE.o ../SecurityModel/Cell.o		  \
 	../SecurityModel/SecurityPoint.o ../SecurityModel/SecurityEvent.o \
@@ -84,6 +90,8 @@ MODELDEPS = ../SecurityModel/COE.o ../SecurityModel/Cell.o		  \
 
 CFLAGS := ${CFLAGS} -I .. -I ../SecurityModel -I ../lib -I ../HurdLib \
 	-I ${SGXDIR} -I ${SANCHOSGX}
+
+XENCFLAGS = ${shell pkg-config --cflags xenstore}
 
 
 #
@@ -113,6 +121,12 @@ quixote-sgx-u: quixote-sgx-u.o ${SANCHOSGX}/SanchoSGX.o sancho-enclave.h \
 	${LIBDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${SANCHOSGX}/SanchoSGX.o ${SEDELIB} ${LIBS} \
 		${ELFLIB} ${SSL_CRYPTO};
+
+quixote-xen: quixote-xen.o
+	gcc ${LDFLAGS} -o $@ $< ${LIBS} ${XENLIBS}
+
+quixote-xen.o: quixote-xen.c
+	${CC} ${CFLAGS} ${XENCFLAGS} -c $< -o $@;
 
 quixote-console: quixote-console.o ${LIBDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${LIBS};

@@ -51,7 +51,7 @@ TARGET_CPPFLAGS = -U __linux__ -U __FreeBSD__ -U __sun__ -nostdinc	\
 DEFINES = -DHAVE_LIBC -D__MINIOS__ -DCONFIG_PARAVIRT -DCONFIG_SPARSE_BSS -DCONFIG_CONSFRONT -DCONFIG_XENBUS -D__XEN_INTERFACE_VERSION__=0x00030205
 
 
-CFLAGS = ${DEFINES} ${CDEBUG} ${TARGET_CPPFLAGS} -Wall
+CFLAGS = ${DEFINES} ${CDEBUG} ${TARGET_CPPFLAGS} -Wall -mno-red-zone
 
 
 #
@@ -67,7 +67,7 @@ CFLAGS = ${DEFINES} ${CDEBUG} ${TARGET_CPPFLAGS} -Wall
 all: sancho.elf
 
 sancho.elf: ${LIBRARY}
-	${MAKE} -C .. mini-os;
+	${MAKE} -C .. mini-os-build;
 
 ${LIBRARY}: ${COBJS}
 	${AR} r ${LIBRARY} $^;
