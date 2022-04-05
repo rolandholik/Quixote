@@ -37,8 +37,7 @@ LIBRARY = lib${LIBNAME}.a
 #
 #CINCLUDE = -I . -I ../.. -I ../../../lib -I ../HurdLib -I ../../../HurdLib
 
-CINCLUDE = -I ../mini-os/include -I ../mini-os/include/x86 \
-	-I ../mini-os/include/x86/x86_64/
+CINCLUDE = -I ../../../HurdLib
 
 TARGET_CPPFLAGS = -U __linux__ -U __FreeBSD__ -U __sun__ -nostdinc	\
 	-isystem ../mini-os/include				\
@@ -51,7 +50,7 @@ TARGET_CPPFLAGS = -U __linux__ -U __FreeBSD__ -U __sun__ -nostdinc	\
 DEFINES = -DHAVE_LIBC -D__MINIOS__ -DCONFIG_PARAVIRT -DCONFIG_SPARSE_BSS -DCONFIG_CONSFRONT -DCONFIG_XENBUS -D__XEN_INTERFACE_VERSION__=0x00030205
 
 
-CFLAGS = ${DEFINES} ${CDEBUG} ${TARGET_CPPFLAGS} -Wall -mno-red-zone
+CFLAGS = ${CINCLUDE} ${DEFINES} ${CDEBUG} ${TARGET_CPPFLAGS} -Wall
 
 
 #

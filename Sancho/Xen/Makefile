@@ -6,6 +6,8 @@
 # **************************************************************************/
 
 
+SUBDIRS = HurdLib
+
 export stubdom=y
 
 CC	  = gcc
@@ -54,9 +56,10 @@ ZLIB_CPPFLAGS = -D__MINIOS__ -DHAVE_LIBC ${TARGET_CPPFLAGS}
 #
 # Generic build targets.
 #
-.PHONY: mini-os-build Sancho
+.PHONY: mini-os-build Sancho ${SUBDIRS}
 
-all: mini-os newlib.stamp zlib.stamp pciutils.stamp Sancho mini-os-build
+all: ${SUBDIRS} mini-os newlib.stamp zlib.stamp pciutils.stamp Sancho \
+	mini-os-build
 
 
 #
@@ -145,7 +148,7 @@ mini-os-build: mini-os
 	MINIOS_ROOT="${CURDIR}/mini-os"					   \
 	DEF_CPPFLAGS="${TARGET_CPPFLAGS} -isystem ${XENSRC}/tools/include" \
 	DEF_CFLAGS="${TARGET_CFLAGS}" DEF_LDFLAGS="${TARGET_LDFLAGS}"	   \
-	make -C mini-os APP_OBJS="${CURDIR}/Sancho/libSanchoXen.a";
+	make -C mini-os APP_OBJS="${CURDIR}/Sancho/libSanchoXen.a ${CURDIR}/HurdLib/libHurdLib.a";
 	cp mini-os/mini-os Sancho/sancho.elf;
 
 mini-os.stamp: mini-os
@@ -161,9 +164,16 @@ mini-os:
 
 
 #
+# Sub-directory targets.
+HurdLib:
+	${MAKE} -C $@;
+
+
+#
 # Utility targets.
 #
 clean:
+	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i clean; done;
 	[ -d zlib ] && make -C zlib clean || true;
 	[ -d pciutils ] && make -C pciutils clean || true;
 	[ -d mini-os ] && make -C mini-os clean || true;
@@ -171,6 +181,7 @@ clean:
 	make -C Sancho clean;
 
 clobber: clean
+	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i clobber; done;
 	[ -d newlib-build ] && rm -frv newlib-build || true;
 	[ -d newlib-root ] && rm -frv newlib-root || true;
 	[ -d newlib ] && rm -frv newlib || true;
