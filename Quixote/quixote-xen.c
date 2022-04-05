@@ -129,7 +129,7 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
-	if ( snprintf(xsvalue, sizeof(xsvalue), "%0x", gnt_refs) >= \
+	if ( snprintf(xsvalue, sizeof(xsvalue), "%u", gnt_refs) >= \
 	     sizeof(xsvalue) ) {
 		fputs("Error building grant reference buffer.\n", stderr);
 		goto done;
@@ -181,6 +181,12 @@ extern int main(int argc, char *argv[])
 	fputs("Sending write of 100 bytes.\n", stdout);
 	*size = 100;
 	xenevtchn_notify(evh, evp);
+
+	fputs("Unmasking for receive.\n", stdout);
+	if ( xenevtchn_unmask(evh, evp) == -1 ) {
+		fputs("Error unmasking event channel.\n", stderr);
+		goto done;
+	}
 
 	if ( xenevtchn_pending(evh) == -1 ) {
 		fputs("Error getting write responde.\n", stderr);

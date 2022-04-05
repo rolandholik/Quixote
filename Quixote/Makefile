@@ -82,7 +82,7 @@ XENLIBS = ${shell pkg-config --libs xenstore}  \
 	${shell pkg-config --libs xengnttab}   \
 	${shell pkg-config --libs xentoolcore} \
 	${shell pkg-config --libs xentoollog}  \
-	${shell pkg-config --libs xenevtchn}
+	${shell pkg-config --libs xenevtchn} -lpthread
 
 MODELDEPS = ../SecurityModel/COE.o ../SecurityModel/Cell.o		  \
 	../SecurityModel/SecurityPoint.o ../SecurityModel/SecurityEvent.o \
@@ -123,7 +123,7 @@ quixote-sgx-u: quixote-sgx-u.o ${SANCHOSGX}/SanchoSGX.o sancho-enclave.h \
 		${ELFLIB} ${SSL_CRYPTO};
 
 quixote-xen: quixote-xen.o
-	gcc ${LDFLAGS} -o $@ $< ${LIBS} ${XENLIBS}
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS} ${XENLIBS};
 
 quixote-xen.o: quixote-xen.c
 	${CC} ${CFLAGS} ${XENCFLAGS} -c $< -o $@;
