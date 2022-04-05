@@ -165,7 +165,7 @@ mini-os:
 
 #
 # Sub-directory targets.
-HurdLib:
+HurdLib: mini-os.stamp
 	${MAKE} -C $@;
 
 
