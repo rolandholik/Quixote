@@ -37,7 +37,7 @@ LIBRARY = lib${LIBNAME}.a
 #
 #CINCLUDE = -I . -I ../.. -I ../../../lib -I ../HurdLib -I ../../../HurdLib
 
-CINCLUDE = -I ../../../HurdLib
+CINCLUDE = -I ../../../HurdLib -I ../NAAAIM -I ../../../lib
 
 TARGET_CPPFLAGS = -U __linux__ -U __FreeBSD__ -U __sun__ -nostdinc	\
 	-isystem ../mini-os/include				\

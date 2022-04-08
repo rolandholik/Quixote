@@ -6,7 +6,7 @@
 # **************************************************************************/
 
 
-SUBDIRS = HurdLib
+SUBDIRS = HurdLib NAAAIM
 
 export stubdom=y
 
@@ -148,7 +148,7 @@ mini-os-build: mini-os
 	MINIOS_ROOT="${CURDIR}/mini-os"					   \
 	DEF_CPPFLAGS="${TARGET_CPPFLAGS} -isystem ${XENSRC}/tools/include" \
 	DEF_CFLAGS="${TARGET_CFLAGS}" DEF_LDFLAGS="${TARGET_LDFLAGS}"	   \
-	make -C mini-os APP_OBJS="${CURDIR}/Sancho/libSanchoXen.a ${CURDIR}/HurdLib/libHurdLib.a";
+	make -C mini-os APP_OBJS="${CURDIR}/Sancho/libSanchoXen.a ${CURDIR}/HurdLib/libHurdLib.a ${CURDIR}/NAAAIM/libNAAAIM.a";
 	cp mini-os/mini-os Sancho/sancho.elf;
 
 mini-os.stamp: mini-os
@@ -165,7 +165,11 @@ mini-os:
 
 #
 # Sub-directory targets.
+#
 HurdLib: mini-os.stamp
+	${MAKE} -C $@;
+
+NAAAIM: mini-os.stamp
 	${MAKE} -C $@;
 
 
