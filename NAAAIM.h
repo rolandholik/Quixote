@@ -104,3 +104,4 @@
 #define NAAAIM_X509cert_OBJID		64
 #define NAAAIM_Prompt_OBJID		65
 #define NAAAIM_SRDEpipe_OBJID		66
+#define NAAAIM_XENduct_OBJID		67

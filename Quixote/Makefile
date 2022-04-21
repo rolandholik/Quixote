@@ -21,7 +21,7 @@ SANCHOSGX = ${SANCHODIR}/SGX
 CSRC = quixote.c quixote-mcu.c quixote-sgx.c quixote-sgx-u.c \
 	quixote-console.c quixote-xen.c test-sancho.c
 
-TOOLS = quixote quixote-mcu quixote-us quixote-sgx quixote-sgx-u \
+TOOLS = quixote quixote-mcu quixote-us quixote-sgx quixote-sgx-u quixote-xen \
 	quixote-console test-sancho test-thread
 
 INSTALLBIN  = quixote-console

@@ -23,7 +23,7 @@
 #define NAAAIM_SHA256_OBJID		1
 #define NAAAIM_RSAkey_OBJID		3
 #define NAAAIM_Base64_OBJID		31
-#define NAAAIM_TTYduct_OBJID		33
+#define NAAAIM_XENduct_OBJID		33
 #define NAAAIM_COE_OBJID		46
 #define NAAAIM_Cell_OBJID		47
 #define NAAAIM_SecurityEvent_OBJID	48

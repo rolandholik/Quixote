@@ -21,7 +21,7 @@ DEFINES = -DMBEDTLS_CONFIG_FILE=\"mbedtls_config.h\"
 #
 # Object and source file definitions.
 #
-CSRC = sancho_main.c
+CSRC = sancho_main.c XENduct.c
 
 COBJS = ${CSRC:.c=.o}
 
@@ -37,7 +37,7 @@ LIBRARY = lib${LIBNAME}.a
 #
 #CINCLUDE = -I . -I ../.. -I ../../../lib -I ../HurdLib -I ../../../HurdLib
 
-CINCLUDE = -I ../../../HurdLib -I ../NAAAIM -I ../../../lib
+CINCLUDE = -I . -I ../../../HurdLib -I ../NAAAIM -I ../../../lib
 
 TARGET_CPPFLAGS = -U __linux__ -U __FreeBSD__ -U __sun__ -nostdinc	\
 	-isystem ../mini-os/include				\
