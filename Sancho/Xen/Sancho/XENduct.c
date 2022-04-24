@@ -131,7 +131,6 @@ static inline uint32_t ntohl(uint32_t value)
 void _event_handler(evtchn_port_t vp, struct pt_regs *regs, void *page)
 
 {
-	fprintf(stdout, "%s: Called: event = %u.\n", __func__, Have_event);
 	Have_event = true;
 	return;
 }
@@ -201,7 +200,6 @@ static _Bool init_device(CO(XENduct, this), CO(char *, path))
 
 	/* Setup a watch for the node. */
 	if ( (err = xenbus_watch_path_token(XBT_NIL, path, path, &S->events)) != NULL ) {
-		fprintf(stdout, "%s: token error: %s\n", __func__, err);
 		free(err);
 		ERR(goto done);
 	}
@@ -260,7 +258,6 @@ static _Bool accept_connection(CO(XENduct, this))
 			waiting = false;
 		free(connect);
 	}
-	fprintf(stdout, "Have connection: %s\n", *connect);
 
 
 	/* Process grant reference connection. */
@@ -270,12 +267,13 @@ static _Bool accept_connection(CO(XENduct, this))
 		free(connect);
 		ERR(goto done);
 	}
-	free(connect);
 
 	if ( (err = xenbus_read(XBT_NIL, *connect, &refstr)) != NULL ) {
 		free(err);
+		free(connect);
 		ERR(goto done);
 	}
+	free(connect);
 
 	grant = (unsigned int) strtol(refstr, NULL, 0);
 	if ( errno == ERANGE )
@@ -297,12 +295,13 @@ static _Bool accept_connection(CO(XENduct, this))
 		free(connect);
 		ERR(goto done);
 	}
-	free(connect);
 
 	if ( (err = xenbus_read(XBT_NIL, *connect, &refstr)) != NULL ) {
 		free(err);
+		free(connect);
 		ERR(goto done);
 	}
+	free(connect);
 
 	S->ev_remote = (unsigned int) strtol(refstr, NULL, 0);
 	if ( errno == ERANGE)
@@ -359,7 +358,13 @@ static _Bool send_Buffer(CO(XENduct, this), CO(Buffer, bf))
 	*(uint32_t *) S->grant_page = size;
 
 	notify_remote_via_evtchn(S->ev_local);
-	retn = true;
+
+	Have_event = false;
+	while ( !Have_event )
+		continue;
+
+	retn	   = true;
+	Have_event = false;
 
 
  done:
@@ -401,9 +406,8 @@ static _Bool receive_Buffer(CO(XENduct, this), CO(Buffer, bf))
 
 
 	/* Wait for an event. */
-	fprintf(stdout, "%s: event = %u\n", __func__, Have_event);
 	while ( !Have_event )
-		msleep(500);
+		msleep(5);
 
 	rsize = *(uint32_t *) S->grant_page;
 
@@ -416,7 +420,6 @@ static _Bool receive_Buffer(CO(XENduct, this), CO(Buffer, bf))
 	 * from a standard error number.
 	 */
 	rsize = ntohl(rsize);
-	fprintf(stdout, "%s: read size = %u\n", __func__, rsize);
 	if ( rsize == 0xffffffff ) {
 		retn   = true;
 		S->eof = true;
@@ -459,7 +462,6 @@ static _Bool eof(CO(XENduct, this))
 {
 	STATE(S);
 
-	fprintf(stdout, "%s: Called eof = %u\n", __func__, S->eof);
 	return S->eof;
 }
 

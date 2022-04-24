@@ -21,7 +21,9 @@ DEFINES = -DMBEDTLS_CONFIG_FILE=\"mbedtls_config.h\"
 #
 # Object and source file definitions.
 #
-CSRC = sancho_main.c XENduct.c
+CSRC = sancho_main.c sancho-interpreter.c regcomp.c regexec.c regerror.c \
+	tre-mem.c reg-support.c XENduct.c COE.c Cell.c SecurityEvent.c	 \
+	SecurityPoint.c TSEM.c EventModel.c
 
 COBJS = ${CSRC:.c=.o}
 
@@ -37,7 +39,8 @@ LIBRARY = lib${LIBNAME}.a
 #
 #CINCLUDE = -I . -I ../.. -I ../../../lib -I ../HurdLib -I ../../../HurdLib
 
-CINCLUDE = -I . -I ../../../HurdLib -I ../NAAAIM -I ../../../lib
+CINCLUDE = -I . -I ../../../HurdLib -I ../NAAAIM -I ../../../lib \
+	-I ../../../Quixote -I ../../../SecurityModel
 
 TARGET_CPPFLAGS = -U __linux__ -U __FreeBSD__ -U __sun__ -nostdinc	\
 	-isystem ../mini-os/include				\
@@ -49,7 +52,6 @@ TARGET_CPPFLAGS = -U __linux__ -U __FreeBSD__ -U __sun__ -nostdinc	\
 
 DEFINES = -DHAVE_LIBC -D__MINIOS__ -DCONFIG_PARAVIRT -DCONFIG_SPARSE_BSS -DCONFIG_CONSFRONT -DCONFIG_XENBUS -D__XEN_INTERFACE_VERSION__=0x00030205
 
-
 CFLAGS = ${CINCLUDE} ${DEFINES} ${CDEBUG} ${TARGET_CPPFLAGS} -Wall
 
 
@@ -57,6 +59,9 @@ CFLAGS = ${CINCLUDE} ${DEFINES} ${CDEBUG} ${TARGET_CPPFLAGS} -Wall
 # Compilation directives.
 #
 %.o: %.c
+	${CC} ${CFLAGS} -c $< -o $@;
+
+%.o: ../../../SecurityModel/%.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
 

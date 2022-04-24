@@ -19,10 +19,10 @@ SANCHODIR = ../Sancho
 SANCHOSGX = ${SANCHODIR}/SGX
 
 CSRC = quixote.c quixote-mcu.c quixote-sgx.c quixote-sgx-u.c \
-	quixote-console.c quixote-xen.c test-sancho.c
+	quixote-console.c quixote-xen.c test-sancho.c test-sancho-xen.c
 
 TOOLS = quixote quixote-mcu quixote-us quixote-sgx quixote-sgx-u quixote-xen \
-	quixote-console test-sancho test-thread
+	quixote-console test-sancho test-thread test-sancho-xen
 
 INSTALLBIN  = quixote-console
 INSTALLSBIN = quixote quixote-mcu quixote-us quixote-sgx quixote-sgx-u \
@@ -136,6 +136,9 @@ test-sancho: test-sancho.o ${LIBDEPS}
 
 test-thread: test-thread.o ${LIBDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${LIBS} -lpthread;
+
+test-sancho-xen: test-sancho-xen.o ${LIBDEPS}
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS} ${XENLIBS};
 
 sancho-enclave.h: ${SANCHOSGX}/SanchoSGX.signed.so
 	${SGXDIR}/generate-array -i ${SANCHOSGX}/SanchoSGX.signed.so \

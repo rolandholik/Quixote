@@ -13,6 +13,8 @@ export stubdom=y
 CC	  = gcc
 CC_SEARCH = ${shell ${CC} -print-search-dirs | sed -n -e 's/install: \(.*\)/\1/p'}
 
+GCCLIB=-L /usr/lib/gcc/x86_64-unknown-linux-gnu/4.9.4 -lgcc
+
 XENSRC = /u/usr/src/Xen/GIT/xen
 
 MINIOS_URL = git://xenbits.xen.org/mini-os.git
@@ -148,7 +150,7 @@ mini-os-build: mini-os
 	MINIOS_ROOT="${CURDIR}/mini-os"					   \
 	DEF_CPPFLAGS="${TARGET_CPPFLAGS} -isystem ${XENSRC}/tools/include" \
 	DEF_CFLAGS="${TARGET_CFLAGS}" DEF_LDFLAGS="${TARGET_LDFLAGS}"	   \
-	make -C mini-os APP_OBJS="${CURDIR}/Sancho/libSanchoXen.a ${CURDIR}/HurdLib/libHurdLib.a ${CURDIR}/NAAAIM/libNAAAIM.a";
+	make -C mini-os APP_OBJS="${CURDIR}/Sancho/libSanchoXen.a ${CURDIR}/HurdLib/libHurdLib.a ${CURDIR}/NAAAIM/libNAAAIM.a" EXTRA_OBJS="${GCCLIB}";
 	cp mini-os/mini-os Sancho/sancho.elf;
 
 mini-os.stamp: mini-os

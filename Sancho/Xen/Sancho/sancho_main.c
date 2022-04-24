@@ -23,34 +23,7 @@
 #include <NAAAIM.h>
 #include <XENduct.h>
 
-
-void interpreter(XENduct duct, Buffer bufr)
-
-{
-	while ( true ) {
-		fputs("Reading:\n", stdout);
-		if ( !duct->receive_Buffer(duct, bufr) )
-			ERR(goto done);
-
-		if ( duct->eof(duct) ) {
-			fputs("Connection closed.\n", stdout);
-			goto done;
-		}
-
-		fputs("Received:\n", stdout);
-		bufr->hprint(bufr);
-
-		fputs("Writing:\n", stdout);
-		if ( !duct->send_Buffer(duct, bufr) )
-			ERR(goto done);
-
-		bufr->reset(bufr);
-	}
-
-
- done:
-	return;
-}
+#include "sancho.h"
 
 
 int main(int argc, char *argv[])
@@ -69,11 +42,12 @@ int main(int argc, char *argv[])
 	if ( !duct->init_device(duct, "backend/SanchoXen") )
 		ERR(goto done);
 
+
+	/* Invoke the interpreter on each connection. */
 	while ( true ) {
 		if ( !duct->accept_connection(duct) )
 			ERR(goto done);
-
-		interpreter(duct, bufr);
+		sancho_interpreter(duct);
 		duct->reset(duct);
 	}
 

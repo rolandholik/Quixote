@@ -362,7 +362,6 @@ static _Bool receive_Buffer(CO(XENduct, this), CO(Buffer, bf))
 		ERR(goto done);
 
 
-
 	/* Wait for signal from the stubdomain. */
 	if ( xenevtchn_pending(S->evh) == -1 )
 		ERR(goto done);
@@ -391,6 +390,8 @@ static _Bool receive_Buffer(CO(XENduct, this), CO(Buffer, bf))
 	if ( !bf->add(bf, S->bufr, rsize) )
 		ERR(goto done);
 	memset(S->bufr, '\0', 4096 - sizeof(uint32_t));
+
+	xenevtchn_notify(S->evh, S->evp);
 
 	if ( xenevtchn_unmask(S->evh, S->evp) == -1 )
 		ERR(goto done);
