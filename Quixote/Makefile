@@ -122,8 +122,8 @@ quixote-sgx-u: quixote-sgx-u.o ${SANCHOSGX}/SanchoSGX.o sancho-enclave.h \
 	${CC} ${LDFLAGS} -o $@ $< ${SANCHOSGX}/SanchoSGX.o ${SEDELIB} ${LIBS} \
 		${ELFLIB} ${SSL_CRYPTO};
 
-quixote-xen: quixote-xen.o
-	${CC} ${LDFLAGS} -o $@ $< ${LIBS} ${XENLIBS};
+quixote-xen: quixote-xen.o ${LIBDEPS} ${MODELDEPS}
+	${CC} ${LDFLAGS} -o $@ $< ${MODELDEPS} ${LIBS} ${XENLIBS};
 
 quixote-xen.o: quixote-xen.c
 	${CC} ${CFLAGS} ${XENCFLAGS} -c $< -o $@;
