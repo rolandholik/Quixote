@@ -1,0 +1,112 @@
+#! /bin/bash
+
+#
+# This script automates the setup of the xenstore configuration between
+# a sancho stubdomain and a domU implementation.
+#
+# The first argument to this function is the name of the sancho
+# stub domain and the second argument is the name of the domU
+# implementation that will be using the stub domain.
+
+#
+# Copyright (c) Enjellic Systems Development, LLC. All rights reserved.
+#
+# Please refer to the file named Documentation/COPYRIGHT in the top of
+# the source tree for copyright and licensing information.
+#
+
+# Name of the utility to be displayed.
+declare -r Pgm=`basename $0`;
+
+# Numeric domain identifiers for SanchoXen and domU.
+declare Sancho_id DomU_id;
+
+# xenstore path for the domU instance in the SanchoXen heirarchy.
+declare Sancho_Path;
+
+
+#
+# Function:	Usage
+#
+# Description:	This function outputs a usage message for the utility
+#		and then exits.
+#
+# Arguments:	None specified.
+#
+# Return:	This function has no return value.
+#
+
+function Usage() {
+
+cat - <<EOF
+
+Usage: $Pgm Sancho_name domU_name
+
+	Sancho_name
+		The name of the Sancho instance that will serve as the
+		Trusted Modeling Agent for a domU instance.
+
+	domU_name
+		The name of the domU instance that will connect to the
+		Trusted Modeling Agent/Sancho instance.
+
+EOF
+
+	exit 1;
+}
+
+
+#
+# Main program starts here.
+#
+
+# Generate TMA/Sancho identifier.
+if [ -z "$1" ]; then
+	echo "$Pgm: No sancho domain specified.";
+	Usage;
+fi;
+
+Sancho_id=`xl domid $1`;
+if [ $? -ne 0 ]; then
+	echo "$Pgm: Error converting domain name $1 to domid.";
+	exit 1;
+fi;
+
+# Generate the domU client identifier.
+if [ -z "$2" ]; then
+	echo "$Pgm: No domU domain specified. ";
+	Usage;
+fi;
+
+
+DomU_id=`xl domid $2`;
+if [ $? -ne 0 ]; then
+	echo "$Pgm: Error converting domain name $2 to domid.";
+	exit 1;
+fi;
+
+Sancho_Path="/local/domain/$Sancho_id/backend/SanchoXen/$DomU_id";
+
+
+# Create the xenstore root for the domU instance.
+xenstore-write $Sancho_Path "";
+if [ $? -ne 0 ]; then
+	echo "$Pgm: Error creating domU root entry.";
+	exit 1;
+fi;
+
+
+# Set the permisions on the domU root entry
+xenstore-chmod $Sancho_Path b$DomU_id;
+if [ $? -ne 0 ]; then
+	echo "$Pgm: Error setting SanchoXen permissions.";
+	exit 1;
+fi;
+
+
+# Advertise result.
+echo "Setup complete for SanchoXen id $Sancho_id";
+
+
+# All done.
+exit 0;
