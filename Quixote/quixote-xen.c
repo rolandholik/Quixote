@@ -1201,39 +1201,6 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint,
 /**
  * Private function.
  *
- * This function is responsible for issueing a reset request to the
- * Sancho micro-controller implementation.
- *
- * \param duct		A pointer to the object being used to communicate
- *			with the micro-controller.
- *
- * \param bufr		The object which will be used to hold the command
- *			to be sent.
- *
- * \return	No return value is defined.
- */
-
-static void send_reset(CO(XENduct, duct), CO(Buffer, bufr))
-
-{
-
-	static unsigned char cmd[] = "reset";
-
-
-	if ( Debug )
-		fputs("Sending reset.\n", Debug);
-
-	bufr->reset(bufr);
-	if ( bufr->add(bufr, cmd, sizeof(cmd)) )
-		duct->send_Buffer(duct, bufr);
-
-	return;
-}
-
-
-/**
- * Private function.
- *
  * This function is responsible for issueing the runc command needed
  * to terminate a software cartridge.  The function waits until the
  * process spawned to execute the runc process terminates.
