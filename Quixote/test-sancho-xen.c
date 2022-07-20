@@ -445,9 +445,6 @@ extern int main(int argc, char *argv[])
 
 
  done:
-	if ( duct != NULL )
-		send_reset(duct, bufr);
-
 	WHACK(duct);
 	WHACK(bufr);
 

@@ -1587,9 +1587,6 @@ extern int main(int argc, char *argv[])
 
 
  done:
-	if ( Duct != NULL )
-		send_reset(Duct, cmdbufr);
-
 	WHACK(cmdbufr);
 	WHACK(mgmt);
 	WHACK(infile);
