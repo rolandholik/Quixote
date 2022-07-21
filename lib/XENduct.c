@@ -36,6 +36,9 @@
 #include "NAAAIM.h"
 #include "XENduct.h"
 
+/* Memory barrier primitive. */
+#define xen_mb() asm volatile ( "lock addl $0, -32(%%rsp)" ::: "memory" )
+
 
 /* State extraction macro. */
 #define STATE(var) CO(XENduct_State, var) = this->state
@@ -87,6 +90,9 @@ struct NAAAIM_XENduct_State
 	/* Shared page address. */
 	uint8_t *gp;
 
+	/* Status word. */
+	uint8_t *sp;
+
 	/* Shared buffer. */
 	uint8_t *bufr;
 
@@ -129,6 +135,7 @@ static void _init_state(CO(XENduct_State, S)) {
 
 	S->gh = NULL;
 	S->gp = NULL;
+	S->sp = NULL;
 
 	S->evp	     = 0;
 	S->ev_remote = 0;
@@ -208,7 +215,8 @@ static _Bool init_device(CO(XENduct, this), CO(char *, path))
 		ERR(goto done);
 
 	memset(S->gp, '\0', 4096);
-	S->bufr = S->gp + sizeof(uint32_t);
+	S->sp	= S->gp + sizeof(uint32_t);
+	S->bufr = S->sp + sizeof(_Bool);
 
 
 	/* Setup event channel. */
@@ -247,10 +255,14 @@ static _Bool init_device(CO(XENduct, this), CO(char *, path))
 		ERR(goto done);
 
 
-	/* Wait for connection response. */
+	/* Wait for connection response and then confirm. */
 	if ( xenevtchn_unmask(S->evh, S->evp) == -1 )
 		ERR(goto done);
-	retn = true;
+	if ( xenevtchn_pending(S->evh) == -1 )
+		ERR(goto done);
+
+	*S->sp = true;
+	retn   = true;
 
 
  done:
@@ -318,8 +330,19 @@ static _Bool send_Buffer(CO(XENduct, this), CO(Buffer, bf))
 	/* Load buffer into shared page area. */
 	memcpy(S->bufr, bf->get(bf), bf->size(bf));
 	*(uint32_t *) S->gp = size;
+	*S->sp		    = false;
 
-	xenevtchn_notify(S->evh, S->evp);
+	if ( xenevtchn_notify(S->evh, S->evp) == -1 )
+		fprintf(stdout, "%s: Failed notify at %d\n", __func__, \
+			__LINE__);
+
+	while ( !*S->sp ) {
+		xen_mb();
+		continue;
+	}
+
+	*S->sp = false;
+	xen_mb();
 
 	retn = true;
 
@@ -354,6 +377,8 @@ static _Bool receive_Buffer(CO(XENduct, this), CO(Buffer, bf))
 
 	uint32_t rsize;
 
+	xenevtchn_port_or_error_t port;
+
 
 	/* Verify arguments. */
 	if ( S->poisoned )
@@ -363,7 +388,9 @@ static _Bool receive_Buffer(CO(XENduct, this), CO(Buffer, bf))
 
 
 	/* Wait for signal from the stubdomain. */
-	if ( xenevtchn_pending(S->evh) == -1 )
+	if ( xenevtchn_unmask(S->evh, S->evp) == -1 )
+		ERR(goto done);
+	if ( (port = xenevtchn_pending(S->evh)) == -1 )
 		ERR(goto done);
 
 	rsize = *(uint32_t *) S->gp;
@@ -389,13 +416,17 @@ static _Bool receive_Buffer(CO(XENduct, this), CO(Buffer, bf))
 	/* Load the received data into a Buffer object. */
 	if ( !bf->add(bf, S->bufr, rsize) )
 		ERR(goto done);
-	memset(S->bufr, '\0', 4096 - sizeof(uint32_t));
+	memset(S->gp, '\0', 4096);
 
-	xenevtchn_notify(S->evh, S->evp);
+	*S->sp = true;
+	xen_mb();
 
-	if ( xenevtchn_unmask(S->evh, S->evp) == -1 )
-		ERR(goto done);
-	retn = true;
+	while ( *S->sp ) {
+		xen_mb();
+		continue;
+	}
+
+	retn  = true;
 
 
  done:
@@ -429,23 +460,17 @@ static void whack(CO(XENduct, this))
 	/* Remove xenstore nodes. */
 	INIT(HurdLib, String, str, goto release);
 	if ( str->add_sprintf(str, "/local/domain/%u/backend/SanchoXen/%s/grant-ref", \
-			      S->remote, S->domid) ) {
-		fprintf(stdout, "%s: Removing: %s\n", __func__, str->get(str));
+			      S->remote, S->domid) )
 		xs_rm(S->xh, XBT_NULL, str->get(str));
-	}
 
 	str->reset(str);
 	if ( str->add_sprintf(str, "/local/domain/%u/backend/SanchoXen/%s/event-channel", \
-			      S->remote, S->domid) ) {
-		fprintf(stdout, "%s: Removing: %s\n", __func__, str->get(str));
+			      S->remote, S->domid) )
 		xs_rm(S->xh, XBT_NULL, str->get(str));
-	}
 
 
-	fputs("Sending shutdown.\n", stderr);
 	xenevtchn_notify(S->evh, S->evp);
-
-	fputs("Waiting for shutdown confirmation.\n", stderr);
+	xenevtchn_unmask(S->evh, S->evp);
 	xenevtchn_pending(S->evh);
 
 

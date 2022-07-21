@@ -47,8 +47,10 @@ int main(int argc, char *argv[])
 	while ( true ) {
 		if ( !duct->accept_connection(duct) )
 			ERR(goto done);
+		fputs("Have connection.\n", stdout);
 		sancho_interpreter(duct);
 		duct->reset(duct);
+		fputs("Connection closed.\n", stdout);
 	}
 
 

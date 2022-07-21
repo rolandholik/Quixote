@@ -127,6 +127,7 @@ static void add_event(CO(XENduct, duct), CO(TSEM, model), CO(Buffer, bufr))
 	if ( !model->update(model, event, &updated, &discipline, &sealed) )
 		ERR(goto done);
 
+
 	/* Send response. */
 	if ( discipline ) {
 		memset(msg, '\0', sizeof(msg));
@@ -603,10 +604,8 @@ extern void sancho_interpreter(const XENduct duct)
 		if ( !duct->receive_Buffer(duct, bufr) )
 			ERR(goto done);
 
-		if ( duct->eof(duct) ) {
-			fputs("Connection closed.\n", stdout);
+		if ( duct->eof(duct) )
 			goto done;
-		}
 
 		switch ( get_command(bufr) ) {
 			case exchange_event:

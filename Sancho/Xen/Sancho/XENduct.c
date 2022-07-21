@@ -58,6 +58,7 @@
 /** A flag to indicate that a duct event has occurred. */
 static _Bool Have_event = false;
 
+
 /** LocalDuct private state information. */
 struct NAAAIM_XENduct_State
 {
@@ -87,6 +88,9 @@ struct NAAAIM_XENduct_State
 
 	/* Shared page address. */
 	uint8_t *grant_page;
+
+	/* Status word. */
+	_Bool *sp;
 
 	/* Shared buffer. */
 	uint8_t *bufr;
@@ -132,6 +136,69 @@ void _event_handler(evtchn_port_t vp, struct pt_regs *regs, void *page)
 
 {
 	Have_event = true;
+	wmb();
+
+	return;
+}
+
+
+/**
+ * Internal private function.
+ *
+ * This method is responsible for polling the variable that is set by
+ * the event handler function previously defined.
+ *
+ * No arguments are defined for this function.
+ *
+ * \return	No return value is defined.
+ */
+
+void _wait_for_event(evtchn_port_t port)
+
+{
+	_Bool if_interrupt;
+
+
+	while ( true ) {
+		if_interrupt = Have_event;
+		wmb();
+
+		if ( if_interrupt )
+			break;
+	}
+
+	return;
+}
+
+
+/**
+ * Internal private method.
+ *
+ * This method is responsible for polling the status variable to
+ * determine if the quixote instance has completed processing.
+ *
+ * No arguments are defined for this function.
+ *
+ * \return	No return value is defined.
+ */
+
+void _wait_for_status(CO(XENduct_State, S))
+
+{
+	_Bool if_status;
+
+
+	while ( true ) {
+		if_status = *S->sp;
+		wmb();
+
+		if ( if_status )
+			break;
+	}
+
+	*S->sp = false;
+	wmb();
+
 	return;
 }
 
@@ -161,6 +228,7 @@ static void _init_state(CO(XENduct_State, S)) {
 
 	memset(&S->map, '\0', sizeof(struct gntmap));
 	S->grant_page = NULL;
+	S->sp	      = NULL;
 
 	S->ev_local  = 0;
 	S->ev_remote = 0;
@@ -285,7 +353,8 @@ static _Bool accept_connection(CO(XENduct, this))
 		ERR(goto done);
 
 	memset(S->grant_page, '\0', 4096);
-	S->bufr = S->grant_page + sizeof(uint32_t);
+	S->sp	= (_Bool *) (S->grant_page + sizeof(uint32_t));
+	S->bufr = (uint8_t *) (S->sp + sizeof(_Bool));
 
 
 	/* Obtain event channel. */
@@ -311,7 +380,13 @@ static _Bool accept_connection(CO(XENduct, this))
 				     S->grant_page, &S->ev_local) != 0 )
 		ERR(goto done);
 
+	*S->sp = false;
+	wmb();
+
 	unmask_evtchn(S->ev_local);
+	notify_remote_via_evtchn(S->ev_local);
+	_wait_for_event(S->ev_local);
+
 	retn = true;
 
 
@@ -356,15 +431,14 @@ static _Bool send_Buffer(CO(XENduct, this), CO(Buffer, bf))
 	/* Load buffer into shared page area. */
 	memcpy(S->bufr, bf->get(bf), bf->size(bf));
 	*(uint32_t *) S->grant_page = size;
+	*S->sp = false;
+	wmb();
 
 	notify_remote_via_evtchn(S->ev_local);
 
-	Have_event = false;
-	while ( !Have_event )
-		continue;
+	_wait_for_status(S);
 
-	retn	   = true;
-	Have_event = false;
+	retn = true;
 
 
  done:
@@ -406,8 +480,10 @@ static _Bool receive_Buffer(CO(XENduct, this), CO(Buffer, bf))
 
 
 	/* Wait for an event. */
-	while ( !Have_event )
-		msleep(5);
+	Have_event  = false;
+	*S->sp	    = false;
+	wmb();
+	_wait_for_event(S->ev_local);
 
 	rsize = *(uint32_t *) S->grant_page;
 
@@ -433,14 +509,21 @@ static _Bool receive_Buffer(CO(XENduct, this), CO(Buffer, bf))
 	/* Load the received data into a Buffer object. */
 	if ( !bf->add(bf, S->bufr, rsize) )
 		ERR(goto done);
-
 	memset(S->grant_page, '\0', 4096);
-	retn	   = true;
+
+
+	*S->sp = true;
+	wmb();
+
+	while ( *S->sp ) {
+		rmb();
+		continue;
+	}
+
+	retn = true;
 
 
  done:
-	Have_event = false;
-
 	if ( !retn )
 		S->poisoned = true;
 
