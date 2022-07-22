@@ -7,7 +7,7 @@
 
 
 # Variable declarations.
-SUBDIRS = STmcu Nordic SGX
+SUBDIRS = STmcu Nordic SGX Xen
 
 
 #
@@ -28,6 +28,9 @@ Nordic:
 	${MAKE} -C $@;
 
 SGX:
+	${MAKE} -C $@;
+
+Xen:
 	${MAKE} -C $@;
 
 
