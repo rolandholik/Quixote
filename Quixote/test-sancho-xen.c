@@ -352,7 +352,7 @@ extern int main(int argc, char *argv[])
 				timing = true;
 				break;
 
-			case 'd':
+			case 't':
 				domid = optarg;
 				break;
 		}
