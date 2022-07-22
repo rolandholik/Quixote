@@ -9,7 +9,7 @@ ifndef CFGDIR
 CFGDIR=${shell cd ..; pwd}
 endif
 
-# include ${MCUCFGDIR}/Nordic.mk
+include ${CFGDIR}/Config.mk
 
 
 #
@@ -52,7 +52,7 @@ TARGET_CPPFLAGS = -U __linux__ -U __FreeBSD__ -U __sun__ -nostdinc	\
 
 DEFINES = -DHAVE_LIBC -D__MINIOS__ -DCONFIG_PARAVIRT -DCONFIG_SPARSE_BSS -DCONFIG_CONSFRONT -DCONFIG_XENBUS -D__XEN_INTERFACE_VERSION__=0x00030205
 
-CFLAGS = ${CINCLUDE} ${DEFINES} ${CDEBUG} ${TARGET_CPPFLAGS} -Wall
+CFLAGS = ${CINCLUDE} ${DEFINES} ${CDEBUG} ${TARGET_CPPFLAGS} ${PLATFORM} -Wall
 
 
 #
