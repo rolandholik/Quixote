@@ -9,7 +9,7 @@
 # Variable declarations.
 TOOLDIR = /opt/ESDembedded
 
-STMDIR	= /u/usr/sources/Development_STM/STM32CubeExpansion_CELLULAR_V6.0.0
+STMDIR	= /opt/ESDembedded/share/SDK/STM32CubeExpansion_CELLULAR_V6.0.0
 RTOSDIR = ${STMDIR}/Middlewares/Third_Party/FreeRTOS/Source
 MBEDDIR = /u/usr/sources/Development_STM/mbedtls-2.16.11
 

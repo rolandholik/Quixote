@@ -17,7 +17,7 @@ include ${MCUCFGDIR}/STmcu.mk
 #
 # Variable definitions for the architecture development kit.
 #
-STMDIR = /u/usr/sources/Development_STM/STM32CubeL5-1.2.0
+STMDIR = /opt/ESDembedded/share/SDK/STM32CubeL5-1.2.0
 
 CINCLUDE = -I . -I ../../include -I ../HurdLib -I ../../../../HurdLib	 \
 	-I ../../../.. -I ../../../../lib -I ../../../../Quixote	 \
