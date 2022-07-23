@@ -164,10 +164,10 @@ install-bin:
 clean:
 	rm -f *.o *~ ldscript;
 	rm -f ${TOOLS};
-	rm -f SanchoSGX.so SanchoSGX.signed.so ISOmanager.so \
-		ISOmanager.signed.so;
 
-clobber:
+clobber: clean
+	rm -f SanchoSGX.so SanchoSGX.signed.so ISOmanager.so \
+		ISOmanager.signed.so
 
 
 # Source dependencies.
