@@ -1,0 +1,261 @@
+From 39cef9453f426f1ae097b726321d0d032787fed1 Mon Sep 17 00:00:00 2001
+From: "Dr. Greg" <greg@enjellic.com>
+Date: Wed, 13 Oct 2021 20:49:50 -0500
+Subject: [PATCH 53/55] Convert to Turing Event nomenclature.
+
+This update converts the terminology for security events that are
+intercepted by the TE security module to use 'te' rather then
+'ai'.
+
+This commit completes the conversion to Quixote nomenclature.
+---
+ security/integrity/ima/ima_events.c | 103 ++++++++++++++--------------
+ 1 file changed, 51 insertions(+), 52 deletions(-)
+
+diff --git a/security/integrity/ima/ima_events.c b/security/integrity/ima/ima_events.c
+index 474e508a3477..ab2fd5b41183 100644
+--- a/security/integrity/ima/ima_events.c
++++ b/security/integrity/ima/ima_events.c
+@@ -29,7 +29,7 @@
+ /* System call definitions. */
+ #define IMA_SET_CONTOUR		0x1
+ #define IMA_SET_PSEUDONYM	0x2
+-#define IMA_SET_AI		0x4
++#define IMA_SET_TE		0x4
+ #define IMA_TE_ENFORCE		0x8
+ #define IMA_EVENT_EXTERNAL	0x10
+ 
+@@ -92,41 +92,40 @@ static struct dentry *state;
+ static struct kobject *ima_events_kobject;
+ 
+ 
+-/* Structure defining an ai security event. */
+-
+-/* Types of AI events. */
+-enum AIevent_type {
+-	AI_file_open=0,
+-	AI_socket_connect,
+-	AI_socket_listen,
+-	AI_undefined
++/* Types of TE events. */
++enum TEevent_type {
++	TE_file_open=0,
++	TE_socket_connect,
++	TE_socket_listen,
++	TE_undefined
+ };
+ 
+-enum AIevent_action {
+-	AI_action_log=0,
+-	AI_action_eperm,
++/* Actions associated with TE events. */
++enum TEevent_action {
++	TE_action_log=0,
++	TE_action_eperm,
+ };
+ 
+-const char *AI_actions[] = {
++const char *TE_actions[] = {
+ 	"LOG",
+ 	"EPERM"
+ };
+ 
+-struct AIevent {
+-	enum AIevent_action action;
++struct TEevent {
++	enum TEevent_action action;
+ 	char *description;
+ };
+ 
+-struct AIdescription {
++struct TEdescription {
+ 	char process[TASK_COMM_LEN];
+-	struct AIevent *descn;
++	struct TEevent *descn;
+ };
+ 
+ /* Array of structures defining the possible events. */
+-struct AIevent AI_events[] = {
+-	{AI_action_log, "file_open"},
+-	{AI_action_log, "socket_connect"},
+-	{AI_action_log, "socket_listen"}
++struct TEevent TE_events[] = {
++	{TE_action_log, "file_open"},
++	{TE_action_log, "socket_connect"},
++	{TE_action_log, "socket_listen"}
+ };
+ 
+ 
+@@ -158,7 +157,7 @@ enum event_types {
+ 	exchange_event,
+ 	aggregate_event,
+ 	seal_event,
+-	ai_event
++	TE_event
+ };
+ 
+ /* Structure defining a model event. */
+@@ -170,7 +169,7 @@ struct event {
+ 	union {
+ 		char measurement[TPM_DIGEST_SIZE];
+ 		struct trajectory *exchange;
+-		struct AIdescription ai;
++		struct TEdescription TE;
+ 	} u;
+ };
+ 
+@@ -214,7 +213,7 @@ struct ima_events_map {
+ 	struct mutex pseudonym_mutex;
+ 	struct list_head pseudonym_list;
+ 
+-	struct AIevent *AI_events;
++	struct TEevent *TE_events;
+ 
+ 	struct kobj_attribute update;
+ } init_ima_events_map = {
+@@ -234,7 +233,7 @@ struct ima_events_map {
+ 	.pseudonym_mutex = __MUTEX_INITIALIZER(init_ima_events_map.pseudonym_mutex),
+ 	.pseudonym_list = LIST_HEAD_INIT(init_ima_events_map.pseudonym_list),
+ 
+-	.AI_events = AI_events
++	.TE_events = TE_events
+ };
+ 
+ struct ima_events_namespace init_ima_events_ns = {
+@@ -930,11 +929,11 @@ static ssize_t show_ns_update(struct kobject *kobj,
+ 			retn = sprintf(page, "%s", "sealed\n");
+ 			break;
+ 
+-		case ai_event:
+-			retn = sprintf(page, "ai_event COE{%s} event{%s} action{%s}\n",
+-				       mp->u.ai.process,
+-				       mp->u.ai.descn->description,
+-				       AI_actions[mp->u.ai.descn->action]);
++		case TE_event:
++			retn = sprintf(page, "TE_event COE{%s} event{%s} action{%s}\n",
++				       mp->u.TE.process,
++				       mp->u.TE.descn->description,
++				       TE_actions[mp->u.TE.descn->action]);
+ 			break;
+ 	}
+ 
+@@ -2243,12 +2242,12 @@ struct ima_events_namespace *ima_copy_events_ns(unsigned long flags,
+ 	mutex_init(&ns->map->pseudonym_mutex);
+ 	INIT_LIST_HEAD(&ns->map->pseudonym_list);
+ 
+-	ns->map->AI_events = kzalloc(sizeof(AI_events), GFP_KERNEL);
+-	if (!ns->map->AI_events) {
++	ns->map->TE_events = kzalloc(sizeof(TE_events), GFP_KERNEL);
++	if (!ns->map->TE_events) {
+ 		retn = -ENOMEM;
+ 		goto done;
+ 	}
+-	memcpy(ns->map->AI_events, AI_events, sizeof(AI_events));
++	memcpy(ns->map->TE_events, TE_events, sizeof(TE_events));
+ 
+ 	ns->map->emit_aggregate = true;
+ 	ns->map->external = events_ns->map->external;
+@@ -2274,7 +2273,7 @@ struct ima_events_namespace *ima_copy_events_ns(unsigned long flags,
+ 	if (retn) {
+ 		if (ns && ns->map) {
+ 			kfree(ns->map->update.attr.name);
+-			kfree(ns->map->AI_events);
++			kfree(ns->map->TE_events);
+ 			kfree(ns->map);
+ 		}
+ 		kfree(ns);
+@@ -2305,7 +2304,7 @@ int ima_events_process_te(unsigned int event)
+ 	struct event *ep;
+ 
+ 	/* Verify a valid event. */
+-	if ( event >= AI_undefined ) {
++	if ( event >= TE_undefined ) {
+ 		pr_warn("[%s]: Undefined event\n", __func__);
+ 		goto done;
+ 	}
+@@ -2315,15 +2314,15 @@ int ima_events_process_te(unsigned int event)
+ 	if (!ep)
+ 		return -ENOMEM;
+ 
+-	ep->type = ai_event;
+-	ep->u.ai.descn = &map->AI_events[event];
+-	strcpy(ep->u.ai.process, current->comm);
++	ep->type = TE_event;
++	ep->u.TE.descn = &map->TE_events[event];
++	strcpy(ep->u.TE.process, current->comm);
+ 
+-	switch ( map->AI_events[event].action ) {
+-		case AI_action_log:
++	switch ( map->TE_events[event].action ) {
++		case TE_action_log:
+ 			retn = 0;
+ 			break;
+-		case AI_action_eperm:
++		case TE_action_eperm:
+ 			retn = -EPERM;
+ 			break;
+ 	}
+@@ -2386,7 +2385,7 @@ SYSCALL_DEFINE3(config_events_ns, unsigned char *, bufr, size_t, cnt,
+ 	int retn = -EINVAL;
+ 	unsigned int lp;
+ 	struct ima_events_map *map = current_map();
+-	struct ai_control {
++	struct TE_control {
+ 		unsigned int hook;
+ 		unsigned int action;
+ 	} ctl;
+@@ -2397,7 +2396,7 @@ SYSCALL_DEFINE3(config_events_ns, unsigned char *, bufr, size_t, cnt,
+ 		return -EPERM;
+ 	if (map->domain_sealed)
+ 		return -EPERM;
+-	if (flags & ~(IMA_SET_CONTOUR | IMA_SET_PSEUDONYM | IMA_SET_AI | \
++	if (flags & ~(IMA_SET_CONTOUR | IMA_SET_PSEUDONYM | IMA_SET_TE | \
+ 		      IMA_TE_ENFORCE | IMA_EVENT_EXTERNAL))
+ 		return -EINVAL;
+ 
+@@ -2411,7 +2410,7 @@ SYSCALL_DEFINE3(config_events_ns, unsigned char *, bufr, size_t, cnt,
+ 		goto done;
+ 	}
+ 
+-	if (flags & IMA_SET_AI) {
++	if (flags & IMA_SET_TE) {
+ 		if (cnt != sizeof(ctl)) {
+ 			retn = -EINVAL;
+ 			goto done;
+@@ -2421,25 +2420,25 @@ SYSCALL_DEFINE3(config_events_ns, unsigned char *, bufr, size_t, cnt,
+ 			goto done;
+ 		}
+ 
+-		if (ctl.hook >= AI_undefined) {
++		if (ctl.hook >= TE_undefined) {
+ 			retn = -EINVAL;
+ 			goto done;
+ 		}
+-		if (ctl.action > AI_action_eperm) {
++		if (ctl.action > TE_action_eperm) {
+ 			retn = -EINVAL;
+ 			goto done;
+ 		}
+ 
+-		map->AI_events[ctl.hook].action = ctl.action;
+-		pr_debug("%s modified ai hook %s, action=%s\n", __func__,
+-			 map->AI_events[ctl.hook].description,
+-			 AI_actions[ctl.action]);
++		map->TE_events[ctl.hook].action = ctl.action;
++		pr_debug("%s modified TE hook %s, action=%s\n", __func__,
++			 map->TE_events[ctl.hook].description,
++			 TE_actions[ctl.action]);
+ 		retn = 0;
+ 	}
+ 
+ 	if (flags & IMA_TE_ENFORCE) {
+-		for (lp = 0; lp < ARRAY_SIZE(AI_events); ++lp)
+-			map->AI_events[lp].action = AI_action_eperm;
++		for (lp = 0; lp < ARRAY_SIZE(TE_events); ++lp)
++			map->TE_events[lp].action = TE_action_eperm;
+ 		retn = 0;
+ 	}
+ 
+-- 
+2.31.1
+

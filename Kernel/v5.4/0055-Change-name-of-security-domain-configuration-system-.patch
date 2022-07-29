@@ -1,0 +1,71 @@
+From 9c9bb4049bb398f37f2316d786906a45ea60f4ba Mon Sep 17 00:00:00 2001
+From: "Dr. Greg" <greg@enjellic.com>
+Date: Thu, 14 Oct 2021 19:29:24 -0500
+Subject: [PATCH 55/55] Change name of security domain configuration system
+ call.
+
+This commit changes the name of the system call that is used to
+configure the parameters of a security event domain to
+config_TSEM.
+---
+ arch/x86/entry/syscalls/syscall_32.tbl | 2 +-
+ arch/x86/entry/syscalls/syscall_64.tbl | 2 +-
+ include/uapi/asm-generic/unistd.h      | 4 ++--
+ security/integrity/ima/ima_events.c    | 2 +-
+ 4 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/arch/x86/entry/syscalls/syscall_32.tbl b/arch/x86/entry/syscalls/syscall_32.tbl
+index 8b7e085c000a..240907b8d2f4 100644
+--- a/arch/x86/entry/syscalls/syscall_32.tbl
++++ b/arch/x86/entry/syscalls/syscall_32.tbl
+@@ -440,5 +440,5 @@
+ 433	i386	fspick			sys_fspick			__ia32_sys_fspick
+ 434	i386	pidfd_open		sys_pidfd_open			__ia32_sys_pidfd_open
+ 435	i386	clone3			sys_clone3			__ia32_sys_clone3
+-436	i386	config_events_ns	sys_config_events_ns		__ia32_sys_config_events_ns
++436	i386	config_TSEM		sys_config_TSEM			__ia32_sys_config_TSEM
+ 437	i386	config_COE		sys_config_COE			__ia32_sys_config_COE
+diff --git a/arch/x86/entry/syscalls/syscall_64.tbl b/arch/x86/entry/syscalls/syscall_64.tbl
+index 63844b7488cc..7acfb60ed53a 100644
+--- a/arch/x86/entry/syscalls/syscall_64.tbl
++++ b/arch/x86/entry/syscalls/syscall_64.tbl
+@@ -357,7 +357,7 @@
+ 433	common	fspick			__x64_sys_fspick
+ 434	common	pidfd_open		__x64_sys_pidfd_open
+ 435	common	clone3			__x64_sys_clone3/ptregs
+-436	common	config_events_ns	__x64_sys_config_events_ns
++436	common	config_TSEM		__x64_sys_config_TSEM
+ 437	common	config_COE		__x64_sys_config_COE
+ 
+ #
+diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
+index 41ca54fcf1b2..8f1ea1712bed 100644
+--- a/include/uapi/asm-generic/unistd.h
++++ b/include/uapi/asm-generic/unistd.h
+@@ -850,8 +850,8 @@ __SYSCALL(__NR_pidfd_open, sys_pidfd_open)
+ #define __NR_clone3 435
+ __SYSCALL(__NR_clone3, sys_clone3)
+ #endif
+-#define __NR_set_behavior 436
+-__SYSCALL(__NR_set_behavior, sys_set_behavior)
++#define __NR_config_TSEM 436
++__SYSCALL(__NR_config_TSEM, sys_config_TSEM)
+ #define __NR_config_COE 437
+ __SYSCALL(__NR_config_COE, sys_config_COE)
+ 
+diff --git a/security/integrity/ima/ima_events.c b/security/integrity/ima/ima_events.c
+index e61ca1b8069c..5cc6bd24940d 100644
+--- a/security/integrity/ima/ima_events.c
++++ b/security/integrity/ima/ima_events.c
+@@ -2379,7 +2379,7 @@ SYSCALL_DEFINE2(config_COE, pid_t, pid, unsigned long, flags)
+ 	return retn;
+ }
+ 
+-SYSCALL_DEFINE3(config_events_ns, unsigned char *, bufr, size_t, cnt,
++SYSCALL_DEFINE3(config_TSEM, unsigned char *, bufr, size_t, cnt,
+ 		unsigned long, flags)
+ {
+ 	int retn = -EINVAL;
+-- 
+2.31.1
+

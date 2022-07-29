@@ -1,0 +1,99 @@
+From 33db094e875c1aab016d83584bf34f37208d4c63 Mon Sep 17 00:00:00 2001
+From: "Dr. Greg" <greg@enjellic.com>
+Date: Thu, 14 Oct 2021 10:00:14 -0500
+Subject: [PATCH 54/55] Change context of execution syscall configuration name.
+
+This commit changes the name of the system call that is used to
+configure a Context Of Execution in the TSEM model to the
+following:
+
+sys_config_COE
+
+In order to increase consistency with the Quixote nomenclature.
+---
+ arch/x86/entry/syscalls/syscall_32.tbl | 2 +-
+ arch/x86/entry/syscalls/syscall_64.tbl | 2 +-
+ include/linux/syscalls.h               | 2 +-
+ include/uapi/asm-generic/unistd.h      | 4 ++--
+ kernel/sys_ni.c                        | 2 +-
+ security/integrity/ima/ima_events.c    | 2 +-
+ 6 files changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/arch/x86/entry/syscalls/syscall_32.tbl b/arch/x86/entry/syscalls/syscall_32.tbl
+index 33dcac507697..8b7e085c000a 100644
+--- a/arch/x86/entry/syscalls/syscall_32.tbl
++++ b/arch/x86/entry/syscalls/syscall_32.tbl
+@@ -441,4 +441,4 @@
+ 434	i386	pidfd_open		sys_pidfd_open			__ia32_sys_pidfd_open
+ 435	i386	clone3			sys_clone3			__ia32_sys_clone3
+ 436	i386	config_events_ns	sys_config_events_ns		__ia32_sys_config_events_ns
+-437	i386	set_bad_actor		sys_set_bad_actor		__ia32_sys_set_bad_actor
++437	i386	config_COE		sys_config_COE			__ia32_sys_config_COE
+diff --git a/arch/x86/entry/syscalls/syscall_64.tbl b/arch/x86/entry/syscalls/syscall_64.tbl
+index 5b06d4dacb75..63844b7488cc 100644
+--- a/arch/x86/entry/syscalls/syscall_64.tbl
++++ b/arch/x86/entry/syscalls/syscall_64.tbl
+@@ -358,7 +358,7 @@
+ 434	common	pidfd_open		__x64_sys_pidfd_open
+ 435	common	clone3			__x64_sys_clone3/ptregs
+ 436	common	config_events_ns	__x64_sys_config_events_ns
+-437	common	set_bad_actor		__x64_sys_set_bad_actor
++437	common	config_COE		__x64_sys_config_COE
+ 
+ #
+ # x32-specific system call numbers start at 512 to avoid cache impact
+diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
+index 57d74d27ae18..db6a7b338405 100644
+--- a/include/linux/syscalls.h
++++ b/include/linux/syscalls.h
+@@ -1426,5 +1426,5 @@ long compat_ksys_semtimedop(int semid, struct sembuf __user *tsems,
+ #ifdef CONFIG_IMA
+ asmlinkage long sys_set_behavior(unsigned char __user * buf, size_t cnt,
+ 				 unsigned long flags);
+-asmlinkage long sys_set_bad_actor(pid_t pid, unsigned long flags);
++asmlinkage long sys_config_COE(pid_t pid, unsigned long flags);
+ #endif
+diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
+index 38574b732e0e..41ca54fcf1b2 100644
+--- a/include/uapi/asm-generic/unistd.h
++++ b/include/uapi/asm-generic/unistd.h
+@@ -852,8 +852,8 @@ __SYSCALL(__NR_clone3, sys_clone3)
+ #endif
+ #define __NR_set_behavior 436
+ __SYSCALL(__NR_set_behavior, sys_set_behavior)
+-#define __NR_set_bad_actor 437
+-__SYSCALL(__NR_set_bad_actor, sys_set_bad_actor)
++#define __NR_config_COE 437
++__SYSCALL(__NR_config_COE, sys_config_COE)
+ 
+ #undef __NR_syscalls
+ #define __NR_syscalls 438
+diff --git a/kernel/sys_ni.c b/kernel/sys_ni.c
+index 9a0434c68c23..81ca578ce2c2 100644
+--- a/kernel/sys_ni.c
++++ b/kernel/sys_ni.c
+@@ -351,7 +351,7 @@ COND_SYSCALL(pkey_free);
+ 
+ /* Set system event parameters */
+ COND_SYSCALL(sys_set_behavior);
+-COND_SYSCALL(sys_set_bad_actor);
++COND_SYSCALL(sys_config_COE);
+ 
+ /*
+  * Architecture specific weak syscall entries.
+diff --git a/security/integrity/ima/ima_events.c b/security/integrity/ima/ima_events.c
+index ab2fd5b41183..e61ca1b8069c 100644
+--- a/security/integrity/ima/ima_events.c
++++ b/security/integrity/ima/ima_events.c
+@@ -2338,7 +2338,7 @@ int ima_events_process_te(unsigned int event)
+ }
+ 
+ 
+-SYSCALL_DEFINE2(set_bad_actor, pid_t, pid, unsigned long, flags)
++SYSCALL_DEFINE2(config_COE, pid_t, pid, unsigned long, flags)
+ {
+ 	bool wakeup = true;
+ 	int retn = -ESRCH;
+-- 
+2.31.1
+
