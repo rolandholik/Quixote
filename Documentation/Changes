@@ -105,3 +105,16 @@ Version 1.2:
 	* Implement model signing utility.
 
 	* Validated functionality in Ubuntu 20.
+
+Version 1.3:
+	* Nordic 52840-DK based TMA/SanchoMCU.
+
+	* Nordic 52840-DONGLE based TMA/SanchoMCU implementation.
+
+	* STM32l562 SanchoMCU implementation.
+
+	* Xen stub domain TMA/SanchoXen implementation.
+
+	* Optimize SecurityModel regex implementation.
+
+	* Kernel driver naming convention changes.
