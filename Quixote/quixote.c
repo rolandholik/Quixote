@@ -20,8 +20,6 @@
  * Copyright (c) 2020, Enjellic Systems Development, LLC. All rights reserved.
  **************************************************************************/
 
-#define QUIXOTE_MAGAZINE "/var/lib/Quixote/Magazine"
-
 #define MEASUREMENT_FILE "/sys/kernel/security/integrity/events/measurement"
 #define STATE_FILE	 "/sys/kernel/security/integrity/events/state"
 #define TRAJECTORY_FILE	 "/sys/kernel/security/integrity/events/trajectory"
@@ -32,18 +30,6 @@
 
 #define READ_SIDE  0
 #define WRITE_SIDE 1
-
-#define CLONE_EVENTS 0x00000040
-
-#define CAP_TRUST 38
-
-#define SYS_CONFIG_DOMAIN  436
-#define IMA_TE_ENFORCE	   0x8
-#define IMA_EVENT_EXTERNAL 0x10
-
-#define SYS_CONFIG_ACTOR  437
-#define DISCIPLINE_ACTOR  1
-#define RELEASE_ACTOR	  2
 
 #define _GNU_SOURCE
 

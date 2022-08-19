@@ -6,16 +6,18 @@
  * the boot of a software 'cartridge' in a subordinate process.  The parent
  * process monitors the following file:
  *
- * /sys/fs/iso-identity/update-NNNNNNNNNN
+ * /sys/fs/tsem-events/update-NNNNNNNNNN
  *
- * Where NNNNNNNNNN is the inode number of the security event namespace.
+ * Where NNNNNNNNNN is the inode number of the security namespace.
  *
- * The security domain state change events are transmitted to a sanchoe
- * userspace process that is responsible for evaluating the security domain.
+ * The security domain state change events are transmitted to a Sancho
+ * Trusted Modeling Agent userspace process that is responsible for
+ * modeling the security domain.
+ *
  * The userspace evaluator advises the setting of the bad actor status
  * bit of the process generating the security state change events based on
  * the security model that was specified.  This security status bit is
- * interrogated by the TE linux security module that can then interdict
+ * interrogated by the TSEM linux security module that can then interdict
  * security sensitive events.
  *
  * The domain is managed through a UNIX domain socket that is created
@@ -33,25 +35,8 @@
  * Copyright (c) 2020, Enjellic Systems Development, LLC. All rights reserved.
  **************************************************************************/
 
-#define QUIXOTE_MAGAZINE "/var/lib/Quixote/Magazine"
-
-#define SYSFS_UPDATES  "/sys/fs/integrity-events/update-%u"
-#define SYSFS_EXTERNAL "/sys/kernel/security/integrity/events/external"
-
 #define READ_SIDE  0
 #define WRITE_SIDE 1
-
-#define CLONE_EVENTS 0x00000040
-
-#define CAP_TRUST 38
-
-#define SYS_CONFIG_DOMAIN  436
-#define IMA_TE_ENFORCE	   0x8
-#define IMA_EVENT_EXTERNAL 0x10
-
-#define SYS_CONFIG_ACTOR  437
-#define DISCIPLINE_ACTOR  1
-#define RELEASE_ACTOR	  2
 
 #define _GNU_SOURCE
 
@@ -1312,7 +1297,7 @@ static _Bool setup_namespace(int *fdptr, _Bool enforce)
 
 
 	/* Create the pathname to the event update file. */
-	if ( stat("/proc/self/ns/events", &statbuf) < 0 )
+	if ( stat("/proc/self/ns/security", &statbuf) < 0 )
 		ERR(goto done);
 
 	memset(fname, '\0', sizeof(fname));
