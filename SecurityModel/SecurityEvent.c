@@ -364,8 +364,6 @@ static _Bool measure(CO(SecurityEvent, this))
 
 	_Bool retn = false;
 
-	uint32_t length = NAAAIM_IDSIZE;
-
 	Buffer bufr = NULL;
 
 
@@ -381,15 +379,8 @@ static _Bool measure(CO(SecurityEvent, this))
 	if ( !S->cell->measure(S->cell) )
 		ERR(goto done);
 
-	/* Compute the intersection identity/measurement. */
-	if ( !bufr->add(bufr, (unsigned char * ) &length, \
-			sizeof(length)) )
-		ERR(goto done);
+	/* Compute the event identity. */
 	if ( !S->coe->get_measurement(S->coe, bufr) )
-		ERR(goto done);
-
-	if ( !bufr->add(bufr, (unsigned char *) &length, \
-			sizeof(length)) )
 		ERR(goto done);
 	if ( !S->cell->get_measurement(S->cell, bufr) )
 		ERR(goto done);
