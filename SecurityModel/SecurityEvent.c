@@ -66,10 +66,26 @@ static _Bool Regex_compiled = false;
 static struct regex_description {
 	char *fd;
 	regex_t regex;
-} Fields[3] = {
+} Fields[] = {
 	{.fd="event\\{([^}]*)\\}"},
 	{.fd="pid\\{([^}]*)\\}"},
+	{.fd="type=([^}]*)"},
 	{.fd=NULL}
+};
+
+/* Types of TE events. */
+enum tsem_event_type {
+	TSEM_UNDEFINED=0,
+	TSEM_FILE_OPEN,
+	TSEM_MMAP_FILE
+};
+
+/* Names of TSEM events. */
+static const char *TSEM_name[] = {
+	"undefined",
+	"file_open",
+	"mmap_file",
+	NULL
 };
 
 /** SecurityEvent private state information. */
@@ -85,6 +101,9 @@ struct NAAAIM_SecurityEvent_State
 
 	/* Object status. */
 	_Bool poisoned;
+
+	/* The numeric event type. */
+	uint32_t type;
 
 	/* The process id involved in the event. */
 	pid_t pid;
@@ -122,7 +141,8 @@ static void _init_state(CO(SecurityEvent_State, S))
 
 	S->poisoned = false;
 
-	S->pid = 0;
+	S->type = TSEM_UNDEFINED;
+	S->pid  = 0;
 
 	S->event       = NULL;
 	S->coe	       = NULL;
@@ -236,8 +256,9 @@ static _Bool _parse_event(CO(SecurityEvent_State, S), regex_t *regex, \
 	char *fp,
 	     bufr[2];
 
-	size_t lp,
-	       len;
+	unsigned int lp;
+
+	size_t len;
 
 	regmatch_t regmatch[2];
 
@@ -256,9 +277,25 @@ static _Bool _parse_event(CO(SecurityEvent_State, S), regex_t *regex, \
 		S->event->add(S->event, bufr);
 		++fp;
 	}
-
 	if ( S->event->poisoned(S->event) )
 		ERR(goto done);
+
+	/* Then the numeric event type. */
+	fp = S->event->get(S->event);
+	if ( regexec(&Fields[2].regex, fp, 2, regmatch, 0) != REG_OK )
+		ERR(goto done);
+
+	fp += regmatch[1].rm_so;
+	len = regmatch[1].rm_eo - regmatch[1].rm_so;
+
+	for (lp= 0; TSEM_name[lp] != NULL; ++lp) {
+		if ( strlen(TSEM_name[lp]) != len )
+		     continue;
+		if ( strncmp(TSEM_name[lp], fp, len) == 0 ) {
+			S->type = lp;
+			break;
+		}
+	}
 	retn = true;
 
 
@@ -380,6 +417,8 @@ static _Bool measure(CO(SecurityEvent, this))
 		ERR(goto done);
 
 	/* Compute the event identity. */
+	if ( !bufr->add(bufr, (uint8_t *) &S->type, sizeof(S->type)) )
+		ERR(goto done);
 	if ( !S->coe->get_measurement(S->coe, bufr) )
 		ERR(goto done);
 	if ( !S->cell->get_measurement(S->cell, bufr) )
@@ -656,6 +695,8 @@ static void reset(CO(SecurityEvent, this))
 
 	S->poisoned = false;
 
+	S->type = TSEM_UNDEFINED;
+
 	S->event->reset(S->event);
 	S->coe->reset(S->coe);
 	S->cell->reset(S->cell);
@@ -686,8 +727,7 @@ static void dump(CO(SecurityEvent, this))
 	fputs("Event:\n", stdout);
 	if ( S->pid != 0 )
 		fprintf(stdout, "pid:\t%u\n", S->pid);
-	fputs("type:\t", stdout);
-	S->event->print(S->event);
+	fprintf(stdout, "type:\t%s / %d\n", S->event->get(S->event), S->type);
 
 	fputs("COE:\n", stdout);
 	S->coe->dump(S->coe);
