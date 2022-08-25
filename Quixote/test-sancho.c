@@ -319,7 +319,7 @@ static _Bool process_command(CO(TTYduct, duct), CO(Buffer, bufr))
 		case exchange_event:
 		case aggregate_event:
 		case seal_event:
-		case TE_event:
+		case TSEM_event:
 		case enable_cell:
 			fprintf(stdout, "%s\n", bufr->get(bufr));
 			break;

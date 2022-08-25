@@ -869,7 +869,7 @@ static _Bool set_aggregate(CO(TSEM, this), CO(Buffer, bufr))
  *		measurement.
  */
 
-static _Bool add_TE_event(CO(TSEM, this), CO(String, event))
+static _Bool add_TSEM_event(CO(TSEM, this), CO(String, event))
 
 {
 	STATE(S);
@@ -896,7 +896,7 @@ static _Bool add_TE_event(CO(TSEM, this), CO(String, event))
 /**
  * External public method.
  *
- * This method is an accessor method for retrieving the TE events which
+ * This method is an accessor method for retrieving the TSEM events which
  * have been injected into the model.  This method is designed to be
  * called repeatedly until the list of TE events is completely traversed.
  * The traversal can be reset by calling the ->rewind_TE_event method.
@@ -916,7 +916,7 @@ static _Bool add_TE_event(CO(TSEM, this), CO(String, event))
  *		event object being set.
  */
 
-static _Bool get_TE_event(CO(TSEM, this), String * const event)
+static _Bool get_TSEM_event(CO(TSEM, this), String * const event)
 
 {
 	STATE(S);
@@ -966,7 +966,7 @@ static _Bool get_TE_event(CO(TSEM, this), String * const event)
  *
  */
 
-static void TE_rewind_event(CO(TSEM, this))
+static void TSEM_rewind_event(CO(TSEM, this))
 
 {
 	STATE(S);
@@ -979,7 +979,7 @@ static void TE_rewind_event(CO(TSEM, this))
 /**
  * External public method.
  *
- * This method implements returning the number of TE events in the
+ * This method implements returning the number of TSEM events in the
  * current security model
  *
  * \param this	A pointer to the object whose event size is to
@@ -989,7 +989,7 @@ static void TE_rewind_event(CO(TSEM, this))
  *
  */
 
-static size_t TE_events_size(CO(TSEM, this))
+static size_t TSEM_events_size(CO(TSEM, this))
 
 {
 	STATE(S);
@@ -1761,10 +1761,10 @@ extern TSEM NAAAIM_TSEM_Init(void)
 
 	this->set_aggregate   = set_aggregate;
 
-	this->add_TE_event    = add_TE_event;
-	this->get_TE_event    = get_TE_event;
-	this->TE_events_size  = TE_events_size;
-	this->TE_rewind_event = TE_rewind_event;
+	this->add_TSEM_event    = add_TSEM_event;
+	this->get_TSEM_event    = get_TSEM_event;
+	this->TSEM_events_size  = TSEM_events_size;
+	this->TSEM_rewind_event = TSEM_rewind_event;
 
 	this->get_measurement = get_measurement;
 	this->get_state	      = get_state;

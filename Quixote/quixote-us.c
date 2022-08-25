@@ -559,7 +559,7 @@ static _Bool add_aggregate(CO(char *, inbufr))
  * This function carries out the addition of a description of an
  * intercepted LSM event to the current security domain model.
  *
- * \param TE_event	A pointer to the character buffer containing
+ * \param TSEM_event	A pointer to the character buffer containing
  *			the ASCII encoded event.
  *
  * \return		A boolean value is returned to indicate whether
@@ -568,7 +568,7 @@ static _Bool add_aggregate(CO(char *, inbufr))
  *			the addition succeeded.
  */
 
-static _Bool add_TE_event(CO(char *, TE_event))
+static _Bool add_TSEM_event(CO(char *, TSEM_event))
 
 {
 	_Bool retn = false;
@@ -577,8 +577,8 @@ static _Bool add_TE_event(CO(char *, TE_event))
 
 
 	INIT(HurdLib, String, event, ERR(goto done));
-	event->add(event, TE_event);
-	if ( !Model->add_TE_event(Model, event) )
+	event->add(event, TSEM_event);
+	if ( !Model->add_TSEM_event(Model, event) )
 		ERR(goto done);
 
 	retn = true;
@@ -661,8 +661,8 @@ static _Bool process_event(const char *event)
 			retn   = true;
 			break;
 
-		case TE_event:
-			retn = add_TE_event(event_arg);
+		case TSEM_event:
+			retn = add_TSEM_event(event_arg);
 			break;
 
 		default:
@@ -1019,7 +1019,7 @@ static _Bool send_events(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	 * Compute the number of elements in the AI list and send it to
 	 * the client.
 	 */
-	cnt = Model->TE_events_size(Model);
+	cnt = Model->TSEM_events_size(Model);
 
 	cmdbufr->reset(cmdbufr);
 	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
@@ -1030,17 +1030,17 @@ static _Bool send_events(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 
 	/* Send each event. */
-	Model->TE_rewind_event(Model);
+	Model->TSEM_rewind_event(Model);
 
 	for (lp= 0; lp < cnt; ++lp) {
-		if ( !Model->get_TE_event(Model, &event) )
+		if ( !Model->get_TSEM_event(Model, &event) )
 			ERR(goto done);
 		if ( event == NULL )
 			continue;
 
 		cmdbufr->reset(cmdbufr);
 		cmdbufr->add(cmdbufr, (unsigned char *) event->get(event), \
-			     event->size(event));
+			     event->size(event) + 1);
 		if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
 			ERR(goto done);
 	}

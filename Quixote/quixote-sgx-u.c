@@ -416,7 +416,7 @@ static _Bool add_aggregate(CO(char *, inbufr))
  * This function carries out the addition of a description of an
  * intercepted LSM event to the current security domain model.
  *
- * \param TE_event	A pointer to the character buffer containing
+ * \param TSEM_event	A pointer to the character buffer containing
  *			the ASCII encoded event.
  *
  * \return		A boolean value is returned to indicate whether
@@ -425,7 +425,7 @@ static _Bool add_aggregate(CO(char *, inbufr))
  *			the addition succeeded.
  */
 
-static _Bool add_TE_event(CO(char *, TE_event))
+static _Bool add_TSEM_event(CO(char *, TSEM_event))
 
 {
 	_Bool retn = false;
@@ -434,7 +434,7 @@ static _Bool add_TE_event(CO(char *, TE_event))
 
 
 	INIT(HurdLib, String, event, ERR(goto done));
-	event->add(event, TE_event);
+	event->add(event, TSEM_event);
 	if ( !Model->add_ai_event(Model, event) )
 		ERR(goto done);
 
@@ -506,8 +506,8 @@ static _Bool process_event(const char *event)
 			retn   = true;
 			break;
 
-		case TE_event:
-			retn = add_TE_event(event_arg);
+		case TSEM_event:
+			retn = add_TSEM_event(event_arg);
 			break;
 
 		default:

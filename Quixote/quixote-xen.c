@@ -356,7 +356,7 @@ static _Bool process_event(CO(XENduct, duct), const char * const event)
 		fprintf(stderr, "Unknown event: %s\n", event);
 		goto done;
 	}
-	if ( cp->command > TE_event ) {
+	if ( cp->command > TSEM_event ) {
 		fprintf(stderr, "Unexpected event: %s\n", event);
 		goto done;
 	}
@@ -894,7 +894,7 @@ static _Bool setup_namespace(int *fdptr, _Bool enforce)
 
 
 	/* Create the pathname to the event update file. */
-	if ( stat("/proc/self/ns/events", &statbuf) < 0 )
+	if ( stat("/proc/self/ns/security", &statbuf) < 0 )
 		ERR(goto done);
 
 	memset(fname, '\0', sizeof(fname));
