@@ -13,10 +13,6 @@
 /* Local defines. */
 #define SGX_DEVICE "/dev/isgx"
 
-#define SYS_CONFIG_ACTOR  437
-#define DISCIPLINE_ACTOR  1
-#define RELEASE_ACTOR	  2
-
 
 /* Include files. */
 #include <stdio.h>
@@ -48,6 +44,8 @@
 #include <SecurityPoint.h>
 #include <SecurityEvent.h>
 
+#include <TSEMcontrol.h>
+
 #include "SanchoSGX.h"
 #include "SanchoSGX-interface.h"
 
@@ -65,32 +63,25 @@
 #endif
 
 
-
 /**
- * System call wrapper for setting the actor status of a process.
+ * The object that controls the TSEM implementation.
  */
-static inline int sys_set_bad_actor(pid_t pid, unsigned long flags)
-{
-	return syscall(SYS_CONFIG_ACTOR, pid, flags);
-}
+static TSEMcontrol Control = NULL;
 
 
 /* OCALL interface to handle the request to discipline a process. */
 static int discipline_pid_ocall(struct SanchoSGX_ocall *oc)
 
 {
-	_Bool discipline,
-	      retn = false;
-
-	int mode = oc->discipline ? DISCIPLINE_ACTOR : RELEASE_ACTOR;
+	_Bool retn = false;
 
 
-	discipline = sys_set_bad_actor(oc->pid, mode);
-	if ( discipline < 0 ) {
-		fprintf(stderr, "actor %s status error: %d:%s\n",	  \
-			oc->discipline ? "discipline" : "release", errno, \
-			strerror(errno));
-		goto done;
+	if ( oc->discipline ) {
+		if ( Control->discipline(Control, oc->pid) )
+			ERR(goto done);
+	} else {
+		if ( Control->release(Control, oc->pid) )
+			ERR(goto done);
 	}
 
 	retn = true;
@@ -309,6 +300,11 @@ static _Bool load_enclave_memory(CO(SanchoSGX, this), CO(uint8_t *, enclave), \
 	File token_file = NULL;
 
 
+	/* Initialize the static TSEM control instance once. */
+	if ( Control == NULL )
+		INIT(NAAAIM, TSEMcontrol, Control, ERR(goto done));
+
+
 	/* Load the EINITTOKEN. */
 	INIT(HurdLib, File, token_file, ERR(goto done));
 	INIT(HurdLib, Buffer, tbufr, ERR(goto done));
@@ -485,6 +481,11 @@ static _Bool load(CO(SanchoSGX, this), CO(String, entry))
 		ERR(goto done);
 	if ( entry->poisoned(entry) )
 		ERR(goto done);
+
+
+	/* Initialize the static TSEM control instance once. */
+	if ( Control == NULL )
+		INIT(NAAAIM, TSEMcontrol, Control, ERR(goto done));
 
 
 	/* Call ECALL slot 12 to add the entry to the TSEM model. */
@@ -690,7 +691,7 @@ static _Bool get_te_event(CO(SanchoSGX, this), String event)
 	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
 		ERR(goto done);
 
-	ecall9.type = TE_EVENTS;
+	ecall9.type = TSEM_EVENTS;
 	if ( !S->enclave->boot_slot(S->enclave, 9, ocall_table, &ecall9, \
 				    &rc) ) {
 		S->enclave_error = rc;
@@ -742,7 +743,7 @@ static size_t te_size(CO(SanchoSGX, this))
 	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
 		ERR(goto done);
 
-	ecall4.type = TE_EVENTS;
+	ecall4.type = TSEM_EVENTS;
 	ecall4.size = 0;
 	if ( !S->enclave->boot_slot(S->enclave, 4, ocall_table, &ecall4, \
 				    &rc) ) {
@@ -794,7 +795,7 @@ static void rewind_te(CO(SanchoSGX, this))
 	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
 		ERR(goto done);
 
-	ecall8.type = TE_EVENTS;
+	ecall8.type = TSEM_EVENTS;
 	if ( !S->enclave->boot_slot(S->enclave, 8, ocall_table, &ecall8, \
 				    &rc) ) {
 		S->enclave_error = rc;
@@ -1960,6 +1961,7 @@ static void whack(CO(SanchoSGX, this))
  done:
 	WHACK(S->enclave);
 	WHACK(S->ocall);
+	WHACK(Control);
 
 	S->root->whack(S->root, this, S);
 	return;

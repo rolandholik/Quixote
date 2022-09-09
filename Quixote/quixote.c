@@ -20,13 +20,13 @@
  * Copyright (c) 2020, Enjellic Systems Development, LLC. All rights reserved.
  **************************************************************************/
 
-#define MEASUREMENT_FILE "/sys/kernel/security/integrity/events/measurement"
-#define STATE_FILE	 "/sys/kernel/security/integrity/events/state"
-#define TRAJECTORY_FILE	 "/sys/kernel/security/integrity/events/trajectory"
-#define POINTS_FILE	 "/sys/kernel/security/integrity/events/points"
-#define FORENSICS_FILE	 "/sys/kernel/security/integrity/events/forensics"
-#define SEAL_FILE	 "/sys/kernel/security/integrity/events/sealed"
-#define MAP_FILE	 "/sys/kernel/security/integrity/events/map"
+#define MEASUREMENT_FILE "/sys/kernel/security/tsem/measurement"
+#define STATE_FILE	 "/sys/kernel/security/tsem/state"
+#define TRAJECTORY_FILE	 "/sys/kernel/security/tsem/trajectory"
+#define POINTS_FILE	 "/sys/kernel/security/tsem/points"
+#define FORENSICS_FILE	 "/sys/kernel/security/tsem/forensics"
+#define SEAL_FILE	 "/sys/kernel/security/tsem/sealed"
+#define MAP_FILE	 "/sys/kernel/security/tsem/map"
 
 #define READ_SIDE  0
 #define WRITE_SIDE 1
@@ -70,6 +70,7 @@
 #include "SHA256.h"
 #include "Base64.h"
 #include "RSAkey.h"
+#include "TSEMcontrol.h"
 
 #include "SecurityPoint.h"
 #include "SecurityEvent.h"
@@ -80,6 +81,11 @@
  * the filehandle to be used for debugging.
  */
 static FILE *Debug = NULL;
+
+/**
+ * The control object for the model.
+ */
+static TSEMcontrol Control = NULL;
 
 /**
  * The process id of the cartridge monitor process.
@@ -148,24 +154,6 @@ struct security_load_definition Security_cmd_list[] = {
 	{model_cmd_signature,	"signature ",	true},
 	{model_cmd_end,		"end",		false}
 };
-
-
-/**
- * System call wrapper for setting the security state of a process.
- */
-static inline int sys_config_actor(pid_t pid, unsigned long flags)
-{
-	return syscall(SYS_CONFIG_ACTOR, pid, flags);
-}
-
-/**
- * System call wrapper for configuring a security event domain.
- */
-static inline int sys_config_domain(unsigned char *bufr, size_t cnt, \
-				    unsigned long flags)
-{
-	return syscall(SYS_CONFIG_DOMAIN, bufr, cnt, flags);
-}
 
 
 /**
@@ -1240,24 +1228,20 @@ static _Bool load_model(CO(File, model))
 /**
  * Private function.
  *
- * This function sets up a namespace and returns a file descriptor
- * to the caller which references the namespace specific /sysfs
- * measurement file.
+ * This function creates an independent security event domain that
+ * is modeled by an in kernel Trusted Modeling Agent implementation.
  *
- * \param fdptr		A pointer to the variable which will hold the
- *			file descriptor for the cartridge measurement
- *			file.
  *
  * \param enforce	A flag variable used to indicate whether or not
- *			the security domain should be placed in
+ *			the security model should be placed in
  *			enforcement mode.
  *
  * \return		A boolean value is returned to indicate whether
- *			or not the the creation of the namespace was
- *			successful.  A false value indicates setup of
- *			the namespace was unsuccessful while a true
- *			value indicates the namespace is setup and
- *			ready to be measured.
+ *			or not the creation of the security event domain
+ *			was successful.  A false value indicates setup of
+ *			the domain was unsuccessful while a true
+ *			value indicates the domain was setup and is
+ *			ready to be modeled.
  */
 
 static _Bool setup_namespace(_Bool enforce)
@@ -1266,17 +1250,17 @@ static _Bool setup_namespace(_Bool enforce)
 	_Bool retn = false;
 
 
-	/* Create an independent and sealed security event domain. */
-	if ( unshare(CLONE_EVENTS) < 0 )
+	/* Create an independent security event model. */
+	if ( !Control->internal(Control) )
 		ERR(goto done);
 
 	if ( enforce ) {
-		if ( sys_config_domain(NULL, 0, IMA_TE_ENFORCE) < 0 )
+		if ( !Control->enforce(Control) )
 			ERR(goto done);
 	}
 
 
-	/* Drop the ability to modify the security domain. */
+	/* Drop the ability to modify the security event model. */
 	if ( cap_drop_bound(CAP_TRUST) != 0 )
 		ERR(goto done);
 
@@ -1665,6 +1649,10 @@ extern int main(int argc, char *argv[])
 	}
 
 
+	/* Initialize the security model controller. */
+	INIT(NAAAIM, TSEMcontrol, Control, ERR(goto done));
+
+
 	/* Setup the management socket. */
 	INIT(NAAAIM, LocalDuct, mgmt, ERR(goto done));
 	if ( !setup_management(mgmt, cartridge) )
@@ -1755,6 +1743,7 @@ extern int main(int argc, char *argv[])
 
 
  done:
+	WHACK(Control);
 	WHACK(cmdbufr);
 	WHACK(mgmt);
 	WHACK(state);

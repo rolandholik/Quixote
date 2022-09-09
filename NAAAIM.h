@@ -105,3 +105,4 @@
 #define NAAAIM_Prompt_OBJID		65
 #define NAAAIM_SRDEpipe_OBJID		66
 #define NAAAIM_XENduct_OBJID		67
+#define NAAAIM_TSEMcontrol_OBJID	68

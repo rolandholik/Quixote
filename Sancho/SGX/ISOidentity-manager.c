@@ -343,7 +343,7 @@ static _Bool send_events(CO(PossumPipe, mgmt), CO(Buffer, cmdbufr))
 	 * Compute the number of elements in the AI list and send it to
 	 * the client.
 	 */
-	cnt = Model->TE_events_size(Model);
+	cnt = Model->TSEM_events_size(Model);
 
 	cmdbufr->reset(cmdbufr);
 	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
@@ -354,9 +354,9 @@ static _Bool send_events(CO(PossumPipe, mgmt), CO(Buffer, cmdbufr))
 
 
 	/* Send each event. */
-	Model->TE_rewind_event(Model);
+	Model->TSEM_rewind_event(Model);
 	for (lp= 0; lp < cnt; ++lp) {
-		if ( !Model->get_TE_event(Model, &event) )
+		if ( !Model->get_TSEM_event(Model, &event) )
 			ERR(goto done);
 		if ( event == NULL )
 			continue;

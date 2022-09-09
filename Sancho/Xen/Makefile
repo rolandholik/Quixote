@@ -60,7 +60,7 @@ ZLIB_CPPFLAGS = -D__MINIOS__ -DHAVE_LIBC ${TARGET_CPPFLAGS}
 #
 .PHONY: mini-os-build Sancho ${SUBDIRS}
 
-all: ${SUBDIRS} mini-os newlib.stamp zlib.stamp pciutils.stamp Sancho \
+all: mini-os newlib.stamp zlib.stamp pciutils.stamp ${SUBDIRS} Sancho \
 	mini-os-build
 
 

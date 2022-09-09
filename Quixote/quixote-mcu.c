@@ -6,9 +6,10 @@
  * the boot of a software 'cartridge' in a subordinate process.  The parent
  * process monitors the following file:
  *
- * /sys/fs/tsem-events/update-NNNNNNNNNN
+ * /sys/fs/tsem/update-NNNNNNNNNN
  *
- * Where NNNNNNNNNN is the inode number of the security event namespace.
+ * Where NNNNNNNNNN is the id number of the security event modeling
+ * domain.
  *
  * The security domain state change events are transmitted to a
  * hardware based Sancho Trusted Modeling Agent.  Based on feedback
@@ -74,6 +75,8 @@
 #include <String.h>
 #include <File.h>
 
+#include <TSEMcontrol.h>
+
 #include "quixote.h"
 #include "sancho-cmd.h"
 
@@ -83,6 +86,11 @@
 #include "SecurityPoint.h"
 #include "SecurityEvent.h"
 
+
+/**
+ * The control object for the model.
+ */
+static TSEMcontrol Control = NULL;
 
 /**
  * Variable used to indicate that debugging is enabled and to provide
@@ -131,24 +139,6 @@ enum {
 	process_mode,
 	cartridge_mode,
 } Mode = cartridge_mode;
-
-
-/**
- * System call wrapper for setting the security state of a process.
- */
-static inline int sys_config_actor(pid_t pid, unsigned long flags)
-{
-	return syscall(SYS_CONFIG_ACTOR, pid, flags);
-}
-
-/**
- * System call wrapper for configuring a security event domain.
- */
-static inline int sys_config_domain(unsigned char *bufr, size_t cnt, \
-				    unsigned long flags)
-{
-	return syscall(SYS_CONFIG_DOMAIN, bufr, cnt, flags);
-}
 
 
 /**
@@ -422,7 +412,7 @@ static _Bool process_event(CO(TTYduct, duct), const char * const event)
 		if ( Debug )
 			fprintf(Debug, "Model error, releasing %u.\n", pid);
 
-		if ( sys_config_actor(pid, RELEASE_ACTOR) < 0 ) {
+		if ( Control->release(Control, pid) < 0 ) {
 			fprintf(stderr, "Bad actor release error: "  \
 				"%d:%s\n", errno, strerror(errno));
 		}
@@ -452,7 +442,7 @@ static _Bool process_event(CO(TTYduct, duct), const char * const event)
 	bp = (char *) bufr->get(bufr);
 
 	if ( strncmp(bp, discipline, strlen(discipline)) == 0 ) {
-		if ( sys_config_actor(pid, DISCIPLINE_ACTOR) < 0 ) {
+		if ( Control->discipline(Control, pid) < 0 ) {
 			fprintf(stderr, "Failed discipline: errno=%d, "\
 				"error=%s\n", errno, strerror(errno));
 		}
@@ -464,7 +454,7 @@ static _Bool process_event(CO(TTYduct, duct), const char * const event)
 	}
 
 	if ( strncmp(bp, release, strlen(release)) == 0 ) {
-		if ( sys_config_actor(pid, RELEASE_ACTOR) < 0 ) {
+		if ( Control->release(Control, pid) < 0 ) {
 			fprintf(stderr, "Failed release: errno=%d, " \
 				"error=%s\n", errno, strerror(errno));
 		}
@@ -844,24 +834,23 @@ static _Bool load_model(CO(TTYduct, duct), CO(Buffer, bufr), char *model_file)
 /**
  * Private function.
  *
- * This function sets up a namespace and returns a file descriptor
- * to the caller which references the namespace specific /sysfs
- * measurement file.
+ * This function creates an independent security event domain that
+ * is modeled by a userspace Trusted Modeling Agent implementation.
  *
- * \param fdptr		A pointer to the variable which will hold the
- *			file descriptor for the cartridge measurement
- *			file.
+ * \param fdptr		A pointer to the variable that will hold the
+ *			file descriptor of the pseudo-file that will
+ *			emit model events for the domain.
  *
  * \param enforce	A flag variable used to indicate whether or not
- *			the security domain should be placed in
+ *			the security model should be placed in
  *			enforcement mode.
  *
  * \return		A boolean value is returned to indicate whether
- *			or not the the creation of the namespace was
+ *			or not the the creation of the domain was
  *			successful.  A false value indicates setup of
- *			the namespace was unsuccessful while a true
- *			value indicates the namespace is setup and
- *			ready to be measured.
+ *			the domain was unsuccessful while a true
+ *			value indicates the domains is setup and
+ *			ready to be modeled.
  */
 
 static _Bool setup_namespace(int *fdptr, _Bool enforce)
@@ -873,37 +862,31 @@ static _Bool setup_namespace(int *fdptr, _Bool enforce)
 
 	int fd;
 
-	struct stat statbuf;
+	uint64_t id;
 
 
-	/* Create an independent security event namespace. */
-	if ( unshare(CLONE_EVENTS) < 0 )
+	/* Create and configure a security model namespace. */
+	if ( !Control->external(Control) )
 		ERR(goto done);
-
-	if ( sys_config_domain(NULL, 0, IMA_EVENT_EXTERNAL) < 0 )
+	if ( !Control->id(Control, &id) )
 		ERR(goto done);
-
 	if ( enforce ) {
-		if ( sys_config_domain(NULL, 0, IMA_TE_ENFORCE) < 0 )
+		if ( !Control->enforce(Control) )
 			ERR(goto done);
 	}
-
 
 	/* Drop the ability to modify the security domain. */
 	if ( cap_drop_bound(CAP_TRUST) != 0 )
 		ERR(goto done);
 
-
 	/* Create the pathname to the event update file. */
-	if ( stat("/proc/self/ns/events", &statbuf) < 0 )
-		ERR(goto done);
-
 	memset(fname, '\0', sizeof(fname));
 	if ( snprintf(fname, sizeof(fname), SYSFS_UPDATES, \
-		      (unsigned int) statbuf.st_ino) >= sizeof(fname) )
+		      (long long int) id) >= sizeof(fname) )
 		ERR(goto done);
 	if ( Debug )
 		fprintf(Debug, "Update file: %s\n", fname);
+
 	if ( (fd = open(fname, O_RDONLY)) < 0 )
 		ERR(goto done);
 	retn = true;
@@ -1401,6 +1384,10 @@ extern int main(int argc, char *argv[])
 		goto done;
 
 
+	/* Initialize the TSEM control object. */
+	INIT(NAAAIM, TSEMcontrol, Control, ERR(goto done));
+
+
 	/* Open a connection to the co-processor. */
 	INIT(NAAAIM, TTYduct, Duct, ERR(goto done));
 	if ( !Duct->init_device(Duct, device) ) {
@@ -1579,6 +1566,7 @@ extern int main(int argc, char *argv[])
 
 	WHACK(Aggregate);
 	WHACK(Duct);
+	WHACK(Control);
 
 	if ( fd > 0 )
 		close(fd);

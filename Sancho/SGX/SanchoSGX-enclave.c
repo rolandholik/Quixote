@@ -296,8 +296,8 @@ size_t get_size(int type)
 		case DOMAIN_POINTS:
 			size = Model->trajectory_size(Model);
 			break;
-		case TE_EVENTS:
-			size = Model->TE_events_size(Model);
+		case TSEM_EVENTS:
+			size = Model->TSEM_events_size(Model);
 			break;
 	}
 
@@ -420,7 +420,7 @@ _Bool add_ai_event(struct ISOidentity_ecall14 *ecall14)
 	if ( !event->add(event, (char *) ecall14->ai_event) )
 		ERR(goto done);
 
-	if ( !Model->add_TE_event(Model, event) )
+	if ( !Model->add_TSEM_event(Model, event) )
 		ERR(goto done);
 	retn = true;
 
@@ -550,8 +550,8 @@ void rewind(int type)
 		case DOMAIN_POINTS:
 			Model->rewind_points(Model);
 			break;
-		case TE_EVENTS:
-			Model->TE_rewind_event(Model);
+		case TSEM_EVENTS:
+			Model->TSEM_rewind_event(Model);
 			break;
 	}
 
@@ -605,8 +605,8 @@ _Bool get_event(char type, char *update, size_t size)
 	memset(update, '\0', size);
 
 
-	if ( type == TE_EVENTS ) {
-		if ( !Model->get_TE_event(Model, &es) )
+	if ( type == TSEM_EVENTS ) {
+		if ( !Model->get_TSEM_event(Model, &es) )
 			ERR(goto done);
 		if ( es == NULL ) {
 			retn = true;

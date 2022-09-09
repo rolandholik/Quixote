@@ -9,11 +9,13 @@
  **************************************************************************/
 
 /* Filesystem locations. */
+#define TSEM_CONTROL_FILE		"/sys/kernel/security/tsem/control"
+
 #define QUIXOTE_PROCESS_MGMT_DIR	"/var/lib/Quixote/mgmt/processes"
 #define QUIXOTE_CARTRIDGE_MGMT_DIR	"/var/lib/Quixote/mgmt/cartridges"
 #define QUIXOTE_MAGAZINE		"/var/lib/Quixote/Magazine"
 
-#define SYSFS_UPDATES			"/sys/fs/tsem-events/update-%u"
+#define SYSFS_UPDATES			"/sys/fs/tsem/update-%llu"
 #define SYSFS_EXTERNAL			"/sys/kernel/security/tsem/external"
 
 /* Kernel driver definitions. */
