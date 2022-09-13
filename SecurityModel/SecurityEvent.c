@@ -69,7 +69,8 @@ static struct regex_description {
 } Fields[] = {
 	{.fd="event\\{([^}]*)\\}"},
 	{.fd="pid\\{([^}]*)\\}"},
-	{.fd="type=([^}]*)"},
+	{.fd="type=([^,]*)"},
+	{.fd="task_id=([^}]*)"},
 	{.fd=NULL}
 };
 
@@ -111,6 +112,9 @@ struct NAAAIM_SecurityEvent_State
 	/* Event description .*/
 	String event;
 
+	/* Task identity. */
+	String task_id;
+
 	/* COE characteristics. */
 	COE coe;
 
@@ -145,6 +149,7 @@ static void _init_state(CO(SecurityEvent_State, S))
 	S->pid  = 0;
 
 	S->event       = NULL;
+	S->task_id     = NULL;
 	S->coe	       = NULL;
 	S->cell	       = NULL;
 	S->identity    = NULL;
@@ -226,10 +231,10 @@ static _Bool _parse_pid(CO(SecurityEvent_State, S), regex_t *regex, \
  * Internal private method.
  *
  * This method is responsible for parsing the event component of an
- * information interaction event.  The event description is in the the
- * following clause of the event:
+ * information interaction event.  The event description is the following
+ * clause in the security event description
  *
- *	event{proc=process_name, path=pathname, pid=PID}
+ *	event{proc=process_name, path=pathname, pid=PID, task_id=HEXID}
  *
  *
  * \param S	A pointer to the state information for the information
@@ -296,10 +301,30 @@ static _Bool _parse_event(CO(SecurityEvent_State, S), regex_t *regex, \
 			break;
 		}
 	}
+
+	/* Parse the task id. */
+	fp = S->event->get(S->event);
+	if ( regexec(&Fields[3].regex, fp, 2, regmatch, 0) != REG_OK )
+		ERR(goto done);
+
+	fp += regmatch[1].rm_so;
+	len = regmatch[1].rm_eo - regmatch[1].rm_so;
+	bufr[1] = '\0';
+
+	for (lp= 0; lp < len; ++lp) {
+		bufr[0] = *fp;
+		S->task_id->add(S->task_id, bufr);
+		++fp;
+	}
+	if ( S->task_id->poisoned(S->task_id) )
+		ERR(goto done);
+
 	retn = true;
 
 
  done:
+	memset(bufr, '\0', sizeof(bufr));
+
 	return retn;
 }
 
@@ -418,6 +443,8 @@ static _Bool measure(CO(SecurityEvent, this))
 
 	/* Compute the event identity. */
 	if ( !bufr->add(bufr, (uint8_t *) &S->type, sizeof(S->type)) )
+		ERR(goto done);
+	if ( !bufr->add_hexstring(bufr, S->task_id->get(S->task_id)) )
 		ERR(goto done);
 	if ( !S->coe->get_measurement(S->coe, bufr) )
 		ERR(goto done);
@@ -698,6 +725,7 @@ static void reset(CO(SecurityEvent, this))
 	S->type = TSEM_UNDEFINED;
 
 	S->event->reset(S->event);
+	S->task_id->reset(S->task_id);
 	S->coe->reset(S->coe);
 	S->cell->reset(S->cell);
 	S->identity->reset(S->identity);
@@ -727,7 +755,8 @@ static void dump(CO(SecurityEvent, this))
 	fputs("Event:\n", stdout);
 	if ( S->pid != 0 )
 		fprintf(stdout, "pid:\t%u\n", S->pid);
-	fprintf(stdout, "type:\t%s / %d\n", S->event->get(S->event), S->type);
+	fprintf(stdout, "type:\t%d / %s\n", S->type, TSEM_name[S->type]);
+	fprintf(stdout, "taskid:\t%s\n\n", S->task_id->get(S->task_id));
 
 	fputs("COE:\n", stdout);
 	S->coe->dump(S->coe);
@@ -753,6 +782,7 @@ static void whack(CO(SecurityEvent, this))
 	STATE(S);
 
 	WHACK(S->event);
+	WHACK(S->task_id);
 	WHACK(S->coe);
 	WHACK(S->cell);
 	WHACK(S->identity);
@@ -799,6 +829,7 @@ extern SecurityEvent NAAAIM_SecurityEvent_Init(void)
 
 	/* Initialize aggregate objects. */
 	INIT(HurdLib, String, this->state->event, goto fail);
+	INIT(HurdLib, String, this->state->task_id, goto fail);
 	INIT(NAAAIM, COE, this->state->coe, goto fail);
 	INIT(NAAAIM, Cell, this->state->cell, goto fail);
 	INIT(NAAAIM, Sha256, this->state->identity, goto fail);
@@ -822,6 +853,7 @@ extern SecurityEvent NAAAIM_SecurityEvent_Init(void)
 
 fail:
 	WHACK(this->state->event);
+	WHACK(this->state->task_id);
 	WHACK(this->state->coe);
 	WHACK(this->state->cell);
 	WHACK(this->state->identity);
