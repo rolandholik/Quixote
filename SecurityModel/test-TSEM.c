@@ -212,9 +212,6 @@ extern int main(int argc, char *argv[])
 		}
 		input->reset(input);
 
-		if ( !event->measure(event) )
-			ERR(goto done);
-
 		if ( !model->update(model, event, &updated, &discipline, \
 				    &sealed) )
 			ERR(goto done);
