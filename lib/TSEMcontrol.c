@@ -12,8 +12,9 @@
  **************************************************************************/
 
 /* Local definitions. */
-#define CONTROL_FILE "/sys/kernel/security/tsem/control"
-#define ID_FILE	     "/sys/kernel/security/tsem/id"
+#define CONTROL_FILE	"/sys/kernel/security/tsem/control"
+#define ID_FILE		"/sys/kernel/security/tsem/id"
+#define PSEUDONYM_FILE	"/sys/kernel/security/tsem/pseudonym"
 
 
 /* Include files. */
@@ -244,7 +245,7 @@ static _Bool internal(CO(TSEMcontrol, this))
  *
  * This method is used to signal the kernel that a process should
  * indicate that a security event should fail.
- * 
+ *
  * \param this	The object that will be implementing the command.
  *
  * \param pid	The process ID whose security event status is to
@@ -283,7 +284,7 @@ static _Bool discipline(CO(TSEMcontrol, this), pid_t pid)
  *
  * This method is used to signal the kernel that a process should
  * indicate that a security event should be allowed.
- * 
+ *
  * \param this	The object that will be implementing the command.
  *
  * \param pid	The process ID whose security event status is to
@@ -322,7 +323,7 @@ static _Bool release(CO(TSEMcontrol, this), pid_t pid)
  *
  * This method is used to return the identification number of the
  * TSEM modeling context.
- * 
+ *
  * \param this	The object that is requesting the id number.
  *
  * \param id	A pointer to the variable that will be populated
@@ -370,7 +371,48 @@ static _Bool id(CO(TSEMcontrol, this), uint64_t *idptr)
 	return retn;
 }
 
-	
+
+/**
+ * External public method.
+ *
+ * This method is used to configure a pseudonym for a TSEM modeling
+ * context.
+ *
+ * \param this	The object that is configuring the pseudonym.
+ *
+ * \param pseudonym	The object containing the pseudonym definition.
+ *
+ * \return	A boolean value is used to indicate the status of
+ *		configuring the pseudonym.  A false value indicates
+ *		an error occured, a true value indicates the
+ *		model has been updated with the pseudonym.
+ */
+
+static _Bool pseudonym(CO(TSEMcontrol, this), CO(Buffer, pseudonym))
+
+{
+	_Bool retn = false;
+
+	File file = NULL;
+
+
+	INIT(HurdLib, File, file, ERR(goto done));
+	if ( !file->open_wo(file, PSEUDONYM_FILE) ) {
+		perror("pseudonym");
+		ERR(goto done);
+	}
+	if ( !file->write_Buffer(file, pseudonym) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	WHACK(file);
+
+	return retn;
+}
+
+
 /**
  * External public method.
  *
@@ -393,7 +435,7 @@ static void whack(const TSEMcontrol const this)
 	return;
 }
 
-	
+
 /**
  * External constructor call.
  *
@@ -443,6 +485,8 @@ extern TSEMcontrol NAAAIM_TSEMcontrol_Init(void)
 
 	this->discipline = discipline;
 	this->release	 = release;
+
+	this->pseudonym = pseudonym;
 
 	this->id = id;
 

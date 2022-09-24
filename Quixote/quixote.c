@@ -1134,6 +1134,13 @@ static _Bool load(CO(String, entry))
 		case model_cmd_pseudonym:
 			if ( !_add_entry(sigdata, entry) )
 				ERR(goto done);
+
+			if ( !bufr->add(bufr, (void *) arg, strlen(arg)) )
+				ERR(goto done);
+			if ( !bufr->add(bufr, (void *) "\n", 1) )
+				ERR(goto done);
+			if ( !Control->pseudonym(Control, bufr) )
+				ERR(goto done);
 			break;
 
 		case model_cmd_seal:
