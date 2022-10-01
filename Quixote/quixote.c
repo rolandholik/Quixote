@@ -341,18 +341,6 @@ static _Bool send_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	File ef = NULL;
 
 
-	/* Hande a sealed model. */
-	if ( Sealed ) {
-		cmdbufr->reset(cmdbufr);
-		cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
-		if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
-			ERR(goto done);
-
-		retn = true;
-		goto done;
-	}
-
-
 	/*
 	 * Compute the number of lines in the trajectory.
 	 */
@@ -434,18 +422,6 @@ static _Bool send_points(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	File ef = NULL;
 
 
-	/* Hande a sealed model. */
-	if ( Sealed ) {
-		cmdbufr->reset(cmdbufr);
-		cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
-		if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
-			ERR(goto done);
-
-		retn = true;
-		goto done;
-	}
-
-
 	/*
 	 * Compute the number of lines in the trajectory.
 	 */
@@ -524,18 +500,6 @@ static _Bool send_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	String es = NULL;
 
 	File ef = NULL;
-
-
-	/* Hande a sealed model. */
-	if ( Sealed ) {
-		cmdbufr->reset(cmdbufr);
-		cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
-		if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
-			ERR(goto done);
-
-		retn = true;
-		goto done;
-	}
 
 
 	/*
@@ -753,8 +717,6 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 	int *cp;
 
-	uint8_t sealed[NAAAIM_IDSIZE] = {0};
-
 	String estr = NULL;
 
 	File efile = NULL;
@@ -782,16 +744,6 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 		case show_measurement:
 			cmdbufr->reset(cmdbufr);
 
-			if ( Sealed ) {
-				if ( !cmdbufr->add(cmdbufr, sealed, \
-						   sizeof(sealed)) )
-					ERR(goto done);
-				if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
-					ERR(goto done);
-				retn = true;
-				goto done;
-			}
-
 			if ( !efile->open_ro(efile, MEASUREMENT_FILE) )
 				ERR(goto done);
 			if ( !efile->read_String(efile, estr) )
@@ -806,18 +758,6 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 		case show_state:
 			cmdbufr->reset(cmdbufr);
-
-			if ( Sealed ) {
-				if ( Debug )
-					fputs("Processing sealed.\n", Debug);
-				if ( !cmdbufr->add(cmdbufr, sealed, \
-						   sizeof(sealed)) )
-					ERR(goto done);
-				if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
-					ERR(goto done);
-				retn = true;
-				goto done;
-			}
 
 			if ( !efile->open_ro(efile, STATE_FILE) )
 				ERR(goto done);
