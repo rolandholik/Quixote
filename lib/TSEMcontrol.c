@@ -243,6 +243,41 @@ static _Bool internal(CO(TSEMcontrol, this))
 /**
  * External public method.
  *
+ * This method creates a TSEM security namespace that is modeled
+ * by a kernel based Trusted Modeling Agent.
+ *
+ * \param this	The object that will be implementing the command.
+ *
+ * \return	A boolean value is used to indicate the status of
+ *		setting of enforcement mode.  A true value indicates
+ *		the write succeeded while a false value indicates
+ *		a failure.
+ */
+
+static _Bool seal(CO(TSEMcontrol, this))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	if ( !S->cmdstr->add(S->cmdstr, "seal\n") )
+		ERR(goto done);
+
+	if ( !_write_cmd(S) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method is used to signal the kernel that a process should
  * indicate that a security event should fail.
  *
@@ -482,6 +517,7 @@ extern TSEMcontrol NAAAIM_TSEMcontrol_Init(void)
 	this->enforce  = enforce;
 	this->external = external;
 	this->internal = internal;
+	this->seal     = seal;
 
 	this->discipline = discipline;
 	this->release	 = release;

@@ -30,6 +30,7 @@ struct NAAAIM_TSEMcontrol
 	_Bool (*enforce)(const TSEMcontrol);
 	_Bool (*external)(const TSEMcontrol);
 	_Bool (*internal)(const TSEMcontrol);
+	_Bool (*seal)(const TSEMcontrol);
 
 	_Bool (*discipline)(const TSEMcontrol, pid_t);
 	_Bool (*release)(const TSEMcontrol, pid_t);

@@ -25,7 +25,6 @@
 #define TRAJECTORY_FILE	 "/sys/kernel/security/tsem/trajectory"
 #define POINTS_FILE	 "/sys/kernel/security/tsem/points"
 #define FORENSICS_FILE	 "/sys/kernel/security/tsem/forensics"
-#define SEAL_FILE	 "/sys/kernel/security/tsem/sealed"
 #define MAP_FILE	 "/sys/kernel/security/tsem/map"
 
 #define READ_SIDE  0
@@ -553,52 +552,6 @@ static _Bool send_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 /**
  * Private function.
  *
- * This function writes the directive needed to seal the security
- * domain to the 'sealed' pseudo-file.
- *
- * \param bufr		The object that will be used to hold the value
- *			to be written to the file.
- *
- * \return		A boolean value is returned to indicate whether
- *			or not the write to the seal file has been
- *			successfully executed.  A false value indicates
- *			failure while a true value indicates success.
- */
-
-static _Bool seal(CO(Buffer, bufr))
-
-{
-	_Bool retn = false;
-
-	File sf = NULL;
-
-	static const unsigned char one[] = "1\n";
-
-
-	INIT(HurdLib, File, sf, ERR(goto done));
-	if ( !sf->open_wo(sf, SEAL_FILE) )
-		ERR(goto done);
-
-	bufr->reset(bufr);
-	bufr->add(bufr, one, sizeof(one) - 1);
-
-	if ( !sf->write_Buffer(sf, bufr) )
-		ERR(goto done);
-
-	retn   = true;
-	Sealed = true;
-
-
- done:
-	WHACK(sf);
-
-	return retn;
-}
-
-
-/**
- * Private function.
- *
  * This function is responsible for sealing a security domain.
  *
  * \param mgmt		The socket object used to communicate with
@@ -624,8 +577,7 @@ static _Bool seal_domain(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 	/* Seal the domain. */
 	if ( !Sealed ) {
-		cmdbufr->reset(cmdbufr);
-		if ( !seal(cmdbufr) )
+		if ( !Control->seal(Control) )
 			ERR(goto done);
 	}
 
@@ -1087,7 +1039,8 @@ static _Bool load(CO(String, entry))
 			if ( !_add_entry(sigdata, entry) )
 				ERR(goto done);
 
-			seal(bufr);
+			if ( !Control->seal(Control) )
+				ERR(goto done);
 			break;
 
 		case model_cmd_signature:
