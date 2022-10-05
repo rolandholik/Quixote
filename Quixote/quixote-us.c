@@ -127,6 +127,13 @@ static _Bool Model_Error = false;
 static Buffer Aggregate = NULL;
 
 /**
+ * This variable is set by the code that loads the security model
+ * in order to advise the namespace setup that the security model
+ * should be sealed from the kernel's perspective.
+ */
+static _Bool Sealed = false;
+
+/**
  * The following variable holds the current measurement.
  */
 #if 0
@@ -647,7 +654,6 @@ static _Bool process_event(const char *event)
 				fputs("Kernel sealed domain.\n", Debug);
 
 			Model->seal(Model);
-			retn   = true;
 			break;
 
 		case TSEM_event:
@@ -1216,6 +1222,9 @@ static _Bool load_model(char *model_file)
 		if ( Debug )
 			fprintf(Debug, "Model entry: %s\n", str->get(str));
 
+		if ( strcmp(str->get(str), "seal") == 0 )
+			Sealed = true;
+
 		if ( !Model->load(Model, str) )
 			ERR(goto done);
 		str->reset(str);
@@ -1273,6 +1282,10 @@ static _Bool setup_namespace(int *fdptr, _Bool enforce)
 		ERR(goto done);
 	if ( enforce ) {
 		if ( !Control->enforce(Control) )
+			ERR(goto done);
+	}
+	if ( Sealed ) {
+		if ( !Control->seal(Control) )
 			ERR(goto done);
 	}
 
