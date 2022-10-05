@@ -35,6 +35,7 @@ struct NAAAIM_TSEMcontrol
 	_Bool (*discipline)(const TSEMcontrol, pid_t);
 	_Bool (*release)(const TSEMcontrol, pid_t);
 
+	_Bool (*add_state)(const TSEMcontrol, const Buffer);
 	_Bool (*pseudonym)(const TSEMcontrol, const Buffer);
 
 	_Bool (*id)(const TSEMcontrol, uint64_t *);

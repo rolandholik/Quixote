@@ -754,62 +754,6 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 
 /**
- * Private function.
- *
- * This function carries out the addition of a state value to the
- * current security model.
- *
- * \param bufr		A pointer to the character buffer containing
- *			the hexadecimally encoded state value.
- *
- * \return		A boolean value is returned to indicate whether
- *			or not addition of the state value succeeded.  A
- *			false value indicates the addition of the
- *			state failed while a true value indicates
- *			the state injection had succeeded.
- */
-
-static _Bool add_state(CO(char *, inbufr))
-
-{
-	_Bool retn = false;
-
-	Buffer bufr = NULL;
-
-	File sf = NULL;
-
-
-	/* Sanity check buffer. */
-	if ( Debug )
-		fprintf(Debug, "adding state: %s\n", inbufr);
-	if ( strlen(inbufr) != (NAAAIM_IDSIZE * 2) )
-		ERR(goto done);
-
-
-	/* Write the hexadecimal point value to the pseudo-file. */
-	INIT(HurdLib, File, sf, ERR(goto done));
-	if ( !sf->open_wo(sf, MAP_FILE) )
-		ERR(goto done);
-
-	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	bufr->add(bufr, (void *) inbufr, NAAAIM_IDSIZE * 2);
-	bufr->add(bufr, (void *) "\n", 1);
-
-	if ( !sf->write_Buffer(sf, bufr) )
-		ERR(goto done);
-
-	retn = true;
-
-
- done:
-	WHACK(bufr);
-	WHACK(sf);
-
-	return retn;
-}
-
-
-/**
  * Internal private function.
  *
  * This function encapsulates the addition of a line from a model file
@@ -1017,9 +961,12 @@ static _Bool load(CO(String, entry))
 			if ( !_add_entry(sigdata, entry) )
 				ERR(goto done);
 
-			if ( !bufr->add_hexstring(bufr, arg) )
+			if ( Debug != NULL )
+				fprintf(Debug, "%s: Adding state: %s\n", \
+					__func__, arg);
+			if ( !bufr->add(bufr, (void *) arg, strlen(arg) + 1) )
 				ERR(goto done);
-			if ( !add_state(arg) )
+			if ( !Control->add_state(Control, bufr) )
 				ERR(goto done);
 			break;
 

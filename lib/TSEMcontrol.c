@@ -410,6 +410,44 @@ static _Bool id(CO(TSEMcontrol, this), uint64_t *idptr)
 /**
  * External public method.
  *
+ * This method is used to add a security event state to a modeling
+ * context.
+ *
+ * \param this	The object that is configuring the pseudonym.
+ *
+ * \param state	The object containing the state definition.
+ *
+ * \return	A boolean value is used to indicate the status of
+ *		configuring the state.  A false value indicates
+ *		an error occured, a true value indicates the
+ *		model has been updated with the state.
+ */
+
+static _Bool add_state(CO(TSEMcontrol, this), CO(Buffer, state))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	if ( !S->cmdstr->add_sprintf(S->cmdstr, "state %s\n", \
+				     (char *) state->get(state)) )
+		ERR(goto done);
+
+	if ( !_write_cmd(S) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method is used to configure a pseudonym for a TSEM modeling
  * context.
  *
@@ -522,6 +560,7 @@ extern TSEMcontrol NAAAIM_TSEMcontrol_Init(void)
 	this->discipline = discipline;
 	this->release	 = release;
 
+	this->add_state = add_state;
 	this->pseudonym = pseudonym;
 
 	this->id = id;
