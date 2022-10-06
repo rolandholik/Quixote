@@ -25,7 +25,6 @@
 #define TRAJECTORY_FILE	 "/sys/kernel/security/tsem/trajectory"
 #define POINTS_FILE	 "/sys/kernel/security/tsem/points"
 #define FORENSICS_FILE	 "/sys/kernel/security/tsem/forensics"
-#define MAP_FILE	 "/sys/kernel/security/tsem/map"
 
 #define READ_SIDE  0
 #define WRITE_SIDE 1
