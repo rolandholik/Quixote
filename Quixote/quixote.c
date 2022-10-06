@@ -974,9 +974,10 @@ static _Bool load(CO(String, entry))
 			if ( !_add_entry(sigdata, entry) )
 				ERR(goto done);
 
-			if ( !bufr->add(bufr, (void *) arg, strlen(arg)) )
-				ERR(goto done);
-			if ( !bufr->add(bufr, (void *) "\n", 1) )
+			if ( Debug != NULL )
+				fprintf(Debug, "%s: Adding pseudonym: %s\n", \
+					__func__, arg);
+			if ( !bufr->add(bufr, (void *) arg, strlen(arg) + 1) )
 				ERR(goto done);
 			if ( !Control->pseudonym(Control, bufr) )
 				ERR(goto done);

@@ -14,7 +14,6 @@
 /* Local definitions. */
 #define CONTROL_FILE	"/sys/kernel/security/tsem/control"
 #define ID_FILE		"/sys/kernel/security/tsem/id"
-#define PSEUDONYM_FILE	"/sys/kernel/security/tsem/pseudonym"
 
 
 /* Include files. */
@@ -464,24 +463,21 @@ static _Bool add_state(CO(TSEMcontrol, this), CO(Buffer, state))
 static _Bool pseudonym(CO(TSEMcontrol, this), CO(Buffer, pseudonym))
 
 {
+	STATE(S);
+
 	_Bool retn = false;
 
-	File file = NULL;
 
-
-	INIT(HurdLib, File, file, ERR(goto done));
-	if ( !file->open_wo(file, PSEUDONYM_FILE) ) {
-		perror("pseudonym");
+	if ( !S->cmdstr->add_sprintf(S->cmdstr, "pseudonym %s\n", \
+				     (char *) pseudonym->get(pseudonym)) )
 		ERR(goto done);
-	}
-	if ( !file->write_Buffer(file, pseudonym) )
+
+	if ( !_write_cmd(S) )
 		ERR(goto done);
 	retn = true;
 
 
  done:
-	WHACK(file);
-
 	return retn;
 }
 
