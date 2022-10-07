@@ -55,6 +55,7 @@
 enum {
 	model_cmd_comment=1,
 	model_cmd_key,
+	model_cmd_base,
 	model_cmd_aggregate,
 	model_cmd_state,
 	model_cmd_pseudonym,
@@ -74,6 +75,7 @@ struct security_load_definition {
 struct security_load_definition Security_cmd_list[] = {
 	{model_cmd_comment,	"#",		false},
 	{model_cmd_key,		"key ",		true},
+	{model_cmd_base,	"base ",	true},
 	{model_cmd_aggregate,	"aggregate ",	true},
 	{model_cmd_state,	"state ",	true},
 	{model_cmd_pseudonym,	"pseudonym ",	true},
@@ -109,8 +111,8 @@ struct NAAAIM_TSEM_State
 	/* Process identifier to be disciplined. */
 	pid_t discipline_pid;
 
-	/* Canister identity. */
-	unsigned char hostid[NAAAIM_IDSIZE];
+	/* Model base point. */
+	unsigned char base[NAAAIM_IDSIZE];
 
 	/* Event domain instance aggregate. */
 	Buffer aggregate;
@@ -163,7 +165,7 @@ static void _init_state(CO(TSEM_State, S))
 
 	S->discipline_pid = 0;
 
-	memset(S->hostid, '\0', sizeof(S->hostid));
+	memset(S->base, '\0', sizeof(S->base));
 	memset(S->measurement, '\0', sizeof(S->measurement));
 
 	S->aggregate	= NULL;
@@ -266,7 +268,7 @@ static _Bool _extend_measurement(CO(TSEM_State, S),    \
 	INIT(NAAAIM, Sha256, sha256, ERR(goto done));
 
 	/* Project the update into a domain specific value. */
-	bufr->add(bufr, S->hostid, sizeof(S->hostid));
+	bufr->add(bufr, S->base, sizeof(S->base));
 	bufr->add(bufr, update, NAAAIM_IDSIZE);
 	sha256->add(sha256, bufr);
 	if ( !sha256->compute(sha256) )
@@ -707,6 +709,15 @@ static _Bool load(CO(TSEM, this), CO(String, entry))
 			if ( !S->key->add(S->key, (void *) arg, \
 					  strlen(arg) + 1) )
 				ERR(goto done);
+			break;
+
+		case model_cmd_base:
+			if ( !_add_entry(S->sigdata, entry) )
+				ERR(goto done);
+
+			if ( !bufr->add_hexstring(bufr, arg) )
+				ERR(goto done);
+			memcpy(S->base, bufr->get(bufr), sizeof(S->base));
 			break;
 
 		case model_cmd_aggregate:

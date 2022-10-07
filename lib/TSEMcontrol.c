@@ -409,6 +409,43 @@ static _Bool id(CO(TSEMcontrol, this), uint64_t *idptr)
 /**
  * External public method.
  *
+ * This method is used to set the base point for a modeling context.
+ *
+ * \param this	The object that is configuring the base point.
+ *
+ * \param state	The object containing the base point definition.
+ *
+ * \return	A boolean value is used to indicate the status of
+ *		configuring the base point.  A false value indicates
+ *		an error occured, a true value indicates the
+ *		model has been updated with the base point.
+ */
+
+static _Bool set_base(CO(TSEMcontrol, this), CO(Buffer, state))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	if ( !S->cmdstr->add_sprintf(S->cmdstr, "base %s\n", \
+				     (char *) state->get(state)) )
+		ERR(goto done);
+
+	if ( !_write_cmd(S) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method is used to add a security event state to a modeling
  * context.
  *
@@ -556,6 +593,7 @@ extern TSEMcontrol NAAAIM_TSEMcontrol_Init(void)
 	this->discipline = discipline;
 	this->release	 = release;
 
+	this->set_base  = set_base;
 	this->add_state = add_state;
 	this->pseudonym = pseudonym;
 

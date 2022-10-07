@@ -126,6 +126,7 @@ struct {
 enum {
 	model_cmd_comment=1,
 	model_cmd_key,
+	model_cmd_base,
 	model_cmd_aggregate,
 	model_cmd_state,
 	model_cmd_pseudonym,
@@ -145,6 +146,7 @@ struct security_load_definition {
 struct security_load_definition Security_cmd_list[] = {
 	{model_cmd_comment,	"#",		false},
 	{model_cmd_key,		"key ",		true},
+	{model_cmd_base,	"base ",	true},
 	{model_cmd_aggregate,	"aggregate ",	true},
 	{model_cmd_state,	"state ",	true},
 	{model_cmd_pseudonym,	"pseudonym ",	true},
@@ -953,6 +955,19 @@ static _Bool load(CO(String, entry))
 
 		case model_cmd_aggregate:
 			if ( !_add_entry(sigdata, entry) )
+				ERR(goto done);
+			break;
+
+		case model_cmd_base:
+			if ( !_add_entry(sigdata, entry) )
+				ERR(goto done);
+
+			if ( Debug != NULL )
+				fprintf(Debug, "%s: Adding base: %s\n", \
+					__func__, arg);
+			if ( !bufr->add(bufr, (void *) arg, strlen(arg) + 1) )
+				ERR(goto done);
+			if ( !Control->set_base(Control, bufr) )
 				ERR(goto done);
 			break;
 
