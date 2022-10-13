@@ -30,9 +30,13 @@ struct HurdLib_String
 {
 	/* External methods. */
 	_Bool (*add)(const String, char const *);
+	_Bool (*add_sprintf)(const String, const char *, ...);
+
 	char * (*get)(const String);
 	size_t (*size)(const String);
+
 	void (*print)(const String);
+
 	_Bool (*poisoned)(const String);
 	void (*reset)(const String);
 	void (*whack)(const String);
