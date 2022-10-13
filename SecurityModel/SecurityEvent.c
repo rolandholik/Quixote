@@ -35,6 +35,8 @@
 #include <Buffer.h>
 #include <String.h>
 
+#include "tsem_event.h"
+
 #include "NAAAIM.h"
 #include "SHA256.h"
 #include "SecurityEvent.h"
@@ -74,18 +76,13 @@ static struct regex_description {
 	{.fd=NULL}
 };
 
-/* Types of TE events. */
-enum tsem_event_type {
-	TSEM_UNDEFINED=0,
-	TSEM_FILE_OPEN,
-	TSEM_MMAP_FILE
-};
-
 /* Names of TSEM events. */
 static const char *TSEM_name[] = {
 	"undefined",
 	"file_open",
 	"mmap_file",
+	"bprm_set_creds",
+	"socket_create",
 	NULL
 };
 
@@ -386,7 +383,7 @@ static _Bool parse(CO(SecurityEvent, this), CO(String, event))
 	/* Parse the COE and Cell components. */
 	if ( !S->coe->parse(S->coe, event) )
 		ERR(goto done);
-	if ( !S->cell->parse(S->cell, event) )
+	if ( !S->cell->parse(S->cell, event, S->type) )
 		ERR(goto done);
 
 	retn = true;

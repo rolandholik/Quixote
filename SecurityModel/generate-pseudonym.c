@@ -48,6 +48,7 @@
 #include <NAAAIM.h>
 #include <SHA256.h>
 
+#include "tsem_event.h"
 #include "Cell.h"
 
 
@@ -151,7 +152,7 @@ static _Bool do_trajectory(CO(String, event))
 
 
 	INIT(NAAAIM, Cell, cell, ERR(goto done));
-	if ( !cell->parse(cell, event) )
+	if ( !cell->parse(cell, event, TSEM_FILE_OPEN) )
 		ERR(goto done);
 
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));

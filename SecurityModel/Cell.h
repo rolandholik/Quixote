@@ -26,7 +26,7 @@ typedef struct NAAAIM_Cell_State * Cell_State;
 struct NAAAIM_Cell
 {
 	/* External methods. */
-	_Bool (*parse)(const Cell, const String);
+	_Bool (*parse)(const Cell, const String, enum tsem_event_type);
 	_Bool (*measure)(const Cell);
 
 	_Bool (*get_measurement)(const Cell, const Buffer);

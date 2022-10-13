@@ -36,6 +36,7 @@
 #include <NAAAIM.h>
 #include <SHA256.h>
 
+#include "tsem_event.h"
 #include "COE.h"
 #include "Cell.h"
 

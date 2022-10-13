@@ -27,6 +27,8 @@
 #include <Buffer.h>
 #include <String.h>
 
+#include "tsem_event.h"
+
 #include "NAAAIM.h"
 #include "SHA256.h"
 #include "Cell.h"
@@ -50,14 +52,17 @@
 
 
 /** Variable to indicate the parsing expressions have been compiled. */
-static _Bool Regex_compiled = false;
+static _Bool File_Fields_compiled	   = false;
+static _Bool Socket_Create_Fields_compiled = false;
 
 /** Array of field descriptions and compiled regular expressions. */
-static struct regex_description {
+struct regex_description {
 	char *fd;
 	regex_t regex;
-} Fields[10] = {
-	{.fd="cell\\{[^}]*\\}"},
+};
+
+struct regex_description File_Fields[10] = {
+	{.fd="file\\{[^}]*\\}"},
 	{.fd="uid=([^,]*)"},
 	{.fd="gid=([^,]*)"},
 	{.fd="mode=([^,]*)"},
@@ -69,9 +74,18 @@ static struct regex_description {
 	{.fd=NULL}
 };
 
+struct regex_description Socket_Create_Fields[10] = {
+	{.fd="socket_create\\{[^}]*\\}"},
+	{.fd="family=([^,]*)"},
+	{.fd="type=([^,]*)"},
+	{.fd="protocol=([^,]*)"},
+	{.fd="kern=([^,]*)"},
+	{.fd=NULL}
+};
 
-/* Cell characteristics. */
-struct cell_characteristics {
+
+/* File characteristics. */
+struct file_parameters {
 	uint32_t uid;
 	uint32_t gid;
 	uint16_t mode;
@@ -83,6 +97,14 @@ struct cell_characteristics {
 	uint8_t s_uuid[16];
 
 	char digest[NAAAIM_IDSIZE];
+};
+
+/* Socket create parameters. */
+struct socket_create_parameters {
+	uint32_t family;
+	uint32_t type;
+	uint32_t protocol;
+	uint32_t kern;
 };
 
 
@@ -100,8 +122,14 @@ struct NAAAIM_Cell_State
 	/* Object status. */
 	_Bool poisoned;
 
-	/* Cell identity elements. */
-	struct cell_characteristics character;
+	/* Type definition for cell contents. */
+	enum tsem_event_type type;
+
+	/* File characteristics. */
+	struct file_parameters file;
+
+	/* Socket creation parameters. */
+	struct socket_create_parameters socket_create;
 
 	/* Measured identity. */
 	_Bool measured;
@@ -127,7 +155,7 @@ static void _init_state(CO(Cell_State, S))
 
 	S->poisoned = false;
 
-	memset(&S->character, '\0', sizeof(struct cell_characteristics));
+	memset(&S->file, '\0', sizeof(struct file_parameters));
 
 	S->measured = false;
 	S->identity = NULL;
@@ -327,16 +355,16 @@ static _Bool _get_text(regex_t *regex, CO(char *, field), uint8_t *fb, \
 
 
 /**
- * External public method.
+ * Internal public method.
  *
- * This method implements parsing of a security state event for the
- * characteristics of a cell
+ * This method implements parsing the characteristics of a file definition
+ * of a security state event.
  *
- * \param this	A pointer to the cell whose trajectory entry
+ * \param S	The state information for the Cell that the file information
+ *		is being parsed into.
+ *
+ * \param entry	The object containing the definition of the event that
  *		is to be parsed.
- *
- * \param entry	A pointer to the object which contains the trajectory
- *		step point which is to be parsed.
  *
  * \return	A boolean value is used to indicate the success or
  *		failure of the parsing.  A false value indicates the
@@ -345,11 +373,9 @@ static _Bool _get_text(regex_t *regex, CO(char *, field), uint8_t *fb, \
  *		populated.
  */
 
-static _Bool parse(CO(Cell, this), CO(String, entry))
+static _Bool _parse_file(CO(Cell_State, S), CO(String, entry))
 
 {
-	STATE(S);
-
 	_Bool retn = false;
 
 	unsigned int cnt;
@@ -363,29 +389,22 @@ static _Bool parse(CO(Cell, this), CO(String, entry))
 	Buffer field = NULL;
 
 
-	/* Verify object and caller state. */
-	if ( S->poisoned )
-		ERR(goto done);
-	if ( entry->poisoned(entry) )
-		ERR(goto done);
-
-
 	/* Compile the regular expressions once. */
-	if ( !Regex_compiled ) {
-		for (cnt= 0; Fields[cnt].fd != NULL; ++cnt) {
-			if ( regcomp(&Fields[cnt].regex, Fields[cnt].fd, \
-				     REG_EXTENDED) != 0 )
+	if ( !File_Fields_compiled ) {
+		for (cnt= 0; File_Fields[cnt].fd != NULL; ++cnt) {
+			if ( regcomp(&File_Fields[cnt].regex,
+				     File_Fields[cnt].fd, REG_EXTENDED) != 0 )
 				ERR(goto done);
 		}
 	}
-	Regex_compiled = true;
+	File_Fields_compiled = true;
 
 
-	/* Extract cell field. */
+	/* Extract the file field. */
 	INIT(HurdLib, Buffer, field, ERR(goto done));
 
 	fp = entry->get(entry);
-	if ( regexec(&Fields[0].regex, fp, 1, &regmatch, 0) != REG_OK )
+	if ( regexec(&File_Fields[0].regex, fp, 1, &regmatch, 0) != REG_OK )
 		ERR(goto done);
 
 	field->add(field, (unsigned char *) (fp + regmatch.rm_so),
@@ -396,34 +415,187 @@ static _Bool parse(CO(Cell, this), CO(String, entry))
 
 	/* Parse field entries. */
 	fp = (char *) field->get(field);
-	if ( !_get_field(&Fields[1].regex, fp, &S->character.uid) )
+	if ( !_get_field(&File_Fields[1].regex, fp, &S->file.uid) )
 		ERR(goto done);
 
-	if ( !_get_field(&Fields[2].regex, fp, &S->character.gid) )
+	if ( !_get_field(&File_Fields[2].regex, fp, &S->file.gid) )
 		ERR(goto done);
 
-	if ( !_get_field(&Fields[3].regex, fp, &value) )
+	if ( !_get_field(&File_Fields[3].regex, fp, &value) )
 		ERR(goto done);
-	S->character.mode = value;
+	S->file.mode = value;
 
-	if ( !_get_field(&Fields[4].regex, fp, &S->character.name_length) )
-		ERR(goto done);
-
-	if ( !_get_digest(&Fields[5].regex, fp, \
-			  (uint8_t *) S->character.name, NAAAIM_IDSIZE) )
+	if ( !_get_field(&File_Fields[4].regex, fp, &S->file.name_length) )
 		ERR(goto done);
 
-	if ( !_get_text(&Fields[6].regex, fp, (uint8_t *) S->character.s_id, \
-			sizeof(S->character.s_id)) )
+	if ( !_get_digest(&File_Fields[5].regex, fp, \
+			  (uint8_t *) S->file.name, NAAAIM_IDSIZE) )
 		ERR(goto done);
 
-	if ( !_get_digest(&Fields[7].regex, fp, S->character.s_uuid, \
-			  sizeof(S->character.s_uuid)) )
+	if ( !_get_text(&File_Fields[6].regex, fp, (uint8_t *) S->file.s_id, \
+			sizeof(S->file.s_id)) )
 		ERR(goto done);
 
-	if ( !_get_digest(&Fields[8].regex, fp, \
-			  (uint8_t *) S->character.digest, NAAAIM_IDSIZE) )
+	if ( !_get_digest(&File_Fields[7].regex, fp, S->file.s_uuid, \
+			  sizeof(S->file.s_uuid)) )
 		ERR(goto done);
+
+	if ( !_get_digest(&File_Fields[8].regex, fp, \
+			  (uint8_t *) S->file.digest, NAAAIM_IDSIZE) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	WHACK(field);
+
+	return retn;
+}
+
+
+/**
+ * Internal public method.
+ *
+ * This method implements parsing the characteristics of a socket creation
+ * security event.
+ *
+ * \param S	The state information for the Cell that the socket creation
+ *		information is being parsed into.
+ *
+ * \param entry	The object containing the definition of the event that
+ *		is to be parsed.
+ *
+ * \return	A boolean value is used to indicate the success or
+ *		failure of the parsing.  A false value indicates the
+ *		parsing failed and the object is poisoned.  A true
+ *		value indicates the object has been successfully
+ *		populated.
+ */
+
+static _Bool _parse_socket_create(CO(Cell_State, S), CO(String, entry))
+
+{
+	_Bool retn = false;
+
+	unsigned int cnt;
+
+	char *fp;
+
+	regmatch_t regmatch;
+
+	Buffer field = NULL;
+
+
+	/* Compile the regular expressions once. */
+	if ( !Socket_Create_Fields_compiled ) {
+		for (cnt= 0; Socket_Create_Fields[cnt].fd != NULL; ++cnt) {
+			if ( regcomp(&Socket_Create_Fields[cnt].regex,
+				     Socket_Create_Fields[cnt].fd,
+				     REG_EXTENDED) != 0 )
+				ERR(goto done);
+		}
+	}
+	Socket_Create_Fields_compiled = true;
+
+
+	/* Extract socket_create parameters. */
+	INIT(HurdLib, Buffer, field, ERR(goto done));
+
+	fp = entry->get(entry);
+	if ( regexec(&Socket_Create_Fields[0].regex, fp, 1, &regmatch, 0) != \
+	     REG_OK )
+		ERR(goto done);
+
+	field->add(field, (unsigned char *) (fp + regmatch.rm_so),
+		   regmatch.rm_eo-regmatch.rm_so);
+	if ( !field->add(field, (unsigned char *) "\0", 1) )
+		ERR(goto done);
+
+
+	/* Parse socket create parameters. */
+	fp = (char *) field->get(field);
+	if ( !_get_field(&Socket_Create_Fields[1].regex, fp,
+			 &S->socket_create.family) )
+		ERR(goto done);
+
+	if ( !_get_field(&Socket_Create_Fields[2].regex, fp,
+			 &S->socket_create.type) )
+		ERR(goto done);
+
+	if ( !_get_field(&Socket_Create_Fields[3].regex, fp,
+			 &S->socket_create.protocol) )
+		ERR(goto done);
+
+	if ( !_get_field(&Socket_Create_Fields[4].regex, fp,
+			 &S->socket_create.kern) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	WHACK(field);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements parsing of a security state event for the
+ * characteristics of a cell
+ *
+ * \param this	A pointer to the cell whose trajectory entry
+ *		is to be parsed.
+ *
+ * \param entry	A pointer to the object which contains the trajectory
+ *		step point which is to be parsed.
+ *
+ * \parm type	The type of the cell
+ *
+ * \return	A boolean value is used to indicate the success or
+ *		failure of the parsing.  A false value indicates the
+ *		parsing failed and the object is poisoned.  A true
+ *		value indicates the object has been successfully
+ *		populated.
+ */
+
+static _Bool parse(CO(Cell, this), CO(String, entry),
+		   enum tsem_event_type type)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Verify object and caller state. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( entry->poisoned(entry) )
+		ERR(goto done);
+
+
+	/* Select the type of parsing based on the event type. */
+	S->type = type;
+
+	switch ( S->type ) {
+		case TSEM_FILE_OPEN:
+		case TSEM_MMAP_FILE:
+			if ( !_parse_file(S, entry) )
+				ERR(goto done);
+			break;
+
+		case TSEM_SOCKET_CREATE:
+			if ( !_parse_socket_create(S, entry) )
+				ERR(goto done);
+			break;
+
+		default:
+			break;
+	}
 
 	retn = true;
 
@@ -432,7 +604,107 @@ static _Bool parse(CO(Cell, this), CO(String, entry))
 	if ( !retn )
 		S->poisoned = true;
 
-	WHACK(field);
+	return retn;
+}
+
+
+/**
+ * Internal private method.
+ *
+ * This method implements computing of the measurement of a cell that
+ * incorporates a file description.
+ *
+ * \param S	The state information of the object whose file measurement
+ *		is to be measured.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the measurement has succeeded.  A false value
+ *		indicates failure while a true value indicates success.
+ */
+
+static _Bool _measure_file(CO(Cell_State, S))
+
+{
+	_Bool retn = false;
+
+	Buffer bufr = NULL;
+
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	bufr->add(bufr, (void *) &S->file.uid, sizeof(S->file.uid));
+	bufr->add(bufr, (void *) &S->file.gid, sizeof(S->file.gid));
+	bufr->add(bufr, (void *) &S->file.mode, sizeof(S->file.mode));
+	bufr->add(bufr, (void *) &S->file.name_length, \
+		  sizeof(S->file.name_length));
+	bufr->add(bufr, (void *) S->file.name, sizeof(S->file.name));
+	bufr->add(bufr, (void *) S->file.s_id, sizeof(S->file.s_id));
+	bufr->add(bufr, (void *) S->file.s_uuid, sizeof(S->file.s_uuid));
+	if ( !bufr->add(bufr, (void *) S->file.digest, \
+			sizeof(S->file.digest)) )
+		ERR(goto done);
+
+	if ( !S->identity->add(S->identity, bufr) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	WHACK(bufr);
+
+	return retn;
+}
+
+
+/**
+ * Internal private method.
+ *
+ * This method implements computing of the measurement of a socket
+ * creation cell.
+ *
+ * \param S	The state information of the object whose socket creation
+ *		measurement is to be generated.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the measurement has succeeded.  A false value
+ *		indicates failure while a true value indicates success.
+ */
+
+static _Bool _measure_socket_create(CO(Cell_State, S))
+
+{
+	_Bool retn = false;
+
+	unsigned char *p;
+
+	size_t size;
+
+	Buffer bufr = NULL;
+
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	p = (unsigned char *) &S->socket_create.family;
+	size = sizeof(S->socket_create.family);
+	bufr->add(bufr, p, size);
+
+	p = (unsigned char *) &S->socket_create.type;
+	size = sizeof(S->socket_create.type);
+	bufr->add(bufr, p, size);
+
+	p = (unsigned char *) &S->socket_create.protocol;
+	size = sizeof(S->socket_create.protocol);
+	bufr->add(bufr, p, size);
+
+	p = (unsigned char *) &S->socket_create.kern;
+	size = sizeof(S->socket_create.kern);
+	if ( !bufr->add(bufr, p, size) )
+		ERR(goto done);
+
+	if ( !S->identity->add(S->identity, bufr) )
+		ERR(goto done);
+	retn = true;
+
+ done:
+	WHACK(bufr);
 
 	return retn;
 }
@@ -459,8 +731,6 @@ static _Bool measure(CO(Cell, this))
 
 	_Bool retn = false;
 
-	Buffer bufr = NULL;
-
 
 	/* Object verifications. */
 	if ( S->poisoned )
@@ -469,32 +739,30 @@ static _Bool measure(CO(Cell, this))
 		ERR(goto done);
 
 
-	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	bufr->add(bufr, (void *) &S->character.uid, sizeof(S->character.uid));
-	bufr->add(bufr, (void *) &S->character.gid, sizeof(S->character.gid));
-	bufr->add(bufr, (void *) &S->character.mode, sizeof(S->character.mode));
-	bufr->add(bufr, (void *) &S->character.name_length, \
-		  sizeof(S->character.name_length));
-	bufr->add(bufr, (void *) S->character.name, sizeof(S->character.name));
-	bufr->add(bufr, (void *) S->character.s_id, sizeof(S->character.s_id));
-	bufr->add(bufr, (void *) S->character.s_uuid, \
-		  sizeof(S->character.s_uuid));
-	if ( !bufr->add(bufr, (void *) S->character.digest, \
-			sizeof(S->character.digest)) )
-		ERR(goto done);
+	switch ( S->type ) {
+		case TSEM_FILE_OPEN:
+		case TSEM_MMAP_FILE:
+			retn = _measure_file(S);
+			break;
 
-	if ( !S->identity->add(S->identity, bufr) )
-		ERR(goto done);
-	if ( !S->identity->compute(S->identity) )
-		ERR(goto done);
+		case TSEM_SOCKET_CREATE:
+			retn =_measure_socket_create(S);
+			break;
 
-	S->measured = true;
-	retn = true;
+		default:
+			break;
+	}
+
+	if ( retn ) {
+		if ( !S->identity->compute(S->identity) )
+			ERR(goto done);
+		S->measured = true;
+	}
+
 
  done:
 	if ( !retn )
 		S->poisoned = true;
-	WHACK(bufr);
 
 	return retn;
 }
@@ -602,10 +870,9 @@ static _Bool get_pseudonym(CO(Cell, this), CO(Buffer, bufr))
 	/* Collect the pseduonym components. */
 	bufr->reset(bufr);
 
-	bufr->add(bufr, (void *) &S->character.name_length, \
-		  sizeof(S->character.name_length));
-	if ( !bufr->add(bufr, (void *) S->character.name, \
-			sizeof(S->character.name)) )
+	bufr->add(bufr, (void *) &S->file.name_length, \
+		  sizeof(S->file.name_length));
+	if ( !bufr->add(bufr, (void *) S->file.name, sizeof(S->file.name)) )
 		ERR(goto done);
 
 
@@ -664,13 +931,12 @@ static _Bool set_digest(CO(Cell, this), CO(Buffer, bufr))
 	/* Verify object status and argument. */
 	if ( S->poisoned )
 		ERR(goto done);
-	if ( bufr->size(bufr) != sizeof(S->character.digest) )
+	if ( bufr->size(bufr) != sizeof(S->file.digest) )
 		ERR(goto done);
 
 
 	/* Update the digest value. */
-	memcpy(S->character.digest, bufr->get(bufr), \
-	       sizeof(S->character.digest));
+	memcpy(S->file.digest, bufr->get(bufr), sizeof(S->file.digest));
 
 	retn = true;
 
@@ -679,6 +945,119 @@ static _Bool set_digest(CO(Cell, this), CO(Buffer, bufr))
 	if ( !retn )
 		S->poisoned = true;
 
+	return retn;
+}
+
+
+/**
+ * Internal public method.
+ *
+ * This method implements the output of the characteristics of a cell
+ * that has a file definition.
+ *
+ * \param S	A pointer to the state of the object being output.
+ *
+ * \parm str	The object into which the formatted output is to
+ *		be placed.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the output was properly formatted.  A true value
+ *		indicates formatting was successful while a false
+ *		value indicates an error occurred.
+ */
+
+static _Bool _format_file(CO(Cell_State, S), CO(String, str))
+
+{
+	_Bool retn = false;
+
+	unsigned int lp;
+
+
+	/* Write the formatted string to the String object. */
+	if ( !str->add_sprintf(str, "file{uid=%lu, gid=%lu, mode=0%lo, name_length=%lu, name=",					       \
+			(unsigned long int) S->file.uid,	\
+			(unsigned long int) S->file.gid,	\
+			(unsigned long int) S->file.mode,	\
+			       (unsigned long int) S->file.name_length) )
+		ERR(goto done);
+
+
+	/* name=%*phN, s_id=%s */
+	for (lp= 0; lp < sizeof(S->file.name); ++lp) {
+		if ( !str->add_sprintf(str, "%02x", \
+				       (unsigned char) S->file.name[lp]) )
+		     ERR(goto done);
+	}
+
+	/* , s_uuid=%*phN */
+	if ( !str->add_sprintf(str, ", s_id=%s, s_uuid=", S->file.s_id) )
+		ERR(goto done);
+
+	for (lp= 0; lp < sizeof(S->file.s_uuid); ++lp) {
+		if ( !str->add_sprintf(str, "%02x",
+				       (unsigned char) S->file.s_uuid[lp]) )
+		     ERR(goto done);
+	}
+
+	/* , digest=%*phN */
+	if ( !str->add_sprintf(str, "%s", ", digest=") )
+		ERR(goto done);
+
+	for (lp= 0; lp < sizeof(S->file.digest); ++lp) {
+		if ( !str->add_sprintf(str, "%02x",
+				       (unsigned char) S->file.digest[lp]) )
+		     ERR(goto done);
+	}
+
+	/* } */
+	if ( !str->add_sprintf(str, "}") )
+		ERR(goto done);
+
+	retn = true;
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * Internal public method.
+ *
+ * This method implements the output of the characteristics of a cell
+ * for a socket creation security event.
+ *
+ * \param S	A pointer to the state of the object being output.
+ *
+ * \parm str	The object into which the formatted output is to
+ *		be placed.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the output was properly formatted.  A true value
+ *		indicates formatting was successful while a false
+ *		value indicates an error occurred.
+ */
+
+static _Bool _format_socket_create(CO(Cell_State, S), CO(String, str))
+
+{
+	_Bool retn = false;
+
+
+	if ( !str->add_sprintf(str, "socket_create{family=%u, type=%u, " \
+			       "protocol=%u, kern=%u}",
+			       S->socket_create.family,
+			       S->socket_create.type,
+			       S->socket_create.protocol,
+			       S->socket_create.kern) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
 	return retn;
 }
 
@@ -702,79 +1081,22 @@ static _Bool format(CO(Cell, this), CO(String, event))
 {
 	STATE(S);
 
-	char bufr[256];
-
-	unsigned int lp;
-
-	size_t used;
-
 	_Bool retn = false;
 
 
-	/* Verify object status. */
-	if ( S->poisoned )
-		ERR(goto done);
-	if ( event->poisoned(event) )
-		ERR(goto done);
+	switch ( S->type ) {
+		case TSEM_FILE_OPEN:
+		case TSEM_MMAP_FILE:
+			retn = _format_file(S, event);
+			break;
 
+		case TSEM_SOCKET_CREATE:
+			retn = _format_socket_create(S, event);
+			break;
 
-	/* Write the formatted string to the String object. */
-	used = snprintf(bufr, sizeof(bufr), "cell{uid=%lu, gid=%lu, mode=0%lo, name_length=%lu, name=",				       \
-			(unsigned long int) S->character.uid,	\
-			(unsigned long int) S->character.gid,	\
-			(unsigned long int) S->character.mode,	\
-			(unsigned long int) S->character.name_length);
-	if ( used >= sizeof(bufr) )
-		ERR(goto done);
-	if ( !event->add(event, bufr) )
-		ERR(goto done);
-
-	/* name=%*phN, s_id=%s */
-	for (lp= 0; lp < sizeof(S->character.name); ++lp) {
-		snprintf(bufr, sizeof(bufr), "%02x", \
-			 (unsigned char) S->character.name[lp]);
-		if ( !event->add(event, bufr) )
-			ERR(goto done);
+		default:
+			break;
 	}
-
-	/* , s_uuid=%*phN */
-	used = snprintf(bufr, sizeof(bufr), ", s_id=%s, s_uuid=", \
-			S->character.s_id);
-	if ( used >= sizeof(bufr) )
-		ERR(goto done);
-	if ( !event->add(event, bufr) )
-		ERR(goto done);
-
-	for (lp= 0; lp < sizeof(S->character.s_uuid); ++lp) {
-		snprintf(bufr, sizeof(bufr), "%02x", \
-			 (unsigned char) S->character.s_uuid[lp]);
-		if ( !event->add(event, bufr) )
-			ERR(goto done);
-	}
-
-	/* , digest=%*phN */
-	used = snprintf(bufr, sizeof(bufr), "%s", ", digest=");
-	if ( used >= sizeof(bufr) )
-		ERR(goto done);
-	if ( !event->add(event, bufr) )
-		ERR(goto done);
-
-	for (lp= 0; lp < sizeof(S->character.digest); ++lp) {
-		snprintf(bufr, sizeof(bufr), "%02x",
-			 (unsigned char) S->character.digest[lp]);
-		if ( !event->add(event, bufr) )
-			ERR(goto done);
-	}
-
-	/* } */
-	if ( !event->add(event, "}") )
-		ERR(goto done);
-
-	retn = true;
-
- done:
-	if ( !retn )
-		S->poisoned = true;
 
 	return retn;
 }
@@ -797,9 +1119,86 @@ static void reset(CO(Cell, this))
 	S->poisoned = false;
 	S->measured = false;
 
-	memset(&S->character, '\0', sizeof(struct cell_characteristics));
+	memset(&S->file, '\0', sizeof(struct file_parameters));
 
 	S->identity->reset(S->identity);
+
+	return;
+}
+
+
+/**
+ * Internal public method.
+ *
+ * This method implements output of the characteristics of a cell
+ * that has a file definition.
+ *
+ * \param S	A pointer to the state of the object being output.
+ */
+
+void _dump_file(CO(Cell_State, S))
+
+{
+	Buffer bufr = NULL;
+
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+
+	fprintf(stdout, "uid:  %lu\n", (unsigned long int) S->file.uid);
+	fprintf(stdout, "gid:  %lu\n", (unsigned long int) S->file.gid);
+	fprintf(stdout, "mode: 0%lo\n",(unsigned long int) S->file.mode);
+	fprintf(stdout, "name length: %lu\n", \
+		(unsigned long int) S->file.name_length);
+
+	if ( !bufr->add(bufr, (unsigned char *) S->file.name, \
+			sizeof(S->file.name)) )
+		ERR(goto done);
+	fputs("name digest: ", stdout);
+	bufr->print(bufr);
+	bufr->reset(bufr);
+
+	fprintf(stdout, "s_id:   %s\n", S->file.s_id);
+
+	if ( !bufr->add(bufr, (unsigned char *) S->file.s_uuid,
+			sizeof(S->file.s_uuid)) )
+		ERR(goto done);
+	fputs("s_uuid: ", stdout);
+	bufr->print(bufr);
+	bufr->reset(bufr);
+
+	if ( !bufr->add(bufr, (unsigned char *) S->file.digest,
+			sizeof(S->file.digest)) )
+		ERR(goto done);
+	fputs("subj digest: ", stdout);
+	bufr->print(bufr);
+
+	fputs("measurement: ", stdout);
+	S->identity->print(S->identity);
+
+
+ done:
+	WHACK(bufr);
+
+	return;
+}
+
+
+/**
+ * Internal public method.
+ *
+ * This method implements output of the characteristics of a cell
+ * that has a file definition.
+ *
+ * \param S	A pointer to the state of the object being output.
+ */
+
+void _dump_socket_create(CO(Cell_State, S))
+
+{
+	fprintf(stdout, "family: %u\n", S->socket_create.family);
+	fprintf(stdout, "type:   %u\n", S->socket_create.type);
+	fprintf(stdout, "type:   %u\n", S->socket_create.protocol);
+	fprintf(stdout, "kern:   %u\n", S->socket_create.kern);
 
 	return;
 }
@@ -820,48 +1219,24 @@ static void dump(CO(Cell, this))
 {
 	STATE(S);
 
-	Buffer bufr = NULL;
-
-
-	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 
 	if ( S->poisoned )
 		fputs("*Poisoned.\n", stdout);
 
-	fprintf(stdout, "uid:  %lu\n", (unsigned long int) S->character.uid);
-	fprintf(stdout, "gid:  %lu\n", (unsigned long int) S->character.gid);
-	fprintf(stdout, "mode: 0%lo\n",(unsigned long int) S->character.mode);
-	fprintf(stdout, "name length: %lu\n", \
-		(unsigned long int) S->character.name_length);
+	switch ( S->type ) {
+		case TSEM_FILE_OPEN:
+		case TSEM_MMAP_FILE:
+			_dump_file(S);
+			break;
 
-	if ( !bufr->add(bufr, (unsigned char *) S->character.name,
-			sizeof(S->character.name)) )
-		ERR(goto done);
-	fputs("name digest: ", stdout);
-	bufr->print(bufr);
-	bufr->reset(bufr);
+		case TSEM_SOCKET_CREATE:
+			_dump_socket_create(S);
+			break;
 
-	fprintf(stdout, "s_id:   %s\n", S->character.s_id);
+		default:
+			break;
+	}
 
-	if ( !bufr->add(bufr, (unsigned char *) S->character.s_uuid,
-			sizeof(S->character.s_uuid)) )
-		ERR(goto done);
-	fputs("s_uuid: ", stdout);
-	bufr->print(bufr);
-	bufr->reset(bufr);
-
-	if ( !bufr->add(bufr, (unsigned char *) S->character.digest,
-			sizeof(S->character.digest)) )
-		ERR(goto done);
-	fputs("subj digest: ", stdout);
-	bufr->print(bufr);
-
-	fputs("measurement: ", stdout);
-	S->identity->print(S->identity);
-
-
- done:
-	WHACK(bufr);
 
 	return;
 }
