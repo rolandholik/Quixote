@@ -80,7 +80,7 @@ struct regex_description Socket_Create_Fields[10] = {
 	{.fd="family=([^,]*)"},
 	{.fd="type=([^,]*)"},
 	{.fd="protocol=([^,]*)"},
-	{.fd="kern=([^,]*)"},
+	{.fd="kern=([^}]*)"},
 	{.fd=NULL}
 };
 
