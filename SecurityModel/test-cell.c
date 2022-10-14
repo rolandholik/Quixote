@@ -100,6 +100,67 @@ static int test_socket_create()
 }
 
 
+/**
+ * Private function.
+ *
+ * This function is responsible for testing the parsing and processing
+ * of a socket connection description.
+ *
+ * \return	A return value of zero indicates that the test utility
+ *		ran correctly.  A value of one is returned to indicate
+ *		an error.
+ */
+
+static int test_socket_connect()
+
+{
+	int retn = 1;
+
+	Buffer bufr = NULL;
+
+	String entry = NULL;
+
+	Cell cell = NULL;
+
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+
+	INIT(HurdLib, String, entry, ERR(goto done));
+	if ( !entry->add(entry, "event{process=runc, filename=none, type=socket_create, task_id=0000000000000000000000000000000000000000000000000000000000000000} COE{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=0x3fffffffff} socket_connect{family=2, data=1f407f0000010000000000000000}") )
+		ERR(goto done);
+
+	entry->print(entry);
+	fputc('\n', stdout);
+
+	INIT(NAAAIM, Cell, cell, ERR(goto done));
+	if ( !cell->parse(cell, entry, TSEM_SOCKET_CONNECT) )
+		ERR(goto done);
+	if ( !cell->measure(cell) )
+		ERR(goto done);
+	if ( !cell->get_measurement(cell, bufr) )
+		ERR(goto done);
+
+	fputs("Arguments:\n", stdout);
+	cell->dump(cell);
+
+	entry->reset(entry);
+	if ( !cell->format(cell, entry) )
+		ERR(goto done);
+	fputs("\nCell characteristics:\n", stdout);
+	entry->print(entry);
+
+	retn = 0;
+
+
+ done:
+	WHACK(bufr);
+	WHACK(entry);
+	WHACK(cell);
+
+	return retn;
+}
+
+
 /*
  * Program entry point begins here.
  */
@@ -131,12 +192,19 @@ extern int main(int argc, char *argv[])
 		fprintf(stderr, "%s: Usage:\n", PGM);
 		fputs("\t-t event_type\n", stderr);
 		fputs("\n\t Event_types:\n", stderr);
-		fputs("\t\tfile_open mmap_file socket_create\n", stderr);
+		fputs("\t\tfile_open mmap_file socket_create " \
+		      "socket_connect\n", stderr);
 		goto done;
 	}
 
 	if ( strcmp(test, "socket_create") == 0 ) {
 		test_socket_create();
+		retn = 0;
+		goto done;
+	}
+
+	if ( strcmp(test, "socket_connect") == 0 ) {
+		test_socket_connect();
 		retn = 0;
 		goto done;
 	}

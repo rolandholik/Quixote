@@ -52,8 +52,9 @@
 
 
 /** Variable to indicate the parsing expressions have been compiled. */
-static _Bool File_Fields_compiled	   = false;
-static _Bool Socket_Create_Fields_compiled = false;
+static _Bool File_Fields_compiled	    = false;
+static _Bool Socket_Create_Fields_compiled  = false;
+static _Bool Socket_Connect_Fields_compiled = false;
 
 /** Array of field descriptions and compiled regular expressions. */
 struct regex_description {
@@ -83,6 +84,13 @@ struct regex_description Socket_Create_Fields[10] = {
 	{.fd=NULL}
 };
 
+struct regex_description Socket_Connect_Fields[10] = {
+	{.fd="socket_connect\\{[^}]*\\}"},
+	{.fd="family=([^,]*)"},
+	{.fd="data=([^}]*)"},
+	{.fd=NULL}
+};
+
 
 /* File characteristics. */
 struct file_parameters {
@@ -105,6 +113,12 @@ struct socket_create_parameters {
 	uint32_t type;
 	uint32_t protocol;
 	uint32_t kern;
+};
+
+/* Socket connect parameters. */
+struct socket_connect_parameters {
+	uint16_t family;
+	uint8_t data[14];
 };
 
 
@@ -130,6 +144,9 @@ struct NAAAIM_Cell_State
 
 	/* Socket creation parameters. */
 	struct socket_create_parameters socket_create;
+
+	/* Socket connection parameters. */
+	struct socket_connect_parameters socket_connect;
 
 	/* Measured identity. */
 	_Bool measured;
@@ -542,6 +559,87 @@ static _Bool _parse_socket_create(CO(Cell_State, S), CO(String, entry))
 
 
 /**
+ * Internal public method.
+ *
+ * This method implements parsing the characteristics of a socket connect
+ * security event.
+ *
+ * \param S	The state information for the Cell that the socket connect
+ *		information is being parsed into.
+ *
+ * \param entry	The object containing the definition of the event that
+ *		is to be parsed.
+ *
+ * \return	A boolean value is used to indicate the success or
+ *		failure of the parsing.  A false value indicates the
+ *		parsing failed and the object is poisoned.  A true
+ *		value indicates the object has been successfully
+ *		populated.
+ */
+
+static _Bool _parse_socket_connect(CO(Cell_State, S), CO(String, entry))
+
+{
+	_Bool retn = false;
+
+	unsigned int cnt,
+		     value;
+
+	char *fp;
+
+	regmatch_t regmatch;
+
+	Buffer field = NULL;
+
+
+	/* Compile the regular expressions once. */
+	if ( !Socket_Connect_Fields_compiled ) {
+		for (cnt= 0; Socket_Connect_Fields[cnt].fd != NULL; ++cnt) {
+			if ( regcomp(&Socket_Connect_Fields[cnt].regex,
+				     Socket_Connect_Fields[cnt].fd,
+				     REG_EXTENDED) != 0 )
+				ERR(goto done);
+		}
+	}
+	Socket_Connect_Fields_compiled = true;
+
+
+	/* Extract socket_connect field. */
+	INIT(HurdLib, Buffer, field, ERR(goto done));
+
+	fp = entry->get(entry);
+	if ( regexec(&Socket_Connect_Fields[0].regex, fp, 1, &regmatch, 0) != \
+	     REG_OK )
+		ERR(goto done);
+
+	field->add(field, (unsigned char *) (fp + regmatch.rm_so),
+		   regmatch.rm_eo-regmatch.rm_so);
+	if ( !field->add(field, (unsigned char *) "\0", 1) )
+		ERR(goto done);
+
+
+	/* Parse socket connect parameters. */
+	fp = (char *) field->get(field);
+	if ( !_get_field(&Socket_Connect_Fields[1].regex, fp, &value) )
+		ERR(goto done);
+	S->socket_connect.family = value;
+
+	if ( !_get_digest(&Socket_Connect_Fields[2].regex, fp,
+			  S->socket_connect.data,
+			  sizeof(S->socket_connect.data)) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	WHACK(field);
+
+	return retn;
+}
+
+
+/**
  * External public method.
  *
  * This method implements parsing of a security state event for the
@@ -590,6 +688,11 @@ static _Bool parse(CO(Cell, this), CO(String, entry),
 
 		case TSEM_SOCKET_CREATE:
 			if ( !_parse_socket_create(S, entry) )
+				ERR(goto done);
+			break;
+
+		case TSEM_SOCKET_CONNECT:
+			if ( !_parse_socket_connect(S, entry) )
 				ERR(goto done);
 			break;
 
@@ -711,6 +814,52 @@ static _Bool _measure_socket_create(CO(Cell_State, S))
 
 
 /**
+ * Internal private method.
+ *
+ * This method implements computing of the measurement of a socket
+ * connect cell.
+ *
+ * \param S	The state information of the object whose socket connect
+ *		measurement is to be generated.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the measurement has succeeded.  A false value
+ *		indicates failure while a true value indicates success.
+ */
+
+static _Bool _measure_socket_connect(CO(Cell_State, S))
+
+{
+	_Bool retn = false;
+
+	unsigned char *p;
+
+	size_t size;
+
+	Buffer bufr = NULL;
+
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	p = (unsigned char *) &S->socket_connect.family;
+	size = sizeof(S->socket_connect.family);
+	bufr->add(bufr, p, size);
+
+	p = (unsigned char *) &S->socket_connect.data;
+	size = sizeof(S->socket_connect.data);
+	bufr->add(bufr, p, size);
+
+	if ( !S->identity->add(S->identity, bufr) )
+		ERR(goto done);
+	retn = true;
+
+ done:
+	WHACK(bufr);
+
+	return retn;
+}
+
+
+/**
  * External public method.
  *
  * This method implements computing of the measurement of a cell.
@@ -747,6 +896,10 @@ static _Bool measure(CO(Cell, this))
 
 		case TSEM_SOCKET_CREATE:
 			retn =_measure_socket_create(S);
+			break;
+
+		case TSEM_SOCKET_CONNECT:
+			retn = _measure_socket_connect(S);
 			break;
 
 		default:
@@ -1063,6 +1216,54 @@ static _Bool _format_socket_create(CO(Cell_State, S), CO(String, str))
 
 
 /**
+ * Internal public method.
+ *
+ * This method implements the output of the characteristics of a cell
+ * for a socket connect security event.
+ *
+ * \param S	A pointer to the state of the object being output.
+ *
+ * \parm str	The object into which the formatted output is to
+ *		be placed.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the output was properly formatted.  A true value
+ *		indicates formatting was successful while a false
+ *		value indicates an error occurred.
+ */
+
+static _Bool _format_socket_connect(CO(Cell_State, S), CO(String, str))
+
+{
+	_Bool retn = false;
+
+	unsigned char *p;
+
+	int lp;
+
+
+	if ( !str->add_sprintf(str, "socket_connect{family=%u, data=", \
+			       S->socket_connect.family) )
+		ERR(goto done);
+
+	p = S->socket_connect.data;
+	for (lp= 0; lp < sizeof(S->socket_connect.data); ++lp) {
+		if ( !str->add_sprintf(str, "%02x", *p) )
+			ERR(goto done);
+		++p;
+	}
+
+	if ( !str->add(str, "}") )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
  * External public method.
  *
  * This method implements the generation of an ASCII formatted
@@ -1092,6 +1293,10 @@ static _Bool format(CO(Cell, this), CO(String, event))
 
 		case TSEM_SOCKET_CREATE:
 			retn = _format_socket_create(S, event);
+			break;
+
+		case TSEM_SOCKET_CONNECT:
+			retn = _format_socket_connect(S, event);
 			break;
 
 		default:
@@ -1187,7 +1392,7 @@ void _dump_file(CO(Cell_State, S))
  * Internal public method.
  *
  * This method implements output of the characteristics of a cell
- * that has a file definition.
+ * that has a socket create definition.
  *
  * \param S	A pointer to the state of the object being output.
  */
@@ -1199,6 +1404,38 @@ void _dump_socket_create(CO(Cell_State, S))
 	fprintf(stdout, "type:   %u\n", S->socket_create.type);
 	fprintf(stdout, "type:   %u\n", S->socket_create.protocol);
 	fprintf(stdout, "kern:   %u\n", S->socket_create.kern);
+
+	return;
+}
+
+
+/**
+ * Internal public method.
+ *
+ * This method implements output of the characteristics of a cell
+ * that has a socket connect definition.
+ *
+ * \param S	A pointer to the state of the object being output.
+ */
+
+void _dump_socket_connect(CO(Cell_State, S))
+
+{
+	Buffer bufr = NULL;
+
+
+	fprintf(stdout, "family: %u\n", S->socket_connect.family);
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	if ( !bufr->add(bufr, S->socket_connect.data, \
+			sizeof(S->socket_connect.data)) )
+		ERR(goto done);
+	fputs("data:   ", stdout);
+	bufr->print(bufr);
+
+
+ done:
+	WHACK(bufr);
 
 	return;
 }
@@ -1231,6 +1468,10 @@ static void dump(CO(Cell, this))
 
 		case TSEM_SOCKET_CREATE:
 			_dump_socket_create(S);
+			break;
+
+		case TSEM_SOCKET_CONNECT:
+			_dump_socket_connect(S);
 			break;
 
 		default:
