@@ -12,6 +12,11 @@
  * the source tree for copyright and licensing information.
  **************************************************************************/
 
+/* Local defines. */
+#define AF_INET	 2
+#define AF_INET6 10
+
+
 /* Include files. */
 #include <stdint.h>
 #include <stdlib.h>
@@ -87,7 +92,10 @@ struct regex_description Socket_Create_Fields[10] = {
 struct regex_description Socket_Connect_Fields[10] = {
 	{.fd="socket_connect\\{[^}]*\\}"},
 	{.fd="family=([^,]*)"},
-	{.fd="data=([^}]*)"},
+	{.fd="port=([^,]*)"},
+	{.fd="flow=([^,]*)"},
+	{.fd="scope=([^,]*)"},
+	{.fd="addr=([^}]*)"},
 	{.fd=NULL}
 };
 
@@ -118,7 +126,14 @@ struct socket_create_parameters {
 /* Socket connect parameters. */
 struct socket_connect_parameters {
 	uint16_t family;
-	uint8_t data[14];
+	uint16_t port;
+	uint32_t flow;
+	uint32_t scope;
+	union {
+		uint32_t ipv4_addr;
+		uint8_t ipv6_addr[16];
+		uint8_t addr[32];
+	} u;
 };
 
 
@@ -587,6 +602,8 @@ static _Bool _parse_socket_connect(CO(Cell_State, S), CO(String, entry))
 
 	char *fp;
 
+	uint8_t *p;
+
 	regmatch_t regmatch;
 
 	Buffer field = NULL;
@@ -608,26 +625,64 @@ static _Bool _parse_socket_connect(CO(Cell_State, S), CO(String, entry))
 	INIT(HurdLib, Buffer, field, ERR(goto done));
 
 	fp = entry->get(entry);
-	if ( regexec(&Socket_Connect_Fields[0].regex, fp, 1, &regmatch, 0) != \
-	     REG_OK )
+	if ( regexec(&Socket_Connect_Fields[0].regex, fp, 1, &regmatch, 0) \
+	     != REG_OK )
 		ERR(goto done);
 
 	field->add(field, (unsigned char *) (fp + regmatch.rm_so),
 		   regmatch.rm_eo-regmatch.rm_so);
 	if ( !field->add(field, (unsigned char *) "\0", 1) )
 		ERR(goto done);
-
-
-	/* Parse socket connect parameters. */
 	fp = (char *) field->get(field);
+
+	/* Parse socket family. */
 	if ( !_get_field(&Socket_Connect_Fields[1].regex, fp, &value) )
-		ERR(goto done);
+				ERR(goto done);
 	S->socket_connect.family = value;
 
-	if ( !_get_digest(&Socket_Connect_Fields[2].regex, fp,
-			  S->socket_connect.data,
-			  sizeof(S->socket_connect.data)) )
-		ERR(goto done);
+	/* Parse port number. */
+	if ( (S->socket_connect.family == AF_INET) ||
+	     (S->socket_connect.family == AF_INET6) ) {
+		if ( !_get_field(&Socket_Connect_Fields[2].regex, fp, &value) )
+			ERR(goto done);
+		S->socket_connect.port = value;
+	}
+
+	/* Extract protocol specific fields. */
+	switch ( S->socket_connect.family ) {
+		case AF_INET:
+			if ( !_get_field(&Socket_Connect_Fields[5].regex, fp, \
+					 &value) )
+				ERR(goto done);
+			S->socket_connect.u.ipv4_addr = value;
+			break;
+
+		case AF_INET6:
+			if ( !_get_field(&Socket_Connect_Fields[3].regex, fp, \
+					 &value) )
+				ERR(goto done);
+			S->socket_connect.flow = value;
+
+			if ( !_get_field(&Socket_Connect_Fields[4].regex, fp, \
+					 &value) )
+				ERR(goto done);
+			S->socket_connect.scope = value;
+
+			p = S->socket_connect.u.ipv6_addr;
+			cnt = sizeof(S->socket_connect.u.ipv6_addr);
+			if ( !_get_digest(&Socket_Connect_Fields[5].regex, \
+					  fp, p, cnt) )
+				ERR(goto done);
+			break;
+
+		default:
+			p = S->socket_connect.u.addr;
+			cnt = sizeof(S->socket_connect.u.addr);
+			if ( !_get_digest(&Socket_Connect_Fields[5].regex,  \
+					  fp, p, cnt) )
+				ERR(goto done);
+			break;
+	}
 
 	retn = true;
 
@@ -645,13 +700,13 @@ static _Bool _parse_socket_connect(CO(Cell_State, S), CO(String, entry))
  * This method implements parsing of a security state event for the
  * characteristics of a cell
  *
- * \param this	A pointer to the cell whose trajectory entry
- *		is to be parsed.
+ * \param this		A pointer to the cell whose trajectory entry
+ *			is to be parsed.
  *
- * \param entry	A pointer to the object which contains the trajectory
- *		step point which is to be parsed.
+ * \param entry		A pointer to the object which contains the
+ *			trajectory step point which is to be parsed.
  *
- * \parm type	The type of the cell
+ * \param type		The type of the socket cell being parsed.
  *
  * \return	A boolean value is used to indicate the success or
  *		failure of the parsing.  A false value indicates the
@@ -844,9 +899,40 @@ static _Bool _measure_socket_connect(CO(Cell_State, S))
 	size = sizeof(S->socket_connect.family);
 	bufr->add(bufr, p, size);
 
-	p = (unsigned char *) &S->socket_connect.data;
-	size = sizeof(S->socket_connect.data);
-	bufr->add(bufr, p, size);
+	if ( (S->socket_connect.family == AF_INET) ||
+	     (S->socket_connect.family == AF_INET6) ) {
+			p = (unsigned char *) &S->socket_connect.port;
+			size = sizeof(S->socket_connect.port);
+			bufr->add(bufr, p, size);
+	}
+
+	switch ( S->socket_connect.family ) {
+		case AF_INET:
+			p = (unsigned char *) &S->socket_connect.u.ipv4_addr;
+			size = sizeof(S->socket_connect.u.ipv4_addr);
+			bufr->add(bufr, p, size);
+			break;
+
+		case AF_INET6:
+			p = (unsigned char *) &S->socket_connect.u.ipv6_addr;
+			size = sizeof(S->socket_connect.u.ipv6_addr);
+			bufr->add(bufr, p, size);
+
+			p = (unsigned char *) &S->socket_connect.flow;
+			size = sizeof(S->socket_connect.flow);
+			bufr->add(bufr, p, size);
+
+			p = (unsigned char *) &S->socket_connect.scope;
+			size = sizeof(S->socket_connect.scope);
+			bufr->add(bufr, p, size);
+			break;
+
+		default:
+			p = (unsigned char *) S->socket_connect.u.addr;
+			size = sizeof(S->socket_connect.u.addr);
+			bufr->add(bufr, p, size);
+			break;
+	}
 
 	if ( !S->identity->add(S->identity, bufr) )
 		ERR(goto done);
@@ -911,7 +997,7 @@ static _Bool measure(CO(Cell, this))
 			ERR(goto done);
 		S->measured = true;
 	}
-
+	retn = true;
 
  done:
 	if ( !retn )
@@ -1239,18 +1325,51 @@ static _Bool _format_socket_connect(CO(Cell_State, S), CO(String, str))
 
 	unsigned char *p;
 
-	int lp;
+	unsigned int lp,
+		     size;
 
 
-	if ( !str->add_sprintf(str, "socket_connect{family=%u, data=", \
+	if ( !str->add_sprintf(str, "socket_connect{family=%u, ", \
 			       S->socket_connect.family) )
 		ERR(goto done);
 
-	p = S->socket_connect.data;
-	for (lp= 0; lp < sizeof(S->socket_connect.data); ++lp) {
-		if ( !str->add_sprintf(str, "%02x", *p) )
-			ERR(goto done);
-		++p;
+	switch ( S->socket_connect.family ) {
+		case AF_INET:
+			if ( !str->add_sprintf(str, "port=%u, addr=%u",	   \
+					       S->socket_connect.port,	   \
+					       S->socket_connect.u.ipv4_addr) )
+				ERR(goto done);
+			break;
+
+		case AF_INET6:
+			if ( !str->add_sprintf(str, "port=%u, flow=%u, "     \
+					       "scope=%u, addr=",	     \
+					       S->socket_connect.port,	     \
+					       S->socket_connect.flow,	     \
+					       S->socket_connect.scope) )
+				ERR(goto done);
+
+			p = S->socket_connect.u.ipv6_addr;
+			size = sizeof(S->socket_connect.u.ipv6_addr);
+			for (lp= 0; lp < size; ++lp) {
+				if ( !str->add_sprintf(str, "%02x", *p) )
+					ERR(goto done);
+				++p;
+			}
+			break;
+
+		default:
+			if ( !str->add_sprintf(str, "addr=") )
+				ERR(goto done);
+
+			p = S->socket_connect.u.addr;
+			size = sizeof(S->socket_connect.u.addr);
+			for (lp= 0; lp < size; ++lp) {
+				if ( !str->add_sprintf(str, "%02x", *p) )
+					ERR(goto done);
+				++p;
+			}
+			break;
 	}
 
 	if ( !str->add(str, "}") )
@@ -1296,7 +1415,7 @@ static _Bool format(CO(Cell, this), CO(String, event))
 			break;
 
 		case TSEM_SOCKET_CONNECT:
-			retn = _format_socket_connect(S, event);
+				retn = _format_socket_connect(S, event);
 			break;
 
 		default:
@@ -1421,21 +1540,59 @@ void _dump_socket_create(CO(Cell_State, S))
 void _dump_socket_connect(CO(Cell_State, S))
 
 {
-	Buffer bufr = NULL;
+	char *type;
+
+	unsigned char *p;
+
+	unsigned int lp,
+		     size;
 
 
-	fprintf(stdout, "family: %u\n", S->socket_connect.family);
+	switch ( S->socket_connect.family ) {
+		case AF_INET:
+			type = "IPV4";
+			break;
+		case AF_INET6:
+			type = "IPV6";
+			break;
+		default:
+			type = "OTHER";
+			break;
+	}
+	fprintf(stdout, "family: %u / %s\n", S->socket_connect.family, type);
 
-	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	if ( !bufr->add(bufr, S->socket_connect.data, \
-			sizeof(S->socket_connect.data)) )
-		ERR(goto done);
-	fputs("data:   ", stdout);
-	bufr->print(bufr);
+	if ( (S->socket_connect.family == AF_INET) ||
+	     (S->socket_connect.family == AF_INET6) )
+		fprintf(stdout, "port:   %u\n", S->socket_connect.port);
 
 
- done:
-	WHACK(bufr);
+	switch ( S->socket_connect.family ) {
+		case AF_INET:
+			fprintf(stdout, "addr:   %u\n", \
+				S->socket_connect.u.ipv4_addr);
+			break;
+		case AF_INET6:
+			fprintf(stdout, "flow:   %u\n", \
+				S->socket_connect.flow);
+			fprintf(stdout, "scope:  %u\n", \
+				S->socket_connect.scope);
+			fputs("addr:   ", stdout);
+			p = S->socket_connect.u.ipv6_addr;
+			size = sizeof(S->socket_connect.u.ipv6_addr);
+			for (lp= 0; lp < size; ++lp)
+				fprintf(stdout, "%02x", *p++);
+			fputs("\n", stdout);
+			break;
+		default:
+			fputs("addr:   ", stdout);
+			p = S->socket_connect.u.addr;
+			size = sizeof(S->socket_connect.u.addr);
+			for (lp= 0; lp < size; ++lp)
+				fprintf(stdout, "%02x", *p++);
+			fputs("\n", stdout);
+			break;
+	}
+
 
 	return;
 }
@@ -1495,6 +1652,7 @@ static void whack(CO(Cell, this))
 
 {
 	STATE(S);
+
 
 	WHACK(S->identity);
 

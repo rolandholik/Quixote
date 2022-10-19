@@ -14,6 +14,12 @@
 
 #define PGM "test-cell"
 
+#define SOCKET_CONNECT "event{process=bash, filename=none, type=socket_connect, task_id=77e90dbb8ae1da51e8dd0dc5f1500d9f6c26332252afa8fb8a4ca91a1ef60cac} COE{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=0x20000420} socket_connect{family=1, addr=29c8abdfccdc1a3d51b989efea75d94b8453ad3014baa78d6a948cc92042c7ce}"
+
+#define SOCKET_CONNECT_IPV4 "event{process=ncat, filename=none, type=socket_connect, task_id=ed7531f7052b0d02cfc0e26c74b0292cc2e46ca48e889f18670cabd75bd4e700} COE{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=0x20000420} socket_connect{family=2, port=16415, addr=16777343}"
+
+#define SOCKET_CONNECT_IPV6 "event{process=ncat, filename=none, type=socket_connect, task_id=ed7531f7052b0d02cfc0e26c74b0292cc2e46ca48e889f18670cabd75bd4e700} COE{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=0x20000420} socket_connect{family=10, port=16415, flow=0, scope=0, addr=20014930017201100000000000000001}"
+
 
 /* Include files. */
 #include <stdio.h>
@@ -79,7 +85,7 @@ static int test_socket_create()
 	if ( !cell->get_measurement(cell, bufr) )
 		ERR(goto done);
 
-	fputs("Arguments:\n", stdout);
+	fputs("\nArguments:\n", stdout);
 	cell->dump(cell);
 
 	entry->reset(entry);
@@ -106,12 +112,15 @@ static int test_socket_create()
  * This function is responsible for testing the parsing and processing
  * of a socket connection description.
  *
+ * \param arg	A pointer to a null-terminated buffer containing
+ *		the socket connection definition to be tested.
+ *
  * \return	A return value of zero indicates that the test utility
  *		ran correctly.  A value of one is returned to indicate
  *		an error.
  */
 
-static int test_socket_connect()
+static int test_socket_connect(char *arg)
 
 {
 	int retn = 1;
@@ -126,7 +135,7 @@ static int test_socket_connect()
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 
 	INIT(HurdLib, String, entry, ERR(goto done));
-	if ( !entry->add(entry, "event{process=runc, filename=none, type=socket_create, task_id=0000000000000000000000000000000000000000000000000000000000000000} COE{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=0x3fffffffff} socket_connect{family=2, data=1f407f0000010000000000000000}") )
+	if ( !entry->add(entry, arg) )
 		ERR(goto done);
 
 	entry->print(entry);
@@ -139,8 +148,10 @@ static int test_socket_connect()
 		ERR(goto done);
 	if ( !cell->get_measurement(cell, bufr) )
 		ERR(goto done);
+	fputs("Cell measurement:\n", stdout);
+	bufr->print(bufr);
 
-	fputs("Arguments:\n", stdout);
+	fputs("\nArguments:\n", stdout);
 	cell->dump(cell);
 
 	entry->reset(entry);
@@ -193,7 +204,7 @@ extern int main(int argc, char *argv[])
 		fputs("\t-t event_type\n", stderr);
 		fputs("\n\t Event_types:\n", stderr);
 		fputs("\t\tfile_open mmap_file socket_create " \
-		      "socket_connect\n", stderr);
+		      "socket_connect\n", stdout);
 		goto done;
 	}
 
@@ -204,8 +215,17 @@ extern int main(int argc, char *argv[])
 	}
 
 	if ( strcmp(test, "socket_connect") == 0 ) {
-		test_socket_connect();
-		retn = 0;
+		retn = test_socket_connect(SOCKET_CONNECT);
+		goto done;
+	}
+
+	if ( strcmp(test, "socket_connect_ipv4") == 0 ) {
+		retn = test_socket_connect(SOCKET_CONNECT_IPV4);
+		goto done;
+	}
+
+	if ( strcmp(test, "socket_connect_ipv6") == 0 ) {
+		retn = test_socket_connect(SOCKET_CONNECT_IPV6);
 		goto done;
 	}
 
