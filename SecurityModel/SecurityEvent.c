@@ -84,6 +84,7 @@ static const char *TSEM_name[] = {
 	"bprm_set_creds",
 	"socket_create",
 	"socket_connect",
+	"socket_bind",
 	NULL
 };
 

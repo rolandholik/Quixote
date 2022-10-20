@@ -59,7 +59,7 @@
 /** Variable to indicate the parsing expressions have been compiled. */
 static _Bool File_Fields_compiled	    = false;
 static _Bool Socket_Create_Fields_compiled  = false;
-static _Bool Socket_Connect_Fields_compiled = false;
+static _Bool Socket_Fields_compiled	    = false;
 
 /** Array of field descriptions and compiled regular expressions. */
 struct regex_description {
@@ -89,8 +89,9 @@ struct regex_description Socket_Create_Fields[10] = {
 	{.fd=NULL}
 };
 
-struct regex_description Socket_Connect_Fields[10] = {
+struct regex_description Socket_Fields[8] = {
 	{.fd="socket_connect\\{[^}]*\\}"},
+	{.fd="socket_bind\\{[^}]*\\}"},
 	{.fd="family=([^,]*)"},
 	{.fd="port=([^,]*)"},
 	{.fd="flow=([^,]*)"},
@@ -576,8 +577,8 @@ static _Bool _parse_socket_create(CO(Cell_State, S), CO(String, entry))
 /**
  * Internal public method.
  *
- * This method implements parsing the characteristics of a socket connect
- * security event.
+ * This method implements parsing the characteristics of either s
+ * socket connect or socket bind event.
  *
  * \param S	The state information for the Cell that the socket connect
  *		information is being parsed into.
@@ -592,7 +593,7 @@ static _Bool _parse_socket_create(CO(Cell_State, S), CO(String, entry))
  *		populated.
  */
 
-static _Bool _parse_socket_connect(CO(Cell_State, S), CO(String, entry))
+static _Bool _parse_socket(CO(Cell_State, S), CO(String, entry))
 
 {
 	_Bool retn = false;
@@ -610,23 +611,34 @@ static _Bool _parse_socket_connect(CO(Cell_State, S), CO(String, entry))
 
 
 	/* Compile the regular expressions once. */
-	if ( !Socket_Connect_Fields_compiled ) {
-		for (cnt= 0; Socket_Connect_Fields[cnt].fd != NULL; ++cnt) {
-			if ( regcomp(&Socket_Connect_Fields[cnt].regex,
-				     Socket_Connect_Fields[cnt].fd,
+	if ( !Socket_Fields_compiled ) {
+		for (cnt= 0; Socket_Fields[cnt].fd != NULL; ++cnt) {
+			if ( regcomp(&Socket_Fields[cnt].regex, \
+				     Socket_Fields[cnt].fd,	\
 				     REG_EXTENDED) != 0 )
 				ERR(goto done);
 		}
 	}
-	Socket_Connect_Fields_compiled = true;
+	Socket_Fields_compiled = true;
 
 
-	/* Extract socket_connect field. */
+	/* Extract the socket field. */
 	INIT(HurdLib, Buffer, field, ERR(goto done));
 
 	fp = entry->get(entry);
-	if ( regexec(&Socket_Connect_Fields[0].regex, fp, 1, &regmatch, 0) \
-	     != REG_OK )
+	switch ( S->type ) {
+		case TSEM_SOCKET_CONNECT:
+			value = 0;
+			break;
+		case TSEM_SOCKET_BIND:
+			value = 1;
+			break;
+		default:
+			break;
+
+	}
+	if ( regexec(&Socket_Fields[value].regex, fp, 1, &regmatch, 0) != \
+	     REG_OK )
 		ERR(goto done);
 
 	field->add(field, (unsigned char *) (fp + regmatch.rm_so),
@@ -636,14 +648,14 @@ static _Bool _parse_socket_connect(CO(Cell_State, S), CO(String, entry))
 	fp = (char *) field->get(field);
 
 	/* Parse socket family. */
-	if ( !_get_field(&Socket_Connect_Fields[1].regex, fp, &value) )
-				ERR(goto done);
+	if ( !_get_field(&Socket_Fields[2].regex, fp, &value) )
+		ERR(goto done);
 	S->socket_connect.family = value;
 
 	/* Parse port number. */
 	if ( (S->socket_connect.family == AF_INET) ||
 	     (S->socket_connect.family == AF_INET6) ) {
-		if ( !_get_field(&Socket_Connect_Fields[2].regex, fp, &value) )
+		if ( !_get_field(&Socket_Fields[3].regex, fp, &value) )
 			ERR(goto done);
 		S->socket_connect.port = value;
 	}
@@ -651,34 +663,32 @@ static _Bool _parse_socket_connect(CO(Cell_State, S), CO(String, entry))
 	/* Extract protocol specific fields. */
 	switch ( S->socket_connect.family ) {
 		case AF_INET:
-			if ( !_get_field(&Socket_Connect_Fields[5].regex, fp, \
-					 &value) )
+			if ( !_get_field(&Socket_Fields[6].regex, fp, &value) )
 				ERR(goto done);
 			S->socket_connect.u.ipv4_addr = value;
 			break;
 
 		case AF_INET6:
-			if ( !_get_field(&Socket_Connect_Fields[3].regex, fp, \
+			if ( !_get_field(&Socket_Fields[4].regex, fp, \
 					 &value) )
 				ERR(goto done);
 			S->socket_connect.flow = value;
 
-			if ( !_get_field(&Socket_Connect_Fields[4].regex, fp, \
-					 &value) )
+			if ( !_get_field(&Socket_Fields[5].regex, fp, &value) )
 				ERR(goto done);
 			S->socket_connect.scope = value;
 
 			p = S->socket_connect.u.ipv6_addr;
 			cnt = sizeof(S->socket_connect.u.ipv6_addr);
-			if ( !_get_digest(&Socket_Connect_Fields[5].regex, \
-					  fp, p, cnt) )
+			if ( !_get_digest(&Socket_Fields[6].regex, fp, p, \
+					  cnt) )
 				ERR(goto done);
 			break;
 
 		default:
 			p = S->socket_connect.u.addr;
 			cnt = sizeof(S->socket_connect.u.addr);
-			if ( !_get_digest(&Socket_Connect_Fields[5].regex,  \
+			if ( !_get_digest(&Socket_Fields[6].regex,  \
 					  fp, p, cnt) )
 				ERR(goto done);
 			break;
@@ -747,7 +757,8 @@ static _Bool parse(CO(Cell, this), CO(String, entry),
 			break;
 
 		case TSEM_SOCKET_CONNECT:
-			if ( !_parse_socket_connect(S, entry) )
+		case TSEM_SOCKET_BIND:
+			if ( !_parse_socket(S, entry) )
 				ERR(goto done);
 			break;
 
@@ -985,6 +996,7 @@ static _Bool measure(CO(Cell, this))
 			break;
 
 		case TSEM_SOCKET_CONNECT:
+		case TSEM_SOCKET_BIND:
 			retn = _measure_socket_connect(S);
 			break;
 
@@ -1323,13 +1335,17 @@ static _Bool _format_socket_connect(CO(Cell_State, S), CO(String, str))
 {
 	_Bool retn = false;
 
+	char *type;
+
 	unsigned char *p;
 
 	unsigned int lp,
 		     size;
 
 
-	if ( !str->add_sprintf(str, "socket_connect{family=%u, ", \
+	type = (S->type == TSEM_SOCKET_CONNECT) ? "socket_connect" : \
+		"socket_bind";
+	if ( !str->add_sprintf(str, "%s{family=%u, ", type, \
 			       S->socket_connect.family) )
 		ERR(goto done);
 
@@ -1415,6 +1431,7 @@ static _Bool format(CO(Cell, this), CO(String, event))
 			break;
 
 		case TSEM_SOCKET_CONNECT:
+		case TSEM_SOCKET_BIND:
 				retn = _format_socket_connect(S, event);
 			break;
 
@@ -1628,6 +1645,7 @@ static void dump(CO(Cell, this))
 			break;
 
 		case TSEM_SOCKET_CONNECT:
+		case TSEM_SOCKET_BIND:
 			_dump_socket_connect(S);
 			break;
 

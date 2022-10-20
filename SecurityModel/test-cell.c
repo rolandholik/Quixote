@@ -20,6 +20,9 @@
 
 #define SOCKET_CONNECT_IPV6 "event{process=ncat, filename=none, type=socket_connect, task_id=ed7531f7052b0d02cfc0e26c74b0292cc2e46ca48e889f18670cabd75bd4e700} COE{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=0x20000420} socket_connect{family=10, port=16415, flow=0, scope=0, addr=20014930017201100000000000000001}"
 
+#define SOCKET_BIND "event{process=ncat, filename=none, type=socket_bind, task_id=6c3377303937c412988b0b5ec741fc01d94f1d3b8a68cb118406d2ca19502816} COE{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=0x7fffffffff} socket_bind{family=10, port=16415, flow=0, scope=0, addr=00000000000000000000000000000000}"
+
+
 
 /* Include files. */
 #include <stdio.h>
@@ -115,12 +118,14 @@ static int test_socket_create()
  * \param arg	A pointer to a null-terminated buffer containing
  *		the socket connection definition to be tested.
  *
+ * \param type	The event type being parsed.
+ *
  * \return	A return value of zero indicates that the test utility
  *		ran correctly.  A value of one is returned to indicate
  *		an error.
  */
 
-static int test_socket_connect(char *arg)
+static int test_socket(char *arg, enum tsem_event_type type)
 
 {
 	int retn = 1;
@@ -142,7 +147,7 @@ static int test_socket_connect(char *arg)
 	fputc('\n', stdout);
 
 	INIT(NAAAIM, Cell, cell, ERR(goto done));
-	if ( !cell->parse(cell, entry, TSEM_SOCKET_CONNECT) )
+	if ( !cell->parse(cell, entry, type) )
 		ERR(goto done);
 	if ( !cell->measure(cell) )
 		ERR(goto done);
@@ -184,6 +189,8 @@ extern int main(int argc, char *argv[])
 
 	char *test = "unknown";
 
+	enum tsem_event_type type;
+
 	String entry = NULL;
 
 	Buffer bufr = NULL;
@@ -203,8 +210,10 @@ extern int main(int argc, char *argv[])
 		fprintf(stderr, "%s: Usage:\n", PGM);
 		fputs("\t-t event_type\n", stderr);
 		fputs("\n\t Event_types:\n", stderr);
-		fputs("\t\tfile_open mmap_file socket_create " \
-		      "socket_connect\n", stdout);
+		fputs("\t\tfile_open mmap_file socket_create\n", stdout);
+		fputs("\t\tsocket_connect socket_connect_ipv4 " \
+		      "socket_connect_ipv6\n", stdout);
+		fputs("\t\tsocket_bind\n", stdout);
 		goto done;
 	}
 
@@ -214,18 +223,25 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
+	type = TSEM_SOCKET_CONNECT;
 	if ( strcmp(test, "socket_connect") == 0 ) {
-		retn = test_socket_connect(SOCKET_CONNECT);
+		retn = test_socket(SOCKET_CONNECT, type);
 		goto done;
 	}
 
 	if ( strcmp(test, "socket_connect_ipv4") == 0 ) {
-		retn = test_socket_connect(SOCKET_CONNECT_IPV4);
+		retn = test_socket(SOCKET_CONNECT_IPV4, type);
 		goto done;
 	}
 
 	if ( strcmp(test, "socket_connect_ipv6") == 0 ) {
-		retn = test_socket_connect(SOCKET_CONNECT_IPV6);
+		retn = test_socket(SOCKET_CONNECT_IPV6, type);
+		goto done;
+	}
+
+	type = TSEM_SOCKET_BIND;
+	if ( strcmp(test, "socket_bind") == 0 ) {
+		retn = test_socket(SOCKET_BIND, type);
 		goto done;
 	}
 
