@@ -1178,7 +1178,7 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint, \
 	_Bool retn = false;
 
 	char *bundle = NULL,
-	     bufr[512];
+	     bufr[1024];
 
 	int rc,
 	    event_fd,
