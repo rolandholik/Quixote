@@ -58,6 +58,7 @@
 
 /** Variable to indicate the parsing expressions have been compiled. */
 static _Bool File_Fields_compiled	    = false;
+static _Bool Mmap_Fields_compiled	    = false;
 static _Bool Socket_Create_Fields_compiled  = false;
 static _Bool Socket_Fields_compiled	    = false;
 
@@ -68,7 +69,7 @@ struct regex_description {
 };
 
 struct regex_description File_Fields[10] = {
-	{.fd="file\\{[^}]*\\}"},
+	{.fd=" file\\{[^}]*\\}"},
 	{.fd="uid=([^,]*)"},
 	{.fd="gid=([^,]*)"},
 	{.fd="mode=([^,]*)"},
@@ -78,6 +79,15 @@ struct regex_description File_Fields[10] = {
 	{.fd="s_uuid=([^,]*)"},
 	{.fd="digest=([^}]*)"},
 	{.fd=NULL}
+};
+
+struct regex_description Mmap_Fields[6] = {
+	{.fd = "mmap_file\\{[^}]*\\}"},
+	{.fd = "type=([^,]*)"},
+	{.fd = "reqprot=([^,]*)"},
+	{.fd =" prot=([^,]*)"},
+	{.fd = "flags=([^}]*)\\}"},
+	{.fd = NULL}
 };
 
 struct regex_description Socket_Create_Fields[10] = {
@@ -114,6 +124,14 @@ struct file_parameters {
 	uint8_t s_uuid[16];
 
 	char digest[NAAAIM_IDSIZE];
+};
+
+/* File mmap parameters. */
+struct mmap_file_parameters {
+	unsigned int anonymous;
+	uint32_t reqprot;
+	uint32_t prot;
+	uint32_t flags;
 };
 
 /* Socket create parameters. */
@@ -157,6 +175,9 @@ struct NAAAIM_Cell_State
 
 	/* File characteristics. */
 	struct file_parameters file;
+
+	/* Memory map characteristics. */
+	struct mmap_file_parameters mmap_file;
 
 	/* Socket creation parameters. */
 	struct socket_create_parameters socket_create;
@@ -490,6 +511,87 @@ static _Bool _parse_file(CO(Cell_State, S), CO(String, entry))
 /**
  * Internal public method.
  *
+ * This method implements parsing the characteristics of a memory
+ * mapping security event.
+ *
+ * \param S	The state information for the Cell that the file information
+ *		is being parsed into.
+ *
+ * \param entry	The object containing the definition of the event that
+ *		is to be parsed.
+ *
+ * \return	A boolean value is used to indicate the success or
+ *		failure of the parsing.  A false value indicates the
+ *		parsing failed and the object is poisoned.  A true
+ *		value indicates the object has been successfully
+ *		populated.
+ */
+
+static _Bool _parse_mmap_file(CO(Cell_State, S), CO(String, entry))
+
+{
+	_Bool retn = false;
+
+	unsigned int cnt;
+
+	char *fp;
+
+	regmatch_t regmatch;
+
+	Buffer field = NULL;
+
+
+	/* Compile the regular expressions once. */
+	if ( !Mmap_Fields_compiled ) {
+		for (cnt= 0; Mmap_Fields[cnt].fd != NULL; ++cnt) {
+			if ( regcomp(&Mmap_Fields[cnt].regex,
+				     Mmap_Fields[cnt].fd, REG_EXTENDED) != 0 )
+				ERR(goto done);
+		}
+	}
+	Mmap_Fields_compiled = true;
+
+
+	/* Extract the mmap field. */
+	INIT(HurdLib, Buffer, field, ERR(goto done));
+
+	fp = entry->get(entry);
+	if ( regexec(&Mmap_Fields[0].regex, fp, 1, &regmatch, 0) != REG_OK )
+		ERR(goto done);
+
+	field->add(field, (unsigned char *) (fp + regmatch.rm_so),
+		   regmatch.rm_eo-regmatch.rm_so);
+	if ( !field->add(field, (unsigned char *) "\0", 1) )
+		ERR(goto done);
+
+
+	/* Parse field entries. */
+	fp = (char *) field->get(field);
+	if ( !_get_field(&Mmap_Fields[1].regex, fp, &S->mmap_file.anonymous) )
+		ERR(goto done);
+
+	if ( !_get_field(&Mmap_Fields[2].regex, fp, &S->mmap_file.reqprot) )
+		ERR(goto done);
+
+	if ( !_get_field(&Mmap_Fields[3].regex, fp, &S->mmap_file.prot) )
+		ERR(goto done);
+
+	if ( !_get_field(&Mmap_Fields[4].regex, fp, &S->mmap_file.flags) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	WHACK(field);
+
+	return retn;
+}
+
+
+/**
+ * Internal public method.
+ *
  * This method implements parsing the characteristics of a socket creation
  * security event.
  *
@@ -746,9 +848,17 @@ static _Bool parse(CO(Cell, this), CO(String, entry),
 
 	switch ( S->type ) {
 		case TSEM_FILE_OPEN:
-		case TSEM_MMAP_FILE:
 			if ( !_parse_file(S, entry) )
 				ERR(goto done);
+			break;
+
+		case TSEM_MMAP_FILE:
+			if ( !_parse_mmap_file(S, entry) )
+				ERR(goto done);
+			if ( !S->mmap_file.anonymous ) {
+				if ( !_parse_file(S, entry) )
+					ERR(goto done);
+			}
 			break;
 
 		case TSEM_SOCKET_CREATE:
@@ -816,6 +926,57 @@ static _Bool _measure_file(CO(Cell_State, S))
 		ERR(goto done);
 	retn = true;
 
+
+ done:
+	WHACK(bufr);
+
+	return retn;
+}
+
+
+/**
+ * Internal private method.
+ *
+ * This method implements adding the parameters of a memory mapping
+ * event to the measurement of the cell.
+ *
+ * \param S	The state information of the object whose memory
+ *		mapping parameters are to be added.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the addition of the parameters has succeeded.  A false
+ *		value indicates failure while a true value indicates
+ *		success.
+ */
+
+static _Bool _measure_mmap_file(CO(Cell_State, S))
+
+{
+	_Bool retn = false;
+
+	unsigned char *p;
+
+	size_t size;
+
+	Buffer bufr = NULL;
+
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	p = (unsigned char *) &S->mmap_file.reqprot;
+	size = sizeof(S->mmap_file.reqprot);
+	bufr->add(bufr, p, size);
+
+	p = (unsigned char *) &S->mmap_file.prot;
+	size = sizeof(S->mmap_file.prot);
+	bufr->add(bufr, p, size);
+
+	p = (unsigned char *) &S->mmap_file.flags;
+	size = sizeof(S->mmap_file.flags);
+	bufr->add(bufr, p, size);
+
+	if ( !S->identity->add(S->identity, bufr) )
+		ERR(goto done);
+	retn = true;
 
  done:
 	WHACK(bufr);
@@ -987,8 +1148,13 @@ static _Bool measure(CO(Cell, this))
 
 	switch ( S->type ) {
 		case TSEM_FILE_OPEN:
-		case TSEM_MMAP_FILE:
 			retn = _measure_file(S);
+			break;
+
+		case TSEM_MMAP_FILE:
+			retn = _measure_mmap_file(S);
+			if ( !S->mmap_file.anonymous )
+				retn = _measure_file(S);
 			break;
 
 		case TSEM_SOCKET_CREATE:
@@ -1278,6 +1444,45 @@ static _Bool _format_file(CO(Cell_State, S), CO(String, str))
 /**
  * Internal public method.
  *
+ * This method implements the output of the characteristics of a
+ * memory mapping event.
+ *
+ * \param S	A pointer to the state of the object being output.
+ *
+ * \parm str	The object into which the formatted output is to
+ *		be placed.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the output was properly formatted.  A true value
+ *		indicates formatting was successful while a false
+ *		value indicates an error occurred.
+ */
+
+static _Bool _format_mmap_file(CO(Cell_State, S), CO(String, str))
+
+{
+	_Bool retn = false;
+
+
+	if ( !str->add_sprintf(str, "mmap_file{type=%u, reqprot=%u, "	      \
+			       "prot=%u, flags=%u} ", S->mmap_file.anonymous, \
+			       S->mmap_file.reqprot, S->mmap_file.prot,	      \
+			       S->mmap_file.flags) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
+ * Internal public method.
+ *
  * This method implements the output of the characteristics of a cell
  * for a socket creation security event.
  *
@@ -1422,8 +1627,13 @@ static _Bool format(CO(Cell, this), CO(String, event))
 
 	switch ( S->type ) {
 		case TSEM_FILE_OPEN:
-		case TSEM_MMAP_FILE:
 			retn = _format_file(S, event);
+			break;
+
+		case TSEM_MMAP_FILE:
+			retn = _format_mmap_file(S, event);
+			if ( !S->mmap_file.anonymous )
+				retn = _format_file(S, event);
 			break;
 
 		case TSEM_SOCKET_CREATE:

@@ -14,6 +14,8 @@
 
 #define PGM "test-cell"
 
+#define MMAP_FILE "event{process=bash, filename=/lib/ld-2.24.so, type=mmap_file, task_id=77e90dbb8ae1da51e8dd0dc5f1500d9f6c26332252afa8fb8a4ca91a1ef60cac} COE{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=0x20000420} mmap_file{type=0, reqprot=3, prot=7, flags=18} file{uid=0, gid=0, mode=0100755, name_length=15, name=5aa7963f1fe8fa3cc7ca977df0773b9eafc286828a923a5307c1574ba4368a9f, s_id=xvdb, s_uuid=a953e99a39e54e478c9edf24815ddc49, digest=1b4cd80888cfe0171d0f413caecc99831a4463c05a8f7c99ab8570d0684b2dc8}"
+
 #define SOCKET_CONNECT "event{process=bash, filename=none, type=socket_connect, task_id=77e90dbb8ae1da51e8dd0dc5f1500d9f6c26332252afa8fb8a4ca91a1ef60cac} COE{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=0x20000420} socket_connect{family=1, addr=29c8abdfccdc1a3d51b989efea75d94b8453ad3014baa78d6a948cc92042c7ce}"
 
 #define SOCKET_CONNECT_IPV4 "event{process=ncat, filename=none, type=socket_connect, task_id=ed7531f7052b0d02cfc0e26c74b0292cc2e46ca48e889f18670cabd75bd4e700} COE{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=0x20000420} socket_connect{family=2, port=16415, addr=16777343}"
@@ -46,6 +48,70 @@
 
 #include "tsem_event.h"
 #include "Cell.h"
+
+
+/**
+ * Private function.
+ *
+ * This function is responsible for testing the parsing and processing
+ * of a memory mapping event
+ *
+ * \param arg	A pointer to a null-terminated buffer containing
+ *		the socket connection definition to be tested.
+ *
+ * \return	A return value of zero indicates that the unit test
+ *		ran correctly.  A value of one is returned to indicate
+ *		an error.
+ */
+
+static int test_mmap_file(char *arg)
+
+{
+	int retn = 1;
+
+	Buffer bufr = NULL;
+
+	String entry = NULL;
+
+	Cell cell = NULL;
+
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+
+	INIT(HurdLib, String, entry, ERR(goto done));
+	if ( !entry->add(entry, arg) )
+		ERR(goto done);
+
+	entry->print(entry);
+	fputc('\n', stdout);
+
+	INIT(NAAAIM, Cell, cell, ERR(goto done));
+	if ( !cell->parse(cell, entry, TSEM_MMAP_FILE) )
+		ERR(goto done);
+	if ( !cell->measure(cell) )
+		ERR(goto done);
+	if ( !cell->get_measurement(cell, bufr) )
+		ERR(goto done);
+
+	fputs("\nArguments:\n", stdout);
+	cell->dump(cell);
+
+	entry->reset(entry);
+	if ( !cell->format(cell, entry) )
+		ERR(goto done);
+	fputs("\nCell characteristics:\n", stdout);
+	entry->print(entry);
+
+	retn = 0;
+
+
+ done:
+	WHACK(bufr);
+	WHACK(entry);
+	WHACK(cell);
+
+	return retn;
+}
 
 
 /**
@@ -245,8 +311,12 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
-	if ( (strcmp(test, "file_open") != 0) && \
-	     (strcmp(test, "mmap_file") != 0) ) {
+	if ( strcmp(test, "mmap_file") == 0 ) {
+		retn = test_mmap_file(MMAP_FILE);
+		goto done;
+	}
+
+	if ( (strcmp(test, "file_open") != 0) ) {
 		fprintf(stderr, "%s: Unknown cell test: %s\n", PGM, test);
 		goto done;
 	}
