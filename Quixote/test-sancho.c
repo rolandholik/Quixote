@@ -316,7 +316,7 @@ static _Bool process_command(CO(TTYduct, duct), CO(Buffer, bufr))
 	fputs("Sancho says:\n", stdout);
 
 	switch ( cmd ) {
-		case exchange_event:
+		case export_event:
 		case aggregate_event:
 		case seal_event:
 		case TSEM_event:

@@ -387,7 +387,7 @@ static _Bool process_event(CO(TTYduct, duct), const char * const event)
 	/* Check event return, OK if other then an exchange event. */
 	bp = (char *) bufr->get(bufr);
 
-	if ( cp->command != exchange_event ) {
+	if ( cp->command != export_event ) {
 		if ( strncmp(bp, "OK", 2) == 0 )
 			retn = true;
 		goto done;

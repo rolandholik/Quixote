@@ -608,7 +608,7 @@ extern void sancho_interpreter(const XENduct duct)
 			goto done;
 
 		switch ( get_command(bufr) ) {
-			case exchange_event:
+			case export_event:
 				add_event(Host, model, bufr);
 				break;
 

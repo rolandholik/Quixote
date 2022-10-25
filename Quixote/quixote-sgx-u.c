@@ -479,7 +479,7 @@ static _Bool process_event(const char *event)
 
 	/* Dispatch the event. */
 	switch ( cp->command ) {
-		case exchange_event:
+		case export_event:
 			retn = add_event(event_arg);
 			break;
 
