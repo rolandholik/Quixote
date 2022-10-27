@@ -61,6 +61,7 @@ static _Bool File_Fields_compiled	    = false;
 static _Bool Mmap_Fields_compiled	    = false;
 static _Bool Socket_Create_Fields_compiled  = false;
 static _Bool Socket_Fields_compiled	    = false;
+static _Bool Task_Kill_Fields_compiled	    = false;
 
 /** Array of field descriptions and compiled regular expressions. */
 struct regex_description {
@@ -110,6 +111,14 @@ struct regex_description Socket_Fields[8] = {
 	{.fd=NULL}
 };
 
+struct regex_description Task_Kill_Fields[] = {
+	{.fd = "task_kill\\{[^}]*\\}"},
+	{.fd = "cross=([^,]*,)"},
+	{.fd = "signal=([^,]*,)"},
+	{.fd = "target=([^}]*)}"},
+	{.fd = NULL}
+};
+
 
 /* File characteristics. */
 struct file_parameters {
@@ -155,6 +164,12 @@ struct socket_connect_parameters {
 	} u;
 };
 
+/* Task kill parameters. */
+struct task_kill_parameters {
+	uint32_t cross_model;
+	uint32_t signal;
+	uint8_t task_id[NAAAIM_IDSIZE];
+};
 
 /** Cell private state information. */
 struct NAAAIM_Cell_State
@@ -184,6 +199,9 @@ struct NAAAIM_Cell_State
 
 	/* Socket connection parameters. */
 	struct socket_connect_parameters socket_connect;
+
+	/* Task kill connection parameters. */
+	struct task_kill_parameters task_kill;
 
 	/* Measured identity. */
 	_Bool measured;
@@ -807,6 +825,89 @@ static _Bool _parse_socket(CO(Cell_State, S), CO(String, entry))
 
 
 /**
+ * Internal public method.
+ *
+ * This method implements parsing the characteristics of a task_kill
+ * security event.
+ *
+ * \param S	The state information for the Cell that the task_kill
+ *		parameters are being parsed into.
+ *
+ * \param entry	The object containing the definition of the event that
+ *		is to be parsed.
+ *
+ * \return	A boolean value is used to indicate the success or
+ *		failure of the parsing.  A false value indicates the
+ *		parsing failed and the object is poisoned.  A true
+ *		value indicates the object has been successfully
+ *		populated.
+ */
+
+static _Bool _parse_task_kill(CO(Cell_State, S), CO(String, entry))
+
+{
+	_Bool retn = false;
+
+	unsigned int cnt;
+
+	char *fp;
+
+	regmatch_t regmatch;
+
+	Buffer field = NULL;
+
+
+	/* Compile the regular expressions once. */
+	if ( !Task_Kill_Fields_compiled ) {
+		for (cnt= 0; Task_Kill_Fields[cnt].fd != NULL; ++cnt) {
+			if ( regcomp(&Task_Kill_Fields[cnt].regex,
+				     Task_Kill_Fields[cnt].fd,
+				     REG_EXTENDED) != 0 )
+				ERR(goto done);
+		}
+	}
+	Task_Kill_Fields_compiled = true;
+
+
+	/* Extract task_kill event. */
+	INIT(HurdLib, Buffer, field, ERR(goto done));
+
+	fp = entry->get(entry);
+	if ( regexec(&Task_Kill_Fields[0].regex, fp, 1, &regmatch, 0) != \
+	     REG_OK )
+		ERR(goto done);
+
+	field->add(field, (unsigned char *) (fp + regmatch.rm_so),
+		   regmatch.rm_eo-regmatch.rm_so);
+	if ( !field->add(field, (unsigned char *) "\0", 1) )
+		ERR(goto done);
+
+
+	/* Parse task_kill parameters. */
+	fp = (char *) field->get(field);
+	if ( !_get_field(&Task_Kill_Fields[1].regex, fp, \
+			 &S->task_kill.cross_model) )
+		ERR(goto done);
+
+	if ( !_get_field(&Task_Kill_Fields[2].regex, fp, \
+			 &S->task_kill.signal) )
+		ERR(goto done);
+
+	if ( !_get_digest(&Task_Kill_Fields[3].regex, fp,
+			 S->task_kill.task_id, NAAAIM_IDSIZE) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	WHACK(field);
+
+	return retn;
+}
+
+
+/**
  * External public method.
  *
  * This method implements parsing of a security state event for the
@@ -869,6 +970,11 @@ static _Bool parse(CO(Cell, this), CO(String, entry),
 		case TSEM_SOCKET_CONNECT:
 		case TSEM_SOCKET_BIND:
 			if ( !_parse_socket(S, entry) )
+				ERR(goto done);
+			break;
+
+		case TSEM_TASK_KILL:
+			if ( !_parse_task_kill(S, entry) )
 				ERR(goto done);
 			break;
 
@@ -1118,6 +1224,57 @@ static _Bool _measure_socket_connect(CO(Cell_State, S))
 
 
 /**
+ * Internal private method.
+ *
+ * This method implements adding the parameters of a task kill
+ * event to the measurement of the cell.
+ *
+ * \param S	The state information of the object whose task kill
+ *		parameters are to be added.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the addition of the parameters has succeeded.  A false
+ *		value indicates failure while a true value indicates
+ *		success.
+ */
+
+static _Bool _measure_task_kill(CO(Cell_State, S))
+
+{
+	_Bool retn = false;
+
+	unsigned char *p;
+
+	size_t size;
+
+	Buffer bufr = NULL;
+
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	p = (unsigned char *) &S->task_kill.cross_model;
+	size = sizeof(S->task_kill.cross_model);
+	bufr->add(bufr, p, size);
+
+	p = (unsigned char *) &S->task_kill.signal;
+	size = sizeof(S->task_kill.signal);
+	bufr->add(bufr, p, size);
+
+	p = (unsigned char *) &S->task_kill.task_id;
+	size = sizeof(S->task_kill.task_id);
+	bufr->add(bufr, p, size);
+
+	if ( !S->identity->add(S->identity, bufr) )
+		ERR(goto done);
+	retn = true;
+
+ done:
+	WHACK(bufr);
+
+	return retn;
+}
+
+
+/**
  * External public method.
  *
  * This method implements computing of the measurement of a cell.
@@ -1164,6 +1321,10 @@ static _Bool measure(CO(Cell, this))
 		case TSEM_SOCKET_CONNECT:
 		case TSEM_SOCKET_BIND:
 			retn = _measure_socket_connect(S);
+			break;
+
+		case TSEM_TASK_KILL:
+			retn = _measure_task_kill(S);
 			break;
 
 		default:
@@ -1604,6 +1765,60 @@ static _Bool _format_socket_connect(CO(Cell_State, S), CO(String, str))
 
 
 /**
+ * Internal public method.
+ *
+ * This method implements the output of the characteristics of a
+ * task kill security event.
+ *
+ * \param S	A pointer to the state of the object being output.
+ *
+ * \parm str	The object into which the formatted output is to
+ *		be placed.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the output was properly formatted.  A true value
+ *		indicates formatting was successful while a false
+ *		value indicates an error occurred.
+ */
+
+static _Bool _format_task_kill(CO(Cell_State, S), CO(String, str))
+
+{
+	unsigned char *p;
+
+	unsigned int size,
+		     lp;
+
+	_Bool retn = false;
+
+
+	if ( !str->add_sprintf(str, "task_kill{cross=%u, signal=%u, "	\
+			       "task_id=", S->task_kill.cross_model,	\
+			       S->task_kill.signal) )
+		ERR(goto done);
+
+	p    = S->task_kill.task_id;
+	size = sizeof(S->task_kill.task_id);
+	for (lp= 0; lp < size; ++lp) {
+		if ( !str->add_sprintf(str, "%02x", *p) )
+			ERR(goto done);
+		++p;
+	}
+
+	if ( !str->add(str, "}") )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	if ( !retn )
+		S->poisoned = true;
+
+	return retn;
+}
+
+
+/**
  * External public method.
  *
  * This method implements the generation of an ASCII formatted
@@ -1643,6 +1858,10 @@ static _Bool format(CO(Cell, this), CO(String, event))
 		case TSEM_SOCKET_CONNECT:
 		case TSEM_SOCKET_BIND:
 				retn = _format_socket_connect(S, event);
+			break;
+
+		case TSEM_TASK_KILL:
+			retn = _format_task_kill(S, event);
 			break;
 
 		default:
@@ -1826,6 +2045,39 @@ void _dump_socket_connect(CO(Cell_State, S))
 
 
 /**
+ * Internal public method.
+ *
+ * This method implements output of the characteristics of a cell
+ * involving a task kill event.
+ *
+ * \param S	A pointer to the state of the object being output.
+ */
+
+void _dump_task_kill(CO(Cell_State, S))
+
+{
+	Buffer bufr = NULL;
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+
+	fprintf(stdout, "cross model: %u\n", S->task_kill.cross_model);
+	fprintf(stdout, "signal:      %u\n", S->task_kill.signal);
+
+	if ( !bufr->add(bufr, S->task_kill.task_id, \
+			sizeof(S->task_kill.task_id)) )
+		ERR(goto done);
+	fputs("task_id:     ", stdout);
+	bufr->print(bufr);
+
+
+ done:
+	WHACK(bufr);
+
+	return;
+}
+
+
+/**
  * External public method.
  *
  * This method implements output of the characteristis of the cell
@@ -1857,6 +2109,10 @@ static void dump(CO(Cell, this))
 		case TSEM_SOCKET_CONNECT:
 		case TSEM_SOCKET_BIND:
 			_dump_socket_connect(S);
+			break;
+
+		case TSEM_TASK_KILL:
+			_dump_task_kill(S);
 			break;
 
 		default:

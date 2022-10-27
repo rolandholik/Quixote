@@ -85,6 +85,7 @@ static const char *TSEM_name[] = {
 	"socket_create",
 	"socket_connect",
 	"socket_bind",
+	"task_kill",
 	NULL
 };
 
