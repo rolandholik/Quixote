@@ -24,6 +24,8 @@
 
 #define SOCKET_BIND "event{process=ncat, filename=none, type=socket_bind, task_id=6c3377303937c412988b0b5ec741fc01d94f1d3b8a68cb118406d2ca19502816} COE{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=0x7fffffffff} socket_bind{family=10, port=16415, flow=0, scope=0, addr=00000000000000000000000000000000}"
 
+#define SOCKET_ACCEPT "event{process=ncat, filename=none, type=socket_accept, task_id=ed7531f7052b0d02cfc0e26c74b0292cc2e46ca48e889f18670cabd75bd4e700} COE{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=0x20000420} socket_accept{family=10, type=1, port=8000, addr=00000000000000000000000000000001}"
+
 #define TASK_KILL "event{process=bash, filename=none, type=task_kill, task_id=77e90dbb8ae1da51e8dd0dc5f1500d9f6c26332252afa8fb8a4ca91a1ef60cac} task_kill{cross=0, signal=0, target=77e90dbb8ae1da51e8dd0dc5f1500d9f6c26332252afa8fb8a4ca91a1ef60cac}"
 
 
@@ -344,7 +346,7 @@ extern int main(int argc, char *argv[])
 		fputs("\t\tfile_open mmap_file socket_create\n", stdout);
 		fputs("\t\tsocket_connect socket_connect_ipv4 " \
 		      "socket_connect_ipv6\n", stdout);
-		fputs("\t\tsocket_bind, task_kill\n", stdout);
+		fputs("\t\tsocket_bind, socket_accept, task_kill\n", stdout);
 		goto done;
 	}
 
@@ -373,6 +375,12 @@ extern int main(int argc, char *argv[])
 	type = TSEM_SOCKET_BIND;
 	if ( strcmp(test, "socket_bind") == 0 ) {
 		retn = test_socket(SOCKET_BIND, type);
+		goto done;
+	}
+
+	type = TSEM_SOCKET_ACCEPT;
+	if ( strcmp(test, "socket_accept") == 0 ) {
+		retn = test_socket(SOCKET_ACCEPT, type);
 		goto done;
 	}
 

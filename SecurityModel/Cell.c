@@ -61,6 +61,7 @@ static _Bool File_Fields_compiled	    = false;
 static _Bool Mmap_Fields_compiled	    = false;
 static _Bool Socket_Create_Fields_compiled  = false;
 static _Bool Socket_Fields_compiled	    = false;
+static _Bool Socket_Accept_Fields_compiled  = false;
 static _Bool Task_Kill_Fields_compiled	    = false;
 
 /** Array of field descriptions and compiled regular expressions. */
@@ -111,11 +112,20 @@ struct regex_description Socket_Fields[8] = {
 	{.fd=NULL}
 };
 
+struct regex_description Socket_Accept_Fields[] = {
+	{.fd = "socket_accept\\{[^}]*\\}"},
+	{.fd = "family=([^,]*)"},
+	{.fd = "type=([^,]*)"},
+	{.fd = "port=([^,]*)"},
+	{.fd = "addr=([^}]*)"},
+	{.fd = NULL}
+};
+
 struct regex_description Task_Kill_Fields[] = {
 	{.fd = "task_kill\\{[^}]*\\}"},
 	{.fd = "cross=([^,]*,)"},
 	{.fd = "signal=([^,]*,)"},
-	{.fd = "target=([^}]*)}"},
+	{.fd = "target=([^}]*)\\}"},
 	{.fd = NULL}
 };
 
@@ -164,6 +174,18 @@ struct socket_connect_parameters {
 	} u;
 };
 
+/* Socket accept parameters. */
+struct socket_accept_parameters {
+	uint16_t family;
+	uint16_t type;
+	uint16_t port;
+	union {
+		uint32_t ipv4_addr;
+		uint8_t ipv6_addr[16];
+		uint8_t addr[32];
+	} u;
+};
+
 /* Task kill parameters. */
 struct task_kill_parameters {
 	uint32_t cross_model;
@@ -199,6 +221,9 @@ struct NAAAIM_Cell_State
 
 	/* Socket connection parameters. */
 	struct socket_connect_parameters socket_connect;
+
+	/* Socket accept parameters. */
+	struct socket_accept_parameters socket_accept;
 
 	/* Task kill connection parameters. */
 	struct task_kill_parameters task_kill;
@@ -827,6 +852,119 @@ static _Bool _parse_socket(CO(Cell_State, S), CO(String, entry))
 /**
  * Internal public method.
  *
+ * This method implements parsing the characteristics of a socket accept
+ * security event.
+ *
+ * \param S	The state information for the Cell that the socket accept
+ *		parameters are being parsed into.
+ *
+ * \param entry	The object containing the definition of the event that
+ *		is to be parsed.
+ *
+ * \return	A boolean value is used to indicate the success or
+ *		failure of the parsing.  A false value indicates the
+ *		parsing failed and the object is poisoned.  A true
+ *		value indicates the object has been successfully
+ *		populated.
+ */
+
+static _Bool _parse_socket_accept(CO(Cell_State, S), CO(String, entry))
+
+{
+	_Bool retn = false;
+
+	char *fp;
+
+	uint8_t *p;
+
+	unsigned int cnt,
+		     value;
+
+	regmatch_t regmatch;
+
+	Buffer field = NULL;
+
+
+	/* Compile the regular expressions once. */
+	if ( !Socket_Accept_Fields_compiled ) {
+		for (cnt= 0; Socket_Accept_Fields[cnt].fd != NULL; ++cnt) {
+			if ( regcomp(&Socket_Accept_Fields[cnt].regex,
+				     Socket_Accept_Fields[cnt].fd,
+				     REG_EXTENDED) != 0 )
+				ERR(goto done);
+		}
+	}
+	Socket_Accept_Fields_compiled = true;
+
+
+	/* Extract socket_accept parameters. */
+	INIT(HurdLib, Buffer, field, ERR(goto done));
+
+	fp = entry->get(entry);
+	if ( regexec(&Socket_Accept_Fields[0].regex, fp, 1, &regmatch, 0) != \
+	     REG_OK )
+		ERR(goto done);
+
+	field->add(field, (unsigned char *) (fp + regmatch.rm_so),
+		   regmatch.rm_eo-regmatch.rm_so);
+	if ( !field->add(field, (unsigned char *) "\0", 1) )
+		ERR(goto done);
+
+
+	/* Parse socket accept parameters. */
+	fp = (char *) field->get(field);
+	if ( !_get_field(&Socket_Accept_Fields[1].regex, fp, &value) )
+		ERR(goto done);
+	S->socket_accept.family = value;
+
+	if ( !_get_field(&Socket_Accept_Fields[2].regex, fp, &value) )
+		ERR(goto done);
+	S->socket_accept.type = value;
+
+	if ( !_get_field(&Socket_Accept_Fields[3].regex, fp, &value) )
+		ERR(goto done);
+	S->socket_accept.port = value;
+
+
+	/* Extract protocol specific fields. */
+	switch ( S->socket_accept.family ) {
+		case AF_INET:
+			if ( !_get_field(&Socket_Accept_Fields[4].regex, fp, \
+					 &value) )
+				ERR(goto done);
+			S->socket_accept.u.ipv4_addr = value;
+			break;
+
+		case AF_INET6:
+			p = S->socket_accept.u.ipv6_addr;
+			cnt = sizeof(S->socket_accept.u.ipv6_addr);
+			if ( !_get_digest(&Socket_Accept_Fields[4].regex, fp, \
+					  p, cnt) )
+				ERR(goto done);
+			break;
+
+		default:
+			p = S->socket_accept.u.addr;
+			cnt = sizeof(S->socket_accept.u.addr);
+			if ( !_get_digest(&Socket_Fields[4].regex,  \
+					  fp, p, cnt) )
+				ERR(goto done);
+			break;
+	}
+
+	retn = true;
+
+
+ done:
+	WHACK(field);
+
+	return retn;
+}
+
+
+/**
+ * Internal public method.
+ *
  * This method implements parsing the characteristics of a task_kill
  * security event.
  *
@@ -970,6 +1108,11 @@ static _Bool parse(CO(Cell, this), CO(String, entry),
 		case TSEM_SOCKET_CONNECT:
 		case TSEM_SOCKET_BIND:
 			if ( !_parse_socket(S, entry) )
+				ERR(goto done);
+			break;
+
+		case TSEM_SOCKET_ACCEPT:
+			if ( !_parse_socket_accept(S, entry) )
 				ERR(goto done);
 			break;
 
@@ -1226,6 +1369,77 @@ static _Bool _measure_socket_connect(CO(Cell_State, S))
 /**
  * Internal private method.
  *
+ * This method implements computing of the measurement of a socket
+ * accept cell.
+ *
+ * \param S	The state information of the object whose socket accept
+ *		measurement is to be generated.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the measurement has succeeded.  A false value
+ *		indicates failure while a true value indicates success.
+ */
+
+static _Bool _measure_socket_accept(CO(Cell_State, S))
+
+{
+	_Bool retn = false;
+
+	unsigned char *p;
+
+	size_t size;
+
+	Buffer bufr = NULL;
+
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	p = (unsigned char *) &S->socket_accept.family;
+	size = sizeof(S->socket_accept.family);
+	bufr->add(bufr, p, size);
+
+	p = (unsigned char *) &S->socket_accept.type;
+	size = sizeof(S->socket_accept.port);
+	bufr->add(bufr, p, size);
+
+	p = (unsigned char *) &S->socket_accept.port;
+	size = sizeof(S->socket_accept.port);
+	bufr->add(bufr, p, size);
+
+
+	switch ( S->socket_accept.family ) {
+		case AF_INET:
+			p = (unsigned char *) &S->socket_accept.u.ipv4_addr;
+			size = sizeof(S->socket_accept.u.ipv4_addr);
+			bufr->add(bufr, p, size);
+			break;
+
+		case AF_INET6:
+			p = (unsigned char *) &S->socket_accept.u.ipv6_addr;
+			size = sizeof(S->socket_accept.u.ipv6_addr);
+			bufr->add(bufr, p, size);
+			break;
+
+		default:
+			p = (unsigned char *) S->socket_connect.u.addr;
+			size = sizeof(S->socket_connect.u.addr);
+			bufr->add(bufr, p, size);
+			break;
+	}
+
+	if ( !S->identity->add(S->identity, bufr) )
+		ERR(goto done);
+	retn = true;
+
+ done:
+	WHACK(bufr);
+
+	return retn;
+}
+
+
+/**
+ * Internal private method.
+ *
  * This method implements adding the parameters of a task kill
  * event to the measurement of the cell.
  *
@@ -1321,6 +1535,10 @@ static _Bool measure(CO(Cell, this))
 		case TSEM_SOCKET_CONNECT:
 		case TSEM_SOCKET_BIND:
 			retn = _measure_socket_connect(S);
+			break;
+
+		case TSEM_SOCKET_ACCEPT:
+			retn = _measure_socket_accept(S);
 			break;
 
 		case TSEM_TASK_KILL:
@@ -1767,6 +1985,77 @@ static _Bool _format_socket_connect(CO(Cell_State, S), CO(String, str))
 /**
  * Internal public method.
  *
+ * This method implements the output of the characteristics of a cell
+ * for a socket accept security event.
+ *
+ * \param S	A pointer to the state of the object being output.
+ *
+ * \parm str	The object into which the formatted output is to
+ *		be placed.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the output was properly formatted.  A true value
+ *		indicates formatting was successful while a false
+ *		value indicates an error occurred.
+ */
+
+static _Bool _format_socket_accept(CO(Cell_State, S), CO(String, str))
+
+{
+	_Bool retn = false;
+
+	unsigned char *p;
+
+	unsigned int lp,
+		     size;
+
+
+	if ( !str->add_sprintf(str, "socket_accept{family=%u, type=%u, "  \
+			       "port=%u, addr=", S->socket_accept.family, \
+			       S->socket_accept.type, S->socket_accept.port) )
+		ERR(goto done);
+
+	switch ( S->socket_accept.family ) {
+		case AF_INET:
+			if ( !str->add_sprintf(str, "%u", \
+					       S->socket_accept.u.ipv4_addr) )
+				ERR(goto done);
+			break;
+
+		case AF_INET6:
+			p = S->socket_accept.u.ipv6_addr;
+			size = sizeof(S->socket_accept.u.ipv6_addr);
+			for (lp= 0; lp < size; ++lp) {
+				if ( !str->add_sprintf(str, "%02x", *p) )
+					ERR(goto done);
+				++p;
+			}
+			break;
+
+		default:
+			p = S->socket_accept.u.addr;
+			size = sizeof(S->socket_accept.u.addr);
+			for (lp= 0; lp < size; ++lp) {
+				if ( !str->add_sprintf(str, "%02x", *p) )
+					ERR(goto done);
+				++p;
+			}
+			break;
+	}
+
+	if ( !str->add(str, "}") )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * Internal public method.
+ *
  * This method implements the output of the characteristics of a
  * task kill security event.
  *
@@ -1857,7 +2146,11 @@ static _Bool format(CO(Cell, this), CO(String, event))
 
 		case TSEM_SOCKET_CONNECT:
 		case TSEM_SOCKET_BIND:
-				retn = _format_socket_connect(S, event);
+			retn = _format_socket_connect(S, event);
+			break;
+
+		case TSEM_SOCKET_ACCEPT:
+			retn = _format_socket_accept(S, event);
 			break;
 
 		case TSEM_TASK_KILL:
@@ -2048,6 +2341,79 @@ void _dump_socket_connect(CO(Cell_State, S))
  * Internal public method.
  *
  * This method implements output of the characteristics of a cell
+ * that has a socket accept definition.
+ *
+ * \param S	A pointer to the state of the object being output.
+ */
+
+void _dump_socket_accept(CO(Cell_State, S))
+
+{
+	char *type;
+
+	unsigned char *p;
+
+	size_t size;
+
+	Buffer bufr = NULL;
+
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+
+	switch ( S->socket_connect.family ) {
+		case AF_INET:
+			type = "IPV4";
+			break;
+		case AF_INET6:
+			type = "IPV6";
+			break;
+		default:
+			type = "OTHER";
+			break;
+	}
+	fprintf(stdout, "family: %u / %s\n", S->socket_accept.family, type);
+
+	if ( (S->socket_accept.family == AF_INET) ||
+	     (S->socket_accept.family == AF_INET6) )
+		fprintf(stdout, "port:   %u\n", S->socket_accept.port);
+
+
+	switch ( S->socket_accept.family ) {
+		case AF_INET:
+			fprintf(stdout, "addr:   %u\n", \
+				S->socket_accept.u.ipv4_addr);
+			break;
+		case AF_INET6:
+			fputs("addr:   ", stdout);
+			p = S->socket_accept.u.ipv6_addr;
+			size = sizeof(S->socket_accept.u.ipv6_addr);
+			if ( !bufr->add(bufr, p, size) )
+				goto done;
+			bufr->print(bufr);
+			fputs("\n", stdout);
+			break;
+		default:
+			fputs("addr:   ", stdout);
+			p = S->socket_accept.u.addr;
+			size = sizeof(S->socket_accept.u.addr);
+			if ( !bufr->add(bufr, p, size) )
+				goto done;
+			bufr->print(bufr);
+			fputs("\n", stdout);
+			break;
+	}
+
+
+ done:
+	WHACK(bufr);
+	return;
+}
+
+
+/**
+ * Internal public method.
+ *
+ * This method implements output of the characteristics of a cell
  * involving a task kill event.
  *
  * \param S	A pointer to the state of the object being output.
@@ -2109,6 +2475,10 @@ static void dump(CO(Cell, this))
 		case TSEM_SOCKET_CONNECT:
 		case TSEM_SOCKET_BIND:
 			_dump_socket_connect(S);
+			break;
+
+		case TSEM_SOCKET_ACCEPT:
+			_dump_socket_accept(S);
 			break;
 
 		case TSEM_TASK_KILL:
