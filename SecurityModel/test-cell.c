@@ -14,6 +14,8 @@
 
 #define PGM "test-cell"
 
+#define FILE_OPEN "event{process=swapper/0, filename=/sbin/init, type=file_open, task_id=0000000000000000000000000000000000000000000000000000000000000000} COE{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=0x7fffffffff} file{flags=32800, uid=0, gid=0, mode=0100755, name_length=10, name=cadb8688009d5594acdf21564a7ac45aa93d7ef7d87c303615c3f73f0ab34278, s_id=xvda, s_uuid=feadbeaffeadbeaffeadbeaffeadbeaf, digest=f8e016c6946526d8a0f40a64725f793fef7688c964ed480e73d91c3f419840f9}"
+
 #define MMAP_FILE "event{process=bash, filename=/lib/ld-2.24.so, type=mmap_file, task_id=77e90dbb8ae1da51e8dd0dc5f1500d9f6c26332252afa8fb8a4ca91a1ef60cac} COE{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=0x20000420} mmap_file{type=0, reqprot=3, prot=7, flags=18} file{uid=0, gid=0, mode=0100755, name_length=15, name=5aa7963f1fe8fa3cc7ca977df0773b9eafc286828a923a5307c1574ba4368a9f, s_id=xvdb, s_uuid=a953e99a39e54e478c9edf24815ddc49, digest=1b4cd80888cfe0171d0f413caecc99831a4463c05a8f7c99ab8570d0684b2dc8}"
 
 #define SOCKET_CONNECT "event{process=bash, filename=none, type=socket_connect, task_id=77e90dbb8ae1da51e8dd0dc5f1500d9f6c26332252afa8fb8a4ca91a1ef60cac} COE{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=0x20000420} socket_connect{family=1, addr=29c8abdfccdc1a3d51b989efea75d94b8453ad3014baa78d6a948cc92042c7ce}"
@@ -403,7 +405,7 @@ extern int main(int argc, char *argv[])
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 
 	INIT(HurdLib, String, entry, ERR(goto done));
-	if ( !entry->add(entry, "event{process=swapper/0, filename=/bin/bash-3.2.48, type=file_open, task_id=0000000000000000000000000000000000000000000000000000000000000000} COE{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=3fffffffff} file{uid=0, gid=0, mode=o100755, name_length=16, name=e1cb9766d47adb4d514d5590dd247504a3aab7e67839d65a6c6f4c32fc120e5d, s_id=xvda, s_uuid=feadbeaffeadbeaffeadbeaffeadbeaf, digest=d2a6bfe0d8a2346d45518dcaaf47642808d6c605506bd0b8e42a65a76735b98e}") )
+	if ( !entry->add(entry, FILE_OPEN) )
 		ERR(goto done);
 
 	entry->print(entry);

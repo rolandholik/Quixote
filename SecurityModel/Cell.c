@@ -70,17 +70,18 @@ struct regex_description {
 	regex_t regex;
 };
 
-struct regex_description File_Fields[10] = {
-	{.fd=" file\\{[^}]*\\}"},
-	{.fd="uid=([^,]*)"},
-	{.fd="gid=([^,]*)"},
-	{.fd="mode=([^,]*)"},
-	{.fd="name_length=([^,]*)"},
-	{.fd="name=([^,]*)"},
-	{.fd="s_id=([^,]*)"},
-	{.fd="s_uuid=([^,]*)"},
-	{.fd="digest=([^}]*)"},
-	{.fd=NULL}
+struct regex_description File_Fields[] = {
+	{.fd = " file\\{[^}]*\\}"},
+	{.fd = "flags=([^,]*),"},
+	{.fd = "uid=([^,]*)"},
+	{.fd = "gid=([^,]*)"},
+	{.fd = "mode=([^,]*)"},
+	{.fd = "name_length=([^,]*)"},
+	{.fd = "name=([^,]*)"},
+	{.fd = "s_id=([^,]*)"},
+	{.fd = "s_uuid=([^,]*)"},
+	{.fd = "digest=([^}]*)"},
+	{.fd = NULL}
 };
 
 struct regex_description Mmap_Fields[6] = {
@@ -132,6 +133,8 @@ struct regex_description Task_Kill_Fields[] = {
 
 /* File characteristics. */
 struct file_parameters {
+	uint32_t flags;
+
 	uint32_t uid;
 	uint32_t gid;
 	uint16_t mode;
@@ -512,32 +515,35 @@ static _Bool _parse_file(CO(Cell_State, S), CO(String, entry))
 
 	/* Parse field entries. */
 	fp = (char *) field->get(field);
-	if ( !_get_field(&File_Fields[1].regex, fp, &S->file.uid) )
+	if ( !_get_field(&File_Fields[1].regex, fp, &S->file.flags) )
 		ERR(goto done);
 
-	if ( !_get_field(&File_Fields[2].regex, fp, &S->file.gid) )
+	if ( !_get_field(&File_Fields[2].regex, fp, &S->file.uid) )
 		ERR(goto done);
 
-	if ( !_get_field(&File_Fields[3].regex, fp, &value) )
+	if ( !_get_field(&File_Fields[3].regex, fp, &S->file.gid) )
+		ERR(goto done);
+
+	if ( !_get_field(&File_Fields[4].regex, fp, &value) )
 		ERR(goto done);
 	S->file.mode = value;
 
-	if ( !_get_field(&File_Fields[4].regex, fp, &S->file.name_length) )
+	if ( !_get_field(&File_Fields[5].regex, fp, &S->file.name_length) )
 		ERR(goto done);
 
-	if ( !_get_digest(&File_Fields[5].regex, fp, \
+	if ( !_get_digest(&File_Fields[6].regex, fp, \
 			  (uint8_t *) S->file.name, NAAAIM_IDSIZE) )
 		ERR(goto done);
 
-	if ( !_get_text(&File_Fields[6].regex, fp, (uint8_t *) S->file.s_id, \
+	if ( !_get_text(&File_Fields[7].regex, fp, (uint8_t *) S->file.s_id, \
 			sizeof(S->file.s_id)) )
 		ERR(goto done);
 
-	if ( !_get_digest(&File_Fields[7].regex, fp, S->file.s_uuid, \
+	if ( !_get_digest(&File_Fields[8].regex, fp, S->file.s_uuid, \
 			  sizeof(S->file.s_uuid)) )
 		ERR(goto done);
 
-	if ( !_get_digest(&File_Fields[8].regex, fp, \
+	if ( !_get_digest(&File_Fields[9].regex, fp, \
 			  (uint8_t *) S->file.digest, NAAAIM_IDSIZE) )
 		ERR(goto done);
 
@@ -1159,6 +1165,7 @@ static _Bool _measure_file(CO(Cell_State, S))
 
 
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	bufr->add(bufr, (void *) &S->file.flags, sizeof(S->file.flags));
 	bufr->add(bufr, (void *) &S->file.uid, sizeof(S->file.uid));
 	bufr->add(bufr, (void *) &S->file.gid, sizeof(S->file.gid));
 	bufr->add(bufr, (void *) &S->file.mode, sizeof(S->file.mode));
@@ -1771,10 +1778,11 @@ static _Bool _format_file(CO(Cell_State, S), CO(String, str))
 
 
 	/* Write the formatted string to the String object. */
-	if ( !str->add_sprintf(str, "file{uid=%lu, gid=%lu, mode=0%lo, name_length=%lu, name=",					       \
-			(unsigned long int) S->file.uid,	\
-			(unsigned long int) S->file.gid,	\
-			(unsigned long int) S->file.mode,	\
+	if ( !str->add_sprintf(str, "file{flags=%lu, uid=%lu, gid=%lu, mode=0%lo, name_length=%lu, name=",						\
+			       (unsigned long int) S->file.flags,	 \
+			       (unsigned long int) S->file.uid,		 \
+			       (unsigned long int) S->file.gid,		 \
+			       (unsigned long int) S->file.mode,	 \
 			       (unsigned long int) S->file.name_length) )
 		ERR(goto done);
 
@@ -2207,9 +2215,11 @@ void _dump_file(CO(Cell_State, S))
 
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 
-	fprintf(stdout, "uid:  %lu\n", (unsigned long int) S->file.uid);
-	fprintf(stdout, "gid:  %lu\n", (unsigned long int) S->file.gid);
-	fprintf(stdout, "mode: 0%lo\n",(unsigned long int) S->file.mode);
+	fprintf(stdout, "flags: %u\n", S->file.flags);
+
+	fprintf(stdout, "uid:   %lu\n", (unsigned long int) S->file.uid);
+	fprintf(stdout, "gid:   %lu\n", (unsigned long int) S->file.gid);
+	fprintf(stdout, "mode:  0%lo\n",(unsigned long int) S->file.mode);
 	fprintf(stdout, "name length: %lu\n", \
 		(unsigned long int) S->file.name_length);
 
