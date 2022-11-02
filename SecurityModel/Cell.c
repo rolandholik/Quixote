@@ -63,6 +63,15 @@ static _Bool Socket_Create_Fields_compiled  = false;
 static _Bool Socket_Fields_compiled	    = false;
 static _Bool Socket_Accept_Fields_compiled  = false;
 static _Bool Task_Kill_Fields_compiled	    = false;
+static _Bool Generic_Event_Fields_compiled  = false;
+
+/** Cell value for a generic security event. */
+const char generic_cell[NAAAIM_IDSIZE] = {
+	0x61, 0x87, 0x8a, 0xe5, 0x8a, 0x7c, 0x22, 0xb4,
+	0xea, 0xb9, 0x32, 0xed, 0x3f, 0xdf, 0x34, 0x54,
+	0x39, 0x9b, 0xeb, 0x48, 0xd7, 0x44, 0xa7, 0x0e,
+	0xab, 0x80, 0xc1, 0xd1, 0x99, 0xd8, 0x69, 0xc8
+};
 
 /** Array of field descriptions and compiled regular expressions. */
 struct regex_description {
@@ -127,6 +136,12 @@ struct regex_description Task_Kill_Fields[] = {
 	{.fd = "cross=([^,]*,)"},
 	{.fd = "signal=([^,]*,)"},
 	{.fd = "target=([^}]*)\\}"},
+	{.fd = NULL}
+};
+
+struct regex_description Generic_Event_Fields[] = {
+	{.fd = "generic_event\\{[^}]*\\}"},
+	{.fd = "type=([^}]*)}"},
 	{.fd = NULL}
 };
 
@@ -210,8 +225,9 @@ struct NAAAIM_Cell_State
 	/* Object status. */
 	_Bool poisoned;
 
-	/* Type definition for cell contents. */
+	/* Event type definitions. */
 	enum tsem_event_type type;
+	enum tsem_event_type generic_event;
 
 	/* File characteristics. */
 	struct file_parameters file;
@@ -1052,6 +1068,80 @@ static _Bool _parse_task_kill(CO(Cell_State, S), CO(String, entry))
 
 
 /**
+ * Internal public method.
+ *
+ * This method implements parsing the characteristics of a generic
+ * security event.
+ *
+ * \param S	The state information for the Cell that the generic
+ *		parameters are being parsed into.
+ *
+ * \param entry	The object containing the definition of the event that
+ *		is to be parsed.
+ *
+ * \return	A boolean value is used to indicate the success or
+ *		failure of the parsing.  A false value indicates the
+ *		parsing failed and the object is poisoned.  A true
+ *		value indicates the object has been successfully
+ *		populated.
+ */
+
+static _Bool _parse_generic_event(CO(Cell_State, S), CO(String, entry))
+
+{
+	_Bool retn = false;
+
+	unsigned int cnt;
+
+	char *fp;
+
+	regmatch_t regmatch;
+
+	Buffer field = NULL;
+
+
+	/* Compile the regular expressions once. */
+	if ( !Generic_Event_Fields_compiled ) {
+		for (cnt= 0; Generic_Event_Fields[cnt].fd != NULL; ++cnt) {
+			if ( regcomp(&Generic_Event_Fields[cnt].regex,
+				     Generic_Event_Fields[cnt].fd,
+				     REG_EXTENDED) != 0 )
+				ERR(goto done);
+		}
+	}
+	Generic_Event_Fields_compiled = true;
+
+
+	/* Extract the generic event. */
+	INIT(HurdLib, Buffer, field, ERR(goto done));
+
+	fp = entry->get(entry);
+	if ( regexec(&Generic_Event_Fields[0].regex, fp, 1, &regmatch, 0) != \
+	     REG_OK )
+		ERR(goto done);
+
+	field->add(field, (unsigned char *) (fp + regmatch.rm_so),
+		   regmatch.rm_eo-regmatch.rm_so);
+	if ( !field->add(field, (unsigned char *) "\0", 1) )
+		ERR(goto done);
+
+
+	/* Parse task_kill parameters. */
+	fp = (char *) field->get(field);
+	if ( !_get_field(&Generic_Event_Fields[1].regex, fp, \
+			 &S->generic_event) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	WHACK(field);
+
+	return retn;
+}
+
+
+/**
  * External public method.
  *
  * This method implements parsing of a security state event for the
@@ -1124,6 +1214,11 @@ static _Bool parse(CO(Cell, this), CO(String, entry),
 
 		case TSEM_TASK_KILL:
 			if ( !_parse_task_kill(S, entry) )
+				ERR(goto done);
+			break;
+
+		case TSEM_GENERIC_EVENT:
+			if ( !_parse_generic_event(S, entry) )
 				ERR(goto done);
 			break;
 
@@ -1496,6 +1591,53 @@ static _Bool _measure_task_kill(CO(Cell_State, S))
 
 
 /**
+ * Internal private method.
+ *
+ * This method implements adding the parameters of a generic security
+ * event to the measurement of the cell.
+ *
+ * \param S	The state information of the object whose generic security
+ *		parameters are to be added.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the addition of the parameters has succeeded.  A false
+ *		value indicates failure while a true value indicates
+ *		success.
+ */
+
+static _Bool _measure_generic_event(CO(Cell_State, S))
+
+{
+	_Bool retn = false;
+
+	unsigned char *p;
+
+	size_t size;
+
+	Buffer bufr = NULL;
+
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	p = (unsigned char *) &S->generic_event;
+	size = sizeof(S->task_kill.cross_model);
+	bufr->add(bufr, p, size);
+
+	p = (unsigned char *) generic_cell;
+	size = sizeof(generic_cell);
+	bufr->add(bufr, p, size);
+
+	if ( !S->identity->add(S->identity, bufr) )
+		ERR(goto done);
+	retn = true;
+
+ done:
+	WHACK(bufr);
+
+	return retn;
+}
+
+
+/**
  * External public method.
  *
  * This method implements computing of the measurement of a cell.
@@ -1550,6 +1692,10 @@ static _Bool measure(CO(Cell, this))
 
 		case TSEM_TASK_KILL:
 			retn = _measure_task_kill(S);
+			break;
+
+		case TSEM_GENERIC_EVENT:
+			retn = _measure_generic_event(S);
 			break;
 
 		default:
@@ -2165,6 +2311,12 @@ static _Bool format(CO(Cell, this), CO(String, event))
 			retn = _format_task_kill(S, event);
 			break;
 
+		case TSEM_GENERIC_EVENT:
+			retn = event->add_sprintf(event,		    \
+						  "generic_event{type=%u}", \
+						  S->generic_event);
+			break;
+
 		default:
 			break;
 	}
@@ -2493,6 +2645,10 @@ static void dump(CO(Cell, this))
 
 		case TSEM_TASK_KILL:
 			_dump_task_kill(S);
+			break;
+
+		case TSEM_GENERIC_EVENT:
+			fprintf(stdout, "type: %u\n", S->generic_event);
 			break;
 
 		default:

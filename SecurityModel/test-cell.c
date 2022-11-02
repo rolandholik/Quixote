@@ -30,6 +30,8 @@
 
 #define TASK_KILL "event{process=bash, filename=none, type=task_kill, task_id=77e90dbb8ae1da51e8dd0dc5f1500d9f6c26332252afa8fb8a4ca91a1ef60cac} task_kill{cross=0, signal=0, target=77e90dbb8ae1da51e8dd0dc5f1500d9f6c26332252afa8fb8a4ca91a1ef60cac}"
 
+#define GENERIC_EVENT "event{process=ncat, filename=none, type=generic_event, task_id=a1dc772f4cf54a4f7e178ce302ba9edad67c2e7bb980ad2a372ffa789b6c57a6} COE{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=0x20000420} generic_event{type=8}"
+
 
 /* Include files. */
 #include <stdio.h>
@@ -312,6 +314,69 @@ static int test_task_kill(char *arg)
 }
 
 
+/**
+ * Private function.
+ *
+ * This function is responsible for testing the parsing and processing
+ * of a generic security event.
+ *
+ * \param arg	A pointer to a null-terminated buffer containing
+ *		the generic security definition to be tested.
+ *
+ * \return	A return value of zero indicates that the unit test
+ *		ran correctly.  A value of one is returned to indicate
+ *		an error.
+ */
+
+static int test_generic_event(char *arg)
+
+{
+	int retn = 1;
+
+	Buffer bufr = NULL;
+
+	String entry = NULL;
+
+	Cell cell = NULL;
+
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+
+	INIT(HurdLib, String, entry, ERR(goto done));
+	if ( !entry->add(entry, arg) )
+		ERR(goto done);
+
+	entry->print(entry);
+
+	INIT(NAAAIM, Cell, cell, ERR(goto done));
+	if ( !cell->parse(cell, entry, TSEM_GENERIC_EVENT) )
+		ERR(goto done);
+	if ( !cell->measure(cell) )
+		ERR(goto done);
+	if ( !cell->get_measurement(cell, bufr) )
+		ERR(goto done);
+
+	fputs("\nArguments:\n", stdout);
+	cell->dump(cell);
+
+	entry->reset(entry);
+	if ( !cell->format(cell, entry) )
+		ERR(goto done);
+	fputs("\nCell characteristics:\n", stdout);
+	entry->print(entry);
+
+	retn = 0;
+
+
+ done:
+	WHACK(bufr);
+	WHACK(entry);
+	WHACK(cell);
+
+	return retn;
+}
+
+
 /*
  * Program entry point begins here.
  */
@@ -348,7 +413,8 @@ extern int main(int argc, char *argv[])
 		fputs("\t\tfile_open mmap_file socket_create\n", stdout);
 		fputs("\t\tsocket_connect socket_connect_ipv4 " \
 		      "socket_connect_ipv6\n", stdout);
-		fputs("\t\tsocket_bind, socket_accept, task_kill\n", stdout);
+		fputs("\t\tsocket_bind, socket_accept, task_kill, " \
+		      "generic_event\n", stdout);
 		goto done;
 	}
 
@@ -393,6 +459,11 @@ extern int main(int argc, char *argv[])
 
 	if ( strcmp(test, "task_kill") == 0 ) {
 		retn = test_task_kill(TASK_KILL);
+		goto done;
+	}
+
+	if ( strcmp(test, "generic_event") == 0 ) {
+		retn = test_generic_event(GENERIC_EVENT);
 		goto done;
 	}
 
