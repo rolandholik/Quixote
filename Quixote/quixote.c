@@ -267,10 +267,16 @@ static _Bool setup_management(CO(LocalDuct, mgmt), const char *cartridge)
 			break;
 
 		case process_mode:
-			sockpath->add(sockpath, QUIXOTE_PROCESS_MGMT_DIR);
-			if ( !sockpath->add_sprintf(sockpath, "/pid-%u", \
-						    getpid()) )
-				ERR(goto done);
+			sockpath->add_sprintf(sockpath, "%s/pid-", \
+					      QUIXOTE_PROCESS_MGMT_DIR);
+			if ( cartridge != NULL ) {
+				if ( !sockpath->add(sockpath, cartridge) )
+					ERR(goto done);
+			} else {
+				if ( !sockpath->add_sprintf(sockpath, "%u", \
+							    getpid()) )
+					ERR(goto done);
+			}
 			break;
 
 		case cartridge_mode:
