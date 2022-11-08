@@ -968,7 +968,7 @@ static _Bool _parse_socket_accept(CO(Cell_State, S), CO(String, entry))
 		default:
 			p = S->socket_accept.u.addr;
 			cnt = sizeof(S->socket_accept.u.addr);
-			if ( !_get_digest(&Socket_Fields[4].regex,  \
+			if ( !_get_digest(&Socket_Accept_Fields[4].regex,  \
 					  fp, p, cnt) )
 				ERR(goto done);
 			break;
@@ -1522,8 +1522,8 @@ static _Bool _measure_socket_accept(CO(Cell_State, S))
 			break;
 
 		default:
-			p = (unsigned char *) S->socket_connect.u.addr;
-			size = sizeof(S->socket_connect.u.addr);
+			p = (unsigned char *) S->socket_accept.u.addr;
+			size = sizeof(S->socket_accept.u.addr);
 			bufr->add(bufr, p, size);
 			break;
 	}
