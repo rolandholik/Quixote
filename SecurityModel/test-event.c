@@ -11,6 +11,9 @@
  * the source tree for copyright and licensing information.
  **************************************************************************/
 
+/* Local defines. */
+#define EVENT "event{process=quixote, filename=/opt/Quixote/sbin/runc, type=file_open, task_id=0000000000000000000000000000000000000000000000000000000000000000} COE{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=0x7fffffffff} file{flags=32800, uid=2, gid=2, mode=0100755, name_length=22, name=b8da9ede1695639ab938d2ec41ce11a6156eb6af1b2506b5c6c92d1836d99ffd, s_id=xvda, s_uuid=feadbeaffeadbeaffeadbeaffeadbeaf, digest=7c1a43eb99fa739056d6554001d450ca1c9c184ca7e2d8a785bd1e5fd53bad8c}"
+
 
 /* Include files. */
 #include <stdio.h>
@@ -132,6 +135,8 @@ extern int main(int argc, char *argv[])
 {
 	_Bool file_mode = false;
 
+	char *event_string = NULL;
+
 	int opt,
 	    retn = 1;
 
@@ -144,10 +149,14 @@ extern int main(int argc, char *argv[])
 	EventModel event_model = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "F")) != EOF )
+	while ( (opt = getopt(argc, argv, "Fe:")) != EOF )
 		switch ( opt ) {
 			case 'F':
 				file_mode = true;
+				break;
+
+			case 'e':
+				event_string = optarg;
 				break;
 		}
 
@@ -163,7 +172,9 @@ extern int main(int argc, char *argv[])
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 
 	INIT(HurdLib, String, entry, ERR(goto done));
-	if ( !entry->add(entry, "event{process=swapper/0, filename=/bin/bash-3.2.48, type=file_open, task_id=0000000000000000000000000000000000000000000000000000000000000000} COE{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=3fffffffff} file{uid=0, gid=0, mode=o100755, name_length=16, name=e1cb9766d47adb4d514d5590dd247504a3aab7e67839d65a6c6f4c32fc120e5d, s_id=xvda, s_uuid=feadbeaffeadbeaffeadbeaffeadbeaf, digest=d2a6bfe0d8a2346d45518dcaaf47642808d6c605506bd0b8e42a65a76735b98e}") )
+	if ( event_string == NULL )
+		event_string = EVENT;
+	if ( !entry->add(entry, event_string) )
 		ERR(goto done);
 
 	entry->print(entry);
