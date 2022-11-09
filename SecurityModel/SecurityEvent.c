@@ -104,6 +104,12 @@ static const char *TSEM_name[] = {
 	"sb_remount",
 	"sb_pivotroot",
 	"sb_statfs",
+	"shm_associate",
+	"shm_shmctl",
+	"shm_shmat",
+	"sem_associate",
+	"sem_semctl",
+	"sem_semop",
 	"move_mount",
 	NULL
 };
