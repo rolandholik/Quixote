@@ -80,6 +80,7 @@ static struct regex_description {
 static const char *TSEM_name[] = {
 	"undefined",
 	"bprm_set_creds",
+	"generic_event",
 	"file_open",
 	"mmap_file",
 	"file_ioctl",
@@ -104,7 +105,6 @@ static const char *TSEM_name[] = {
 	"sb_pivotroot",
 	"sb_statfs",
 	"move_mount",
-	"generic_event",
 	NULL
 };
 
