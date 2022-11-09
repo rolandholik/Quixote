@@ -113,6 +113,8 @@ static const char *TSEM_name[] = {
 	"sem_semop",
 	"syslog",
 	"settime",
+	"quotactl",
+	"quota_on"
 	NULL
 };
 
