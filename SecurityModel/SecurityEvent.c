@@ -111,6 +111,8 @@ static const char *TSEM_name[] = {
 	"sem_semctl",
 	"sem_semop",
 	"move_mount",
+	"syslog",
+	"settime",
 	NULL
 };
 
