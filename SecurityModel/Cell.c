@@ -1619,7 +1619,7 @@ static _Bool _measure_generic_event(CO(Cell_State, S))
 
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 	p = (unsigned char *) &S->generic_event;
-	size = sizeof(S->task_kill.cross_model);
+	size = sizeof(S->generic_event);
 	bufr->add(bufr, p, size);
 
 	p = (unsigned char *) generic_cell;
