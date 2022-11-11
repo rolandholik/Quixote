@@ -122,6 +122,7 @@ static const char *TSEM_name[] = {
 	"ipc_permission",
 	"key_alloc",
 	"key_permission",
+	"netlink_send",
 	NULL
 };
 
