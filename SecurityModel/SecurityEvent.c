@@ -120,6 +120,8 @@ static const char *TSEM_name[] = {
 	"msg_queue_msgsnd",
 	"msg_queue_msgrcv",
 	"ipc_permission",
+	"key_alloc",
+	"key_permission",
 	NULL
 };
 
