@@ -1108,7 +1108,7 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint,
 
 			if ( Signals.sigchild ) {
 				if ( child_exited(cartridge_pid) ) {
-					fputs("Cartridge spent.\n", stdout);
+
 					close(event_fd);
 					close(event_pipe[WRITE_SIDE]);
 					_exit(0);
