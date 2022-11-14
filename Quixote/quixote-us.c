@@ -1295,10 +1295,6 @@ static _Bool setup_namespace(int *fdptr, _Bool enforce)
 			ERR(goto done);
 	}
 
-	/* Drop the ability to modify the security domain. */
-	if ( cap_drop_bound(CAP_TRUST) != 0 )
-		ERR(goto done);
-
 	/* Create the pathname to the event update file. */
 	memset(fname, '\0', sizeof(fname));
 	if ( snprintf(fname, sizeof(fname), SYSFS_UPDATES, \
@@ -1473,6 +1469,10 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint, \
 
 		/* Child process - run the cartridge. */
 		if ( cartridge_pid == 0 ) {
+			/* Drop the ability to modify the trust state. */
+			if ( cap_drop_bound(CAP_TRUST) != 0 )
+				ERR(goto done);
+
 			if ( Mode == cartridge_mode ) {
 				execlp("runc", "runc", "run", "-b", bundle, \
 				       cartridge, NULL);

@@ -1126,12 +1126,6 @@ static _Bool setup_namespace(_Bool enforce)
 		if ( !Control->enforce(Control) )
 			ERR(goto done);
 	}
-
-
-	/* Drop the ability to modify the security event model. */
-	if ( cap_drop_bound(CAP_TRUST) != 0 )
-		ERR(goto done);
-
 	retn = true;
 
 
@@ -1290,6 +1284,10 @@ static _Bool fire_cartridge(CO(char *, cartridge), CO(File, map), \
 
 	/* Child process - run the cartridge. */
 	if ( Cartridge_pid == 0 ) {
+		/* Drop the ability to modify the security event model. */
+		if ( cap_drop_bound(CAP_TRUST) != 0 )
+			ERR(goto done);
+
 		if ( Mode == cartridge_mode ) {
 			execlp("runc", "runc", "run", "-b", bundle, \
 			       cartridge, NULL);
