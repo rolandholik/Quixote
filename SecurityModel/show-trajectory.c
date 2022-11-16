@@ -91,15 +91,14 @@ extern int main(int argc, char *argv[])
 			fputc('\n', stdout);
 			event->dump(event);
 			fputc('\n', stdout);
-			continue;
+		} else {
+			entry->reset(entry);
+			if ( generic )
+				event->format_generic(event, entry);
+			else
+				event->format(event, entry);
+			entry->print(entry);
 		}
-
-		entry->reset(entry);
-		if ( generic )
-			event->format_generic(event, entry);
-		else
-			event->format(event, entry);
-		entry->print(entry);
 
 		event->reset(event);
 		entry->reset(entry);
