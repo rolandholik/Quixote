@@ -15,7 +15,7 @@ CSRC = COE.c Cell.c SecurityEvent.c SecurityPoint.c TSEM.c EventModel.c \
 
 TOOLS = test-COE test-cell test-event generate-states sha-tool		\
 	compute-measurement set-behavior test-TSEM compute-aggregate	\
-	bad-actor sign-model generate-pseudonym
+	bad-actor sign-model generate-pseudonym show-trajectory
 
 INSTALLBIN  = generate-states generate-pseudonym sign-model
 INSTALLSBIN = set-behavior
@@ -122,6 +122,9 @@ sign-model: sign-model.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 generate-pseudonym: generate-pseudonym.o Cell.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
+
+show-trajectory: show-trajectory.o SecurityEvent.o COE.o Cell.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 tags:

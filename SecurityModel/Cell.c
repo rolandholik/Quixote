@@ -2328,6 +2328,77 @@ static _Bool format(CO(Cell, this), CO(String, event))
 /**
  * External public method.
  *
+ * This method implements the generation of an ASCII formatted
+ * representation of the characteristics of a call.  The string
+ * generated uses the name of a generic event rather than its
+ * event number.
+ *
+ * \param this	A pointer to the object containing the characteristics
+ *		which are to be formatted.
+ *
+ * \param event	The object into which the formatted string is to
+ *		be copied.
+ *
+ * \param names	A pointer to a character array containing the generic
+ *		event names that will be used to translate the event
+ *		type into a name.
+ */
+
+static _Bool format_generic(CO(Cell, this), CO(String, event), \
+			    const char **names)
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	switch ( S->type ) {
+		case TSEM_FILE_OPEN:
+			retn = _format_file(S, event);
+			break;
+
+		case TSEM_MMAP_FILE:
+			retn = _format_mmap_file(S, event);
+			if ( !S->mmap_file.anonymous )
+				retn = _format_file(S, event);
+			break;
+
+		case TSEM_SOCKET_CREATE:
+			retn = _format_socket_create(S, event);
+			break;
+
+		case TSEM_SOCKET_CONNECT:
+		case TSEM_SOCKET_BIND:
+			retn = _format_socket_connect(S, event);
+			break;
+
+		case TSEM_SOCKET_ACCEPT:
+			retn = _format_socket_accept(S, event);
+			break;
+
+		case TSEM_TASK_KILL:
+			retn = _format_task_kill(S, event);
+			break;
+
+		case TSEM_GENERIC_EVENT:
+			retn = event->add_sprintf(event,		     \
+						  "generic_event{type=%d, ", \
+						  S->generic_event);
+			retn = event->add_sprintf(event, "name=%s}",
+						  names[S->generic_event]);
+			break;
+
+		default:
+			break;
+	}
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements the reset of the Cell object to a state
  * which would allow the generation of a new set of cell characteritics.
  *
@@ -2727,7 +2798,9 @@ extern Cell NAAAIM_Cell_Init(void)
 
 	this->set_digest = set_digest;
 
-	this->format = format;
+	this->format	     = format;
+	this->format_generic = format_generic;
+
 	this->reset  = reset;
 	this->dump   = dump;
 	this->whack  = whack;
