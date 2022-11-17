@@ -141,6 +141,21 @@ static const char *TSEM_name[] = {
 	"key_alloc",
 	"key_permission",
 	"netlink_send",
+	"inode_create",
+	"inode_link",
+	"inode_unlink",
+	"inode_symlink",
+	"inode_mkdir",
+	"inode_rmdir",
+	"inode_mknod",
+	"inode_rename",
+	"inode_setattr",
+	"inode_getattr",
+	"inode_setxattr",
+	"inode_getxattr",
+	"inode_listxattr",
+	"inode_removexattr",
+	"inode_killpriv",
 	NULL
 };
 
