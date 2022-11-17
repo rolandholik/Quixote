@@ -156,6 +156,10 @@ static const char *TSEM_name[] = {
 	"inode_listxattr",
 	"inode_removexattr",
 	"inode_killpriv",
+	"tun_dev_create",
+	"tun_dev_attach_queue",
+	"tun_dev_attach",
+	"tun_dev_open",
 	NULL
 };
 
