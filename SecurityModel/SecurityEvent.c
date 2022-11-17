@@ -160,6 +160,9 @@ static const char *TSEM_name[] = {
 	"tun_dev_attach_queue",
 	"tun_dev_attach",
 	"tun_dev_open",
+	"bpf",
+	"bpf_map",
+	"bpf_prog",
 	NULL
 };
 
