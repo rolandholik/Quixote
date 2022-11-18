@@ -134,6 +134,12 @@ static Buffer Aggregate = NULL;
 static _Bool Sealed = false;
 
 /**
+ * This variable is used to indicate that an execution trajectory
+ * should be generated.
+ */
+static _Bool Trajectory = false;
+
+/**
  * The following variable holds the current measurement.
  */
 #if 0
@@ -1250,6 +1256,215 @@ static _Bool load_model(char *model_file)
 /**
  * Private function.
  *
+ * This is a helper function that adds a hexadecimally encoded state
+ * point to a String object.
+ *
+ * \param str	The object that is to have the buffer encoded.
+ *
+ * \param bufr	A pointer to the buffer whose contents is to be
+ *		encoded into the String object.
+ *
+ * \param cnt	The number of bytes to encode from the buffer.
+ *
+ * \return	No return value is defined.
+ */
+
+static void _encode_buffer(CO(String, str), unsigned char *bufr, \
+			   const size_t size)
+
+{
+	unsigned char *p = bufr;
+
+	unsigned int lp;
+
+
+	for (lp= 0; lp < size; ++lp) {
+		str->add_sprintf(str, "%02x", *p);
+		++p;
+	}
+
+	return;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function implements the output of a security execution trajectory.
+ *
+ * \param fname		The name of the file that the security trajectrory
+ *			will be written to.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not the trajectory was output.  A false value
+ *			indicates output failed while a true value
+ *			indicates the trajectory was successfully output.
+ */
+
+static _Bool output_trajectory(CO(char *, fname))
+
+{
+	_Bool retn = false;
+
+	size_t lp,
+	       cnt = 0;
+
+	SecurityEvent event;
+
+	Buffer bufr = NULL;
+
+	String es = NULL;
+
+	File outfile = NULL;
+
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	INIT(HurdLib, String, es, ERR(goto done));
+
+	INIT(HurdLib, File, outfile, ERR(goto done));
+	if ( !outfile->open_rw(outfile, fname) )
+		ERR(goto done);
+
+
+	/* Write each trajectory point. */
+	Model->rewind_event(Model);
+	cnt = Model->trajectory_size(Model);
+
+	for (lp= 0; lp < cnt; ++lp ) {
+		if ( !Model->get_event(Model, &event) )
+			ERR(goto done);
+		if ( event == NULL )
+			continue;
+		if ( !event->format(event, es) )
+			ERR(goto done);
+
+		bufr->reset(bufr);
+		bufr->add(bufr, (void *) es->get(es), es->size(es));
+		bufr->add(bufr, (void *) "\n", 1);
+		if ( !outfile->write_Buffer(outfile, bufr) )
+			ERR(goto done);
+		es->reset(es);
+	}
+
+	retn = true;
+
+ done:
+	WHACK(bufr);
+	WHACK(es);
+	WHACK(outfile);
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function implements the output of a security model.
+ *
+ * \param fname		The name of the file that the security model
+ *			will be written to.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not the model was output.  A false value
+ *			indicates output failed while a true value
+ *			indicates the model was successfully output.
+ */
+
+static _Bool output_model(CO(char *, fname))
+
+{
+	_Bool retn = false;
+
+	size_t lp,
+	       cnt = 0;
+
+	Buffer bufr = NULL;
+
+	String str = NULL;
+
+	SecurityPoint cp = NULL;
+
+	File outfile = NULL;
+
+	static const char *aggregate_cmd = "aggregate ",
+			  *state_cmd	 = "state ",
+			  *seal_cmd	 = "seal\n",
+			  *end_cmd	 = "end\n";
+
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	INIT(HurdLib, String, str, ERR(goto done));
+
+	INIT(HurdLib, File, outfile, ERR(goto done));
+	if ( !outfile->open_rw(outfile, fname) )
+		ERR(goto done);
+
+
+	/* Output the aggregate value. */
+	if ( !str->add(str, aggregate_cmd) )
+		ERR(goto done);
+	_encode_buffer(str, Aggregate->get(Aggregate), \
+		       Aggregate->size(Aggregate));
+	bufr->add(bufr, (void *) str->get(str), str->size(str));
+	bufr->add(bufr, (void *) "\n", 1);
+	if ( !outfile->write_Buffer(outfile, bufr) )
+		ERR(goto done);
+
+	/* Send the state points. */
+	Model->rewind_points(Model);
+	cnt = Model->points_size(Model);
+
+	for (lp= 0; lp < cnt; ++lp ) {
+		if ( !Model->get_point(Model, &cp) )
+			ERR(goto done);
+		if ( cp == NULL )
+			continue;
+
+		str->reset(str);
+		if ( !str->add(str, state_cmd) )
+			ERR(goto done);
+		_encode_buffer(str, cp->get(cp), NAAAIM_IDSIZE);
+
+		bufr->reset(bufr);
+		bufr->add(bufr, (void *) str->get(str), str->size(str));
+		bufr->add(bufr, (void *) "\n", 1);
+		if ( !outfile->write_Buffer(outfile, bufr) )
+			ERR(goto done);
+	}
+
+	/* Output the closing tags. */
+	str->reset(str);
+	bufr->reset(bufr);
+	if ( !str->add(str, seal_cmd) )
+		ERR(goto done);
+	bufr->add(bufr, (void *) str->get(str), str->size(str));
+	if ( !outfile->write_Buffer(outfile, bufr) )
+		ERR(goto done);
+
+	str->reset(str);
+	bufr->reset(bufr);
+	if ( !str->add(str, end_cmd) )
+		ERR(goto done);
+	bufr->add(bufr, (void *) str->get(str), str->size(str));
+	if ( !outfile->write_Buffer(outfile, bufr) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	WHACK(bufr);
+	WHACK(str);
+	WHACK(outfile);
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
  * This function creates an independent security event domain that
  * is modeled by a userspace Trusted Modeling Agent implementation.
  *
@@ -1390,6 +1605,258 @@ static void show_magazine(CO(char *, root))
 /**
  * Private function.
  *
+ * This function is responsible for issueing the runc command needed
+ * to terminate a software cartridge.  The function waits until the
+ * process spawned to execute the runc process terminates.
+ *
+ * \param name		A pointer to a character buffer containing the
+ *			name of the software cartridge.
+ *
+ * \param wait		A boolean flag used to indicate whether or
+ *			not the runc kill process should be waited for.
+ *
+ * \return	No return value is defined.
+ */
+
+static void kill_cartridge(const char *cartridge, const _Bool wait)
+
+{
+	int status;
+
+	static pid_t kill_process = 0;
+
+
+	/* Signal the monitor process to shutdown the cartridge process. */
+	if ( Mode == process_mode ) {
+		if ( Debug )
+			fprintf(Debug, "%u sending SIGHUP to %u.\n", \
+				getpid(), Monitor_pid);
+		kill(Monitor_pid, SIGTERM);
+		return;
+	}
+
+
+	/* Check to see if runc kill has finished. */
+	if ( kill_process ) {
+		waitpid(kill_process, &status, WNOHANG);
+		if ( !WIFEXITED(status) )
+			return;
+
+		if ( Debug )
+			fprintf(Debug, "Cartridge kill status: %d\n", \
+				WEXITSTATUS(status));
+		if ( WEXITSTATUS(status) == 0 ) {
+			kill_process = 0;
+			return;
+		}
+	}
+
+
+	/* Fork a process to use runc to send the termination signal. */
+	kill_process = fork();
+	if ( kill_process == -1 )
+		return;
+
+	/* Child process - execute runc in kill mode. */
+	if ( kill_process == 0 ) {
+		if ( Debug )
+			fputs("Killing runc cartridge.\n", Debug);
+		execlp("runc", "runc", "kill", cartridge, "SIGKILL", \
+		       NULL);
+		exit(1);
+	}
+
+	/* Parent process - wait for the kill process to complete. */
+	if ( wait )
+		waitpid(kill_process, &status, 0);
+
+	return;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function is responsible for monitoring the child process that
+ * is running the modeled workload.  The event loop monitors for a
+ * a child exit and process management requests.
+ *
+ * \param mgmt		The object that will be used to receive management
+ *			requests.
+ *
+ * \param cartridge	A pointer to a null terminated buffer containing
+ *			the name of the cartridge being run.
+ *
+ * \param fd		The file descriptor from which security domain
+ *			updates will be read from.
+ *
+ * \return		A boolean value is used to indicate the status
+ *			of the child monitor.  A true value indicates
+ *			that management was successfully completed while
+ *			a false value indicates an error occurred.
+ */
+
+static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int fd)
+
+{
+	_Bool retn = false,
+	      connected = false;
+
+	char *p,
+	     bufr[512];
+
+	int rc;
+
+	unsigned int cycle = 0;
+
+	struct pollfd poll_data[2];
+
+	Buffer cmdbufr = NULL;
+
+
+	INIT(HurdLib, Buffer, cmdbufr, ERR(goto done));
+
+	poll_data[0].fd	    = fd;
+	poll_data[0].events = POLLIN;
+
+	if ( !mgmt->get_socket(mgmt, &poll_data[1].fd) ) {
+		fputs("Error setting up polling data.\n", stderr);
+		goto done;
+	}
+	poll_data[1].events = POLLIN;
+
+
+	/* Dispatch loop. */
+	if ( Debug ) {
+		fprintf(Debug, "%d: Calling event loop\n", getpid());
+		fprintf(Debug, "descriptor 1: %d, descriptor 2: %d\n", \
+			poll_data[0].fd, poll_data[1].fd);
+	}
+
+	while ( 1 ) {
+		if ( Debug )
+			fprintf(Debug, "\n%d: Poll cycle: %d\n", getpid(), \
+				++cycle);
+
+		rc = poll(poll_data, 2, -1);
+		if ( rc < 0 ) {
+			if ( Signals.stop ) {
+				if ( Debug )
+					fputs("Quixote terminated.\n", Debug);
+				kill_cartridge(cartridge, true);
+				goto done;
+			}
+			if ( Signals.sigchild ) {
+				if ( !child_exited(Monitor_pid) )
+					continue;
+				goto done;
+			}
+
+			fputs("Poll error.\n", stderr);
+			kill_cartridge(cartridge, true);
+			goto done;
+		}
+		if ( rc == 0 ) {
+			if ( Debug )
+				fputs("Poll timeout.\n", Debug);
+			continue;
+		}
+
+		if ( Debug )
+			fprintf(Debug, "Events: %d, Data poll=%0x, "	\
+				"Mgmt poll=%0x\n", retn,		\
+				poll_data[0].revents, poll_data[1].revents);
+
+		if ( poll_data[0].revents & POLLHUP ) {
+			if ( Signals.stop )
+				goto done;
+			if ( Signals.sigchild ) {
+				if ( !child_exited(Monitor_pid) )
+					continue;
+				goto done;
+			}
+		}
+
+		if ( poll_data[0].revents & POLLIN ) {
+			p = bufr;
+			memset(bufr, '\0', sizeof(bufr));
+			while ( 1 ) {
+				retn = read(fd, p, 1);
+				if ( retn < 0 ) {
+					if ( errno != ENODATA )
+						fprintf(stderr, "Have "	    \
+							"error: retn=%d, "  \
+							"error=%s\n", retn, \
+							strerror(errno));
+				}
+				if ( *p != '\n' ) {
+					++p;
+					continue;
+				}
+				else
+					*p = '\0';
+				if ( Debug )
+					fprintf(Debug,			  \
+						"Processing event: %s\n", \
+						bufr);
+				if ( !process_event(bufr) ) {
+					if ( Debug )
+						fprintf(Debug, "Event "	     \
+							"processing error, " \
+							"%u killing %u\n",   \
+							getpid(), Monitor_pid);
+					Model_Error = true;
+				}
+				if ( Model_Error )
+					kill_cartridge(cartridge, false);
+				break;
+			}
+		}
+
+		if ( poll_data[1].revents & POLLIN ) {
+			if ( !connected ) {
+				if ( Debug )
+					fputs("Have socket connection.\n", \
+					      Debug);
+
+				if ( !mgmt->accept_connection(mgmt) )
+					ERR(goto done);
+				if ( !mgmt->get_fd(mgmt, &poll_data[1].fd) )
+					ERR(goto done);
+				connected = true;
+				continue;
+			}
+			if ( !mgmt->receive_Buffer(mgmt, cmdbufr) )
+				continue;
+			if ( mgmt->eof(mgmt) ) {
+				if ( Debug )
+					fputs("Terminating management.\n", \
+					      Debug);
+				mgmt->reset(mgmt);
+				if ( !mgmt->get_socket(mgmt, \
+						       &poll_data[1].fd) )
+					ERR(goto done);
+				connected = false;
+				continue;
+			}
+
+			if ( !process_command(mgmt, cmdbufr) )
+				ERR(goto done);
+			cmdbufr->reset(cmdbufr);
+		}
+	}
+
+
+ done:
+	WHACK(cmdbufr);
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
  * This function is responsible for launching a software cartridge
  * in an independent measurement domain.  A pipe is established
  * between the parent process and the child that is used to return
@@ -1399,13 +1866,13 @@ static void show_magazine(CO(char *, root))
  * \param root		A pointer to the buffer containing the root
  *			directory to be used to display the cartridges.
  *
- * \param endpoint	A character pointer to the buffer containing
- *			the directory which holds the container to
- *			be executed.
- *
  * \param enforce	A flag used to indicate whether or not the
  *			security domain should be placed in enforcement
  *			mode.
+ *
+ * \param outfile	A pointer to a null-terminated array
+ *			containing the name of the output file that
+ *			is to be generated.
  *
  * \return	A boolean value is returned to reflect the status of
  *		the launch.  A false value indicates an error was
@@ -1413,8 +1880,8 @@ static void show_magazine(CO(char *, root))
  *		was successfully launched.
  */
 
-static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint, \
-			    _Bool enforce)
+static _Bool fire_cartridge(CO(LocalDuct, mgmt), CO(char *, cartridge), \
+			    _Bool enforce, char *outfile)
 
 {
 	_Bool retn = false;
@@ -1423,8 +1890,8 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint, \
 	     bufr[1024];
 
 	int rc,
-	    event_fd,
-	    event_pipe[2];
+	    event_pipe[2],
+	    event_fd = 0;
 
 	pid_t cartridge_pid;
 
@@ -1452,15 +1919,28 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint, \
 	if ( Monitor_pid == -1 )
 		ERR(goto done);
 
+	/* Monitor parent process. */
+	if ( Monitor_pid > 0 ) {
+		if ( Debug )
+			fprintf(Debug, "Monitor process: %d\n", getpid());
+		close(event_pipe[WRITE_SIDE]);
+		if ( !child_monitor(mgmt, cartridge, event_pipe[READ_SIDE]) )
+			ERR(goto done);
+		if ( outfile != NULL ) {
+			if ( Trajectory )
+				retn = output_trajectory(outfile);
+			else
+				retn = output_model(outfile);
+		}
+		retn = true;
+		goto done;
+	}
 
 	/* Child process - create an independent namespace for this process. */
 	if ( Monitor_pid == 0 ) {
-		if ( Debug )
-			fprintf(Debug, "Monitor process: %d\n", getpid());
 		close(event_pipe[READ_SIDE]);
-
 		if ( !setup_namespace(&event_fd, enforce) )
-			exit(1);
+			_exit(1);
 
 		/* Fork again to run the cartridge. */
 		cartridge_pid = fork();
@@ -1469,6 +1949,10 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint, \
 
 		/* Child process - run the cartridge. */
 		if ( cartridge_pid == 0 ) {
+			if ( Debug )
+				fprintf(Debug, "Workload process: %d\n",
+					getpid());
+
 			/* Drop the ability to modify the trust state. */
 			if ( cap_drop_bound(CAP_TRUST) != 0 )
 				ERR(goto done);
@@ -1571,88 +2055,10 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint, \
 	}
 
 
-	/* Monitor parent process - return monitor fd. */
-	close(event_pipe[WRITE_SIDE]);
-	*endpoint = event_pipe[READ_SIDE];
-	retn = true;
-
-
  done:
 	WHACK(cartridge_dir);
 
 	return retn;
-}
-
-
-/**
- * Private function.
- *
- * This function is responsible for issueing the runc command needed
- * to terminate a software cartridge.  The function waits until the
- * process spawned to execute the runc process terminates.
- *
- * \param name		A pointer to a character buffer containing the
- *			name of the software cartridge.
- *
- * \param wait		A boolean flag used to indicate whether or
- *			not the runc kill process should be waited for.
- *
- * \return	No return value is defined.
- */
-
-static void kill_cartridge(const char *cartridge, const _Bool wait)
-
-{
-	int status;
-
-	static pid_t kill_process = 0;
-
-
-	/* Signal the monitor process to shutdown the cartridge process. */
-	if ( Mode == process_mode ) {
-		if ( Debug )
-			fprintf(Debug, "%u sending SIGHUP to %u.\n", \
-				getpid(), Monitor_pid);
-		kill(Monitor_pid, SIGTERM);
-		return;
-	}
-
-
-	/* Check to see if runc kill has finished. */
-	if ( kill_process ) {
-		waitpid(kill_process, &status, WNOHANG);
-		if ( !WIFEXITED(status) )
-			return;
-
-		if ( Debug )
-			fprintf(Debug, "Cartridge kill status: %d\n", \
-				WEXITSTATUS(status));
-		if ( WEXITSTATUS(status) == 0 ) {
-			kill_process = 0;
-			return;
-		}
-	}
-
-
-	/* Fork a process to use runc to send the termination signal. */
-	kill_process = fork();
-	if ( kill_process == -1 )
-		return;
-
-	/* Child process - execute runc in kill mode. */
-	if ( kill_process == 0 ) {
-		if ( Debug )
-			fputs("Killing runc cartridge.\n", Debug);
-		execlp("runc", "runc", "kill", cartridge, "SIGKILL", \
-		       NULL);
-		exit(1);
-	}
-
-	/* Parent process - wait for the kill process to complete. */
-	if ( wait )
-		waitpid(kill_process, &status, 0);
-
-	return;
 }
 
 
@@ -1664,32 +2070,23 @@ static void kill_cartridge(const char *cartridge, const _Bool wait)
 extern int main(int argc, char *argv[])
 
 {
-	_Bool enforce	= false,
-	      connected = false;
+	_Bool enforce = false;
 
-	char *p,
-	     *debug	= NULL,
+	char *debug	= NULL,
 	     *model	= NULL,
-	     *cartridge	= NULL,
-	     bufr[1024];
-
+	     *outfile	= NULL,
+	     *cartridge	= NULL;
 
 	int opt,
 	    fd	 = 0,
 	    retn = 1;
 
-	struct pollfd poll_data[2];
-
 	struct sigaction signal_action;
-
-	Buffer cmdbufr = NULL;
 
 	LocalDuct mgmt = NULL;
 
-	File infile = NULL;
 
-
-	while ( (opt = getopt(argc, argv, "CPSec:d:m:")) != EOF )
+	while ( (opt = getopt(argc, argv, "CPSetc:d:m:o:p:")) != EOF )
 		switch ( opt ) {
 			case 'C':
 				Mode = cartridge_mode;
@@ -1703,6 +2100,9 @@ extern int main(int argc, char *argv[])
 			case 'e':
 				enforce = true;
 				break;
+			case 't':
+				Trajectory = true;
+				break;
 
 			case 'c':
 				cartridge = optarg;
@@ -1712,6 +2112,9 @@ extern int main(int argc, char *argv[])
 				break;
 			case 'm':
 				model = optarg;
+				break;
+			case 'o':
+				outfile = optarg;
 				break;
 		}
 
@@ -1762,6 +2165,8 @@ extern int main(int argc, char *argv[])
 		goto done;
 	if ( sigaction(SIGCHLD, &signal_action, NULL) == -1 )
 		goto done;
+	if ( sigaction(SIGUSR1, &signal_action, NULL) == -1 )
+		goto done;
 
 
 	/* Initialize the security model and its controller. */
@@ -1786,155 +2191,17 @@ extern int main(int argc, char *argv[])
 	if ( !setup_management(mgmt, cartridge) )
 		ERR(goto done);
 
-
-	/* Launch the software cartridge. */
+	/* Fire the workload cartridge. */
 	if ( Debug )
-		fprintf(Debug, "Primary process: %d\n", getpid());
-
-	if ( !fire_cartridge(cartridge, &fd, enforce) )
+		fprintf(Debug, "Launch process: %d\n", getpid());
+	if ( !fire_cartridge(mgmt, cartridge, enforce, outfile) )
 		ERR(goto done);
-	poll_data[0].fd	    = fd;
-	poll_data[0].events = POLLIN;
 
-	if ( !mgmt->get_socket(mgmt, &poll_data[1].fd) ) {
-		fputs("Error setting up polling data.\n", stderr);
-		goto done;
-	}
-	poll_data[1].events = POLLIN;
-
-
-	/* Dispatch loop. */
-	if ( Debug ) {
-		fprintf(Debug, "%d: Calling event loop\n", getpid());
-		fprintf(Debug, "descriptor 1: %d, descriptor 2: %d\n", \
-			poll_data[0].fd, poll_data[1].fd);
-	}
-
-	INIT(HurdLib, Buffer, cmdbufr, ERR(goto done));
-
-	opt = 0;
-	while ( 1 ) {
-		if ( Debug )
-			fprintf(Debug, "\n%d: Poll cycle: %d\n", getpid(), \
-				++opt);
-
-		retn = poll(poll_data, 2, -1);
-		if ( retn < 0 ) {
-			if ( Signals.stop ) {
-				if ( Debug )
-					fputs("Quixote terminated.\n", Debug);
-				kill_cartridge(cartridge, true);
-				goto done;
-			}
-			if ( Signals.sigchild ) {
-				if ( !child_exited(Monitor_pid) )
-					continue;
-				fputs("Monitor process terminated.\n", stdout);
-				goto done;
-			}
-
-			fputs("Poll error.\n", stderr);
-			kill_cartridge(cartridge, true);
-			goto done;
-		}
-		if ( retn == 0 ) {
-			if ( Debug )
-				fputs("Poll timeout.\n", Debug);
-			continue;
-		}
-
-		if ( Debug )
-			fprintf(Debug, "Events: %d, Data poll=%0x, "	\
-				"Mgmt poll=%0x\n", retn,		\
-				poll_data[0].revents, poll_data[1].revents);
-
-		if ( poll_data[0].revents & POLLHUP ) {
-			if ( Signals.stop ) {
-				fputs("Monitor process stopped.\n", stdout);
-				goto done;
-			}
-			if ( Signals.sigchild ) {
-				if ( !child_exited(Monitor_pid) )
-					continue;
-				fputs("Monitor process exited.\n", stdout);
-				goto done;
-			}
-		}
-
-		if ( poll_data[0].revents & POLLIN ) {
-			p = bufr;
-			memset(bufr, '\0', sizeof(bufr));
-			while ( 1 ) {
-				retn = read(fd, p, 1);
-				if ( retn < 0 ) {
-					if ( errno != ENODATA )
-						fprintf(stderr, "Have "	    \
-							"error: retn=%d, "  \
-							"error=%s\n", retn, \
-							strerror(errno));
-				}
-				if ( *p != '\n' ) {
-					++p;
-					continue;
-				}
-				else
-					*p = '\0';
-				if ( Debug )
-					fprintf(Debug,			  \
-						"Processing event: %s\n", \
-						bufr);
-				if ( !process_event(bufr) ) {
-					if ( Debug )
-						fprintf(Debug, "Event "	     \
-							"processing error, " \
-							"%u killing %u\n",   \
-							getpid(), Monitor_pid);
-					Model_Error = true;
-				}
-				if ( Model_Error )
-					kill_cartridge(cartridge, false);
-				break;
-			}
-		}
-
-		if ( poll_data[1].revents & POLLIN ) {
-			if ( !connected ) {
-				if ( Debug )
-					fputs("Have socket connection.\n", \
-					      Debug);
-
-				if ( !mgmt->accept_connection(mgmt) )
-					ERR(goto done);
-				if ( !mgmt->get_fd(mgmt, &poll_data[1].fd) )
-					ERR(goto done);
-				connected = true;
-				continue;
-			}
-			if ( !mgmt->receive_Buffer(mgmt, cmdbufr) )
-				continue;
-			if ( mgmt->eof(mgmt) ) {
-				if ( Debug )
-					fputs("Terminating management.\n", \
-					      Debug);
-				mgmt->reset(mgmt);
-				if ( !mgmt->get_socket(mgmt, \
-						       &poll_data[1].fd) )
-					ERR(goto done);
-				connected = false;
-				continue;
-			}
-
-			if ( !process_command(mgmt, cmdbufr) )
-				ERR(goto done);
-			cmdbufr->reset(cmdbufr);
-		}
-	}
+	waitpid(Monitor_pid, NULL, 0);
 
 
  done:
-	WHACK(cmdbufr);
 	WHACK(mgmt);
-	WHACK(infile);
 
 	WHACK(Aggregate);
 	WHACK(Model);
