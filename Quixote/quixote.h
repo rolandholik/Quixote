@@ -15,7 +15,7 @@
 #define QUIXOTE_CARTRIDGE_MGMT_DIR	"/var/lib/Quixote/mgmt/cartridges"
 #define QUIXOTE_MAGAZINE		"/var/lib/Quixote/Magazine"
 
-#define SYSFS_UPDATES			"/sys/fs/tsem/update-%llu"
+#define SYSFS_UPDATES			"/sys/fs/tsem/ExternalTMA/%llu"
 #define SYSFS_EXTERNAL			"/sys/kernel/security/tsem/external"
 
 /* Kernel driver definitions. */

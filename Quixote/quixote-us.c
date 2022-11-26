@@ -1989,7 +1989,7 @@ static _Bool fire_cartridge(CO(LocalDuct, mgmt), CO(char *, cartridge), \
 
 		/* Parent process - monitor for events. */
 		poll_data[0].fd	    = event_fd;
-		poll_data[0].events = POLLPRI;
+		poll_data[0].events = POLLIN;
 
 		while ( true ) {
 			if ( Signals.stop ) {
@@ -2018,6 +2018,8 @@ static _Bool fire_cartridge(CO(LocalDuct, mgmt), CO(char *, cartridge), \
 			memset(bufr, '\0', sizeof(bufr));
 
 			rc = poll(poll_data, 1, -1);
+			if ( Debug )
+				fprintf(Debug, "Poll returns: %d\n", rc);
 			if ( rc < 0 ) {
 				if ( errno == -EINTR ) {
 					fputs("poll interrupted.\n", stderr);
@@ -2025,7 +2027,7 @@ static _Bool fire_cartridge(CO(LocalDuct, mgmt), CO(char *, cartridge), \
 				}
 			}
 
-			if ( (poll_data[0].revents & POLLPRI) == 0 )
+			if ( (poll_data[0].revents & POLLIN) == 0 )
 				continue;
 
 			while ( true ) {

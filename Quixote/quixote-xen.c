@@ -1088,7 +1088,7 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint,
 
 		/* Parent process - monitor for events. */
 		poll_data[0].fd	    = event_fd;
-		poll_data[0].events = POLLPRI;
+		poll_data[0].events = POLLIN;
 
 		while ( true ) {
 			if ( Signals.stop ) {
@@ -1125,7 +1125,7 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint,
 				}
 			}
 
-			if ( (poll_data[0].revents & POLLPRI) == 0 )
+			if ( (poll_data[0].revents & POLLIN) == 0 )
 				continue;
 
 			while ( true ) {
