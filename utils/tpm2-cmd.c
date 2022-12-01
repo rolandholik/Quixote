@@ -10,6 +10,8 @@
  * the source tree for copyright and licensing information.
  **************************************************************************/
 
+#define TPM_POSIX
+
 #include <stdio.h>
 #include <unistd.h>
 #include <stdbool.h>

@@ -20,6 +20,7 @@ CC = musl-gcc
 
 ifeq (${CC}, musl-gcc)
 MUSL_INCLUDE = /usr/local/musl/include
+QUIXOTE_INCLUDE = /usr/local/Quixote/include
 else
 MUSL_INCLUDE = /usr/local/ESD/include
 endif
@@ -47,7 +48,7 @@ CDEBUG = -g ${DMALLOC}
 CFLAGS = -Wall ${CDEBUG}
 
 # LDFLAGS = -s -L/usr/local/krb5/lib 
-LDFLAGS = -g -L ../lib -L ../HurdLib
+LDFLAGS = -g -L ../lib -L ../HurdLib -L /usr/local/Quixote/lib
 ifneq (${CC}, musl-gcc)
 LDFLAGS += -lpthread -lrt -Wl,-rpath=/usr/local/ESD/lib
 endif
@@ -68,7 +69,7 @@ COBJS = ${CSRC:.c=.o}
 LIBS = -lNAAAIM -lHurdLib 
 
 CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I${SSL_INCLUDE} \
-	-I${MUSL_INCLUDE}/tpm_tools -I${MUSL_INCLUDE}/tss
+	-I${MUSL_INCLUDE}/tpm_tools -I${MUSL_INCLUDE}/tss -I${QUIXOTE_INCLUDE}
 
 
 #
@@ -139,7 +140,7 @@ mgmt-set-key: mgmt-set-key.o MGMTsupvr.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO} ${PCSC_LIBRARY};
 
 tpm2-cmd: tpm2-cmd.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -libmtss_nf ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -libmtssmin_nf ${SSL_CRYPTO};
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};
