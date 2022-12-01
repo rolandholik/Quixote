@@ -25,6 +25,7 @@
 #define TRAJECTORY_FILE	 "/sys/fs/tsem/trajectory"
 #define POINTS_FILE	 "/sys/fs/tsem/points"
 #define FORENSICS_FILE	 "/sys/fs/tsem/forensics"
+#define AGGREGATE_FILE	 "/sys/fs/tsem/aggregate"
 
 #define READ_SIDE  0
 #define WRITE_SIDE 1
@@ -647,22 +648,33 @@ static _Bool send_map(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 {
 	_Bool retn = false;
 
-	uint8_t aggregate[NAAAIM_IDSIZE];
+	String as = NULL;
+
+	File af = NULL;
 
 
-	/* Send the domain aggregate. */
-	memset(aggregate, '\0', sizeof(aggregate));
-	cmdbufr->reset(cmdbufr);
-	cmdbufr->add(cmdbufr, aggregate, sizeof(aggregate));
-	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
+	/* Read and send the platform aggregate value. */
+	INIT(HurdLib, String, as, ERR(goto done));
+
+	INIT(HurdLib, File, af, ERR(goto done));
+	if ( !af->open_ro(af, AGGREGATE_FILE) )
+		ERR(goto done);
+	if ( !af->read_String(af, as) )
 		ERR(goto done);
 
+	cmdbufr->reset(cmdbufr);
+	cmdbufr->add_hexstring(cmdbufr, (void *) as->get(as));
+	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
+		ERR(goto done);
 
 	/* Send each point in the model. */
 	retn = send_points(mgmt, cmdbufr);
 
 
  done:
+	WHACK(as);
+	WHACK(af);
+
 	return retn;
 }
 
@@ -1351,8 +1363,6 @@ static _Bool upload_model(const int fd)
 {
 	_Bool retn = false;
 
-	unsigned char aggregate[NAAAIM_IDSIZE];
-
 	static const char *aggregate_tag = "aggregate ",
 			  *state_tag = "state ",
 			  *seal_tag = "seal\n",
@@ -1367,10 +1377,12 @@ static _Bool upload_model(const int fd)
 	INIT(HurdLib, File, ef, ERR(goto done));
 
 	/* Send aggregate. */
-	write(fd, aggregate_tag, strlen(aggregate_tag));
-	memset(aggregate, '\0', sizeof(aggregate));
-	_encode_buffer(str, aggregate, sizeof(aggregate));
-	if ( !str->add_sprintf(str, "%s", "\n") )
+	if ( !ef->open_ro(ef, AGGREGATE_FILE) )
+		ERR(goto done);
+	str->add(str, aggregate_tag);
+	if ( !ef->read_String(ef, str) )
+		ERR(goto done);
+	if ( !str->add(str, "\n") )
 		ERR(goto done);
 	write(fd, str->get(str), str->size(str));
 
