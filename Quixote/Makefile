@@ -22,7 +22,8 @@ CSRC = quixote.c quixote-mcu.c quixote-sgx.c quixote-sgx-u.c \
 	quixote-console.c quixote-xen.c test-sancho.c test-sancho-xen.c
 
 TOOLS = quixote quixote-mcu quixote-us quixote-sgx quixote-sgx-u quixote-xen \
-	quixote-console test-sancho test-thread test-sancho-xen
+	quixote-console test-sancho test-thread test-sancho-xen		     \
+	test-domain-creation
 
 INSTALLBIN  = quixote-console
 INSTALLSBIN = quixote quixote-mcu quixote-us quixote-sgx quixote-sgx-u \
@@ -143,6 +144,9 @@ test-sancho-xen: test-sancho-xen.o ${LIBDEPS}
 sancho-enclave.h: ${SANCHOSGX}/SanchoSGX.signed.so
 	${SGXDIR}/generate-array -i ${SANCHOSGX}/SanchoSGX.signed.so \
 		-n Enclave > $@ || rm $@;
+
+test-domain-creation: test-domain-creation.o ${LIBDEPS}
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
 
 install-bin:
 	[ -d ${INSTPATH}/bin ] || mkdir -p ${INSTPATH}/bin;
