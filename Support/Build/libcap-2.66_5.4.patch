@@ -1,0 +1,293 @@
+diff -urNp v2.66/libcap-2.66/doc/values/38.txt libcap-2.66/doc/values/38.txt
+--- v2.66/libcap-2.66/doc/values/38.txt	2020-07-11 19:30:19.000000001 -0500
++++ libcap-2.66/doc/values/38.txt	2022-12-02 19:18:02.000000001 -0600
+@@ -1,4 +1,2 @@
+-Allows a process to enable observability of privileged
+-operations related to performance. The mechanisms
+-include perf_events, i915_perf and other kernel
+-subsystems.
++Allows a process the ability to alter the trust state of
++the platform.
+diff -urNp v2.66/libcap-2.66/doc/values/39.txt libcap-2.66/doc/values/39.txt
+--- v2.66/libcap-2.66/doc/values/39.txt	2020-07-11 19:30:19.000000001 -0500
++++ libcap-2.66/doc/values/39.txt	1969-12-31 18:00:00.000000000 -0600
+@@ -1,33 +0,0 @@
+-Allows a process to manipulate aspects of the kernel
+-enhanced Berkeley Packet Filter (BPF) system. This is
+-an execution subsystem of the kernel, that manages BPF
+-programs. CAP_BPF permits a process to:
+-  - create all types of BPF maps
+-  - advanced verifier features:
+-    - indirect variable access
+-    - bounded loops
+-    - BPF to BPF function calls
+-    - scalar precision tracking
+-    - larger complexity limits
+-    - dead code elimination
+-    - potentially other features
+-
+-Other capabilities can be used together with CAP_BFP to
+-further manipulate the BPF system:
+-  - CAP_PERFMON relaxes the verifier checks as follows:
+-    - BPF programs can use pointer-to-integer
+-      conversions
+-    - speculation attack hardening measures can be
+-      bypassed
+-    - bpf_probe_read to read arbitrary kernel memory is
+-      permitted
+-    - bpf_trace_printk to print the content of kernel
+-      memory
+-  - CAP_SYS_ADMIN permits the following:
+-    - use of bpf_probe_write_user
+-    - iteration over the system-wide loaded programs,
+-      maps, links BTFs and convert their IDs to file
+-      descriptors.
+-  - CAP_PERFMON is required to load tracing programs.
+-  - CAP_NET_ADMIN is required to load networking
+-    programs.
+diff -urNp v2.66/libcap-2.66/doc/values/40.txt libcap-2.66/doc/values/40.txt
+--- v2.66/libcap-2.66/doc/values/40.txt	2020-08-13 22:54:41.000000001 -0500
++++ libcap-2.66/doc/values/40.txt	1969-12-31 18:00:00.000000000 -0600
+@@ -1,4 +0,0 @@
+-Allows a process to perform checkpoint
+-and restore operations. Also permits
+-explicit PID control via clone3() and
+-also writing to ns_last_pid.
+diff -urNp v2.66/libcap-2.66/libcap/include/uapi/linux/capability.h libcap-2.66/libcap/include/uapi/linux/capability.h
+--- v2.66/libcap-2.66/libcap/include/uapi/linux/capability.h	2022-01-24 00:02:32.000000001 -0600
++++ libcap-2.66/libcap/include/uapi/linux/capability.h	2022-12-02 18:55:49.000000001 -0600
+@@ -1,3 +1,4 @@
++/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
+ /*
+  * This is <linux/capability.h>
+  *
+@@ -7,16 +8,13 @@
+  *
+  * See here for the libcap library ("POSIX draft" compliance):
+  *
+- * https://git.kernel.org/pub/scm/libs/libcap/libcap.git/refs/
+- * http://www.kernel.org/pub/linux/libs/security/linux-privs/
++ * ftp://www.kernel.org/pub/linux/libs/security/linux-privs/kernel-2.6/
+  */
+ 
+ #ifndef _UAPI_LINUX_CAPABILITY_H
+ #define _UAPI_LINUX_CAPABILITY_H
+ 
+-#include <stdint.h>
+-#define __u32 uint32_t
+-#define __le32 __u32
++#include <linux/types.h>
+ 
+ /* User-level do most of the mapping between kernel and user
+    capabilities based on the version tag given by the kernel. The
+@@ -41,13 +39,13 @@
+ typedef struct __user_cap_header_struct {
+ 	__u32 version;
+ 	int pid;
+-} *cap_user_header_t;
++} __user *cap_user_header_t;
+ 
+ typedef struct __user_cap_data_struct {
+         __u32 effective;
+         __u32 permitted;
+         __u32 inheritable;
+-} *cap_user_data_t;
++} __user *cap_user_data_t;
+ 
+ 
+ #define VFS_CAP_REVISION_MASK	0xFF000000
+@@ -64,30 +62,30 @@ typedef struct __user_cap_data_struct {
+ #define XATTR_CAPS_SZ_2         (sizeof(__le32)*(1 + 2*VFS_CAP_U32_2))
+ 
+ #define VFS_CAP_REVISION_3	0x03000000
+-#define VFS_CAP_U32_3           VFS_CAP_U32_2
+-#define XATTR_CAPS_SZ_3         (sizeof(__le32)+XATTR_CAPS_SZ_2)
++#define VFS_CAP_U32_3           2
++#define XATTR_CAPS_SZ_3         (sizeof(__le32)*(2 + 2*VFS_CAP_U32_3))
+ 
+-/*
+- * Kernel capabilities default to v2. The v3 VFS caps are only used,
+- * at present, for namespace specific filesystem capabilities.
+- */
+-#define XATTR_CAPS_SZ           XATTR_CAPS_SZ_2
+-#define VFS_CAP_U32             VFS_CAP_U32_2
+-#define VFS_CAP_REVISION	VFS_CAP_REVISION_2
+-
+-#define _VFS_CAP_DATA_HEAD \
+-	__le32 magic_etc;            /* Little endian */ \
+-	struct {                                         \
+-		__le32 permitted;    /* Little endian */ \
+-		__le32 inheritable;  /* Little endian */ \
+-	} data[VFS_CAP_U32]
++#define XATTR_CAPS_SZ           XATTR_CAPS_SZ_3
++#define VFS_CAP_U32             VFS_CAP_U32_3
++#define VFS_CAP_REVISION	VFS_CAP_REVISION_3
+ 
+ struct vfs_cap_data {
+-	_VFS_CAP_DATA_HEAD;
++	__le32 magic_etc;            /* Little endian */
++	struct {
++		__le32 permitted;    /* Little endian */
++		__le32 inheritable;  /* Little endian */
++	} data[VFS_CAP_U32];
+ };
+ 
++/*
++ * same as vfs_cap_data but with a rootid at the end
++ */
+ struct vfs_ns_cap_data {
+-	_VFS_CAP_DATA_HEAD;
++	__le32 magic_etc;
++	struct {
++		__le32 permitted;    /* Little endian */
++		__le32 inheritable;  /* Little endian */
++	} data[VFS_CAP_U32];
+ 	__le32 rootid;
+ };
+ 
+@@ -333,8 +331,6 @@ struct vfs_ns_cap_data {
+ 
+ #define CAP_AUDIT_CONTROL    30
+ 
+-/* Set capabilities on files. */
+-
+ #define CAP_SETFCAP	     31
+ 
+ /* Override MAC access.
+@@ -368,52 +364,14 @@ struct vfs_ns_cap_data {
+ 
+ /* Allow reading the audit log via multicast netlink socket */
+ 
+-#define CAP_AUDIT_READ       37
++#define CAP_AUDIT_READ		37
+ 
+-/* Allow system performance and observability privileged operations using
+- * perf_events, i915_perf and other kernel subsystems. */
++/* Allow modifications to the trust status of the system */
+ 
+-#define CAP_PERFMON	     38
++#define CAP_TRUST	38
+ 
+-/*
+- * CAP_BPF allows the following BPF operations:
+- * - Creating all types of BPF maps
+- * - Advanced verifier features
+- *   - Indirect variable access
+- *   - Bounded loops
+- *   - BPF to BPF function calls
+- *   - Scalar precision tracking
+- *   - Larger complexity limits
+- *   - Dead code elimination
+- *   - And potentially other features
+- * - Loading BPF Type Format (BTF) data
+- * - Retrieve xlated and JITed code of BPF programs
+- * - Use bpf_spin_lock() helper
+- *
+- * CAP_PERFMON relaxes the verifier checks further:
+- * - BPF progs can use of pointer-to-integer conversions
+- * - speculation attack hardening measures are bypassed
+- * - bpf_probe_read to read arbitrary kernel memory is allowed
+- * - bpf_trace_printk to print kernel memory is allowed
+- *
+- * CAP_SYS_ADMIN is required to use bpf_probe_write_user.
+- *
+- * CAP_SYS_ADMIN is required to iterate system wide loaded
+- * programs, maps, links, BTFs and convert their IDs to file descriptors.
+- *
+- * CAP_PERFMON and CAP_BPF are required to load tracing programs.
+- * CAP_NET_ADMIN and CAP_BPF are required to load networking programs.
+- */
+-
+-#define CAP_BPF		     39
+ 
+-/* Allow checkpoint/restore related operations */
+-/* Allow PID selection during clone3() */
+-/* Allow writing to ns_last_pid */
+-
+-#define CAP_CHECKPOINT_RESTORE 40
+-
+-#define CAP_LAST_CAP         CAP_CHECKPOINT_RESTORE
++#define CAP_LAST_CAP         CAP_TRUST
+ 
+ #define cap_valid(x) ((x) >= 0 && (x) <= CAP_LAST_CAP)
+ 
+@@ -422,6 +380,7 @@ struct vfs_ns_cap_data {
+  */
+ 
+ #define CAP_TO_INDEX(x)     ((x) >> 5)        /* 1 << 5 == bits in __u32 */
+-#define CAP_TO_MASK(x)      (1u << ((x) & 31)) /* mask for indexed __u32 */
++#define CAP_TO_MASK(x)      (1 << ((x) & 31)) /* mask for indexed __u32 */
++
+ 
+ #endif /* _UAPI_LINUX_CAPABILITY_H */
+diff -urNp v2.66/libcap-2.66/progs/capshdoc.c libcap-2.66/progs/capshdoc.c
+--- v2.66/libcap-2.66/progs/capshdoc.c	2021-09-29 23:46:31.000000001 -0500
++++ libcap-2.66/progs/capshdoc.c	2022-12-03 07:45:09.000000001 -0600
+@@ -321,54 +321,9 @@ static const char *explanation37[] = {
+     "netlink socket.",
+     NULL
+ };
+-static const char *explanation38[] = {  /* cap_perfmon = 38 */
+-    "Allows a process to enable observability of privileged",
+-    "operations related to performance. The mechanisms",
+-    "include perf_events, i915_perf and other kernel",
+-    "subsystems.",
+-    NULL
+-};
+-static const char *explanation39[] = {  /* cap_bpf = 39 */
+-    "Allows a process to manipulate aspects of the kernel",
+-    "enhanced Berkeley Packet Filter (BPF) system. This is",
+-    "an execution subsystem of the kernel, that manages BPF",
+-    "programs. CAP_BPF permits a process to:",
+-    "  - create all types of BPF maps",
+-    "  - advanced verifier features:",
+-    "    - indirect variable access",
+-    "    - bounded loops",
+-    "    - BPF to BPF function calls",
+-    "    - scalar precision tracking",
+-    "    - larger complexity limits",
+-    "    - dead code elimination",
+-    "    - potentially other features",
+-    "",
+-    "Other capabilities can be used together with CAP_BFP to",
+-    "further manipulate the BPF system:",
+-    "  - CAP_PERFMON relaxes the verifier checks as follows:",
+-    "    - BPF programs can use pointer-to-integer",
+-    "      conversions",
+-    "    - speculation attack hardening measures can be",
+-    "      bypassed",
+-    "    - bpf_probe_read to read arbitrary kernel memory is",
+-    "      permitted",
+-    "    - bpf_trace_printk to print the content of kernel",
+-    "      memory",
+-    "  - CAP_SYS_ADMIN permits the following:",
+-    "    - use of bpf_probe_write_user",
+-    "    - iteration over the system-wide loaded programs,",
+-    "      maps, links BTFs and convert their IDs to file",
+-    "      descriptors.",
+-    "  - CAP_PERFMON is required to load tracing programs.",
+-    "  - CAP_NET_ADMIN is required to load networking",
+-    "    programs.",
+-    NULL
+-};
+-static const char *explanation40[] = {  /* cap_checkpoint_restore = 40 */
+-    "Allows a process to perform checkpoint",
+-    "and restore operations. Also permits",
+-    "explicit PID control via clone3() and",
+-    "also writing to ns_last_pid.",
++static const char *explanation38[] = {  /* cap_trust = 38 */
++    "Allows a process the ability to alter the trust state of",
++    "the platform.",
+     NULL
+ };
+ const char **explanations[] = {
+@@ -411,8 +366,6 @@ const char **explanations[] = {
+     explanation36,
+     explanation37,
+     explanation38,
+-    explanation39,
+-    explanation40,
+ };
+ 
+-const int capsh_doc_limit = 41;
++const int capsh_doc_limit = 39;
