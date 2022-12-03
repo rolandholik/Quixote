@@ -71,11 +71,7 @@ SSL_CRYPTO = -L /usr/local/ESD/lib -lcrypto -ldl -lpthread
 endif
 
 # libcap library
-ifeq (${CC}, musl-gcc)
-LIBCAP = -L /usr/local/musl/lib -lcap
-else
-LIBCAP = -lcap
-endif
+LIBCAP = -L ../support/libcap -lcap
 
 LIBS	= ${NAAAIMLIB} ${HURDLIB} ${LIBCAP} ${SSL_CRYPTO}
 LIBDEPS = ${HURD_LIBRARY} ${NAAAIM_LIBRARY}

@@ -6,16 +6,17 @@
 # **************************************************************************/
 
 # Variable declarations.
+GLOBAL_BUILD = true
+include Config.mak
+
 INSTPATH = ${DESTDIR}/opt/ESD
 HURDINC = HurdLib/Buffer.h HurdLib/Config.h HurdLib/Fibsequence.h \
 	HurdLib/File.h HurdLib/HurdLib.h HurdLib/Options.h	  \
 	HurdLib/Origin.h HurdLib/String.h
 HURDLIB = HurdLib/libHurdLib.a
 
-SUBDIRS	    = utils SRDE Sancho SecurityModel Quixote
+SUBDIRS	    = Support utils SRDE Sancho SecurityModel Quixote
 DEV_SUBDIRS = lib SRDE
-
-CC = musl-gcc
 
 
 #
@@ -54,6 +55,9 @@ Quixote:
 	${MAKE} -C $@;
 
 Sancho:
+	${MAKE} -C $@;
+
+Support:
 	${MAKE} -C $@;
 
 install-bin:
