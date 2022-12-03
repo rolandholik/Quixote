@@ -6,7 +6,7 @@
 # **************************************************************************/
 
 # Variable declarations.
-GLOBAL_BUILD = true
+export GLOBAL_BUILD = true
 include Config.mak
 
 INSTPATH = ${DESTDIR}/opt/ESD
