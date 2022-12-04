@@ -227,7 +227,9 @@ struct NAAAIM_Cell_State
 
 	/* Event type definitions. */
 	enum tsem_event_type type;
-	enum tsem_event_type generic_event;
+
+	/* Generic event description .*/
+	String event;
 
 	/* File characteristics. */
 	struct file_parameters file;
@@ -274,6 +276,7 @@ static void _init_state(CO(Cell_State, S))
 	memset(&S->file, '\0', sizeof(struct file_parameters));
 
 	S->measured = false;
+	S->event    = NULL;
 	S->identity = NULL;
 
 	return;
@@ -1093,7 +1096,8 @@ static _Bool _parse_generic_event(CO(Cell_State, S), CO(String, entry))
 
 	unsigned int cnt;
 
-	char *fp;
+	char *fp,
+	     event[40];
 
 	regmatch_t regmatch;
 
@@ -1126,10 +1130,13 @@ static _Bool _parse_generic_event(CO(Cell_State, S), CO(String, entry))
 		ERR(goto done);
 
 
-	/* Parse task_kill parameters. */
+	/* Parse the generic event type parameter. */
+	memset(event, '\0', sizeof(event));
 	fp = (char *) field->get(field);
-	if ( !_get_field(&Generic_Event_Fields[1].regex, fp, \
-			 &S->generic_event) )
+	if ( !_get_text(&Generic_Event_Fields[1].regex, fp,
+			(uint8_t *) event, sizeof(event) - 1) )
+		ERR(goto done);
+	if ( !S->event->add(S->event, event) )
 		ERR(goto done);
 	retn = true;
 
@@ -1618,8 +1625,8 @@ static _Bool _measure_generic_event(CO(Cell_State, S))
 
 
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	p = (unsigned char *) &S->generic_event;
-	size = sizeof(S->generic_event);
+	p = (unsigned char *) S->event->get(S->event);
+	size = S->event->size(S->event);
 	bufr->add(bufr, p, size);
 
 	p = (unsigned char *) generic_cell;
@@ -2313,79 +2320,8 @@ static _Bool format(CO(Cell, this), CO(String, event))
 
 		case TSEM_GENERIC_EVENT:
 			retn = event->add_sprintf(event,		    \
-						  "generic_event{type=%u}", \
-						  S->generic_event);
-			break;
-
-		default:
-			break;
-	}
-
-	return retn;
-}
-
-
-/**
- * External public method.
- *
- * This method implements the generation of an ASCII formatted
- * representation of the characteristics of a call.  The string
- * generated uses the name of a generic event rather than its
- * event number.
- *
- * \param this	A pointer to the object containing the characteristics
- *		which are to be formatted.
- *
- * \param event	The object into which the formatted string is to
- *		be copied.
- *
- * \param names	A pointer to a character array containing the generic
- *		event names that will be used to translate the event
- *		type into a name.
- */
-
-static _Bool format_generic(CO(Cell, this), CO(String, event), \
-			    const char **names)
-{
-	STATE(S);
-
-	_Bool retn = false;
-
-
-	switch ( S->type ) {
-		case TSEM_FILE_OPEN:
-			retn = _format_file(S, event);
-			break;
-
-		case TSEM_MMAP_FILE:
-			retn = _format_mmap_file(S, event);
-			if ( !S->mmap_file.anonymous )
-				retn = _format_file(S, event);
-			break;
-
-		case TSEM_SOCKET_CREATE:
-			retn = _format_socket_create(S, event);
-			break;
-
-		case TSEM_SOCKET_CONNECT:
-		case TSEM_SOCKET_BIND:
-			retn = _format_socket_connect(S, event);
-			break;
-
-		case TSEM_SOCKET_ACCEPT:
-			retn = _format_socket_accept(S, event);
-			break;
-
-		case TSEM_TASK_KILL:
-			retn = _format_task_kill(S, event);
-			break;
-
-		case TSEM_GENERIC_EVENT:
-			retn = event->add_sprintf(event,		     \
-						  "generic_event{type=%d, ", \
-						  S->generic_event);
-			retn = event->add_sprintf(event, "name=%s}",
-						  names[S->generic_event]);
+						  "generic_event{type=%s}", \
+						  S->event->get(S->event));
 			break;
 
 		default:
@@ -2415,6 +2351,7 @@ static void reset(CO(Cell, this))
 
 	memset(&S->file, '\0', sizeof(struct file_parameters));
 
+	S->event->reset(S->event);
 	S->identity->reset(S->identity);
 
 	return;
@@ -2719,7 +2656,8 @@ static void dump(CO(Cell, this))
 			break;
 
 		case TSEM_GENERIC_EVENT:
-			fprintf(stdout, "type: %u\n", S->generic_event);
+			fputs("type: ", stdout);
+			S->event->print(S->event);
 			break;
 
 		default:
@@ -2745,6 +2683,7 @@ static void whack(CO(Cell, this))
 	STATE(S);
 
 
+	WHACK(S->event);
 	WHACK(S->identity);
 
 	S->root->whack(S->root, this, S);
@@ -2787,6 +2726,7 @@ extern Cell NAAAIM_Cell_Init(void)
 	_init_state(this->state);
 
 	/* Initialize aggregate objects. */
+	INIT(HurdLib, String, this->state->event, ERR(goto fail));
 	INIT(NAAAIM, Sha256, this->state->identity, ERR(goto fail));
 
 	/* Method initialization. */
@@ -2799,7 +2739,6 @@ extern Cell NAAAIM_Cell_Init(void)
 	this->set_digest = set_digest;
 
 	this->format	     = format;
-	this->format_generic = format_generic;
 
 	this->reset  = reset;
 	this->dump   = dump;
@@ -2808,6 +2747,7 @@ extern Cell NAAAIM_Cell_Init(void)
 	return this;
 
 fail:
+	WHACK(this->state->event);
 	WHACK(this->state->identity);
 
 	root->whack(root, this, this->state);

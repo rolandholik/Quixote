@@ -35,7 +35,6 @@ struct NAAAIM_Cell
 	_Bool (*set_digest)(const Cell, const Buffer);
 
 	_Bool (*format)(const Cell, const String);
-	_Bool (*format_generic)(const Cell, const String, const char **names);
 
 	void (*reset)(const Cell);
 	void (*dump)(const Cell);

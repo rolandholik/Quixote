@@ -519,7 +519,8 @@ static _Bool measure(CO(SecurityEvent, this))
 		ERR(goto done);
 
 	/* Compute the event identity. */
-	if ( !bufr->add(bufr, (uint8_t *) &S->type, sizeof(S->type)) )
+	if ( !bufr->add(bufr, (uint8_t *) TSEM_name[S->type], \
+			strlen(TSEM_name[S->type])) )
 		ERR(goto done);
 	if ( !bufr->add_hexstring(bufr, S->task_id->get(S->task_id)) )
 		ERR(goto done);
@@ -784,55 +785,6 @@ static _Bool format(CO(SecurityEvent, this), CO(String, event))
 /**
  * External public method.
  *
- * This method implements the generation of an ASCII formatted
- * representation of the security event.  The difference between
- * this method and the SecurityEvent->format method is that this
- * method translates the generic type number into a name.  This
- * allows more rapid interpretation of the generic type being
- * displayed.
- *
- * \param this	A pointer to the security event object that is being
- *		displayed.
- *
- * \param event	The object into which the formatted string is to
- *		be copied.
- */
-
-static _Bool format_generic(CO(SecurityEvent, this), CO(String, event))
-
-{
-	STATE(S);
-
-	_Bool retn = false;
-
-
-	/* Verify object status. */
-	if ( S->poisoned )
-		ERR(goto done);
-	if ( event->poisoned(event) )
-		ERR(goto done);
-
-
-	/* Add the event description, COE and Cell elements. */
-	event->add(event, "event{");
-	event->add(event, S->event->get(S->event));
-	event->add(event, "} ");
-
-	S->coe->format(S->coe, event);
-
-	if ( !S->cell->format_generic(S->cell, event, TSEM_name) )
-		ERR(goto done);
-
-	retn = true;
-
- done:
-	return retn;
-}
-
-
-/**
- * External public method.
- *
  * This method implements the reset of an security information event
  * object to a state which would allow the processing of a new
  * event.
@@ -970,7 +922,6 @@ extern SecurityEvent NAAAIM_SecurityEvent_Init(void)
 	this->get_pid	   = get_pid;
 
 	this->format	     = format;
-	this->format_generic = format_generic;
 
 	this->reset = reset;
 	this->dump  = dump;
