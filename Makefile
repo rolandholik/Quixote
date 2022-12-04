@@ -6,8 +6,7 @@
 # **************************************************************************/
 
 # Variable declarations.
-export GLOBAL_BUILD = true
-include Config.mk
+-include Build.mk
 
 INSTPATH = ${DESTDIR}/opt/ESD
 HURDINC = HurdLib/Buffer.h HurdLib/Config.h HurdLib/Fibsequence.h \
@@ -26,7 +25,7 @@ DEV_SUBDIRS = lib SRDE
 
 
 # Targets
-all: HurdLib/libHurdLib.a lib ${SUBDIRS}
+all: config HurdLib/libHurdLib.a lib ${SUBDIRS}
 
 HurdLib/libHurdLib.a:
 	cd HurdLib && CC=${CC} ./configure;
@@ -60,6 +59,13 @@ Sancho:
 Support:
 	${MAKE} -C $@;
 
+config: Build.mk
+
+Build.mk:
+	echo "export TOPDIR=`pwd`" > Build.mk;
+	echo "export BUILD_CONFIG=true" >> Build.mk;
+	echo 'include $${TOPDIR}/Config.mk' >> Build.mk;
+
 install-bin:
 	set -e; for dir in ${SUBDIRS}; do ${MAKE} -C $$dir $@; done;
 
@@ -81,3 +87,6 @@ clean:
 	${MAKE} -C HurdLib clean;
 	${MAKE} -C lib clean;
 	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i clean; done;
+
+distclean: clean
+	rm -f Build.mk;

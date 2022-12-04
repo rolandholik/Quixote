@@ -6,14 +6,17 @@
 # **************************************************************************/
 
 #
-# This file contains global package definitions to be used for
-# the build process.  Site specific modifications should be in
-# the Build.mk file.
+# This file defines build rules.  The Build.mk file, which must exist,
+# is used to implement build or site specific modifications.
 #
+ifeq (${BUILD_CONFIG},"true")
+include ${TOPDIR}/Build.mk
+endif
 
 # Compiler selection.
 CC ?= musl-gcc
 
 # Kernel version selection.
-# export KERNEL_VERSION=5.4
-export KERNEL_VERSION=6.1
+KERNEL_VERSION ?= 6.1
+
+export CC KERNEL_VERSION

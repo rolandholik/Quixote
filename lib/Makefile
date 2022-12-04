@@ -6,6 +6,14 @@
 # **************************************************************************/
 
 
+#
+# Include global build definitions if this is a sub-directory build.
+#
+ifndef BUILD_CONFIG
+include ${shell cd ..; pwd}/Build.mk
+endif
+
+
 # Variable declarations.
 INSTPATH = ${DESTDIR}/opt/ESD
 INSTINCLUDE = ../NAAAIM.h AES256_cbc.h Base64.h Curve25519.h Duct.h	\

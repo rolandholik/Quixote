@@ -6,6 +6,13 @@
 # **************************************************************************/
 
 
+#
+# Include global build definitions if this is a sub-directory build.
+#
+ifndef BUILD_CONFIG
+include ${shell cd ..; pwd}/Build.mk
+endif
+
 # Variable declarations.
 CSRC = gen-image.c load-image.c boot.c Netconfig.c IPsec.c SoftwareTPM.c \
 	device-supvr.c mgmt-supvr.c MGMTsupvr.c vm-supvr.c copy-edid.c

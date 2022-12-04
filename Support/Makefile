@@ -8,8 +8,8 @@
 #
 # Include global build definitions if this is a sub-directory build.
 #
-ifndef GLOBAL_BUILD
-include ${shell cd ..; pwd}/Config.mk
+ifndef BUILD_CONFIG
+include ${shell cd ..; pwd}/Build.mk
 endif
 
 
