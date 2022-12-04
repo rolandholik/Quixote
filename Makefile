@@ -7,7 +7,7 @@
 
 # Variable declarations.
 export GLOBAL_BUILD = true
-include Config.mak
+include Config.mk
 
 INSTPATH = ${DESTDIR}/opt/ESD
 HURDINC = HurdLib/Buffer.h HurdLib/Config.h HurdLib/Fibsequence.h \

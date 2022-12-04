@@ -7,12 +7,12 @@
 
 #
 # This file contains global package definitions to be used for
-# the build process.
+# the build process.  Site specific modifications should be in
+# the Build.mk file.
 #
 
 # Compiler selection.
-export CC=musl-gcc
-# export CC=gcc
+CC ?= musl-gcc
 
 # Kernel version selection.
 # export KERNEL_VERSION=5.4

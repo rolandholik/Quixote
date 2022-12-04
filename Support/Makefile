@@ -9,7 +9,7 @@
 # Include global build definitions if this is a sub-directory build.
 #
 ifndef GLOBAL_BUILD
-include ${shell cd ..; pwd}/Config.mak
+include ${shell cd ..; pwd}/Config.mk
 endif
 
 
