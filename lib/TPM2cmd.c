@@ -42,7 +42,6 @@
 #include <Buffer.h>
 
 #include <ibmtss/tss.h>
-#include <ibmtss/tssproperties.h>
 #include <ibmtss/tssresponsecode.h>
 
 #include "NAAAIM.h"

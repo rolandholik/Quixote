@@ -68,7 +68,9 @@ LDFLAGS = -g -L ../HurdLib
 #
 COBJS = ${CSRC:.c=.o}
 
-CFLAGS := ${CFLAGS} -I.. -I../HurdLib -I${SSL_INCLUDE}
+CINCLUDE := -I .. -I ../HurdLib -I ${SSL_INCLUDE} -I /usr/local/Quixote/include
+
+CFLAGS := ${CFLAGS} ${CINCLUDE}
 
 
 #
