@@ -615,7 +615,7 @@ extern void sancho_interpreter(const TTYduct duct)
 		bsp_board_led_on(ACTIVITY_LED);
 
 		switch ( get_command(bufr) ) {
-			case exchange_event:
+			case export_event:
 				add_event(Host, model, bufr);
 				break;
 
