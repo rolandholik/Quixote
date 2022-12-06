@@ -15,11 +15,13 @@ endif
 
 include ${XENCFGDIR}/Config.mk
 
+COMPILER_DIRECTORY := ${shell dirname ${shell ${CC} -print-libgcc-file-name}}
+
 TARGET_CPPFLAGS = -U __linux__ -U __FreeBSD__ -U __sun__ -nostdinc	\
-	-isystem ../mini-os/include				\
-	-isystem ../mini-os/include/posix			\
-	-isystem ../newlib-root/x86_64-xen-elf/include		\
-	-isystem /usr/lib/gcc/x86_64-unknown-linux-gnu/4.9.4/include	\
+	-isystem ../mini-os/include					\
+	-isystem ../mini-os/include/posix				\
+	-isystem ../newlib-root/x86_64-xen-elf/include			\
+	-isystem ${COMPILER_DIRECTORY}/include				\
 	-isystem ../mini-os/include/x86					\
 	-isystem ../mini-os/include/x86/x86_64
 

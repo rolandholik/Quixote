@@ -13,7 +13,7 @@ export stubdom=y
 CC	  = gcc
 CC_SEARCH = ${shell ${CC} -print-search-dirs | sed -n -e 's/install: \(.*\)/\1/p'}
 
-GCCLIB=-L /usr/lib/gcc/x86_64-unknown-linux-gnu/4.9.4 -lgcc
+GCCLIB=-L ${shell dirname ${shell ${CC} -print-libgcc-file-name}} -lgcc
 
 XENSRC = /u/usr/src/Xen/GIT/xen
 
