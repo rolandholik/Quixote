@@ -300,7 +300,7 @@ static _Bool discipline(CO(TSEMcontrol, this), pid_t pid)
 	_Bool retn = false;
 
 
-	if ( !S->cmdstr->add_sprintf(S->cmdstr, "discipline %d\n", pid) )
+	if ( !S->cmdstr->add_sprintf(S->cmdstr, "untrusted %d\n", pid) )
 		ERR(goto done);
 
 	if ( !_write_cmd(S) )
@@ -339,7 +339,7 @@ static _Bool release(CO(TSEMcontrol, this), pid_t pid)
 	_Bool retn = false;
 
 
-	if ( !S->cmdstr->add_sprintf(S->cmdstr, "release %d\n", pid) )
+	if ( !S->cmdstr->add_sprintf(S->cmdstr, "trusted %d\n", pid) )
 		ERR(goto done);
 
 	if ( !_write_cmd(S) )
