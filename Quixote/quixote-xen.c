@@ -351,7 +351,7 @@ static _Bool process_event(CO(XENduct, duct), const char * const event)
 		fprintf(stderr, "Unknown event: %s\n", event);
 		goto done;
 	}
-	if ( cp->command > TSEM_event ) {
+	if ( cp->command > log_event ) {
 		fprintf(stderr, "Unexpected event: %s\n", event);
 		goto done;
 	}

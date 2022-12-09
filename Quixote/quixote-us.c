@@ -668,7 +668,7 @@ static _Bool process_event(const char *event)
 			Model->seal(Model);
 			break;
 
-		case TSEM_event:
+		case log_event:
 			retn = add_TSEM_event(event_arg);
 			break;
 

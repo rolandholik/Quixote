@@ -425,7 +425,7 @@ static _Bool receive_TE_events(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 		ERR(goto done);
 	cnt = *(unsigned int *) cmdbufr->get(cmdbufr);
 	if ( TTY_output )
-		fprintf(stdout, "TE event size: %u\n", cnt);
+		fprintf(stdout, "Untrusted event size: %u\n", cnt);
 
 
 	/* Output each point. */

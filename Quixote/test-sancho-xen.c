@@ -282,7 +282,7 @@ static _Bool process_command(CO(XENduct, duct), CO(Buffer, bufr))
 		case export_event:
 		case aggregate_event:
 		case seal_event:
-		case TSEM_event:
+		case log_event:
 		case enable_cell:
 			fprintf(stdout, "%s\n", bufr->get(bufr));
 			break;

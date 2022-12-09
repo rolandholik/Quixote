@@ -621,7 +621,7 @@ extern void sancho_interpreter(const XENduct duct)
 				send_ok(Host, bufr);
 				break;
 
-			case TSEM_event:
+			case log_event:
 				add_security(duct, model, bufr);
 				break;
 
