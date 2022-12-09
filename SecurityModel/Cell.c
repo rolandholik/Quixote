@@ -87,6 +87,7 @@ struct regex_description File_Fields[] = {
 	{.fd = "mode=([^,]*)"},
 	{.fd = "name_length=([^,]*)"},
 	{.fd = "name=([^,]*)"},
+	{.fd = "s_magic=([^,]*)"},
 	{.fd = "s_id=([^,]*)"},
 	{.fd = "s_uuid=([^,]*)"},
 	{.fd = "digest=([^}]*)"},
@@ -157,6 +158,7 @@ struct file_parameters {
 	uint32_t name_length;
 	char name[NAAAIM_IDSIZE];
 
+	uint32_t s_magic;
 	char s_id[32];
 	uint8_t s_uuid[16];
 
@@ -554,15 +556,19 @@ static _Bool _parse_file(CO(Cell_State, S), CO(String, entry))
 			  (uint8_t *) S->file.name, NAAAIM_IDSIZE) )
 		ERR(goto done);
 
-	if ( !_get_text(&File_Fields[7].regex, fp, (uint8_t *) S->file.s_id, \
+	if ( !_get_field(&File_Fields[7].regex, fp, &value) )
+		ERR(goto done);
+	S->file.s_magic = value;
+
+	if ( !_get_text(&File_Fields[8].regex, fp, (uint8_t *) S->file.s_id, \
 			sizeof(S->file.s_id)) )
 		ERR(goto done);
 
-	if ( !_get_digest(&File_Fields[8].regex, fp, S->file.s_uuid, \
+	if ( !_get_digest(&File_Fields[9].regex, fp, S->file.s_uuid, \
 			  sizeof(S->file.s_uuid)) )
 		ERR(goto done);
 
-	if ( !_get_digest(&File_Fields[9].regex, fp, \
+	if ( !_get_digest(&File_Fields[10].regex, fp, \
 			  (uint8_t *) S->file.digest, NAAAIM_IDSIZE) )
 		ERR(goto done);
 
@@ -1274,6 +1280,7 @@ static _Bool _measure_file(CO(Cell_State, S))
 	bufr->add(bufr, (void *) &S->file.name_length, \
 		  sizeof(S->file.name_length));
 	bufr->add(bufr, (void *) S->file.name, sizeof(S->file.name));
+	bufr->add(bufr, (void *) &S->file.s_magic, sizeof(S->file.s_magic));
 	bufr->add(bufr, (void *) S->file.s_id, sizeof(S->file.s_id));
 	bufr->add(bufr, (void *) S->file.s_uuid, sizeof(S->file.s_uuid));
 	if ( !bufr->add(bufr, (void *) S->file.digest, \
@@ -1947,8 +1954,9 @@ static _Bool _format_file(CO(Cell_State, S), CO(String, str))
 		     ERR(goto done);
 	}
 
-	/* , s_uuid=%*phN */
-	if ( !str->add_sprintf(str, ", s_id=%s, s_uuid=", S->file.s_id) )
+	/* , s_magic=%0x, s_id=%s, s_uuid=%*phN */
+	if ( !str->add_sprintf(str, ", s_magic=0x%0x, s_id=%s, s_uuid=", \
+			       S->file.s_magic, S->file.s_id) )
 		ERR(goto done);
 
 	for (lp= 0; lp < sizeof(S->file.s_uuid); ++lp) {
@@ -2390,12 +2398,13 @@ void _dump_file(CO(Cell_State, S))
 	bufr->print(bufr);
 	bufr->reset(bufr);
 
-	fprintf(stdout, "s_id:   %s\n", S->file.s_id);
+	fprintf(stdout, "s_magic: 0x%x\n", S->file.s_magic);
+	fprintf(stdout, "s_id:    %s\n", S->file.s_id);
 
 	if ( !bufr->add(bufr, (unsigned char *) S->file.s_uuid,
 			sizeof(S->file.s_uuid)) )
 		ERR(goto done);
-	fputs("s_uuid: ", stdout);
+	fputs("s_uuid:  ", stdout);
 	bufr->print(bufr);
 	bufr->reset(bufr);
 
