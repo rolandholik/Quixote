@@ -18,7 +18,18 @@ LIBCAP_VERSION = 2.66
 LIBCAP_FILE    = libcap-${LIBCAP_VERSION}.tar.gz
 LIBCAP_URL     = https://www.kernel.org/pub/linux/libs/security/linux-privs/libcap2/${LIBCAP_FILE}
 LIBCAP_TAR     = Build/${LIBCAP_FILE}
-LIBCAP_PATCH   = Build/libcap-${LIBCAP_VERSION}_${KERNEL_VERSION}.patch
+
+ifeq ("${KERNEL_VERSION}","5.4")
+LIBCAP_PATCH = Build/libcap-2.66_cap_38.patch
+endif
+
+ifeq ("${KERNEL_VERSION}","5.15")
+LIBCAP_PATCH = Build/libcap-2.66_cap_41.patch
+endif
+
+ifeq ("${KERNEL_VERSION}","6.1")
+LIBCAP_PATCH = Build/libcap-2.66_cap_41.patch
+endif
 
 
 #
