@@ -2201,6 +2201,14 @@ extern int main(int argc, char *argv[])
 
 	waitpid(Monitor_pid, NULL, 0);
 
+	if ( outfile != NULL ) {
+		if ( Trajectory )
+			fputs("Wrote execution trajectory to: ", stdout);
+		else
+			fputs("Wrote security map to: ", stdout);
+		fprintf(stdout, "%s\n", outfile);
+	}
+
 
  done:
 	WHACK(mgmt);
