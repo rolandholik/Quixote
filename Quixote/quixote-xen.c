@@ -1,23 +1,23 @@
 /** \file
  *
  * This file implements a utility for running and managing software
- * stacks in an independent hardware security domain.  After creating an
- * independent measurement domain the utility forks and then executes
- * the boot of a software 'cartridge' in a subordinate process.  The parent
- * process monitors the following file:
+ * stacks run in an external modeling domain implemented in a Xen
+ * stubdom based Trusted Modeling Agent.
  *
- * /sys/fs/tsem-evenets/update-NNNNNNNNNN
+ * After creating a cartridge launch process in a process running in
+ * an independent modeling domain a monitor process reads kernel
+ * security event descriptions from the following file:
  *
- * Where NNNNNNNNNN is the inode number of the security event namespace.
+ * /sys/fs/tsem/ExternalTMA/NNN
  *
- * The security domain state change events are transmitted to a Xen
- * stubdom based Trusted Modeling agent instance.  Based on feedback from
- * the TMA the process is woken with its status bit set or cleared.
- * This security status bit is interrogated by the TSEM linux security
- * module that can then interdict non-modeled events.
+ * Where NNN is the number of the model domain.
  *
- * The domain is managed through a UNIX domain socket that is created
- * in one of the the following locations:
+ * The security event descriptions are sent to the Xen stubdomain.
+ * Based on the modeling of the event by the TMA the trust status of
+ * the process is set to trusted or untrusted.
+ *
+ * The modeling domain is managed through a UNIX domain socket that is
+ * created in one of the the following locations:
  *
  * /var/lib/Quixote/mgmt/cartridges
  *
@@ -28,7 +28,11 @@
  */
 
 /**************************************************************************
- * Copyright (c) 2020, Enjellic Systems Development, LLC. All rights reserved.
+ * Copyright (c) 2022, Enjellic Systems Development, LLC. All rights reserved.
+ *
+ *
+ * Please refer to the file named COPYING in the top of the source tree
+ * for licensing information.
  **************************************************************************/
 
 #define READ_SIDE  0
@@ -86,6 +90,11 @@
 
 
 /**
+ * The object used to communicate with the SanchoXen instance.
+ */
+static XENduct Sancho = NULL;
+
+/**
  * The control object for the model.
  */
 static TSEMcontrol Control = NULL;
@@ -113,6 +122,12 @@ static _Bool Model_Error = false;
  * Sancho instance.
  */
 static Buffer Aggregate = NULL;
+
+/**
+ * This variable is used to indicate that an execution trajectory
+ * should be generated.
+ */
+static _Bool Trajectory = false;
 
 /**
  * The following variable holds booleans which describe signals
@@ -278,7 +293,7 @@ static _Bool setup_management(CO(LocalDuct, mgmt), const char *cartridge)
 
 	mask = umask(0x2);
 	rc = mgmt->init_port(mgmt, sockpath->get(sockpath));
-	mask = umask(mask);
+	umask(mask);
 
 	if ( !rc ) {
 		fprintf(stderr, "Cannot initialize socket: %s.\n", \
@@ -416,7 +431,7 @@ static _Bool process_event(CO(XENduct, duct), const char * const event)
 		if ( Debug )
 			fprintf(Debug, "Model error, releasing %u.\n", pid);
 
-		if ( !Control->release(Control, pid) < 0 ) {
+		if ( !Control->release(Control, pid) ) {
 			fprintf(stderr, "Bad actor release error: "  \
 				"%d:%s\n", errno, strerror(errno));
 		}
@@ -458,7 +473,7 @@ static _Bool process_event(CO(XENduct, duct), const char * const event)
 	}
 
 	if ( strncmp(bp, release, strlen(release)) == 0 ) {
-		if ( Control->release(Control, pid) < 0 ) {
+		if ( !Control->release(Control, pid) ) {
 			fprintf(stderr, "Failed release: errno=%d, " \
 				"error=%s\n", errno, strerror(errno));
 		}
@@ -759,9 +774,6 @@ static _Bool process_command(CO(XENduct, duct), CO(LocalDuct, mgmt), \
  * \param duct		The object that will be used to communicate
  *			with the SanchoMCU instance.
  *
- * \param bufr		The object that will be used to hold the commands
- *			sent to and the response from the co-processor.
- *
  * \param model_file	The name of the file containing the security
  *			model.
  *
@@ -775,10 +787,12 @@ static _Bool process_command(CO(XENduct, duct), CO(LocalDuct, mgmt), \
  *			additional command cycle should be processed.
  */
 
-static _Bool load_model(CO(XENduct, duct), CO(Buffer, bufr), char *model_file)
+static _Bool load_model(CO(XENduct, duct), char *model_file)
 
 {
 	_Bool retn = false;
+
+	Buffer bufr = NULL;
 
 	String str = NULL;
 
@@ -788,6 +802,7 @@ static _Bool load_model(CO(XENduct, duct), CO(Buffer, bufr), char *model_file)
 
 
 	/* Open the file containing the security map. */
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 	INIT(HurdLib, String, str, ERR(goto done));
 
 	INIT(HurdLib, File, model, ERR(goto done));
@@ -828,8 +843,221 @@ static _Bool load_model(CO(XENduct, duct), CO(Buffer, bufr), char *model_file)
 
 
  done:
+	WHACK(bufr);
 	WHACK(str);
 	WHACK(model);
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function implements the output of a security execution trajectory.
+ *
+ * \param fname		The name of the file that the security trajectrory
+ *			will be written to.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not the trajectory was output.  A false value
+ *			indicates output failed while a true value
+ *			indicates the trajectory was successfully output.
+ */
+
+static _Bool output_trajectory(CO(char *, fname))
+
+{
+	_Bool retn = false;
+
+	uint32_t cnt = 0;
+
+	Buffer bufr = NULL;
+
+	File outfile = NULL;
+
+	static const char *cmd = "show trajectory";
+
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	INIT(HurdLib, File, outfile, ERR(goto done));
+	if ( !outfile->open_rw(outfile, fname) )
+		ERR(goto done);
+
+	/* Request the trajectory listing. */
+	bufr->add(bufr, (void *) cmd, strlen(cmd));
+	if ( !Sancho->send_Buffer(Sancho, bufr) )
+		ERR(goto done);
+
+	/* Write the result list to the output file. */
+	bufr->reset(bufr);
+	if ( !Sancho->receive_Buffer(Sancho, bufr) )
+		ERR(goto done);
+	cnt = *(unsigned int *) bufr->get(bufr);
+
+	while ( cnt-- > 0 ) {
+		bufr->reset(bufr);
+		if ( !Sancho->receive_Buffer(Sancho, bufr) )
+			ERR(goto done);
+
+		bufr->shrink(bufr, 1);
+		bufr->add(bufr, (void *) "\n", 1);
+		if ( !outfile->write_Buffer(outfile, bufr) )
+			ERR(goto done);
+	}
+
+	retn = true;
+
+
+ done:
+	WHACK(bufr);
+	WHACK(outfile);
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
+ * This is a helper function that adds a hexadecimally encoded state
+ * point to a String object.
+ *
+ * \param str	The object that is to have the buffer encoded.
+ *
+ * \param bufr	A pointer to the buffer whose contents is to be
+ *		encoded into the String object.
+ *
+ * \param cnt	The number of bytes to encode from the buffer.
+ *
+ * \return	No return value is defined.
+ */
+
+static void _encode_buffer(CO(String, str), unsigned char *bufr, \
+			   const size_t size)
+
+{
+	unsigned char *p = bufr;
+
+	unsigned int lp;
+
+
+	for (lp= 0; lp < size; ++lp) {
+		str->add_sprintf(str, "%02x", *p);
+		++p;
+	}
+
+	return;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function implements the output of a security model.
+ *
+ * \param fname		The name of the file that the security model
+ *			will be written to.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not the model was output.  A false value
+ *			indicates output failed while a true value
+ *			indicates the model was successfully output.
+ */
+
+static _Bool output_model(CO(char *, fname))
+
+{
+	_Bool retn = false;
+
+	uint32_t lp,
+		 cnt = 0;
+
+	Buffer bufr = NULL;
+
+	String str = NULL;
+
+	File outfile = NULL;
+
+	static const char *cmd		 = "show points\n",
+			  *aggregate_cmd = "aggregate ",
+			  *state_cmd	 = "state ",
+			  *seal_cmd	 = "seal\n",
+			  *end_cmd	 = "end\n";
+
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	INIT(HurdLib, String, str, ERR(goto done));
+
+	INIT(HurdLib, File, outfile, ERR(goto done));
+	if ( !outfile->open_rw(outfile, fname) )
+		ERR(goto done);
+
+
+	/* Output the aggregate value. */
+	if ( !str->add(str, aggregate_cmd) )
+		ERR(goto done);
+	_encode_buffer(str, Aggregate->get(Aggregate), \
+		       Aggregate->size(Aggregate));
+	bufr->add(bufr, (void *) str->get(str), str->size(str));
+	bufr->add(bufr, (void *) "\n", 1);
+	if ( !outfile->write_Buffer(outfile, bufr) )
+		ERR(goto done);
+
+	/* Output the state points. */
+	bufr->reset(bufr);
+	if ( !bufr->add(bufr, (void *) cmd, strlen(cmd)) )
+		ERR(goto done);
+	if ( !Sancho->send_Buffer(Sancho, bufr) )
+		ERR(goto done);
+
+	bufr->reset(bufr);
+	if ( !Sancho->receive_Buffer(Sancho, bufr) )
+		ERR(goto done);
+	cnt = *(uint32_t *) bufr->get(bufr);
+
+	for (lp= 0; lp < cnt; ++lp ) {
+		bufr->reset(bufr);
+		if ( !Sancho->receive_Buffer(Sancho, bufr) )
+			ERR(goto done);
+
+		str->reset(str);
+		if ( !str->add(str, state_cmd) )
+			ERR(goto done);
+		if ( !str->add(str, (char *) bufr->get(bufr)) )
+			ERR(goto done);
+
+		bufr->reset(bufr);
+		bufr->add(bufr, (void *) str->get(str), str->size(str));
+		bufr->add(bufr, (void *) "\n", 1);
+		if ( !outfile->write_Buffer(outfile, bufr) )
+			ERR(goto done);
+	}
+
+	/* Output the closing tags. */
+	str->reset(str);
+	bufr->reset(bufr);
+	if ( !str->add(str, seal_cmd) )
+		ERR(goto done);
+	bufr->add(bufr, (void *) str->get(str), str->size(str));
+	if ( !outfile->write_Buffer(outfile, bufr) )
+		ERR(goto done);
+
+	str->reset(str);
+	bufr->reset(bufr);
+	if ( !str->add(str, end_cmd) )
+		ERR(goto done);
+	bufr->add(bufr, (void *) str->get(str), str->size(str));
+	if ( !outfile->write_Buffer(outfile, bufr) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	WHACK(bufr);
+	WHACK(str);
+	WHACK(outfile);
 
 	return retn;
 }
@@ -912,7 +1140,7 @@ static _Bool setup_namespace(int *fdptr, _Bool enforce)
  * \return	No return value is defined.
  */
 
-static void * show_magazine(CO(char *, root))
+static void show_magazine(CO(char *, root))
 
 {
 	char *p;
@@ -974,6 +1202,264 @@ static void * show_magazine(CO(char *, root))
 /**
  * Private function.
  *
+ * This function is responsible for issueing the runc command needed
+ * to terminate a software cartridge.  The function waits until the
+ * process spawned to execute the runc process terminates.
+ *
+ * \param name		A pointer to a character buffer containing the
+ *			name of the software cartridge.
+ *
+ * \param wait		A boolean flag used to indicate whether or
+ *			not the runc kill process should be waited for.
+ *
+ * \return	No return value is defined.
+ */
+
+static void kill_cartridge(const char *cartridge, const _Bool wait)
+
+{
+	int status;
+
+	static pid_t kill_process = 0;
+
+
+	/* Signal the monitor process to shutdown the cartridge process. */
+	if ( Mode == process_mode ) {
+		if ( Debug )
+			fprintf(Debug, "%u sending SIGHUP to %u.\n", \
+				getpid(), Monitor_pid);
+		kill(Monitor_pid, SIGTERM);
+		return;
+	}
+
+
+	/* Check to see if runc kill has finished. */
+	if ( kill_process ) {
+		waitpid(kill_process, &status, WNOHANG);
+		if ( !WIFEXITED(status) )
+			return;
+
+		if ( Debug )
+			fprintf(Debug, "Cartridge kill status: %d\n", \
+				WEXITSTATUS(status));
+		if ( WEXITSTATUS(status) == 0 ) {
+			kill_process = 0;
+			return;
+		}
+	}
+
+
+	/* Fork a process to use runc to send the termination signal. */
+	kill_process = fork();
+	if ( kill_process == -1 )
+		return;
+
+	/* Child process - execute runc in kill mode. */
+	if ( kill_process == 0 ) {
+		if ( Debug )
+			fputs("Killing runc cartridge.\n", Debug);
+
+		execlp("runc", "runc", "kill", cartridge, "SIGKILL", NULL);
+		exit(1);
+	}
+
+	/* Parent process - wait for the kill process to complete. */
+	if ( wait )
+		waitpid(kill_process, &status, 0);
+
+	return;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function is responsible for monitoring the child process that
+ * is running the modeled workload.  The event loop monitors for a
+ * a child exit and process management requests.
+ *
+ * \param mgmt		The object that will be used to receive management
+ *			requests.
+ *
+ * \param cartridge	A pointer to a null terminated buffer containing
+ *			the name of the cartridge being run.
+ *
+ * \param fd		The file descriptor from which security domain
+ *			updates will be read from.
+ *
+ * \return		A boolean value is used to indicate the status
+ *			of the child monitor.  A true value indicates
+ *			that management was successfully completed while
+ *			a false value indicates an error occurred.
+ */
+
+static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int fd)
+
+{
+	_Bool retn = false,
+	      connected = false;
+
+	char *p,
+	     bufr[512];
+
+	int rc;
+
+	unsigned int cycle = 0;
+
+	struct pollfd poll_data[2];
+
+	Buffer cmdbufr = NULL;
+
+
+	INIT(HurdLib, Buffer, cmdbufr, ERR(goto done));
+
+	poll_data[0].fd	    = fd;
+	poll_data[0].events = POLLIN;
+
+	if ( !mgmt->get_socket(mgmt, &poll_data[1].fd) ) {
+		fputs("Error setting up polling data.\n", stderr);
+		goto done;
+	}
+	poll_data[1].events = POLLIN;
+
+
+	/* Dispatch loop. */
+	if ( Debug ) {
+		fprintf(Debug, "%d: Calling event loop\n", getpid());
+		fprintf(Debug, "descriptor 1: %d, descriptor 2: %d\n", \
+			poll_data[0].fd, poll_data[1].fd);
+	}
+
+	while ( 1 ) {
+		if ( Debug )
+			fprintf(Debug, "\n%d: Poll cycle: %d\n", getpid(), \
+				++cycle);
+
+		rc = poll(poll_data, 2, -1);
+		if ( rc < 0 ) {
+			if ( Signals.stop ) {
+				if ( Debug )
+					fputs("Quixote terminated.\n", Debug);
+				kill_cartridge(cartridge, true);
+				retn = true;
+				goto done;
+			}
+			if ( Signals.sigchild ) {
+				if ( !child_exited(Monitor_pid) )
+					continue;
+				retn = true;
+				goto done;
+			}
+
+			fputs("Poll error.\n", stderr);
+			kill_cartridge(cartridge, true);
+			retn = true;
+			goto done;
+		}
+		if ( rc == 0 ) {
+			if ( Debug )
+				fputs("Poll timeout.\n", Debug);
+			continue;
+		}
+
+		if ( Debug )
+			fprintf(Debug, "Events: %d, Data poll=%0x, "	\
+				"Mgmt poll=%0x\n", rc,			\
+				poll_data[0].revents, poll_data[1].revents);
+
+		if ( poll_data[0].revents & POLLHUP ) {
+			if ( Signals.stop ) {
+				retn = true;
+				goto done;
+			}
+			if ( Signals.sigchild ) {
+				if ( !child_exited(Monitor_pid) )
+					continue;
+				retn = true;
+				goto done;
+			}
+		}
+
+		if ( poll_data[0].revents & POLLIN ) {
+			p = bufr;
+			memset(bufr, '\0', sizeof(bufr));
+			while ( 1 ) {
+				rc = read(fd, p, 1);
+				if ( rc < 0 ) {
+					if ( errno != ENODATA )
+						fprintf(stderr, "Have "	  \
+							"error: rc=%d "	  \
+							"error=%s\n", rc, \
+							strerror(errno));
+				}
+				if ( *p != '\n' ) {
+					++p;
+					continue;
+				}
+				else
+					*p = '\0';
+				if ( Debug )
+					fprintf(Debug,			  \
+						"Processing event: %s\n", \
+						bufr);
+				if ( !process_event(Sancho, bufr) ) {
+					if ( Debug )
+						fprintf(Debug, "Event "	     \
+							"processing error, " \
+							"%u killing %u\n",   \
+							getpid(), Monitor_pid);
+					Model_Error = true;
+				}
+				if ( Model_Error )
+					kill_cartridge(cartridge, false);
+				break;
+			}
+		}
+
+		if ( poll_data[1].revents & POLLIN ) {
+			if ( !connected ) {
+				if ( Debug )
+					fputs("Have socket connection.\n", \
+					      Debug);
+
+				if ( !mgmt->accept_connection(mgmt) )
+					ERR(goto done);
+				if ( !mgmt->get_fd(mgmt, &poll_data[1].fd) )
+					ERR(goto done);
+				connected = true;
+				continue;
+			}
+			if ( !mgmt->receive_Buffer(mgmt, cmdbufr) )
+				continue;
+			if ( mgmt->eof(mgmt) ) {
+				if ( Debug )
+					fputs("Terminating management.\n", \
+					      Debug);
+				mgmt->reset(mgmt);
+				if ( !mgmt->get_socket(mgmt, \
+						       &poll_data[1].fd) )
+					ERR(goto done);
+				connected = false;
+				continue;
+			}
+
+			if ( !process_command(Sancho, mgmt, cmdbufr) )
+				ERR(goto done);
+			cmdbufr->reset(cmdbufr);
+		}
+	}
+
+
+ done:
+	WHACK(cmdbufr);
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
  * This function is responsible for launching a software cartridge
  * in an independent measurement domain.  A pipe is established
  * between the parent process and the child that is used to return
@@ -983,13 +1469,13 @@ static void * show_magazine(CO(char *, root))
  * \param root		A pointer to the buffer containing the root
  *			directory to be used to display the cartridges.
  *
- * \param endpoint	A character pointer to the buffer containing
- *			the directory which holds the container to
- *			be executed.
- *
  * \param enforce	A flag used to indicate whether or not the
  *			security domain should be placed in enforcement
  *			mode.
+ *
+ * \param outfile	A pointer to a null-terminated array
+ *			containing the name of the output file that
+ *			is to be generated.
  *
  * \return	A boolean value is returned to reflect the status of
  *		the launch.  A false value indicates an error was
@@ -997,8 +1483,8 @@ static void * show_magazine(CO(char *, root))
  *		was successfully launched.
  */
 
-static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint,
-			    _Bool enforce)
+static _Bool fire_cartridge(CO(LocalDuct, mgmt), CO(char *, cartridge), \
+			    _Bool enforce, char *outfile)
 
 {
 	_Bool retn = false;
@@ -1007,8 +1493,8 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint,
 	     bufr[1024];
 
 	int rc,
-	    event_fd,
-	    event_pipe[2];
+	    event_pipe[2],
+	    event_fd = 0;
 
 	pid_t cartridge_pid;
 
@@ -1017,7 +1503,7 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint,
 	String cartridge_dir = NULL;
 
 
-	/* Create the name of the bundle directory. */
+	/* Create the name of the bundle directory if in cartridge mode. */
 	if ( Mode == cartridge_mode ) {
 		INIT(HurdLib, String, cartridge_dir, ERR(goto done));
 		cartridge_dir->add(cartridge_dir, QUIXOTE_MAGAZINE);
@@ -1036,15 +1522,27 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint,
 	if ( Monitor_pid == -1 )
 		ERR(goto done);
 
+	/* Monitor parent process. */
+	if ( Monitor_pid > 0 ) {
+		if ( Debug )
+			fprintf(Debug, "Monitor process: %d\n", getpid());
+		close(event_pipe[WRITE_SIDE]);
+		if ( !child_monitor(mgmt, cartridge, event_pipe[READ_SIDE]) )
+			ERR(goto done);
+		if ( outfile != NULL ) {
+			if ( Trajectory )
+				retn = output_trajectory(outfile);
+			else
+				retn = output_model(outfile);
+		}
+		goto done;
+	}
 
 	/* Child process - create an independent namespace for this process. */
 	if ( Monitor_pid == 0 ) {
-		if ( Debug )
-			fprintf(Debug, "Monitor process: %d\n", getpid());
 		close(event_pipe[READ_SIDE]);
-
 		if ( !setup_namespace(&event_fd, enforce) )
-			exit(1);
+			_exit(1);
 
 		/* Fork again to run the cartridge. */
 		cartridge_pid = fork();
@@ -1053,18 +1551,18 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint,
 
 		/* Child process - run the cartridge. */
 		if ( cartridge_pid == 0 ) {
-			/* Drop the ability to modify the security domain. */
+			if ( Debug )
+				fprintf(Debug, "Workload process: %d\n",
+					getpid());
+
+			/* Drop the ability to modify the trust state. */
 			if ( cap_drop_bound(CAP_TRUST) != 0 )
 				ERR(goto done);
 
 			if ( Mode == cartridge_mode ) {
-				if ( Debug )
-					fputs("Executing cartridge " \
-					      "process.\n", Debug);
 				execlp("runc", "runc", "run", "-b", bundle, \
 				       cartridge, NULL);
-				fputs("Cartridge process execution failed.\n",\
-				      stderr);
+				fputs("Cartridge execution failed.\n", stderr);
 				exit(1);
 			}
 
@@ -1080,8 +1578,13 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint,
 						exit(1);
 					}
 				}
+
+				if ( Debug )
+					fputs("Executing cartridge process.\n",
+					      Debug);
 				execlp("bash", "bash", "-i", NULL);
-				fputs("Process execution failed.\n", stderr);
+				fputs("Cartridge process execution failed.\n",\
+				      stderr);
 				exit(1);
 			}
 		}
@@ -1108,7 +1611,6 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint,
 
 			if ( Signals.sigchild ) {
 				if ( child_exited(cartridge_pid) ) {
-
 					close(event_fd);
 					close(event_pipe[WRITE_SIDE]);
 					_exit(0);
@@ -1118,6 +1620,8 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint,
 			memset(bufr, '\0', sizeof(bufr));
 
 			rc = poll(poll_data, 1, -1);
+			if ( Debug )
+				fprintf(Debug, "Poll returns: %d\n", rc);
 			if ( rc < 0 ) {
 				if ( errno == -EINTR ) {
 					fputs("poll interrupted.\n", stderr);
@@ -1155,90 +1659,10 @@ static _Bool fire_cartridge(CO(char *, cartridge), int *endpoint,
 	}
 
 
-	/* Monitor parent process - return monitor fd. */
-	close(event_pipe[WRITE_SIDE]);
-	*endpoint = event_pipe[READ_SIDE];
-	retn = true;
-
-
  done:
 	WHACK(cartridge_dir);
 
 	return retn;
-}
-
-
-/**
- * Private function.
- *
- * This function is responsible for issueing the runc command needed
- * to terminate a software cartridge.  The function waits until the
- * process spawned to execute the runc process terminates.
- *
- * \param name		A pointer to a character buffer containing the
- *			name of the software cartridge.
- *
- * \param wait		A boolean flag used to indicate whether or
- *			not the runc kill process should be waited for.
- *
- * \return	No return value is defined.
- */
-
-static void kill_cartridge(const char *cartridge, const _Bool wait)
-
-{
-	int status;
-
-	static pid_t kill_process;
-
-
-	/* Signal the monitor process to shutdown the cartridge process. */
-	if ( Mode == process_mode ) {
-		if ( Debug )
-			fprintf(Debug, "%u sending SIGHUP to %u.\n", \
-				getpid(), Monitor_pid);
-		kill(Monitor_pid, SIGTERM);
-		return;
-	}
-
-
-	/* Check to see if runc kill has finished. */
-	if ( kill_process ) {
-		waitpid(kill_process, &status, WNOHANG);
-		if ( !WIFEXITED(status) )
-			return;
-
-		if ( Debug )
-			fprintf(Debug, "Cartridge kill status: %d\n", \
-				WEXITSTATUS(status));
-		if ( WEXITSTATUS(status) == 0 ) {
-			kill_process = 0;
-			return;
-		}
-	}
-
-
-	/* Fork a process to use runc to send the terminationa signal. */
-	kill_process = fork();
-	if ( kill_process == -1 )
-		return;
-
-
-	/* Child process - execute runc in kill mode. */
-	if ( kill_process == 0 ) {
-		if ( Debug )
-			fputs("Killing runc cartridge.\n", Debug);
-
-		execlp("runc", "runc", "kill", cartridge, "SIGKILL", NULL);
-		exit(1);
-	}
-
-
-	/* Parent process - wait for the kill process to complete. */
-	if ( wait )
-		waitpid(kill_process, &status, 0);
-
-	return;
 }
 
 
@@ -1249,34 +1673,24 @@ static void kill_cartridge(const char *cartridge, const _Bool wait)
 extern int main(int argc, char *argv[])
 
 {
-	_Bool enforce	= false,
-	      connected = false;
+	_Bool enforce = false;
 
-	char *p,
-	     *debug	= NULL,
-	     *map	= NULL,
+	char *debug	= NULL,
+	     *model	= NULL,
+	     *outfile	= NULL,
 	     *cartridge	= NULL,
-	     *domid	= NULL,
-	     bufr[1024];
+	     *domid	= NULL;
 
 	int opt,
 	    fd	 = 0,
 	    retn = 1;
 
-	struct pollfd poll_data[2];
-
 	struct sigaction signal_action;
-
-	Buffer cmdbufr = NULL;
 
 	LocalDuct mgmt = NULL;
 
-	File infile = NULL;
 
-	XENduct Duct = NULL;
-
-
-	while ( (opt = getopt(argc, argv, "CPSec:d:m:t:")) != EOF )
+	while ( (opt = getopt(argc, argv, "CPSetc:d:m:o:s:")) != EOF )
 		switch ( opt ) {
 			case 'C':
 				Mode = cartridge_mode;
@@ -1290,6 +1704,9 @@ extern int main(int argc, char *argv[])
 			case 'e':
 				enforce = true;
 				break;
+			case 't':
+				Trajectory = true;
+				break;
 
 			case 'c':
 				cartridge = optarg;
@@ -1298,9 +1715,12 @@ extern int main(int argc, char *argv[])
 				debug = optarg;
 				break;
 			case 'm':
-				map = optarg;
+				model = optarg;
 				break;
-			case 't':
+			case 'o':
+				outfile = optarg;
+				break;
+			case 's':
 				domid = optarg;
 				break;
 		}
@@ -1309,7 +1729,6 @@ extern int main(int argc, char *argv[])
 	/* Execute cartridge display mode. */
 	if ( Mode == show_mode )
 		show_magazine(QUIXOTE_MAGAZINE);
-
 
 	if ( (Mode == cartridge_mode) && (cartridge == NULL) ) {
 		fputs("No software cartridge specified.\n", stderr);
@@ -1360,24 +1779,22 @@ extern int main(int argc, char *argv[])
 
 
 	/* Open a connection to the co-processor. */
-	INIT(NAAAIM, XENduct, Duct, ERR(goto done));
-	if ( !Duct->init_device(Duct, domid) ) {
-		WHACK(Duct);
-		fprintf(stderr, "quixote-mcu: Cannot connect to Sancho " \
+	INIT(NAAAIM, XENduct, Sancho, ERR(goto done));
+	if ( !Sancho->init_device(Sancho, domid) ) {
+		WHACK(Sancho);
+		fprintf(stderr, "quixote-mcu: Cannot connect to SanchoXen " \
 			"instance %s.\n", domid);
 		goto done;
 	}
 
-	INIT(HurdLib, Buffer, cmdbufr, ERR(goto done));
 
-
-	/* Load and seal a behavior map if specified. */
-	if ( map != NULL ) {
+	/* Load and seal a security model if specified. */
+	if ( model != NULL ) {
 		if ( Debug )
-			fprintf(Debug, "Loading security state: %s\n", map);
+			fprintf(Debug, "Loading security model: %s\n", model);
 
-		if ( !load_model(Duct, cmdbufr, map) ) {
-			fputs("Cannot initialize security state.\n", stderr);
+		if ( !load_model(Sancho, model) ) {
+			fputs("Cannot initialize security model.\n", stderr);
 			goto done;
 		}
 	}
@@ -1388,152 +1805,28 @@ extern int main(int argc, char *argv[])
 	if ( !setup_management(mgmt, cartridge) )
 		ERR(goto done);
 
-
-	/* Launch the software cartridge. */
+	/* Fire the workload cartridge. */
 	if ( Debug )
-		fprintf(Debug, "Primary process: %d\n", getpid());
-
-	if ( !fire_cartridge(cartridge, &fd, enforce) )
+		fprintf(Debug, "Launch process: %d\n", getpid());
+	if ( !fire_cartridge(mgmt, cartridge, enforce, outfile) )
 		ERR(goto done);
-	poll_data[0].fd	    = fd;
-	poll_data[0].events = POLLIN;
 
-	if ( !mgmt->get_socket(mgmt, &poll_data[1].fd) ) {
-		fputs("Error setting up polling data.\n", stderr);
-		goto done;
-	}
-	poll_data[1].events = POLLIN;
+	waitpid(Monitor_pid, NULL, 0);
 
-
-	/* Dispatch loop. */
-	if ( Debug ) {
-		fprintf(Debug, "%d: Calling event loop\n", getpid());
-		fprintf(Debug, "descriptor 1: %d, descriptor 2: %d\n", \
-			poll_data[0].fd, poll_data[1].fd);
-	}
-
-	opt = 0;
-	while ( 1 ) {
-		if ( Debug )
-			fprintf(Debug, "\n%d: Poll cycle: %d\n", getpid(), \
-				++opt);
-
-		retn = poll(poll_data, 2, -1);
-		if ( retn < 0 ) {
-			if ( Signals.stop ) {
-				if ( Debug )
-					fputs("Quixote terminated.\n", Debug);
-				kill_cartridge(cartridge, true);
-				goto done;
-			}
-			if ( Signals.sigchild ) {
-				if ( !child_exited(Monitor_pid) )
-					continue;
-				fputs("Cartridge exited.\n", stdout);
-				goto done;
-			}
-
-			fputs("Poll error.\n", stderr);
-			kill_cartridge(cartridge, true);
-			goto done;
-		}
-		if ( retn == 0 ) {
-			if ( Debug )
-				fputs("Poll timeout.\n", Debug);
-			continue;
-		}
-
-		if ( Debug )
-			fprintf(Debug, "Events: %d, Data poll=%0x, "	\
-				"Mgmt poll=%0x\n", retn,		\
-				poll_data[0].revents, poll_data[1].revents);
-
-		if ( poll_data[0].revents & POLLHUP ) {
-			if ( Signals.sigchild ) {
-				if ( !child_exited(Monitor_pid) )
-					continue;
-				fputs("Monitor process terminated.\n", stdout);
-				goto done;
-			}
-		}
-
-		if ( poll_data[0].revents & POLLIN ) {
-			p = bufr;
-			memset(bufr, '\0', sizeof(bufr));
-			while ( 1 ) {
-				retn = read(fd, p, 1);
-				if ( retn < 0 ) {
-					if ( errno != ENODATA )
-						fprintf(stderr, "Have "	    \
-							"error: retn=%d, "  \
-							"error=%s\n", retn, \
-							strerror(errno));
-				}
-				if ( *p != '\n' ) {
-					++p;
-					continue;
-				}
-				else
-					*p = '\0';
-				if ( Debug )
-					fprintf(Debug,			  \
-						"Processing event: %s\n", \
-						bufr);
-				if ( !process_event(Duct, bufr) ) {
-					if ( Debug )
-						fprintf(Debug, "Event "	     \
-							"processing error, " \
-							"%u kill %u\n",	     \
-							getpid(), Monitor_pid);
-					Model_Error = true;
-				}
-				if ( Model_Error )
-					kill_cartridge(cartridge, false);
-				break;
-			}
-		}
-
-		if ( poll_data[1].revents & POLLIN ) {
-			if ( !connected ) {
-				if ( Debug )
-					fputs("Have socket connection.\n", \
-					      Debug);
-
-				if ( !mgmt->accept_connection(mgmt) )
-					ERR(goto done);
-				if ( !mgmt->get_fd(mgmt, &poll_data[1].fd) )
-					ERR(goto done);
-				connected = true;
-				continue;
-			}
-			if ( !mgmt->receive_Buffer(mgmt, cmdbufr) )
-				continue;
-			if ( mgmt->eof(mgmt) ) {
-				if ( Debug )
-					fputs("Terminating management.\n", \
-					      Debug);
-				mgmt->reset(mgmt);
-				if ( !mgmt->get_socket(mgmt, \
-						       &poll_data[1].fd) )
-					ERR(goto done);
-				connected = false;
-				continue;
-			}
-
-			if ( !process_command(Duct, mgmt, cmdbufr) )
-				ERR(goto done);
-			cmdbufr->reset(cmdbufr);
-		}
+	if ( outfile != NULL ) {
+		if ( Trajectory )
+			fputs("Wrote execution trajectory to: ", stdout);
+		else
+			fputs("Wrote security map to: ", stdout);
+		fprintf(stdout, "%s\n", outfile);
 	}
 
 
  done:
-	WHACK(cmdbufr);
 	WHACK(mgmt);
-	WHACK(infile);
 
 	WHACK(Aggregate);
-	WHACK(Duct);
+	WHACK(Sancho);
 	WHACK(Control);
 
 	if ( fd > 0 )

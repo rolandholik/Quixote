@@ -346,13 +346,13 @@ extern int main(int argc, char *argv[])
 
 
         /* Get operational mode. */
-        while ( (retn = getopt(argc, argv, "Td:")) != EOF )
+        while ( (retn = getopt(argc, argv, "Ts:")) != EOF )
                 switch ( retn ) {
 			case 'T':
 				timing = true;
 				break;
 
-			case 't':
+			case 's':
 				domid = optarg;
 				break;
 		}
