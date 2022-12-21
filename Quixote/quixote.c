@@ -1312,40 +1312,6 @@ static void kill_cartridge(const char *cartridge, const _Bool wait)
 /**
  * Private function.
  *
- * This is a helper function that adds a hexadecimally encoded state
- * point to a String object.
- *
- * \param str	The object that is to have the buffer encoded.
- *
- * \param bufr	A pointer to the buffer whose contents is to be
- *		encoded into the String object.
- *
- * \param cnt	The number of bytes to encode from the buffer.
- *
- * \return	No return value is defined.
- */
-
-static void _encode_buffer(CO(String, str), unsigned char *bufr, \
-			   const size_t size)
-
-{
-	unsigned char *p = bufr;
-
-	unsigned int lp;
-
-
-	for (lp= 0; lp < size; ++lp) {
-		str->add_sprintf(str, "%02x", *p);
-		++p;
-	}
-
-	return;
-}
-
-
-/**
- * Private function.
- *
  * This function is responsible for sending a security model map to the
  * launch process.
  *
