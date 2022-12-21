@@ -1790,10 +1790,6 @@ static _Bool receive_model(CO(char *, filename), const int fd)
 
 
  done:
-	if ( Trajectory )
-		fputs("Received model trajectory.\n", stdout);
-	else
-		fputs("Received security model.\n", stdout);
 
 	WHACK(bufr);
 	WHACK(outfile);
@@ -1942,6 +1938,12 @@ extern int main(int argc, char *argv[])
 	if ( Pause ) {
 		if ( !receive_model(outfile, mapfd) )
 			ERR(goto done);
+
+		if ( Trajectory )
+			fputs("Wrote execution trajectory to: ", stdout);
+		else
+			fputs("Wrote security map to: ", stdout);
+		fprintf(stdout, "%s\n", outfile);
 	} else {
 		while ( 1 ) {
 			if ( Debug )
