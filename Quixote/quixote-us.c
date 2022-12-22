@@ -448,7 +448,7 @@ static _Bool add_event(CO(char *, inbufr))
 
 		if ( !event->get_pid(event, &pid) )
 			ERR(goto done);
-		if ( !Control->release(Control, pid) < 0 ) {
+		if ( !Control->release(Control, pid) ) {
 			fprintf(stderr, "Bad actor release error: "  \
 				"%d:%s\n", errno, strerror(errno));
 		}
@@ -474,7 +474,7 @@ static _Bool add_event(CO(char *, inbufr))
 	if ( !sealed ) {
 		if ( Debug )
 			fputs("Unsealed, releasing actor.\n", Debug);
-		if ( !Control->release(Control, pid) < 0 )
+		if ( !Control->release(Control, pid) )
 			fprintf(stderr, "[%s]: Release actor status: %d:%s\n",
 				__func__, errno, strerror(errno));
 	}
@@ -498,7 +498,7 @@ static _Bool add_event(CO(char *, inbufr))
 		} else {
 			if ( Debug )
 				fputs("Sealed, releasing actor.\n", Debug);
-			if ( !Control->release(Control,pid) < 0 ) {
+			if ( !Control->release(Control,pid) ) {
 				fprintf(stderr, "Good actor release error: "  \
 					"%d:%s\n", errno, strerror(errno));
 					retn = false;
@@ -1744,16 +1744,19 @@ static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int fd)
 				if ( Debug )
 					fputs("Quixote terminated.\n", Debug);
 				kill_cartridge(cartridge, true);
+				retn = true;
 				goto done;
 			}
 			if ( Signals.sigchild ) {
 				if ( !child_exited(Monitor_pid) )
 					continue;
+				retn = true;
 				goto done;
 			}
 
 			fputs("Poll error.\n", stderr);
 			kill_cartridge(cartridge, true);
+			retn = true;
 			goto done;
 		}
 		if ( rc == 0 ) {
@@ -1768,11 +1771,14 @@ static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int fd)
 				poll_data[0].revents, poll_data[1].revents);
 
 		if ( poll_data[0].revents & POLLHUP ) {
-			if ( Signals.stop )
+			if ( Signals.stop ) {
+				retn = true;
 				goto done;
+			}
 			if ( Signals.sigchild ) {
 				if ( !child_exited(Monitor_pid) )
 					continue;
+				retn = true;
 				goto done;
 			}
 		}
@@ -1781,8 +1787,8 @@ static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int fd)
 			p = bufr;
 			memset(bufr, '\0', sizeof(bufr));
 			while ( 1 ) {
-				retn = read(fd, p, 1);
-				if ( retn < 0 ) {
+				rc = read(fd, p, 1);
+				if ( rc < 0 ) {
 					if ( errno != ENODATA )
 						fprintf(stderr, "Have "	    \
 							"error: retn=%d, "  \
