@@ -1529,12 +1529,15 @@ static _Bool fire_cartridge(CO(LocalDuct, mgmt), CO(char *, cartridge), \
 		close(event_pipe[WRITE_SIDE]);
 		if ( !child_monitor(mgmt, cartridge, event_pipe[READ_SIDE]) )
 			ERR(goto done);
+
 		if ( outfile != NULL ) {
 			if ( Trajectory )
 				retn = output_trajectory(outfile);
 			else
 				retn = output_model(outfile);
 		}
+		else
+			retn = true;
 		goto done;
 	}
 
