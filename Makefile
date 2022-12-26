@@ -28,7 +28,7 @@ DEV_SUBDIRS = lib SRDE
 all: config HurdLib/libHurdLib.a lib ${SUBDIRS}
 
 HurdLib/libHurdLib.a:
-	cd HurdLib && CC=${CC} ./configure;
+	cd HurdLib && CC=${CC} CFLAGS="${BUILD_CFLAGS}" ./configure;
 	make -C HurdLib;
 
 sha256key: sha256key.o
