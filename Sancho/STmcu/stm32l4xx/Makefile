@@ -34,5 +34,5 @@ Sancho_Cell:
 clean:
 	set -e; for dir in ${SUBDIRS}; do ${MAKE} -C $$dir clean; done;
 
-clobber: clean
-	set -e; for dir in ${SUBDIRS}; do ${MAKE} -C $$dir clobber; done;
+distclean: clean
+	set -e; for dir in ${SUBDIRS}; do ${MAKE} -C $$dir distclean; done;

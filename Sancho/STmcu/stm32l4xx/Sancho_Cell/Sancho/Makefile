@@ -158,5 +158,5 @@ reset_hard:
 clean:
 	rm -f *.o;
 
-clobber: clean
+distclean: clean
 	rm -f sancho.ld sancho.elf sancho-term.elf;

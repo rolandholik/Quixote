@@ -159,6 +159,8 @@ clean:
 	rm -f *.o *~ TAGS;
 	rm -f ${TOOLS};
 
+distclean: clean
+
 
 # Source dependencies.
 Netconfig.o: Netconfig.h

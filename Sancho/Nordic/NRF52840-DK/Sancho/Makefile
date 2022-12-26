@@ -206,5 +206,5 @@ reset:
 clean:
 	rm -f *.o;
 
-clobber: clean
+distclean: clean
 	rm -f nrf_common.ld sancho.ld sancho.elf sancho.elf.hex;

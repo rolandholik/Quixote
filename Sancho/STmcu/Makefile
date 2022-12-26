@@ -38,5 +38,5 @@ stm32l562:
 clean:
 	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i clean; done;
 
-clobber:
-	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i clobber; done;
+distclean:
+	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i distclean; done;

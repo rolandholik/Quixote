@@ -31,3 +31,6 @@ install-dev:
 
 clean:
 	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i clean; done
+
+distclean:
+	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i distclean; done

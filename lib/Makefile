@@ -153,8 +153,10 @@ tags:
 
 clean:
 	rm -f *.o *~ TAGS;
-	rm -f ${LIBRARY};
 	rm -f ${TESTS} OTEDKS.out;
+
+distclean: clean
+	rm -f ${LIBRARY};
 
 
 # Source dependencies.

@@ -189,8 +189,8 @@ clean:
 	rm -f mini-os.stamp;
 	make -C Sancho clean;
 
-clobber: clean
-	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i clobber; done;
+distclean: clean
+	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i distclean; done;
 	[ -d newlib-build ] && rm -frv newlib-build || true;
 	[ -d newlib-root ] && rm -frv newlib-root || true;
 	[ -d newlib ] && rm -frv newlib || true;
@@ -198,5 +198,5 @@ clobber: clean
 	[ -d pciutils ] && rm -frv pciutils || true;
 	[ -d mini-os ] && rm -frv mini-os || true;
 	rm -f *.stamp;
-	rm -rv Build/*.tar.gz;
-	make -C Sancho clobber;
+	rm -frv Build/*.tar.gz;
+	make -C Sancho distclean;

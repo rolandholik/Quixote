@@ -71,3 +71,5 @@ ${LIBNAME}: ${COBJS}
 
 clean:
 	rm -f *.o ${LIBNAME};
+
+distclean: clean

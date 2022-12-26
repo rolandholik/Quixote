@@ -89,4 +89,7 @@ clean:
 	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i clean; done;
 
 distclean: clean
+	${MAKE} -C lib distclean;
+	${MAKE} -C HurdLib distclean;
+	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i distclean; done;
 	rm -f Build.mk;

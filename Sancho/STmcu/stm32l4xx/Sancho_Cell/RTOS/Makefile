@@ -71,5 +71,5 @@ librtos.a: ${COBJS}
 clean:
 	rm -f *.o;
 
-clobber: clean
+distclean: clean
 	rm -f librtos.a;

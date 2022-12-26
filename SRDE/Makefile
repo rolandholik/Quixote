@@ -272,10 +272,14 @@ install-dev:
 tags:
 	/opt/emacs/bin/etags *.{h,c};
 clean:
-	rm -f *.o *~ TAGS sigstruct.h LE_whitelist.h LE.h TE.h;
+	rm -f *.o *~;
 	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i clean; done
 	rm -f ${LIBRARY};
 	rm -f generate-array sdk-compute-size ${TOOLS};
+
+distclean: clean;
+	rm -f TAGS sigstruct.h LE_whitelist.h LE.h TE.h;
+	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i distclean; done
 
 
 # Source dependencies.

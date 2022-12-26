@@ -46,10 +46,9 @@ install-dev:
 
 clean:
 	rm -f test-fusion.c test-fusion-enclave.c test-fusion-interface.{c,h};
-	rm -f test-fusion-enclave.xml
 	rm -f test-naaaim.c test-naaaim-enclave.c test-naaaim-interface.{c,h};
-	rm -f test-naaaim-enclave.xml
-	make -f Makefile.sample clean;
 
-clobber: clean
+distclean: clean
+	rm -f test-fusion-enclave.xml
+	rm -f test-naaaim-enclave.xml
 	make -f Makefile.sample clobber;

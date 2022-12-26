@@ -195,8 +195,11 @@ install-bin:
 	install ${INSTALLENCLAVE} ${INSTPATH}/lib/enclaves;
 
 clean:
-	rm -f *.o *~ ldscript;
+	rm -f *.o *~;
 	rm -f ${TOOLS};
+
+distclean: clean
+	rm -f ldscript;
 	rm -f LocalTarget.so LocalTarget.signed.so;
 	rm -f LocalSource.so LocalSource.signed.so;
 	rm -f Attestation.so Attestation.signed.so;

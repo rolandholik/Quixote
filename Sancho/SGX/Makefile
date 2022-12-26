@@ -165,7 +165,7 @@ clean:
 	rm -f *.o *~ ldscript;
 	rm -f ${TOOLS};
 
-clobber: clean
+distclean: clean
 	rm -f SanchoSGX.so SanchoSGX.signed.so ISOmanager.so \
 		ISOmanager.signed.so
 

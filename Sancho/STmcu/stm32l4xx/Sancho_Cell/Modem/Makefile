@@ -75,5 +75,5 @@ ${LIBNAME}: ${COBJS}
 clean:
 	rm -f *.o;
 
-clobber:
+distclean:
 	rm -f ${LIBNAME};

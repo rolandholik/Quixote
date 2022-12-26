@@ -169,6 +169,8 @@ clean:
 	rm -f *.o *~;
 	rm -f ${TOOLS};
 
+distclean: clean
+
 
 # Source dependencies.
 quixote.o: quixote.h sancho-cmd.h

@@ -63,3 +63,5 @@ all: ${COBJS}
 
 clean:
 	rm -f *.o;
+
+distclean: clean

@@ -145,6 +145,8 @@ install-bin:
 
 clean:
 	rm -f *.o *~ TAGS;
+
+distclean: clean
 	rm -f ${TOOLS};
 
 

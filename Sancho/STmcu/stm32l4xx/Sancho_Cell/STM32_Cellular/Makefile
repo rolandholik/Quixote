@@ -24,4 +24,5 @@ all: ${LIBDIRS}
 clean:
 	set -e; for dir in ${LIBDIRS}; do ${MAKE} -C $$dir $@; done;
 
-clobber: clean
+distclean: clean
+	set -e; for dir in ${LIBDIRS}; do ${MAKE} -C $$dir $@; done;

@@ -166,6 +166,8 @@ clean:
 	rm -f *.o *~ ldscript;
 	rm -f ${TOOLS};
 	rm -f ${LIBRARY};
+
+distclean: clean
 	rm -f test-fusion.so test-fusion.signed.so;
 
 

@@ -49,5 +49,5 @@ Sancho:
 clean:
 	set -e; for dir in ${LIBDIRS}; do ${MAKE} -C $$dir clean; done;
 
-clobber: clean
-	set -e; for dir in ${LIBDIRS}; do ${MAKE} -C $$dir clobber; done;
+distclean: clean
+	set -e; for dir in ${LIBDIRS}; do ${MAKE} -C $$dir distclean; done;

@@ -56,7 +56,7 @@ ${LIBRARY}: ${COBJS}
 clean:
 	rm -f ${COBJS} ${LIBRARY} *~;
 
-clobber: clean
+distclean: clean
 	rm -f ${LIBRARY};
 
 
