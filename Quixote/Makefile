@@ -37,10 +37,17 @@ INSTALLBIN  = quixote-console
 INSTALLSBIN = quixote quixote-mcu quixote-us quixote-sgx quixote-sgx-u \
 	quixote-xen
 
-CC = musl-gcc
+ifeq ("${KERNEL_VERSION}","5.4")
+DEFINES = -DCAP_TRUST=38
+endif
+ifeq ("${KERNEL_VERSION}","5.15")
+DEFINES = -DCAP_TRUST=41
+endif
+ifeq ("${KERNEL_VERSION}","6.1")
+DEFINES = -DCAP_TRUST=41
+endif
 
-CDEBUG = -g -O2 -fomit-frame-pointer -march=core2
-CFLAGS = -Wall ${CDEBUG} ${TYPE}
+CFLAGS = ${BUILD_CFLAGS} ${DEFINES}
 
 LDFLAGS = ${STATIC} -g
 

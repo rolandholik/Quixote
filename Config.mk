@@ -14,6 +14,9 @@
 # Compiler selection.
 CC = musl-gcc
 
+# Generic compiler flags to use for the build.
+BUILD_CFLAGS = -O2 -fomit-frame-pointer -march=core2 -Wall
+
 # Kernel version selection.
 KERNEL_VERSION = 6.1
 

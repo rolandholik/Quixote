@@ -17,16 +17,3 @@
 
 #define SYSFS_UPDATES			"/sys/fs/tsem/ExternalTMA/%llu"
 #define SYSFS_EXTERNAL			"/sys/kernel/security/tsem/external"
-
-/* Kernel driver definitions. */
-#define CLONE_EVENTS 0x00000040
-
-#define CAP_TRUST 38
-
-#define SYS_CONFIG_DOMAIN  436
-#define IMA_TE_ENFORCE	   0x8
-#define IMA_EVENT_EXTERNAL 0x10
-
-#define SYS_CONFIG_ACTOR  437
-#define DISCIPLINE_ACTOR  1
-#define RELEASE_ACTOR	  2
