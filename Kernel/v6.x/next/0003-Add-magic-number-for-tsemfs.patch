@@ -1,0 +1,24 @@
+From 1a70c3a51c9e3211365ab22ea3e6dcbd4625d174 Mon Sep 17 00:00:00 2001
+From: "Dr. Greg" <greg@enjellic.com>
+Date: Mon, 26 Dec 2022 04:42:34 -0600
+Subject: [PATCH 03/14] Add magic number for tsemfs.
+
+---
+ include/uapi/linux/magic.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/include/uapi/linux/magic.h b/include/uapi/linux/magic.h
+index 6325d1d0e90f..6a6a2b70c529 100644
+--- a/include/uapi/linux/magic.h
++++ b/include/uapi/linux/magic.h
+@@ -95,6 +95,7 @@
+ #define BPF_FS_MAGIC		0xcafe4a11
+ #define AAFS_MAGIC		0x5a3c69f0
+ #define ZONEFS_MAGIC		0x5a4f4653
++#define TSEMFS_MAGIC		0x11242022
+ 
+ /* Since UDF 2.01 is ISO 13346 based... */
+ #define UDF_SUPER_MAGIC		0x15013346
+-- 
+2.31.1
+

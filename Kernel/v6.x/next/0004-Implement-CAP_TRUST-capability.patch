@@ -1,0 +1,61 @@
+From ba0167e005b749efad1799b543e71eed9e04e7ef Mon Sep 17 00:00:00 2001
+From: "Dr. Greg" <greg@enjellic.com>
+Date: Mon, 26 Dec 2022 11:26:43 -0600
+Subject: [PATCH 04/14] Implement CAP_TRUST capability.
+
+TSEM was designed to support the concept of a Trust Orchestration
+System (TOS).  A TOS based security system uses the concept of a
+minimum Trusted Computing Base of utilities, referred to as trust
+orchestrators, that maintain workloads in a trusted execution
+state.  The trust orchestrators are thus, from a security
+perspective, the most privileged assets on the platform.
+
+Introduce the CAP_TRUST capability that is defined as a
+capability that allows a process to alter the trust status of the
+platform.  In a fully trust orchestrated system only the
+orchestrators carry this capability bit.
+
+CAP_MAC_OVERRIDE was considered as an alternative candidate but
+this would preclude a TOS based system from supporting
+alternative LSM's.
+
+The proposed Integrity Measurement Architecture namespaces would
+also be a candidate to use the CAP_TRUST capability.
+---
+ include/uapi/linux/capability.h     | 6 +++++-
+ security/selinux/include/classmap.h | 2 +-
+ 2 files changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/include/uapi/linux/capability.h b/include/uapi/linux/capability.h
+index 463d1ba2232a..17bbb31ba3b7 100644
+--- a/include/uapi/linux/capability.h
++++ b/include/uapi/linux/capability.h
+@@ -417,7 +417,11 @@ struct vfs_ns_cap_data {
+ 
+ #define CAP_CHECKPOINT_RESTORE	40
+ 
+-#define CAP_LAST_CAP         CAP_CHECKPOINT_RESTORE
++/* Allow modifications to the trust status of the system */
++
++#define CAP_TRUST	41
++
++#define CAP_LAST_CAP         CAP_TRUST
+ 
+ #define cap_valid(x) ((x) >= 0 && (x) <= CAP_LAST_CAP)
+ 
+diff --git a/security/selinux/include/classmap.h b/security/selinux/include/classmap.h
+index a3c380775d41..e8c497c16271 100644
+--- a/security/selinux/include/classmap.h
++++ b/security/selinux/include/classmap.h
+@@ -30,7 +30,7 @@
+ 		"wake_alarm", "block_suspend", "audit_read", "perfmon", "bpf", \
+ 		"checkpoint_restore"
+ 
+-#if CAP_LAST_CAP > CAP_CHECKPOINT_RESTORE
++#if CAP_LAST_CAP > CAP_TRUST
+ #error New capability defined, please update COMMON_CAP2_PERMS.
+ #endif
+ 
+-- 
+2.31.1
+

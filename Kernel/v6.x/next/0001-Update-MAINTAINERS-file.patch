@@ -1,0 +1,34 @@
+From 06a89792f4435d7b1c88603f8880e2483cb7d1e0 Mon Sep 17 00:00:00 2001
+From: "Dr. Greg" <greg@enjellic.com>
+Date: Mon, 26 Dec 2022 03:36:16 -0600
+Subject: [PATCH 01/14] Update MAINTAINERS file.
+
+Add an entry to the MAINTAINERS file to document the maintainer's
+address and files relevant to the Trusted Security Event Modeling
+system (TSEM).
+---
+ MAINTAINERS | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index cf0f18502372..c917bd01db03 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -18558,6 +18558,14 @@ F:	include/uapi/linux/selinux_netlink.h
+ F:	scripts/selinux/
+ F:	security/selinux/
+ 
++TSEM SECURITY MODULE
++M:	Greg Wettstein <greg@enjellic.com>
++S:	Supported
++L:	linux-security-module@vger.kernel.org
++F:	Documentation/admin-guide/LSM/tsem.rst
++F:	Documentation/ABI/testing/tsemfs
++F:	security/tsem/
++
+ SENSABLE PHANTOM
+ M:	Jiri Slaby <jirislaby@kernel.org>
+ S:	Maintained
+-- 
+2.31.1
+
