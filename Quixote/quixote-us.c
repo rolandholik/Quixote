@@ -1766,9 +1766,9 @@ static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int fd)
 		}
 
 		if ( Debug )
-			fprintf(Debug, "Events: %d, Data poll=%0x, "	\
-				"Mgmt poll=%0x\n", retn,		\
-				poll_data[0].revents, poll_data[1].revents);
+			fprintf(Debug, "Poll retn=%d, Data poll=%0x, "	     \
+				"Mgmt poll=%0x\n", rc, poll_data[0].revents, \
+				poll_data[1].revents);
 
 		if ( poll_data[0].revents & POLLHUP ) {
 			if ( Signals.stop ) {
