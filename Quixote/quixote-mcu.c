@@ -1310,7 +1310,7 @@ extern int main(int argc, char *argv[])
 	TTYduct Duct = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "CPSec:d:m:t:")) != EOF )
+	while ( (opt = getopt(argc, argv, "CPSec:d:m:s:")) != EOF )
 		switch ( opt ) {
 			case 'C':
 				Mode = cartridge_mode;
@@ -1334,7 +1334,7 @@ extern int main(int argc, char *argv[])
 			case 'm':
 				map = optarg;
 				break;
-			case 't':
+			case 's':
 				device = optarg;
 				break;
 		}
