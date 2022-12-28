@@ -16,7 +16,7 @@ endif
 # Definitions for building libcap.
 LIBCAP_VERSION = 2.66
 LIBCAP_FILE    = libcap-${LIBCAP_VERSION}.tar.gz
-LIBCAP_URL     = https://www.kernel.org/pub/linux/libs/security/linux-privs/libcap2/${LIBCAP_FILE}
+LIBCAP_URL     = https://mirrors.edge.kernel.org/pub/linux/libs/security/linux-privs/libcap2/${LIBCAP_FILE}
 LIBCAP_TAR     = Build/${LIBCAP_FILE}
 
 ifeq ("${KERNEL_VERSION}","5.4")
