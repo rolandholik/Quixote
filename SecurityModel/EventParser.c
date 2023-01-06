@@ -314,23 +314,23 @@ static _Bool _get_key(CO(EventParser_State, S), CO(char *, key))
  */
 
 static _Bool get_integer(CO(EventParser, this), CO(char *, key), \
-			 long int *vp)
+			 long long int *vp)
 
 {
 	STATE(S);
 
 	_Bool retn = false;
 
-	long int value;
+	long long int value;
 
 
 	if ( key != NULL ) {
 		if ( !_get_key(S, key) )
 			ERR(goto done);
-		value = strtol(S->key_value->get(S->key_value), NULL, 0);
+		value = strtoll(S->key_value->get(S->key_value), NULL, 0);
 	}
 	else
-		value = strtol(S->field->get(S->field), NULL, 0);
+		value = strtoll(S->field->get(S->field), NULL, 0);
 
 	if ( errno == ERANGE)
 		ERR(goto done);

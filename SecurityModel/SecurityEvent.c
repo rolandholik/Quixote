@@ -252,7 +252,7 @@ static _Bool _parse_pid(CO(SecurityEvent_State, S), CO(EventParser, parser), \
 {
 	_Bool retn = false;
 
-	long int vl;
+	long long int vl;
 
 
 	/* Verify that a pid field is present. */
@@ -267,10 +267,10 @@ static _Bool _parse_pid(CO(SecurityEvent_State, S), CO(EventParser, parser), \
 		ERR(goto done);
 	if ( !parser->get_integer(parser, NULL, &vl) )
 		ERR(goto done);
-	if ( vl > UINT32_MAX )
+	if ( (unsigned long long int) vl > UINT32_MAX )
 		ERR(goto done);
 
-	S->pid = vl;
+	S->pid = (uint32_t) vl;
 	retn = true;
 
 

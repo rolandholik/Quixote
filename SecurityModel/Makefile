@@ -96,7 +96,7 @@ all: ${COBJS} tools
 
 tools: ${TOOLS}
 
-test-COE: test-COE.o COE.o
+test-COE: test-COE.o COE.o EventParser.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 test-cell: test-cell.o Cell.o
@@ -113,7 +113,7 @@ test-TSEM: test-TSEM.o TSEM.o SecurityPoint.o SecurityEvent.o COE.o Cell.o \
 generate-states: generate-states.o SecurityEvent.o EventParser.o COE.o Cell.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
-compute-measurement: compute-measurement.o COE.o Cell.o
+compute-measurement: compute-measurement.o COE.o Cell.o EventParser.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 compute-aggregate: compute-aggregate.o

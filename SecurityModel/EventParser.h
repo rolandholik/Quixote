@@ -28,7 +28,7 @@ struct NAAAIM_EventParser
 	_Bool (*extract_field)(const EventParser, const String, const char *);
 
 	_Bool (*get_field)(const EventParser, const String);
-	_Bool (*get_integer)(const EventParser, const char *, long int *);
+	_Bool (*get_integer)(const EventParser, const char *, long long int *);
 	_Bool (*get_text)(const EventParser, const char *, const String);
 
 	void (*print)(const EventParser);

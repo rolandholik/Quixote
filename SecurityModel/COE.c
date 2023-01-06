@@ -18,7 +18,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
-#include <regex.h>
 #include <errno.h>
 
 #include <Origin.h>
@@ -29,6 +28,7 @@
 #include "NAAAIM.h"
 #include "SHA256.h"
 #include "COE.h"
+#include "EventParser.h"
 
 #if !defined(REG_OK)
 #define REG_OK REG_NOERROR
@@ -46,28 +46,6 @@
 #if !defined(NAAAIM_COE_OBJID)
 #error Object identifier not defined.
 #endif
-
-
-/** Variable to indicate the parsing expressions have been compiled. */
-static _Bool Regex_compiled = false;
-
-/** Array of field descriptions and compiled regular expressions. */
-static struct regex_description {
-	char *fd;
-	regex_t regex;
-} Fields[11] = {
-	{.fd="COE\\{[^}]*\\}"},
-	{.fd="uid=([^,]*)"},
-	{.fd="euid=([^,]*)"},
-	{.fd="suid=([^,]*)"},
-	{.fd="gid=([^,]*)"},
-	{.fd="egid=([^,]*)"},
-	{.fd="sgid=([^,]*)"},
-	{.fd="fsuid=([^,]*)"},
-	{.fd="fsgid=([^,]*)"},
-	{.fd="cap=([^}]*)"},
-	{.fd=NULL}
-};
 
 
 /* COE identity elements. */
@@ -177,56 +155,39 @@ static void set_characteristics(CO(COE, this), const uint32_t uid,	     \
 /**
  * Internal private function.
  *
- * This method parses a single numeric entry specified by a regular
- * expression and returns the integer value of the field arguement.
+ * This method extracts a single numeric value from the COE description.
  *
- * \param regex	A regular expression which extracts the desired
- *		field.
+ * \param parser	The parser object used to extract the field
+ *			description.
  *
- * \param field	A character pointer to the field which is to be
- *		parsed.
+ * \param field		The description of the field parameter to extract.
  *
- * \param value	A pointer to the variable which will be loaded with
- *		the parsed value.
+ * \param value		A pointer to the variable which will be loaded
+ *			with the parsed value.
  *
  * \return	A boolean value is used to indicate the success or
- *		failure of the field extraction.  A false value is
- *		used to indicate a failure occurred during the field
- *		entry extraction.  A true value indicates the
- *		field has been successfully extracted and the value
- *		variable contains a legitimate value.
+ *		failure of extraction of the value.  A false value is
+ *		used to indicate a failure occurred during the
+ *		extraction.  A true value indicates the value has
+ *		been successfully extracted and contains a legitimate
+ *		value.
  */
 
-static _Bool _get_field(regex_t *regex, CO(char *, field), uint32_t *value)
+static _Bool _get_field(CO(EventParser, parser), CO(char *, field), \
+			uint32_t *value)
 
 {
 	_Bool retn = false;
 
-	char match[32];
-
-	long int vl;
-
-	size_t len;
-
-	regmatch_t regmatch[2];
+	long long int vl;
 
 
-	if ( regexec(regex, field, 2, regmatch, 0) != REG_OK )
+	if ( !parser->get_integer(parser, field, &vl) )
+		ERR(goto done);
+	if ( (unsigned long long int) vl > UINT32_MAX )
 		ERR(goto done);
 
-	len = regmatch[1].rm_eo - regmatch[1].rm_so;
-	if ( len > sizeof(match) )
-		ERR(goto done);
-	memset(match, '\0', sizeof(match));
-	memcpy(match, field + regmatch[1].rm_so, len);
-
-	vl = strtol(match, NULL, 0);
-	if ( errno == ERANGE )
-		ERR(goto done);
-	if ( vl > UINT32_MAX )
-		ERR(goto done);
-
-	*value = vl;
+	*value = (uint32_t) vl;
 	retn = true;
 
 
@@ -238,57 +199,38 @@ static _Bool _get_field(regex_t *regex, CO(char *, field), uint32_t *value)
 /**
  * Internal private function.
  *
- * This method parses the capability entry from the coe definition
+ * This method parses the capability entry from the COE definition
  * field.  This is special cased since the capability field is a
  * 64-bit entry.
  *
- * \param regex	A regular expression which extracts the desired
- *		field.
+ * \param parser	The object that contains the field description
+ *			to be parsed.
  *
- * \param field	A character pointer to the field which is to be
- *		parsed.
+ * \param field		A character pointer to the event field that
+ *			is to be extracted.
  *
- * \param value	A pointer to the variable which will be loaded with
- *		the parsed value.
+ * \param value		A pointer to the variable that will be loaded
+ *			with the capability value.
  *
  * \return	A boolean value is used to indicate the success or
- *		failure of the field extraction.  A false value is
- *		used to indicate a failure occurred during the field
- *		entry extraction.  A true value indicates the
- *		field has been successfully extracted and the value
- *		variable contains a legitimate value.
+ *		failure of the capability extraction.  A false value is
+ *		used to indicate a failure while a true value indicates
+ *		the field entry has been successfully extracted.
  */
 
-static _Bool _get_caps(regex_t *regex, CO(char *, field), uint64_t *value)
+static _Bool _get_caps(CO(EventParser, parser), CO(char *, field), \
+		       uint64_t *value)
 
 {
 	_Bool retn = false;
 
-	char match[32];
-
 	long long int vl;
 
-	size_t len;
 
-	regmatch_t regmatch[2];
-
-
-	if ( regexec(regex, field, 2, regmatch, 0) != REG_OK )
+	if ( !parser->get_integer(parser, field, &vl) )
 		ERR(goto done);
 
-	len = regmatch[1].rm_eo - regmatch[1].rm_so;
-	if ( len > sizeof(match) )
-		ERR(goto done);
-	memset(match, '\0', sizeof(match));
-	memcpy(match, field + regmatch[1].rm_so, len);
-
-	vl = strtoll(match, NULL, 16);
-	if ( errno == ERANGE )
-		ERR(goto done);
-	if ( vl > UINT64_MAX )
-		ERR(goto done);
-
-	*value = vl;
+	*value = (uint64_t) vl;
 	retn = true;
 
 
@@ -323,13 +265,7 @@ static _Bool parse(CO(COE, this), CO(String, entry))
 
 	_Bool retn = false;
 
-	unsigned int cnt;
-
-	char *fp;
-
-	regmatch_t regmatch;
-
-	Buffer field = NULL;
+	EventParser parser = NULL;
 
 
 	/* Verify object and caller state. */
@@ -339,57 +275,38 @@ static _Bool parse(CO(COE, this), CO(String, entry))
 		ERR(goto done);
 
 
-	/* Compile the regular expressions once. */
-	if ( !Regex_compiled ) {
-		for (cnt= 0; Fields[cnt].fd != NULL; ++cnt) {
-			if ( regcomp(&Fields[cnt].regex, Fields[cnt].fd, \
-				     REG_EXTENDED) != 0 )
-				ERR(goto done);
-		}
-	}
-	Regex_compiled = true;
-
-
 	/* Extract coe field. */
-	INIT(HurdLib, Buffer, field, ERR(goto done));
-
-	fp = entry->get(entry);
-	if ( regexec(&Fields[0].regex, fp, 1, &regmatch, 0) != REG_OK )
-		ERR(goto done);
-
-	field->add(field, (unsigned char *) (fp + regmatch.rm_so),
-		   regmatch.rm_eo-regmatch.rm_so);
-	if ( !field->add(field, (unsigned char *) "\0", 1) )
+	INIT(NAAAIM, EventParser, parser, ERR(goto done));
+	if ( !parser->extract_field(parser, entry, "COE") )
 		ERR(goto done);
 
 
 	/* Parse field entries. */
-	fp = (char *) field->get(field);
-	if ( !_get_field(&Fields[1].regex, fp, &S->character.uid) )
+	if ( !_get_field(parser, "uid", &S->character.uid) )
 		ERR(goto done);
 
-	if ( !_get_field(&Fields[2].regex, fp, &S->character.euid) )
+	if ( !_get_field(parser, "euid", &S->character.euid) )
 		ERR(goto done);
 
-	if ( !_get_field(&Fields[3].regex, fp, &S->character.suid) )
+	if ( !_get_field(parser, "suid", &S->character.suid) )
 		ERR(goto done);
 
-	if ( !_get_field(&Fields[4].regex, fp, &S->character.gid) )
+	if ( !_get_field(parser, "gid", &S->character.gid) )
 		ERR(goto done);
 
-	if ( !_get_field(&Fields[5].regex, fp, &S->character.egid) )
+	if ( !_get_field(parser, "egid", &S->character.egid) )
 		ERR(goto done);
 
-	if ( !_get_field(&Fields[6].regex, fp, &S->character.sgid) )
+	if ( !_get_field(parser, "sgid", &S->character.sgid) )
 		ERR(goto done);
 
-	if ( !_get_field(&Fields[7].regex, fp, &S->character.fsuid) )
+	if ( !_get_field(parser, "fsuid", &S->character.fsuid) )
 		ERR(goto done);
 
-	if ( !_get_field(&Fields[8].regex, fp, &S->character.fsgid) )
+	if ( !_get_field(parser, "fsgid", &S->character.fsgid) )
 		ERR(goto done);
 
-	if ( !_get_caps(&Fields[9].regex, fp, &S->character.capability) )
+	if ( !_get_caps(parser, "cap", &S->character.capability) )
 		ERR(goto done);
 
 	retn = true;
@@ -399,7 +316,7 @@ static _Bool parse(CO(COE, this), CO(String, entry))
 	if ( !retn )
 		S->poisoned = true;
 
-	WHACK(field);
+	WHACK(parser);
 
 	return retn;
 }
