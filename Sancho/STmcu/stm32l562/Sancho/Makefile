@@ -42,8 +42,8 @@ STMSRC = stm32l5xx_hal_msp.c stm32l5xx_it.c system_stm32l5xx.c syscalls.c    \
 	stm32l5xx_hal_cortex.c stm32l5xx_hal_exti.c
 
 APPSRC = sancho.c sancho-interpreter.c TTYduct.c COE.c Cell.c SecurityEvent.c \
-	SecurityPoint.c EventModel.c TSEM.c regcomp.c regexec.c regerror.c    \
-	tre-mem.c reg-support.c
+	SecurityPoint.c EventModel.c EventParser.c TSEM.c regcomp.c	      \
+	regexec.c regerror.c  tre-mem.c reg-support.c
 
 CSRC = syscalls.c sysmem.c board_interrupts.c ${STMSRC} ${APPSRC}
 

@@ -24,7 +24,7 @@ DEFINES = -DMBEDTLS_CONFIG_FILE=\"mbedtls_config.h\"
 #
 CSRC = sancho_main.c sancho-interpreter.c regcomp.c regexec.c regerror.c \
 	tre-mem.c reg-support.c XENduct.c COE.c Cell.c SecurityEvent.c	 \
-	SecurityPoint.c TSEM.c EventModel.c
+	SecurityPoint.c TSEM.c EventModel.c EventParser.c
 
 COBJS = ${CSRC:.c=.o}
 

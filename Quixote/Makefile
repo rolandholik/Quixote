@@ -98,7 +98,8 @@ XENLIBS = ${shell pkg-config --libs xenstore}  \
 
 MODELDEPS = ../SecurityModel/COE.o ../SecurityModel/Cell.o		  \
 	../SecurityModel/SecurityPoint.o ../SecurityModel/SecurityEvent.o \
-	../SecurityModel/TSEM.o ../SecurityModel/EventModel.o
+	../SecurityModel/TSEM.o ../SecurityModel/EventModel.o		  \
+	../SecurityModel/EventParser.o
 
 CFLAGS := ${CFLAGS} -I .. -I ../SecurityModel -I ../lib -I ../HurdLib \
 	-I ${SGXDIR} -I ${SANCHOSGX}

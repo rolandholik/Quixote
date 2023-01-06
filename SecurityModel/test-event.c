@@ -12,7 +12,7 @@
  **************************************************************************/
 
 /* Local defines. */
-#define EVENT "event{process=quixote, filename=/opt/Quixote/sbin/runc, type=file_open, task_id=0000000000000000000000000000000000000000000000000000000000000000} COE{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=0x7fffffffff} file{flags=32800, uid=2, gid=2, mode=0100755, name_length=22, name=b8da9ede1695639ab938d2ec41ce11a6156eb6af1b2506b5c6c92d1836d99ffd, s_id=xvda, s_uuid=feadbeaffeadbeaffeadbeaffeadbeaf, digest=7c1a43eb99fa739056d6554001d450ca1c9c184ca7e2d8a785bd1e5fd53bad8c}"
+#define EVENT "event{process=quixote, filename=/bin/bash-3.2.57, type=file_open, task_id=0000000000000000000000000000000000000000000000000000000000000000} COE{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=0x3ffffffffff} file{flags=32800, uid=0, gid=0, mode=0100755, name_length=16, name=b580cfcfd5888533f011c73e863c3c2c2b2cd5c32839a66be5065118a6293f6e, s_magic=0xef53, s_id=xvda, s_uuid=feadbeaffeadbeaffeadbeaffeadbeaf, digest=575c788d39f3bc837fcfd9c083af5667ed82852b1e10f07e0db8d91988b22008}"
 
 
 /* Include files. */

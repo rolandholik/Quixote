@@ -25,7 +25,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include <regex.h>
 #include <string.h>
 #include <errno.h>
 #include <sys/types.h>
@@ -39,6 +38,7 @@
 
 #include "NAAAIM.h"
 #include "SHA256.h"
+#include "EventParser.h"
 #include "SecurityEvent.h"
 #include "COE.h"
 #include "Cell.h"
@@ -60,21 +60,6 @@
 #error Object identifier not defined.
 #endif
 
-
-/** Variable to indicate the parsing expressions have been compiled. */
-static _Bool Regex_compiled = false;
-
-/** Array of field descriptions and compiled regular expressions. */
-static struct regex_description {
-	char *fd;
-	regex_t regex;
-} Fields[] = {
-	{.fd="event\\{([^}]*)\\}"},
-	{.fd="pid\\{([^}]*)\\}"},
-	{.fd="type=([^,]*)"},
-	{.fd="task_id=([^}]*)"},
-	{.fd=NULL}
-};
 
 /* Names of TSEM events. */
 static const char *TSEM_name[] = {
@@ -247,57 +232,47 @@ static void _init_state(CO(SecurityEvent_State, S))
  * Where NN is the numeric identifier of the process which executed
  * the information interaction event.
  *
- * \param S	A pointer to the state information for the information
- *		interaction event.
+ * \param S		A pointer to the state information for the
+ *			information event.
  *
- * \param regex	A pointer to the compiled regular expression that will
- *		extract the process id.
+ * \param parser	A pointer to the compiled regular expression that
+ *			will extract the process id.
  *
- * \param event	The object containing the event.
+ * \param event		The object containing the event.
  *
  * \return	A boolean value is used to indicate the success or
- *		failure of parsing the event definition.  A false
- *		value indicates the parsing failed and the object.
- *		A true value indicates the object has been successfully
- *		populated.
+ *		failure of parsing the pid.  A false value indicates
+ *		the parsing failed. A true value indicates the pid
+ *		has been successfuly parsed.
  */
 
-static _Bool _parse_pid(CO(SecurityEvent_State, S), regex_t *regex, \
+static _Bool _parse_pid(CO(SecurityEvent_State, S), CO(EventParser, parser), \
 			CO(String, event))
 
 {
 	_Bool retn = false;
 
-	char *fp,
-	     match[11];
-
 	long int vl;
 
-	size_t len;
 
-	regmatch_t regmatch[2];
-
-
-	fp = event->get(event);
-	if ( regexec(regex, fp, 2, regmatch, 0) == REG_NOMATCH ) {
+	/* Verify that a pid field is present. */
+	if ( strstr(event->get(event), "pid{") == NULL ) {
 		retn = true;
 		goto done;
 	}
 
-	len = regmatch[1].rm_eo - regmatch[1].rm_so;
-	if ( len > sizeof(match) )
-		ERR(goto done);
-	memset(match, '\0', sizeof(match));
-	memcpy(match, fp + regmatch[1].rm_so, len);
 
-	vl = strtol(match, NULL, 0);
-	if ( errno == ERANGE )
+	/* Extract and verify the pid. */
+	if ( !parser->extract_field(parser, event, "pid") )
+		ERR(goto done);
+	if ( !parser->get_integer(parser, NULL, &vl) )
 		ERR(goto done);
 	if ( vl > UINT32_MAX )
 		ERR(goto done);
 
 	S->pid = vl;
 	retn = true;
+
 
  done:
 	return retn;
@@ -314,93 +289,62 @@ static _Bool _parse_pid(CO(SecurityEvent_State, S), regex_t *regex, \
  *	event{proc=process_name, path=pathname, pid=PID, task_id=HEXID}
  *
  *
- * \param S	A pointer to the state information for the information
- *		interaction event.
+ * \param S		A pointer to the state information for the
+ *			security event description.
  *
- * \param regex	A pointer to the compiled regular expression that will
- *		extract the process id.
+ * \param parser	A pointer to the object that will be used to
+ *			parse the process id.
  *
- * \param event	The object containing the event.
+ * \param event		The object containing the security event
+ *			description.
  *
  * \return	A boolean value is used to indicate the success or
- *		failure of parsing the event definition.  A false
+ *		failure of parsing the security event definition.  A false
  *		value indicates the parsing failed and the object.
  *		A true value indicates the object has been successfully
  *		populated.
  */
 
-static _Bool _parse_event(CO(SecurityEvent_State, S), regex_t *regex, \
-			  CO(String, event))
+static _Bool _parse_event(CO(SecurityEvent_State, S), \
+			  CO(EventParser, parser), CO(String, event))
 
 {
 	_Bool retn = false;
 
-	char *fp,
-	     bufr[2];
-
 	unsigned int lp;
 
-	size_t len;
-
-	regmatch_t regmatch[2];
+	String str = NULL;
 
 
-	/* Extract the field itself. */
-	fp = event->get(event);
-	if ( regexec(regex, fp, 2, regmatch, 0) != REG_OK )
+	/* Extract the event field itself. */
+	if ( !parser->extract_field(parser, event, "event") )
 		ERR(goto done);
-
-	fp += regmatch[1].rm_so;
-	len = regmatch[1].rm_eo - regmatch[1].rm_so;
-	bufr[1] = '\0';
-
-	for (lp= 0; lp < len; ++lp) {
-		bufr[0] = *fp;
-		S->event->add(S->event, bufr);
-		++fp;
-	}
-	if ( S->event->poisoned(S->event) )
+	if ( !parser->get_field(parser, S->event) )
 		ERR(goto done);
 
 	/* Then the numeric event type. */
-	fp = S->event->get(S->event);
-	if ( regexec(&Fields[2].regex, fp, 2, regmatch, 0) != REG_OK )
+	INIT(HurdLib, String, str, ERR(goto done));
+	if ( !parser->get_text(parser, "type", str) )
 		ERR(goto done);
 
-	fp += regmatch[1].rm_so;
-	len = regmatch[1].rm_eo - regmatch[1].rm_so;
-
 	for (lp= 0; TSEM_name[lp] != NULL; ++lp) {
-		if ( strlen(TSEM_name[lp]) != len )
-		     continue;
-		if ( strncmp(TSEM_name[lp], fp, len) == 0 ) {
+		if ( strcmp(TSEM_name[lp], str->get(str)) == 0 ) {
 			S->type = lp;
 			break;
 		}
 	}
 
+	if ( S->type == TSEM_UNDEFINED )
+		ERR(goto done);
+
 	/* Parse the task id. */
-	fp = S->event->get(S->event);
-	if ( regexec(&Fields[3].regex, fp, 2, regmatch, 0) != REG_OK )
+	if ( !parser->get_text(parser, "task_id", S->task_id) )
 		ERR(goto done);
-
-	fp += regmatch[1].rm_so;
-	len = regmatch[1].rm_eo - regmatch[1].rm_so;
-	bufr[1] = '\0';
-
-	for (lp= 0; lp < len; ++lp) {
-		bufr[0] = *fp;
-		S->task_id->add(S->task_id, bufr);
-		++fp;
-	}
-	if ( S->task_id->poisoned(S->task_id) )
-		ERR(goto done);
-
 	retn = true;
 
 
  done:
-	memset(bufr, '\0', sizeof(bufr));
+	WHACK(str);
 
 	return retn;
 }
@@ -409,9 +353,9 @@ static _Bool _parse_event(CO(SecurityEvent_State, S), regex_t *regex, \
 /**
  * External public method.
  *
- * This method the parsing of an information interaction event in ASCII
- * form.  This method uses the COE and Cell objects to parse and aggregate
- * those components of the event.
+ * This method implements the parsing of an information interaction
+ * event in ASCII form.  The COE and Cell objects to parse and
+ * aggregate those components of the event.
  *
  * \param this	A pointer to the security interaction event object which
  *		is to be parsed.
@@ -430,9 +374,9 @@ static _Bool parse(CO(SecurityEvent, this), CO(String, event))
 {
 	STATE(S);
 
-	unsigned int cnt;
-
 	_Bool retn = false;
+
+	EventParser parser = NULL;
 
 
 	/* Verify object and event state. */
@@ -442,22 +386,14 @@ static _Bool parse(CO(SecurityEvent, this), CO(String, event))
 		ERR(goto done);
 
 
-	/* Compile the regular expressions once. */
-	if ( !Regex_compiled ) {
-		for (cnt= 0; Fields[cnt].fd != NULL; ++cnt) {
-			if ( regcomp(&Fields[cnt].regex, Fields[cnt].fd, \
-				     REG_EXTENDED) != 0 )
-				ERR(goto done);
-		}
-	}
-	Regex_compiled = true;
-
 	/* Parse the event definition. */
-	if ( !_parse_event(S, &Fields[0].regex, event) )
+	INIT(NAAAIM, EventParser, parser, ERR(goto done));
+	if ( !_parse_event(S, parser, event) )
 		ERR(goto done);
 
 	/* Parse the process id. */
-	if ( !_parse_pid(S, &Fields[1].regex, event) )
+	parser->reset(parser);
+	if ( !_parse_pid(S, parser, event) )
 		ERR(goto done);
 
 	/* Parse the COE and Cell components. */
@@ -470,6 +406,8 @@ static _Bool parse(CO(SecurityEvent, this), CO(String, event))
 
 
  done:
+	WHACK(parser);
+
 	if ( !retn )
 		S->poisoned = true;
 

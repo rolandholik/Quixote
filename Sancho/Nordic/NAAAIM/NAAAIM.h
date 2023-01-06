@@ -30,3 +30,4 @@
 #define NAAAIM_TSEM_OBJID		49
 #define NAAAIM_SecurityPoint_OBJID	50
 #define NAAAIM_EventModel_OBJID		51
+#define NAAAIM_EventParser_OBJID	52

@@ -19,7 +19,8 @@ INSTPATH       = ${DESTDIR}/opt/Quixote
 SANCHODIR = ../Sancho/SGX
 
 CSRC = COE.c Cell.c SecurityEvent.c SecurityPoint.c TSEM.c EventModel.c \
-	compute-aggregate.c generate-pseudonym.c generate-states.c
+	EventParser.c compute-aggregate.c generate-pseudonym.c		\
+	generate-states.c
 
 TOOLS = test-COE test-cell test-event generate-states sha-tool		\
 	compute-measurement set-behavior test-TSEM compute-aggregate	\
@@ -101,14 +102,15 @@ test-COE: test-COE.o COE.o
 test-cell: test-cell.o Cell.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
-test-event: test-event.o SecurityEvent.o COE.o Cell.o EventModel.o
+test-event: test-event.o SecurityEvent.o COE.o Cell.o EventModel.o \
+	EventParser.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 test-TSEM: test-TSEM.o TSEM.o SecurityPoint.o SecurityEvent.o COE.o Cell.o \
-	EventModel.o
+	EventModel.o EventParser.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
-generate-states: generate-states.o SecurityEvent.o COE.o Cell.o
+generate-states: generate-states.o SecurityEvent.o EventParser.o COE.o Cell.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 compute-measurement: compute-measurement.o COE.o Cell.o
@@ -159,6 +161,7 @@ SecurityPoint.o: SecurityPoint.h
 SecurityEvent.o: SecurityEvent.h
 TSEM.o: TSEM.h
 EventModel.o: EventModel.h SecurityEvent.h
+EventParser.o: EventParser.h
 
 # SRDEmetadata.o: SGX.h SRDEmetadata.h
 # SRDEloader.o: SRDE.h SRDEloader.h

@@ -75,7 +75,7 @@ NORDICSRC = system_nrf52840.c nrfx_clock.c				 \
 
 APPSRC = sancho.c sancho-interpreter.c regcomp.c regexec.c regerror.c  \
 	tre-mem.c reg-support.c TTYduct.c COE.c Cell.c SecurityEvent.c \
-	SecurityPoint.c TSEM.c EventModel.c
+	SecurityPoint.c TSEM.c EventModel.c EventParser.c
 
 CSRC = ${NORDICSRC} ${APPSRC}
 ASRC = gcc_startup_nrf52840.S
