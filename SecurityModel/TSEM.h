@@ -57,6 +57,7 @@ struct NAAAIM_TSEM
 	void (*dump_points)(const TSEM);
 	void (*dump_forensics)(const TSEM);
 
+	void (*disable_logging)(const TSEM);
 	void (*seal)(const TSEM);
 	void (*whack)(const TSEM);
 

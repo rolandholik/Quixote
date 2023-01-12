@@ -108,6 +108,9 @@ struct NAAAIM_TSEM_State
 	/* Flag to indicate the measurement domain has been sealed. */
 	_Bool sealed;
 
+	/* Flag to indicate security event descriptions are logged. */
+	_Bool logging;
+
 	/* Process identifier to be disciplined. */
 	pid_t discipline_pid;
 
@@ -162,6 +165,7 @@ static void _init_state(CO(TSEM_State, S))
 	S->have_aggregate = false;
 	S->loading	  = false;
 	S->sealed	  = false;
+	S->logging	  = true;
 
 	S->discipline_pid = 0;
 
@@ -419,8 +423,10 @@ static _Bool update(CO(TSEM, this), CO(SecurityEvent, event), _Bool *status, \
 	else
 		list = S->trajectory;
 
-	if ( !GADD(list, event) )
-		ERR(goto done);
+	if ( S->logging ) {
+		if ( !GADD(list, event) )
+			ERR(goto done);
+	}
 
 	retn  = true;
 	added = true;
@@ -1669,6 +1675,26 @@ static void dump_points(CO(TSEM, this))
 /**
  * External public method.
  *
+ * This method implements disabling of the tracking of execution trajectory
+ * events.  Limited memory models such as the SanchoMCU implemenetations
+ * may not have sufficient memory to store the events.
+ *
+ * \param this	A pointer to the object for which event tracking is to
+ *		be disabled.
+ *
+ */
+
+static void disable_logging(CO(TSEM, this))
+
+{
+	this->state->logging = false;
+	return;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements sealing the behavioral model in its current
  * state.  Sealing the model implies that any additional events which
  * are not in the behavioral map constitute forensic violations for
@@ -1797,8 +1823,9 @@ extern TSEM NAAAIM_TSEM_Init(void)
 	this->dump_points  = dump_points;
 	this->dump_forensics = dump_forensics;
 
-	this->seal  = seal;
-	this->whack = whack;
+	this->disable_logging = disable_logging;
+	this->seal	      = seal;
+	this->whack	      = whack;
 
 	return this;
 
