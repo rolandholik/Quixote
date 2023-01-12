@@ -900,6 +900,13 @@ static _Bool add_TSEM_event(CO(TSEM, this), CO(String, event))
 	if ( event->poisoned(event) )
 		ERR(goto done);
 
+	/* Skip saving of an event violation if logging is not enabled. */
+	if ( !S->logging ) {
+		retn = true;
+		goto done;
+	}
+
+	/* Log the security violation. */
 	if ( !GADD(S->TE_events, event) )
 		ERR(goto done);
 	retn = true;
