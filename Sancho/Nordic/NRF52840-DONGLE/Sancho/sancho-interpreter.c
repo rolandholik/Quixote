@@ -155,8 +155,7 @@ static void add_event(CO(TTYduct, duct), CO(TSEM, model), CO(Buffer, bufr))
 
  done:
 	WHACK(update);
-	if ( !updated )
-		WHACK(event);
+	WHACK(event);
 
 	return;
 }
@@ -604,6 +603,7 @@ extern void sancho_interpreter(const TTYduct duct)
 
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 	INIT(NAAAIM, TSEM, model, ERR(goto done));
+	model->disable_logging(model);
 
 	while ( connected ) {
 		__WFE();
