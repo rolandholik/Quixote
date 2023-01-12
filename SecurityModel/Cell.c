@@ -1,8 +1,8 @@
 /** \file
  * This file contains the implementation of an object which represents
- * a cell (data sync or source) in the Turing event modeling system.
+ * a CELL (data sync or source) in Trusted Security Event Modeling system.
  * The purpose of this object is to consolidate all of the characteristics
- * of a cell for the purposes of computing its value.
+ * of a CELL for the purposes of computing its value.
  */
 
 /**************************************************************************
@@ -36,6 +36,7 @@
 
 #include "NAAAIM.h"
 #include "SHA256.h"
+#include "EventParser.h"
 #include "Cell.h"
 
 #if !defined(REG_OK)
@@ -56,94 +57,12 @@
 #endif
 
 
-/** Variable to indicate the parsing expressions have been compiled. */
-static _Bool File_Fields_compiled	    = false;
-static _Bool Mmap_Fields_compiled	    = false;
-static _Bool Socket_Create_Fields_compiled  = false;
-static _Bool Socket_Fields_compiled	    = false;
-static _Bool Socket_Accept_Fields_compiled  = false;
-static _Bool Task_Kill_Fields_compiled	    = false;
-static _Bool Generic_Event_Fields_compiled  = false;
-
 /** Cell value for a generic security event. */
 const char generic_cell[NAAAIM_IDSIZE] = {
 	0x61, 0x87, 0x8a, 0xe5, 0x8a, 0x7c, 0x22, 0xb4,
 	0xea, 0xb9, 0x32, 0xed, 0x3f, 0xdf, 0x34, 0x54,
 	0x39, 0x9b, 0xeb, 0x48, 0xd7, 0x44, 0xa7, 0x0e,
 	0xab, 0x80, 0xc1, 0xd1, 0x99, 0xd8, 0x69, 0xc8
-};
-
-/** Array of field descriptions and compiled regular expressions. */
-struct regex_description {
-	char *fd;
-	regex_t regex;
-};
-
-struct regex_description File_Fields[] = {
-	{.fd = " file\\{[^}]*\\}"},
-	{.fd = "flags=([^,]*),"},
-	{.fd = "uid=([^,]*)"},
-	{.fd = "gid=([^,]*)"},
-	{.fd = "mode=([^,]*)"},
-	{.fd = "name_length=([^,]*)"},
-	{.fd = "name=([^,]*)"},
-	{.fd = "s_magic=([^,]*)"},
-	{.fd = "s_id=([^,]*)"},
-	{.fd = "s_uuid=([^,]*)"},
-	{.fd = "digest=([^}]*)"},
-	{.fd = NULL}
-};
-
-struct regex_description Mmap_Fields[6] = {
-	{.fd = "mmap_file\\{[^}]*\\}"},
-	{.fd = "type=([^,]*)"},
-	{.fd = "reqprot=([^,]*)"},
-	{.fd =" prot=([^,]*)"},
-	{.fd = "flags=([^}]*)\\}"},
-	{.fd = NULL}
-};
-
-struct regex_description Socket_Create_Fields[10] = {
-	{.fd="socket_create\\{[^}]*\\}"},
-	{.fd="family=([^,]*)"},
-	{.fd="type=([^,]*)"},
-	{.fd="protocol=([^,]*)"},
-	{.fd="kern=([^}]*)"},
-	{.fd=NULL}
-};
-
-struct regex_description Socket_Fields[8] = {
-	{.fd="socket_connect\\{[^}]*\\}"},
-	{.fd="socket_bind\\{[^}]*\\}"},
-	{.fd="family=([^,]*)"},
-	{.fd="port=([^,]*)"},
-	{.fd="flow=([^,]*)"},
-	{.fd="scope=([^,]*)"},
-	{.fd="addr=([^}]*)"},
-	{.fd=NULL}
-};
-
-struct regex_description Socket_Accept_Fields[] = {
-	{.fd = "socket_accept\\{[^}]*\\}"},
-	{.fd = "family=([^,]*)"},
-	{.fd = "type=([^,]*)"},
-	{.fd = "port=([^,]*)"},
-	{.fd = "addr=([^}]*)"},
-	{.fd = NULL}
-};
-
-struct regex_description Task_Kill_Fields[] = {
-	{.fd = "task_kill\\{[^}]*\\}"},
-	{.fd = "cross=([^,]*,)"},
-	{.fd = "signal=([^,]*,)"},
-	{.fd = "target=([^}]*)\\}"},
-	{.fd = NULL}
-};
-
-struct regex_description Generic_Event_Fields[] = {
-	{.fd = "generic_event\\{[^}]*\\}"},
-	{.fd = "type=([^}]*)}"},
-	{.fd = NULL}
 };
 
 
@@ -167,7 +86,7 @@ struct file_parameters {
 
 /* File mmap parameters. */
 struct mmap_file_parameters {
-	unsigned int anonymous;
+	uint32_t anonymous;
 	uint32_t reqprot;
 	uint32_t prot;
 	uint32_t flags;
@@ -288,56 +207,39 @@ static void _init_state(CO(Cell_State, S))
 /**
  * Internal private function.
  *
- * This method parses a single numeric entry specified by a regular
- * expression and returns the integer value of the field arguement.
+ * This method extracts a single numeric value from the COE description.
  *
- * \param regex	A regular expression which extracts the desired
- *		field.
+ * \param parser	The parser object used to extract the field
+ *			description.
  *
- * \param field	A character pointer to the field which is to be
- *		parsed.
+ * \param field		The description of the field parameter to extract.
  *
- * \param value	A pointer to the variable which will be loaded with
- *		the parsed value.
+ * \param value		A pointer to the variable which will be loaded
+ *			with the parsed value.
  *
  * \return	A boolean value is used to indicate the success or
- *		failure of the field extraction.  A false value is
- *		used to indicate a failure occurred during the field
- *		entry extraction.  A true value indicates the
- *		field has been successfully extracted and the value
- *		variable contains a legitimate value.
+ *		failure of extraction of the value.  A false value is
+ *		used to indicate a failure occurred during the
+ *		extraction.  A true value indicates the value has
+ *		been successfully extracted and contains a legitimate
+ *		value.
  */
 
-static _Bool _get_field(regex_t *regex, CO(char *, field), uint32_t *value)
+static _Bool _get_field(CO(EventParser, parser), CO(char *, field), \
+			uint32_t *value)
 
 {
 	_Bool retn = false;
 
-	char match[32];
-
-	long int vl;
-
-	size_t len;
-
-	regmatch_t regmatch[2];
+	long long int vl;
 
 
-	if ( regexec(regex, field, 2, regmatch, 0) != REG_OK )
+	if ( !parser->get_integer(parser, field, &vl) )
+		ERR(goto done);
+	if ( (unsigned long long int) vl > UINT32_MAX )
 		ERR(goto done);
 
-	len = regmatch[1].rm_eo - regmatch[1].rm_so;
-	if ( len > sizeof(match) )
-		ERR(goto done);
-	memset(match, '\0', sizeof(match));
-	memcpy(match, field + regmatch[1].rm_so, len);
-
-	vl = strtol(match, NULL, 0);
-	if ( errno == ERANGE )
-		ERR(goto done);
-	if ( vl > UINT32_MAX )
-		ERR(goto done);
-
-	*value = vl;
+	*value = (uint32_t) vl;
 	retn = true;
 
 
@@ -353,51 +255,42 @@ static _Bool _get_field(regex_t *regex, CO(char *, field), uint32_t *value)
  * digest field is assumed to have a size equal to the operative
  * identity size.
  *
- * \param regex	A regular expression which extracts the desired
- *		field.
+ * \param parser	The parser object used to extract the field
+ *			description.
  *
- * \param field	A character pointer to the field which is to be
- *		parsed.
+ * \param field		A character pointer to the characteristic that
+ *			is to be parsed.
  *
- * \param value	A pointer to the character area which the field
- *		will be loaded into.
+ * \param fb		A pointer to buffer that the field is to be
+ *			copied into.
  *
- * \param fb	A pointer to buffer that the field is to be copied
- *		into.
- *
- * \param size	The length of the digest field to be populated.
+ * \param size		The length of the digest field to be populated.
  *
  * \return	A boolean value is used to indicate the success or
- *		failure of the field extraction.  A false value is
- *		used to indicate a failure occurred during the field
+ *		failure of the characteristic extraction.  A false value
+ *		is used to indicate a failure occurred during the field
  *		entry extraction.  A true value indicates the
  *		field has been successfully extracted and the value
  *		variable contains a legitimate value.
  */
 
-static _Bool _get_digest(regex_t *regex, CO(char *, field), uint8_t *fb, \
-			 size_t size)
+static _Bool _get_digest(CO(EventParser, parser), CO(char *, field),
+			 uint8_t *fb, size_t size)
 
 {
 	_Bool retn = false;
 
-	size_t len;
+	Buffer bufr  = NULL;
 
-	regmatch_t regmatch[2];
-
-	Buffer bufr  = NULL,
-	       match = NULL;
+	String match = NULL;
 
 
-	if ( regexec(regex, field, 2, regmatch, 0) != REG_OK )
+	/* Get the ASCII hexadecimal value of the field itself. */
+	INIT(HurdLib, String, match, ERR(goto done));
+	if ( !parser->get_text(parser, field, match) )
 		ERR(goto done);
 
-	INIT(HurdLib, Buffer, match, ERR(goto done));
-	len = regmatch[1].rm_eo - regmatch[1].rm_so;
-	match->add(match, (unsigned char *) (field + regmatch[1].rm_so), len);
-	if ( !match->add(match, (unsigned char *) "\0", 1) )
-		ERR(goto done);
-
+	/* Convert the hexadecimal value to the binary value. */
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 	if ( !bufr->add_hexstring(bufr, (char *) match->get(match)) )
 		ERR(goto done);
@@ -419,17 +312,18 @@ static _Bool _get_digest(regex_t *regex, CO(char *, field), uint8_t *fb, \
 /**
  * Internal private function.
  *
- * This method parses a test entry from a cell characteristic field.
+ * This method parses a text value from a cell characteristic field.
  *
- * \param regex	A regular expression which extracts the desired
- *		field.
+ * \param parser	The parser object used to extract the field
+ *			description.
  *
- * \param field A pointer to the field that is to be parsed.
+ * \param field		A pointer to the field that is to be parsed.
  *
- * \param fb	A pointer to the buffer area which is to be loaded
- *		with the text field.
+ * \param fb		A pointer to the buffer area which is to be
+ *			loaded with the text field.
  *
- * \param fblen	The length of the buffer area which is to be filled.
+ * \param fblen		The length of the buffer area which is to be
+ *			filled.
  *
  * \return	A boolean value is used to indicate the success or
  *		failure of the field extraction.  A false value is
@@ -439,37 +333,29 @@ static _Bool _get_digest(regex_t *regex, CO(char *, field), uint8_t *fb, \
  *		variable contains a legitimate value.
  */
 
-static _Bool _get_text(regex_t *regex, CO(char *, field), uint8_t *fb, \
-		       size_t fblen)
+static _Bool _get_text(CO(EventParser, parser), CO(char *, field), \
+		       uint8_t *fb, size_t fblen)
 
 {
 	_Bool retn = false;
 
-	size_t len;
-
-	regmatch_t regmatch[2];
-
-	Buffer bufr = NULL;
+	String match = NULL;
 
 
-	if ( regexec(regex, field, 2, regmatch, 0) != REG_OK )
+	/* Get the field itself. */
+	INIT(HurdLib, String, match, ERR(goto done));
+	if ( !parser->get_text(parser, field, match) )
 		ERR(goto done);
 
-	len = regmatch[1].rm_eo - regmatch[1].rm_so;
-	if ( len > (fblen - 1) )
+	/* Copy it to the destination. */
+	if ( (match->size(match) + 1) > fblen )
 		ERR(goto done);
-
-
-	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	bufr->add(bufr, (unsigned char *) (field + regmatch[1].rm_so), len);
-	if ( !bufr->add(bufr, (unsigned char *) "\0", 1) )
-		ERR(goto done);
-	memcpy(fb, bufr->get(bufr), bufr->size(bufr));
-
+	memcpy(fb, match->get(match), match->size(match) + 1);
 	retn = true;
 
+
  done:
-	WHACK(bufr);
+	WHACK(match);
 
 	return retn;
 }
@@ -499,84 +385,62 @@ static _Bool _parse_file(CO(Cell_State, S), CO(String, entry))
 {
 	_Bool retn = false;
 
-	unsigned int cnt;
-
 	uint32_t value;
 
-	char *fp;
-
-	regmatch_t regmatch;
-
-	Buffer field = NULL;
-
-
-	/* Compile the regular expressions once. */
-	if ( !File_Fields_compiled ) {
-		for (cnt= 0; File_Fields[cnt].fd != NULL; ++cnt) {
-			if ( regcomp(&File_Fields[cnt].regex,
-				     File_Fields[cnt].fd, REG_EXTENDED) != 0 )
-				ERR(goto done);
-		}
-	}
-	File_Fields_compiled = true;
+	EventParser parser = NULL;
 
 
 	/* Extract the file field. */
-	INIT(HurdLib, Buffer, field, ERR(goto done));
-
-	fp = entry->get(entry);
-	if ( regexec(&File_Fields[0].regex, fp, 1, &regmatch, 0) != REG_OK )
+	INIT(NAAAIM, EventParser, parser, ERR(goto done));
+	if ( !parser->extract_field(parser, entry, "file") )
 		ERR(goto done);
-
-	field->add(field, (unsigned char *) (fp + regmatch.rm_so),
-		   regmatch.rm_eo-regmatch.rm_so);
-	if ( !field->add(field, (unsigned char *) "\0", 1) )
-		ERR(goto done);
-
 
 	/* Parse field entries. */
-	fp = (char *) field->get(field);
-	if ( !_get_field(&File_Fields[1].regex, fp, &S->file.flags) )
+	if ( !_get_field(parser, "flags", &value) )
 		ERR(goto done);
+	S->file.flags = value;
 
-	if ( !_get_field(&File_Fields[2].regex, fp, &S->file.uid) )
+	if ( !_get_field(parser, "uid", &value) )
 		ERR(goto done);
+	S->file.uid = value;
 
-	if ( !_get_field(&File_Fields[3].regex, fp, &S->file.gid) )
+	if ( !_get_field(parser, "gid", &value) )
 		ERR(goto done);
+	S->file.gid = value;
 
-	if ( !_get_field(&File_Fields[4].regex, fp, &value) )
+	if ( !_get_field(parser, "mode", &value) )
 		ERR(goto done);
 	S->file.mode = value;
 
-	if ( !_get_field(&File_Fields[5].regex, fp, &S->file.name_length) )
+	if ( !_get_field(parser, "name_length", &value) )
+		ERR(goto done);
+	S->file.name_length = value;
+
+	if ( !_get_digest(parser, "name", (uint8_t *) S->file.name, \
+			  NAAAIM_IDSIZE) )
 		ERR(goto done);
 
-	if ( !_get_digest(&File_Fields[6].regex, fp, \
-			  (uint8_t *) S->file.name, NAAAIM_IDSIZE) )
-		ERR(goto done);
-
-	if ( !_get_field(&File_Fields[7].regex, fp, &value) )
+	if ( !_get_field(parser, "s_magic", &value) )
 		ERR(goto done);
 	S->file.s_magic = value;
 
-	if ( !_get_text(&File_Fields[8].regex, fp, (uint8_t *) S->file.s_id, \
+	if ( !_get_text(parser, "s_id", (uint8_t *) S->file.s_id, \
 			sizeof(S->file.s_id)) )
 		ERR(goto done);
 
-	if ( !_get_digest(&File_Fields[9].regex, fp, S->file.s_uuid, \
+	if ( !_get_digest(parser, "s_uuid", S->file.s_uuid, \
 			  sizeof(S->file.s_uuid)) )
 		ERR(goto done);
 
-	if ( !_get_digest(&File_Fields[10].regex, fp, \
-			  (uint8_t *) S->file.digest, NAAAIM_IDSIZE) )
+	if ( !_get_digest(parser, "digest", (uint8_t *) S->file.digest, \
+			  NAAAIM_IDSIZE) )
 		ERR(goto done);
 
 	retn = true;
 
 
  done:
-	WHACK(field);
+	WHACK(parser);
 
 	return retn;
 }
@@ -606,58 +470,33 @@ static _Bool _parse_mmap_file(CO(Cell_State, S), CO(String, entry))
 {
 	_Bool retn = false;
 
-	unsigned int cnt;
-
-	char *fp;
-
-	regmatch_t regmatch;
-
-	Buffer field = NULL;
+	EventParser parser = NULL;
 
 
-	/* Compile the regular expressions once. */
-	if ( !Mmap_Fields_compiled ) {
-		for (cnt= 0; Mmap_Fields[cnt].fd != NULL; ++cnt) {
-			if ( regcomp(&Mmap_Fields[cnt].regex,
-				     Mmap_Fields[cnt].fd, REG_EXTENDED) != 0 )
-				ERR(goto done);
-		}
-	}
-	Mmap_Fields_compiled = true;
-
-
-	/* Extract the mmap field. */
-	INIT(HurdLib, Buffer, field, ERR(goto done));
-
-	fp = entry->get(entry);
-	if ( regexec(&Mmap_Fields[0].regex, fp, 1, &regmatch, 0) != REG_OK )
-		ERR(goto done);
-
-	field->add(field, (unsigned char *) (fp + regmatch.rm_so),
-		   regmatch.rm_eo-regmatch.rm_so);
-	if ( !field->add(field, (unsigned char *) "\0", 1) )
+	/* Extract the field. */
+	INIT(NAAAIM, EventParser, parser, ERR(goto done));
+	if ( !parser->extract_field(parser, entry, "mmap_file") )
 		ERR(goto done);
 
 
 	/* Parse field entries. */
-	fp = (char *) field->get(field);
-	if ( !_get_field(&Mmap_Fields[1].regex, fp, &S->mmap_file.anonymous) )
+	if ( !_get_field(parser, "type", &S->mmap_file.anonymous) )
 		ERR(goto done);
 
-	if ( !_get_field(&Mmap_Fields[2].regex, fp, &S->mmap_file.reqprot) )
+	if ( !_get_field(parser, "reqprot", &S->mmap_file.reqprot) )
 		ERR(goto done);
 
-	if ( !_get_field(&Mmap_Fields[3].regex, fp, &S->mmap_file.prot) )
+	if ( !_get_field(parser, "prot", &S->mmap_file.prot) )
 		ERR(goto done);
 
-	if ( !_get_field(&Mmap_Fields[4].regex, fp, &S->mmap_file.flags) )
+	if ( !_get_field(parser, "flags", &S->mmap_file.flags) )
 		ERR(goto done);
 
 	retn = true;
 
 
  done:
-	WHACK(field);
+	WHACK(parser);
 
 	return retn;
 }
@@ -687,64 +526,32 @@ static _Bool _parse_socket_create(CO(Cell_State, S), CO(String, entry))
 {
 	_Bool retn = false;
 
-	unsigned int cnt;
-
-	char *fp;
-
-	regmatch_t regmatch;
-
-	Buffer field = NULL;
+	EventParser parser = NULL;
 
 
-	/* Compile the regular expressions once. */
-	if ( !Socket_Create_Fields_compiled ) {
-		for (cnt= 0; Socket_Create_Fields[cnt].fd != NULL; ++cnt) {
-			if ( regcomp(&Socket_Create_Fields[cnt].regex,
-				     Socket_Create_Fields[cnt].fd,
-				     REG_EXTENDED) != 0 )
-				ERR(goto done);
-		}
-	}
-	Socket_Create_Fields_compiled = true;
-
-
-	/* Extract socket_create parameters. */
-	INIT(HurdLib, Buffer, field, ERR(goto done));
-
-	fp = entry->get(entry);
-	if ( regexec(&Socket_Create_Fields[0].regex, fp, 1, &regmatch, 0) != \
-	     REG_OK )
+	/* Extract the field itself. */
+	INIT(NAAAIM, EventParser, parser, ERR(goto done));
+	if ( !parser->extract_field(parser, entry, "socket_create") )
 		ERR(goto done);
-
-	field->add(field, (unsigned char *) (fp + regmatch.rm_so),
-		   regmatch.rm_eo-regmatch.rm_so);
-	if ( !field->add(field, (unsigned char *) "\0", 1) )
-		ERR(goto done);
-
 
 	/* Parse socket create parameters. */
-	fp = (char *) field->get(field);
-	if ( !_get_field(&Socket_Create_Fields[1].regex, fp,
-			 &S->socket_create.family) )
+	if ( !_get_field(parser, "family", &S->socket_create.family) )
 		ERR(goto done);
 
-	if ( !_get_field(&Socket_Create_Fields[2].regex, fp,
-			 &S->socket_create.type) )
+	if ( !_get_field(parser, "type", &S->socket_create.type) )
 		ERR(goto done);
 
-	if ( !_get_field(&Socket_Create_Fields[3].regex, fp,
-			 &S->socket_create.protocol) )
+	if ( !_get_field(parser, "protocol", &S->socket_create.protocol) )
 		ERR(goto done);
 
-	if ( !_get_field(&Socket_Create_Fields[4].regex, fp,
-			 &S->socket_create.kern) )
+	if ( !_get_field(parser, "kern", &S->socket_create.kern) )
 		ERR(goto done);
 
 	retn = true;
 
 
  done:
-	WHACK(field);
+	WHACK(parser);
 
 	return retn;
 }
@@ -774,34 +581,21 @@ static _Bool _parse_socket(CO(Cell_State, S), CO(String, entry))
 {
 	_Bool retn = false;
 
-	unsigned int cnt,
-		     value;
-
-	char *fp;
+	unsigned int cnt;
 
 	uint8_t *p;
 
-	regmatch_t regmatch;
+	uint32_t value;
 
-	Buffer field = NULL;
+	EventParser parser = NULL;
 
-
-	/* Compile the regular expressions once. */
-	if ( !Socket_Fields_compiled ) {
-		for (cnt= 0; Socket_Fields[cnt].fd != NULL; ++cnt) {
-			if ( regcomp(&Socket_Fields[cnt].regex, \
-				     Socket_Fields[cnt].fd,	\
-				     REG_EXTENDED) != 0 )
-				ERR(goto done);
-		}
-	}
-	Socket_Fields_compiled = true;
+	static char *type[2] = {
+		"socket_connect",
+		"socket_bind"
+	};
 
 
-	/* Extract the socket field. */
-	INIT(HurdLib, Buffer, field, ERR(goto done));
-
-	fp = entry->get(entry);
+	/* Extract the field itself. */
 	switch ( S->type ) {
 		case TSEM_SOCKET_CONNECT:
 			value = 0;
@@ -810,28 +604,24 @@ static _Bool _parse_socket(CO(Cell_State, S), CO(String, entry))
 			value = 1;
 			break;
 		default:
+			ERR(goto done);
 			break;
 
 	}
-	if ( regexec(&Socket_Fields[value].regex, fp, 1, &regmatch, 0) != \
-	     REG_OK )
+	INIT(NAAAIM, EventParser, parser, ERR(goto done));
+	if ( !parser->extract_field(parser, entry, type[value]) )
 		ERR(goto done);
 
-	field->add(field, (unsigned char *) (fp + regmatch.rm_so),
-		   regmatch.rm_eo-regmatch.rm_so);
-	if ( !field->add(field, (unsigned char *) "\0", 1) )
-		ERR(goto done);
-	fp = (char *) field->get(field);
 
 	/* Parse socket family. */
-	if ( !_get_field(&Socket_Fields[2].regex, fp, &value) )
+	if ( !_get_field(parser, "family", &value) )
 		ERR(goto done);
 	S->socket_connect.family = value;
 
 	/* Parse port number. */
 	if ( (S->socket_connect.family == AF_INET) ||
 	     (S->socket_connect.family == AF_INET6) ) {
-		if ( !_get_field(&Socket_Fields[3].regex, fp, &value) )
+		if ( !_get_field(parser, "port", &value) )
 			ERR(goto done);
 		S->socket_connect.port = value;
 	}
@@ -839,33 +629,30 @@ static _Bool _parse_socket(CO(Cell_State, S), CO(String, entry))
 	/* Extract protocol specific fields. */
 	switch ( S->socket_connect.family ) {
 		case AF_INET:
-			if ( !_get_field(&Socket_Fields[6].regex, fp, &value) )
+			if ( !_get_field(parser, "addr", &value) )
 				ERR(goto done);
 			S->socket_connect.u.ipv4_addr = value;
 			break;
 
 		case AF_INET6:
-			if ( !_get_field(&Socket_Fields[4].regex, fp, \
-					 &value) )
+			if ( !_get_field(parser, "flow", &value) )
 				ERR(goto done);
 			S->socket_connect.flow = value;
 
-			if ( !_get_field(&Socket_Fields[5].regex, fp, &value) )
+			if ( !_get_field(parser, "scope", &value) )
 				ERR(goto done);
 			S->socket_connect.scope = value;
 
 			p = S->socket_connect.u.ipv6_addr;
 			cnt = sizeof(S->socket_connect.u.ipv6_addr);
-			if ( !_get_digest(&Socket_Fields[6].regex, fp, p, \
-					  cnt) )
+			if ( !_get_digest(parser, "addr", p, cnt) )
 				ERR(goto done);
 			break;
 
 		default:
 			p = S->socket_connect.u.addr;
 			cnt = sizeof(S->socket_connect.u.addr);
-			if ( !_get_digest(&Socket_Fields[6].regex,  \
-					  fp, p, cnt) )
+			if ( !_get_digest(parser, "addr", p, cnt) )
 				ERR(goto done);
 			break;
 	}
@@ -874,7 +661,7 @@ static _Bool _parse_socket(CO(Cell_State, S), CO(String, entry))
 
 
  done:
-	WHACK(field);
+	WHACK(parser);
 
 	return retn;
 }
@@ -904,55 +691,30 @@ static _Bool _parse_socket_accept(CO(Cell_State, S), CO(String, entry))
 {
 	_Bool retn = false;
 
-	char *fp;
-
 	uint8_t *p;
 
-	unsigned int cnt,
-		     value;
+	uint32_t value;
 
-	regmatch_t regmatch;
+	unsigned int cnt;
 
-	Buffer field = NULL;
+	EventParser parser = NULL;
 
 
 	/* Compile the regular expressions once. */
-	if ( !Socket_Accept_Fields_compiled ) {
-		for (cnt= 0; Socket_Accept_Fields[cnt].fd != NULL; ++cnt) {
-			if ( regcomp(&Socket_Accept_Fields[cnt].regex,
-				     Socket_Accept_Fields[cnt].fd,
-				     REG_EXTENDED) != 0 )
-				ERR(goto done);
-		}
-	}
-	Socket_Accept_Fields_compiled = true;
-
-
-	/* Extract socket_accept parameters. */
-	INIT(HurdLib, Buffer, field, ERR(goto done));
-
-	fp = entry->get(entry);
-	if ( regexec(&Socket_Accept_Fields[0].regex, fp, 1, &regmatch, 0) != \
-	     REG_OK )
+	INIT(NAAAIM, EventParser, parser, ERR(goto done));
+	if ( !parser->extract_field(parser, entry, "socket_accept") )
 		ERR(goto done);
-
-	field->add(field, (unsigned char *) (fp + regmatch.rm_so),
-		   regmatch.rm_eo-regmatch.rm_so);
-	if ( !field->add(field, (unsigned char *) "\0", 1) )
-		ERR(goto done);
-
 
 	/* Parse socket accept parameters. */
-	fp = (char *) field->get(field);
-	if ( !_get_field(&Socket_Accept_Fields[1].regex, fp, &value) )
+	if ( !_get_field(parser, "family", &value) )
 		ERR(goto done);
 	S->socket_accept.family = value;
 
-	if ( !_get_field(&Socket_Accept_Fields[2].regex, fp, &value) )
+	if ( !_get_field(parser, "type", &value) )
 		ERR(goto done);
 	S->socket_accept.type = value;
 
-	if ( !_get_field(&Socket_Accept_Fields[3].regex, fp, &value) )
+	if ( !_get_field(parser, "port", &value) )
 		ERR(goto done);
 	S->socket_accept.port = value;
 
@@ -960,8 +722,7 @@ static _Bool _parse_socket_accept(CO(Cell_State, S), CO(String, entry))
 	/* Extract protocol specific fields. */
 	switch ( S->socket_accept.family ) {
 		case AF_INET:
-			if ( !_get_field(&Socket_Accept_Fields[4].regex, fp, \
-					 &value) )
+			if ( !_get_field(parser, "addr", &value) )
 				ERR(goto done);
 			S->socket_accept.u.ipv4_addr = value;
 			break;
@@ -969,16 +730,14 @@ static _Bool _parse_socket_accept(CO(Cell_State, S), CO(String, entry))
 		case AF_INET6:
 			p = S->socket_accept.u.ipv6_addr;
 			cnt = sizeof(S->socket_accept.u.ipv6_addr);
-			if ( !_get_digest(&Socket_Accept_Fields[4].regex, fp, \
-					  p, cnt) )
+			if ( !_get_digest(parser, "addr", p, cnt) )
 				ERR(goto done);
 			break;
 
 		default:
 			p = S->socket_accept.u.addr;
 			cnt = sizeof(S->socket_accept.u.addr);
-			if ( !_get_digest(&Socket_Accept_Fields[4].regex,  \
-					  fp, p, cnt) )
+			if ( !_get_digest(parser, "addr", p, cnt) )
 				ERR(goto done);
 			break;
 	}
@@ -987,7 +746,7 @@ static _Bool _parse_socket_accept(CO(Cell_State, S), CO(String, entry))
 
 
  done:
-	WHACK(field);
+	WHACK(parser);
 
 	return retn;
 }
@@ -1017,60 +776,30 @@ static _Bool _parse_task_kill(CO(Cell_State, S), CO(String, entry))
 {
 	_Bool retn = false;
 
-	unsigned int cnt;
-
-	char *fp;
-
-	regmatch_t regmatch;
-
-	Buffer field = NULL;
-
-
-	/* Compile the regular expressions once. */
-	if ( !Task_Kill_Fields_compiled ) {
-		for (cnt= 0; Task_Kill_Fields[cnt].fd != NULL; ++cnt) {
-			if ( regcomp(&Task_Kill_Fields[cnt].regex,
-				     Task_Kill_Fields[cnt].fd,
-				     REG_EXTENDED) != 0 )
-				ERR(goto done);
-		}
-	}
-	Task_Kill_Fields_compiled = true;
+	EventParser parser = NULL;
 
 
 	/* Extract task_kill event. */
-	INIT(HurdLib, Buffer, field, ERR(goto done));
-
-	fp = entry->get(entry);
-	if ( regexec(&Task_Kill_Fields[0].regex, fp, 1, &regmatch, 0) != \
-	     REG_OK )
+	INIT(NAAAIM, EventParser, parser, ERR(goto done));
+	if ( !parser->extract_field(parser, entry, "task_kill") )
 		ERR(goto done);
-
-	field->add(field, (unsigned char *) (fp + regmatch.rm_so),
-		   regmatch.rm_eo-regmatch.rm_so);
-	if ( !field->add(field, (unsigned char *) "\0", 1) )
-		ERR(goto done);
-
 
 	/* Parse task_kill parameters. */
-	fp = (char *) field->get(field);
-	if ( !_get_field(&Task_Kill_Fields[1].regex, fp, \
-			 &S->task_kill.cross_model) )
+	if ( !_get_field(parser, "cross", &S->task_kill.cross_model) )
 		ERR(goto done);
 
-	if ( !_get_field(&Task_Kill_Fields[2].regex, fp, \
-			 &S->task_kill.signal) )
+	if ( !_get_field(parser, "signal", &S->task_kill.signal) )
 		ERR(goto done);
 
-	if ( !_get_digest(&Task_Kill_Fields[3].regex, fp,
-			 S->task_kill.task_id, NAAAIM_IDSIZE) )
+	if ( !_get_digest(parser, "target", S->task_kill.task_id, \
+			  NAAAIM_IDSIZE) )
 		ERR(goto done);
 
 	retn = true;
 
 
  done:
-	WHACK(field);
+	WHACK(parser);
 
 	return retn;
 }
@@ -1100,55 +829,22 @@ static _Bool _parse_generic_event(CO(Cell_State, S), CO(String, entry))
 {
 	_Bool retn = false;
 
-	unsigned int cnt;
-
-	char *fp,
-	     event[40];
-
-	regmatch_t regmatch;
-
-	Buffer field = NULL;
-
-
-	/* Compile the regular expressions once. */
-	if ( !Generic_Event_Fields_compiled ) {
-		for (cnt= 0; Generic_Event_Fields[cnt].fd != NULL; ++cnt) {
-			if ( regcomp(&Generic_Event_Fields[cnt].regex,
-				     Generic_Event_Fields[cnt].fd,
-				     REG_EXTENDED) != 0 )
-				ERR(goto done);
-		}
-	}
-	Generic_Event_Fields_compiled = true;
+	EventParser parser = NULL;
 
 
 	/* Extract the generic event. */
-	INIT(HurdLib, Buffer, field, ERR(goto done));
-
-	fp = entry->get(entry);
-	if ( regexec(&Generic_Event_Fields[0].regex, fp, 1, &regmatch, 0) != \
-	     REG_OK )
+	INIT(NAAAIM, EventParser, parser, ERR(goto done));
+	if ( !parser->extract_field(parser, entry, "generic_event") )
 		ERR(goto done);
-
-	field->add(field, (unsigned char *) (fp + regmatch.rm_so),
-		   regmatch.rm_eo-regmatch.rm_so);
-	if ( !field->add(field, (unsigned char *) "\0", 1) )
-		ERR(goto done);
-
 
 	/* Parse the generic event type parameter. */
-	memset(event, '\0', sizeof(event));
-	fp = (char *) field->get(field);
-	if ( !_get_text(&Generic_Event_Fields[1].regex, fp,
-			(uint8_t *) event, sizeof(event) - 1) )
-		ERR(goto done);
-	if ( !S->event->add(S->event, event) )
+	if ( !parser->get_text(parser, "type", S->event) )
 		ERR(goto done);
 	retn = true;
 
 
  done:
-	WHACK(field);
+	WHACK(parser);
 
 	return retn;
 }
@@ -1175,7 +871,7 @@ static _Bool _parse_generic_event(CO(Cell_State, S), CO(String, entry))
  *		populated.
  */
 
-static _Bool parse(CO(Cell, this), CO(String, entry),
+static _Bool parse(CO(Cell, this), CO(String, entry), \
 		   enum tsem_event_type type)
 
 {

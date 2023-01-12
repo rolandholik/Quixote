@@ -99,7 +99,7 @@ tools: ${TOOLS}
 test-COE: test-COE.o COE.o EventParser.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
-test-cell: test-cell.o Cell.o
+test-cell: test-cell.o Cell.o EventParser.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 test-event: test-event.o SecurityEvent.o COE.o Cell.o EventModel.o \
@@ -131,7 +131,7 @@ set-behavior: set-behavior.o
 sign-model: sign-model.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
-generate-pseudonym: generate-pseudonym.o Cell.o
+generate-pseudonym: generate-pseudonym.o Cell.o EventParser.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
 
 tags:
