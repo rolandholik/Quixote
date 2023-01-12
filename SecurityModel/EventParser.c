@@ -132,9 +132,18 @@ static _Bool extract_field(CO(EventParser, this), CO(String, event), \
 	while ( !found ) {
 		if ( (start = strstr(start, field)) == NULL )
 			ERR(goto done);
-		if ( start[strlen(field)] == '{' ) {
-			found = true;
-			continue;
+		if ( start == event->get(event) ) {
+			if ( start[strlen(field)] == '{' ) {
+				found = true;
+				continue;
+			}
+		}
+		else {
+			if ( (*(start-1) == ' ') && \
+			     (start[strlen(field)] == '{') ) {
+				found = true;
+				continue;
+			}
 		}
 		start += strlen(field);
 	}
