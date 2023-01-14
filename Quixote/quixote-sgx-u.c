@@ -114,11 +114,6 @@ static pid_t Monitor_pid;
 static SanchoSGX Model = NULL;
 
 /**
- * The control object for the model.
- */
-static TSEMcontrol Control = NULL;
-
-/**
  * The seal status of the domain.  This variable is set by a
  * seal event for the domain.  Updates which are not in the
  * security state will cause disciplining requests to be generated
@@ -1046,14 +1041,18 @@ static _Bool setup_namespace(int *fdptr, _Bool enforce)
 
 	uint64_t id;
 
+	TSEMcontrol control = NULL;
+
 
 	/* Create and configure a security model namespace. */
-	if ( !Control->external(Control) )
+	INIT(NAAAIM, TSEMcontrol, control, ERR(goto done));
+
+	if ( !control->external(control) )
 		ERR(goto done);
-	if ( !Control->id(Control, &id) )
+	if ( !control->id(control, &id) )
 		ERR(goto done);
 	if ( enforce ) {
-		if ( !Control->enforce(Control) )
+		if ( !control->enforce(control) )
 			ERR(goto done);
 	}
 
@@ -1071,6 +1070,8 @@ static _Bool setup_namespace(int *fdptr, _Bool enforce)
 
 
  done:
+	WHACK(control);
+
 	if ( retn )
 		*fdptr = fd;
 	return retn;
@@ -1537,7 +1538,6 @@ extern int main(int argc, char *argv[])
 	if ( !Model->load_enclave_memory(Model, Enclave, sizeof(Enclave), \
 					 token) )
 		ERR(goto done);
-	INIT(NAAAIM, TSEMcontrol, Control, ERR(goto done));
 
 
 	/* Load and seal a security model if specified. */

@@ -63,24 +63,20 @@
 #endif
 
 
-/**
- * The object that controls the TSEM implementation.
- */
-static TSEMcontrol Control = NULL;
-
-
 /* OCALL interface to handle the request to discipline a process. */
 static int discipline_pid_ocall(struct SanchoSGX_ocall *oc)
 
 {
 	_Bool retn = false;
 
+	TSEMcontrol control = oc->control;
+
 
 	if ( oc->discipline ) {
-		if ( Control->discipline(Control, oc->pid) )
+		if ( !control->discipline(control, oc->pid) )
 			ERR(goto done);
 	} else {
-		if ( Control->release(Control, oc->pid) )
+		if ( !control->release(control, oc->pid) )
 			ERR(goto done);
 	}
 
@@ -113,6 +109,8 @@ struct NAAAIM_SanchoSGX_State
 	/* Enclave error code. */
 	int enclave_error;
 
+	TSEMcontrol control;
+
 	/* SGX enclave object. */
 	SRDEenclave enclave;
 
@@ -142,6 +140,7 @@ static void _init_state(CO(SanchoSGX_State, S))
 	S->debug	 = false;
 	S->enclave_error = 0;
 
+	S->control = NULL;
 	S->enclave = NULL;
 	S->ocall   = NULL;
 
@@ -300,11 +299,6 @@ static _Bool load_enclave_memory(CO(SanchoSGX, this), CO(uint8_t *, enclave), \
 	File token_file = NULL;
 
 
-	/* Initialize the static TSEM control instance once. */
-	if ( Control == NULL )
-		INIT(NAAAIM, TSEMcontrol, Control, ERR(goto done));
-
-
 	/* Load the EINITTOKEN. */
 	INIT(HurdLib, File, token_file, ERR(goto done));
 	INIT(HurdLib, Buffer, tbufr, ERR(goto done));
@@ -422,7 +416,8 @@ static _Bool update(CO(SanchoSGX, this), CO(String, update), \
 	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
 		ERR(goto done);
 
-	ecall1.update = update->get(update);
+	ecall1.update  = update->get(update);
+	ecall1.control = S->control;
 
 	if ( !S->enclave->boot_slot(S->enclave, 1, ocall_table, &ecall1, \
 				    &rc) ) {
@@ -482,14 +477,7 @@ static _Bool load(CO(SanchoSGX, this), CO(String, entry))
 	if ( entry->poisoned(entry) )
 		ERR(goto done);
 
-
-	/* Initialize the static TSEM control instance once. */
-	if ( Control == NULL )
-		INIT(NAAAIM, TSEMcontrol, Control, ERR(goto done));
-
-
 	/* Call ECALL slot 12 to add the entry to the TSEM model. */
-
 	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
 		ERR(goto done);
 
@@ -1961,7 +1949,7 @@ static void whack(CO(SanchoSGX, this))
  done:
 	WHACK(S->enclave);
 	WHACK(S->ocall);
-	WHACK(Control);
+	WHACK(S->control);
 
 	S->root->whack(S->root, this, S);
 	return;
@@ -2004,6 +1992,7 @@ extern SanchoSGX NAAAIM_SanchoSGX_Init(void)
 	_init_state(this->state);
 
 	/* Initialize aggregate objects. */
+	INIT(NAAAIM, TSEMcontrol, this->state->control, goto fail);
 
 	/* Method initialization. */
 	this->load_enclave	  = load_enclave;
@@ -2048,4 +2037,9 @@ extern SanchoSGX NAAAIM_SanchoSGX_Init(void)
 	this->whack		= whack;
 
 	return this;
+
+
+fail:
+	root->whack(root, this, this->state);
+	return NULL;
 }

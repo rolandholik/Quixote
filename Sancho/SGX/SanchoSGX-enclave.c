@@ -187,6 +187,7 @@ _Bool update_model(struct ISOidentity_ecall1_interface *ecall1)
 	ocall.debug	 = ecall1->debug;
 	ocall.ocall	 = SanchoSGX_discipline;
 	ocall.discipline = ecall1->discipline;
+	ocall.control	 = ecall1->control;
 	if ( discipline_ocall(&ocall) != 0 )
 		ERR(goto done);
 

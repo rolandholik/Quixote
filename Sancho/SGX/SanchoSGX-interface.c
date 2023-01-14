@@ -105,8 +105,8 @@ static sgx_status_t sgx_update_model(void *pms)
 
 	ms = (struct ISOidentity_ecall1_interface *) pms;
 	memset(&ecall1, '\0', sizeof(struct ISOidentity_ecall1_interface));
-
-	ecall1.debug = ms->debug;
+	ecall1.debug   = ms->debug;
+	ecall1.control = ms->control;
 
 	/* Replicate update string into structure. */
 	update_length = strlen(ms->update) + 1;

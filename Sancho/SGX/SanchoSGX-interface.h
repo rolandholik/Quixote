@@ -41,6 +41,7 @@ struct ISOidentity_ecall1_interface {
 	_Bool discipline;
 	_Bool sealed;
 	char *update;
+	void *control;
 };
 
 struct ISOidentity_ecall4_interface {
@@ -144,4 +145,5 @@ struct SanchoSGX_ocall {
 
 	pid_t pid;
 	_Bool discipline;
+	void *control;
 };
