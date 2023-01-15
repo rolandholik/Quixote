@@ -73,7 +73,7 @@ struct ISOidentity_ecall8_interface {
 struct ISOidentity_ecall9_interface {
 	_Bool retn;
 	int type;
-	char event[512];
+	char event[768];
 };
 
 struct ISOidentity_ecall10_interface {
