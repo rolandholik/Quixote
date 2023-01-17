@@ -1729,6 +1729,8 @@ static _Bool receive_model(CO(char *, filename), const int fd)
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 
 	INIT(HurdLib, File, outfile, ERR(goto done));
+	if ( truncate(filename, 0) != 0 )
+		ERR(goto done);
 	if ( !outfile->open_rw(outfile, filename) )
 		ERR(goto done);
 
