@@ -18,15 +18,22 @@ the security behavior of a platform, or a workload, like all other
 physical phenomenon, can be mathematically modeled.
 
 Security, is at once, both a technical and economic problem.  One of
-the objectives of TSEM is to address the inherent economic barrier to
-security, by introducing technology that reduces the skill and time
-needed to implement a level of security, equivalent to what can be
-achieved by mandatory access controls, through unit testing of an
-application stack.
+the objectives of TSEM is to address inherent and structural economic
+barriers to security, by introducing technology that reduces the skill
+and time needed to implement a level of security, equivalent to what
+can be achieved by mandatory access controls, through unit testing of
+an application stack.
 
-An additional, and secondary objective, is to reduce the skill,
-complexity and infrastructure needed to create remotely attestable
-platforms and/or workloads.
+A second objective, is to reduce the skill, complexity and
+infrastructure needed to create remotely attestable platforms and/or
+workloads.
+
+The final objective is to provide a framework for the open development
+of hardware assisted security technology.  Secondary to economic
+factors, specialized security technology has frequently been 'SKUed'
+to limit its availability to select OEM's and/or verticals.  This
+introduces both technical and accessibility barriers that prevent the
+needed widespread availability and utility of the technologies.
 
 To achieve these objectives, TSEM implements the concept of a modeling
 domain, nee namespace, that reduces the complexity of a security model
@@ -40,7 +47,7 @@ Computing Base (TCB) that supervises and maintains subordinate
 modeling domains/namespaces in a known trust state.
 
 TSEM is implemented as a Linux Security Module (LSM) and is designed
-to be self-contained, with little or no dependency on kernel
+to be self-contained with little or no dependency on kernel
 infrastructure, other than the LSM hooks themselves.
 
 In addition, TSEM implements its equivalent of mandatory access
@@ -146,7 +153,7 @@ typically an inode, on the second axis.  The descriptions are
 commonly referred to as subjects and objects.
 
 A security policy is developed that assigns a boolean value for each
-element of the matrix, that specifies whether or not permission should
+element of the matrix that specifies whether or not permission should
 be granted for the subject to access the object.
 
 These schemes are frequently referred to as 'mandatory access
@@ -176,7 +183,7 @@ under security controlled conditions with the labels protected against
 offline modification by cryptographic integrity guarantees.
 
 Mandatory access controls had their origin in centralized multi-user
-platforms and before the now widely accepted strategy of using
+platforms, and before the now, widely accepted strategy of using
 resource compartmentalization (namespaces) to isolate applications
 from each other and the system at large.  A legitimate technical
 argument can be made as to whether or not enforcement of a system wide
@@ -323,14 +330,14 @@ externally modeled domains.
 
 The TMA, regardless of locality, is responsible for processing the
 characteristics that describe a security event, computing the identity
-for the COE and CELL, and then combining these two identities to
-create a security event state point.  With respect to modeling theory,
-the security event state point is a task specific coefficient
-representing the event in a security model.
+for the COE and CELL and then combining these two identities to create
+a security event state point.  With respect to modeling theory, the
+security event state point is a task specific coefficient representing
+the event in a security model.
 
 TSEM is dispassionate with respect to the type of algorithm that is
-implemented.  The processing of the security event characteristics,
-and their conversion to state points, is driven by the security
+implemented.  The processing of the security event characteristics and
+their conversion to state points, is driven by the security
 model/policy that will be implemented for the workload.  It is
 assumed, that security model algorithms will embrace various
 approximations, and perhaps even stochastic reasoning and machine
@@ -351,7 +358,7 @@ event that does not map to a known good point, results in the trust
 orchestrator designating that the process be run as an untrusted
 process.
 
-Trust orchestrators, and their associated TMA's, are designed to
+Trust orchestrators and their associated TMA's, are designed to
 support signed security models.  This results in the elimination of
 the requirement to verify or appraise extended attributes and other
 measures currently required to protect trusted security systems
@@ -393,8 +400,8 @@ Placing a TMA model in 'enforcing' status implies that the model is in
 a sealed state and any subsequent violations to the model will result
 in a violating process being placed in untrusted status.  The
 characteristics of the violating event will be registered in the
-forensics trajectory for the model, for use in subsequent evaluation
-of the violating event and/or model refinement.
+forensics trajectory for the model for use in subsequent evaluation of
+the violating event and/or model refinement.
 
 Process and Platform Trust Status
 =================================
@@ -482,7 +489,7 @@ delegated, when possible, to userspace rather than to kernel based
 implementations.
 
 The model is extremely simplistic; a TMA interprets a security event
-and its characteristics, and advises whether or not the kernel should
+and its characteristics and advises whether or not the kernel should
 designate the process as trusted or untrusted after event processing
 is complete.
 
@@ -519,7 +526,7 @@ security state points into TPM PCR 11, secondary to the fact that the
 process invoking the security event hook will be scheduled away while
 the TPM transaction completes.
 
-Addressing this problem directly requires a re-consideration of the
+Addressing this problem directly requires a consideration of the
 context from which the security event handlers are being called.
 Subsequent implementations of TSEM will include a mechanism for
 asynchronous deferral of model processing, until when and if, a review
@@ -533,11 +540,11 @@ event to return a permissions violation in enforcing mode, even if the
 security event cannot be directly modeled.
 
 Security event modeling typically traps violations of trust by a COE
-with unmodeled characteristics, attempting to access/execute a file or
-map memory as executable; or by a COE with known characteristics
-attempting to access or execute a CELL not prescribed by a model.  As
-a result, the impact of the ability to not directly model these events
-is lessened.
+with unmodeled characteristics that is attempting to access/execute a
+file or map memory as executable; or by a COE with known
+characteristics attempting to access or execute a CELL not prescribed
+by a model.  As a result, the impact of the ability to not directly
+model these events is lessened.
 
 Explicit vs generic modeling
 ----------------------------
@@ -630,10 +637,10 @@ standard security point; with the exception that the task identity is
 replaced with a 'null id', one that consists of 32 null bytes.
 
 One of the CELL characteristics used in the computation of the task
-identity, is the digest of the executable file.  Modifying an
+identity is the digest of the executable file.  Modifying an
 executable, or attempting to execute a binary not considered in the
-security model, will result in an alternation of the task identity
-that propagates to the generation of invalid state points.
+security model, will result in an alteration of the task identity that
+propagates to the generation of invalid state points.
 
 The task identity is saved in the TSEM specific task structure and is
 used to compute the state points for any security events that the task
@@ -676,7 +683,7 @@ From a hardware perspective, this is important with respect to the
 notion of a TMA being a model for a successor to the TPM.  From a
 system trust or integrity perspective, a TPM is designed to provide a
 retrospective assessment of the actions that have occurred on a
-platform.  A verifying party uses the TPM event log, and a PCR based
+platform.  A verifying party uses the TPM event log and a PCR based
 summary measurement, to verify what actions have occurred on the host,
 in order to allow a determination of whether or not the platform
 should be 'trusted'.
@@ -700,7 +707,7 @@ Security model functional definitions
 -------------------------------------
 
 Previously, classic trusted system implementations supported the
-notion of the 'measurement' of the system.  The measurement is output
+notion of the 'measurement' of the system.  The measurement is the
 value of a linear extension function of all the security relevant
 actions recorded by a trust measurement system such as IMA.
 
@@ -814,7 +821,7 @@ This filesystem is primarily intended for use by trust orchestrators
 and must be mounted in order for orchestrators to create and manage
 security modeling domains.
 
-The following files, grouped below by generic functionality, are
+The following files grouped below by generic functionality, are
 presented in the filesystem:
 
 	control
@@ -835,7 +842,7 @@ The /sys/fs/tsem directory contains the following sub-directory:
 That is used to hold files that will be used to export security event
 descriptions for externally modeled domains.
 
-The files are process context sensitive.  Writing to the control file,
+The files are process context sensitive.  Writing to the control file
 or reading from the informational files, will act on or reference the
 security domain that the access process is assigned to.
 
@@ -937,7 +944,7 @@ state.
 The ABI documentation file contains a complete description of the
 output that is generated by each of these files.
 
-A security model, for an internally modeled domain, is loaded by
+A security model for an internally modeled domain is loaded by
 writing the valid security points to the 'state' file in the control
 plane.  This will result in the 'trajectory' file having no event
 descriptions for a sealed model, since the event description vector is
@@ -963,7 +970,7 @@ responsible for executing and monitoring a process that is run in the
 context of the domain.  The trust orchestrator is also responsible for
 providing access to the security model implemented by the TMA.
 
-Trust orchestrators, for externally modeled domains, have an
+Trust orchestrators for externally modeled domains, have an
 associated TMA that is responsible for implementing the security model
 for a domain.  The TMA represents the the root of trust for the
 modeled domain.  The TMA advises the trust orchestrator as to what the
@@ -974,7 +981,7 @@ orchestrator.
 In a trust orchestration architecture, secondary to their integral
 role in maintaining the trust state of the system, the trust
 orchestrators are the highest value security asset running on the
-system.  In order to support this, the Linux TSEM implementation
+system.  In order to support this the Linux TSEM implementation
 implements a new security capability, CAP_TRUST, that only the trust
 orchestrators are designed to run with.
 
@@ -1196,11 +1203,16 @@ OpenSK security key implementation.  This form factor allows the
 development and experimentation with deployable hardware based TMA
 implementations.
 
-The NRF52840-DONGLE architecture was also chosen by the European based
-'FobNail' project that is developing a hardware based attestation
-server.  This initiative discusses the notion of this architecture
+The NRF52840-DONGLE architecture was also chosen by the NLnet
+sponsored 'FobNail' project, that is developing a hardware based
+attestation server:
+
+https://fobnail.3mdeb.com/
+
+The Fobnail projects discusses the notion of their architecture
 expanding to provide protection for a Linux system at large.
-Quixote/TSEM is a demonstration of the feasibility of such an approach.
+Quixote/TSEM running, on the NRF52840-DONGLE micro-controller, is a
+demonstration of such an implementation.
 
 ===============
 Closing Remarks
@@ -1221,3 +1233,5 @@ and/or questions regarding TSEM and its reference TOS implementation.
      The Quixote Team - Flailing at the Travails of Cybersecurity
 
 	With all due respect to Miguel de Cervantes Saavedra.
+
+   From the glacial moraine lake country of West-Central Minnesota.
