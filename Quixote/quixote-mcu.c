@@ -1536,8 +1536,7 @@ static _Bool fire_cartridge(CO(LocalDuct, mgmt), CO(char *, cartridge), \
 			ERR(goto done);
 
 		if ( outfile != NULL ) {
-			if ( truncate(outfile, 0) != 0 )
-				ERR(goto done);
+			truncate(outfile, 0);
 			if ( Trajectory )
 				retn = output_trajectory(outfile);
 			else
