@@ -1453,7 +1453,7 @@ static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int fd)
 	      connected = false;
 
 	char *p,
-	     bufr[512];
+	     bufr[768];
 
 	int rc;
 
