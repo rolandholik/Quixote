@@ -6,6 +6,13 @@
 # **************************************************************************/
 
 
+#
+# Include global build definitions if this is a sub-directory build.
+#
+ifndef BUILD_CONFIG
+include ${shell cd ..; pwd}/Build.mk
+endif
+
 # Variable declarations.
 INSTPATH      = ${DESTDIR}/opt/ESD
 INSTALLBIN    = srde-check srde-gen-token srde-gen-verifier srde-load \
@@ -43,8 +50,6 @@ LE_SIGSTRUCT = /opt/intel/sgxpsw/aesm/le_prod_css.bin
 SGXKEY = ${CURDIR}/Signing-key.pem
 export SGXKEY
 
-
-CC = musl-gcc
 AS = as
 
 ifeq (${CC}, musl-gcc)
