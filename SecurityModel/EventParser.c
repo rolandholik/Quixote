@@ -15,7 +15,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include <regex.h>
 #include <string.h>
 #include <errno.h>
 #include <sys/types.h>

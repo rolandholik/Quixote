@@ -73,8 +73,7 @@ NORDICSRC = system_nrf52840.c nrfx_clock.c				 \
 	nrfx_gpiote.c app_error_handler_gcc.c nrfx_power.c		 \
 	nrf_drv_clock.c
 
-APPSRC = sancho.c sancho-interpreter.c regcomp.c regexec.c regerror.c  \
-	tre-mem.c reg-support.c TTYduct.c COE.c Cell.c SecurityEvent.c \
+APPSRC = sancho.c sancho-interpreter.c TTYduct.c COE.c Cell.c SecurityEvent.c \
 	SecurityPoint.c TSEM.c EventModel.c EventParser.c
 
 CSRC = ${NORDICSRC} ${APPSRC}

@@ -59,11 +59,10 @@ STMSRC = stm32l4xx_hal.c stm32l4xx_hal_rcc.c stm32l4xx_hal_rcc_ex.c	    \
 
 MISCSRC = cmd.c
 
-APPSRC = sancho.c ip4_addr.c Duct.c COE.c Cell.c SecurityEvent.c	    \
-	SecurityPoint.c TSEM.c TTYduct.c EventModel.c EventParser.c	    \
-	regcomp.c regexec.c regerror.c tre-mem.c reg-support.c gpio.c rng.c \
-	rtc.c usart.c stm32l4xx_hal_msp.c stm32l4xx_it.c usart.c	    \
-	system_stm32l4xx.c stm32l4xx_hal_timebase_TIM.c
+APPSRC = sancho.c ip4_addr.c Duct.c COE.c Cell.c SecurityEvent.c	\
+	SecurityPoint.c TSEM.c TTYduct.c EventModel.c EventParser.c	\
+	gpio.c rng.c rtc.c usart.c stm32l4xx_hal_msp.c stm32l4xx_it.c	\
+	usart.c	system_stm32l4xx.c stm32l4xx_hal_timebase_TIM.c
 
 CSRC = syscalls.c sysmem.c board_interrupts.c ${STMSRC} ${MISCSRC} ${APPSRC}
 
