@@ -17,10 +17,19 @@ CC = musl-gcc
 # Generic compiler flags to use for the build.
 BUILD_CFLAGS = -O2 -fomit-frame-pointer -march=core2 -Wall
 
+# Default linker flags.
+ifeq (${CC}, musl-gcc)
+BUILD_LDFLAGS = -Wl,-rpath-link=/usr/local/musl/lib -L ${TOPDIR}/HurdLib
+endif
+
+ifdef STATIC
+BUILD_LDFLAGS += -static
+endif
+
 # Kernel version selection.
 KERNEL_VERSION = 6.1
 
-export CC KERNEL_VERSION
+export CC KERNEL_VERSION BUILD_LDFLAGS
 
 
 #

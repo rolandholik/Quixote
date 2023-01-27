@@ -69,10 +69,7 @@ CC = musl-gcc
 CFLAGS = -Wall -O2 -fomit-frame-pointer -march=core2 -I .. -I ../.. \
 	-I ../../HurdLib -I ../../SecurityModel -I ../../lib ${TYPE}
 
-LDFLAGS = -g
-ifneq (${CC}, musl-gcc)
-LDFLAGS += -Wl,-rpath=/usr/local/ESD/lib -L /usr/local/ESD/lib
-endif
+LDFLAGS = ${BUILD_LDFLAGS}
 
 ELFLIB = -lelf
 

@@ -83,10 +83,7 @@ endif
 CFLAGS = -Wall -O2 -fpic -fomit-frame-pointer -march=core2 -I ../.. \
 	-I ../../.. -I ../../../HurdLib ${TYPE}
 
-LDFLAGS = ${STATIC} -g
-ifneq (${CC}, musl-gcc)
-LDFLAGS += -Wl,-rpath=/usr/local/ESD/lib -L /usr/local/ESD/lib
-endif
+LDFLAGS = ${BUILD_LDFLAGS}
 
 ELFLIB = -lelf
 

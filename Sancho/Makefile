@@ -5,6 +5,12 @@
 # * the source tree for copyright and licensing information.
 # **************************************************************************/
 
+#
+# Include global build definitions if this is a sub-directory build.
+#
+ifndef BUILD_CONFIG
+include ${shell cd ..; pwd}/Build.mk
+endif
 
 # Variable declarations.
 SUBDIRS = STmcu Nordic SGX Xen

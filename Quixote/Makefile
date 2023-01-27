@@ -49,7 +49,7 @@ endif
 
 CFLAGS = ${BUILD_CFLAGS} ${DEFINES}
 
-LDFLAGS = ${STATIC} -g
+LDFLAGS = ${BUILD_LDFLAGS}
 
 
 #

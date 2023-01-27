@@ -67,7 +67,7 @@ CC = musl-gcc
 CFLAGS = -Wall -O2 -fomit-frame-pointer -march=core2 -I ../.. -I ${SGXDIR} \
 	-I ../../HurdLib -I ../../SecurityModel -I ../../lib ${TYPE}
 
-LDFLAGS = -g
+LDFLAGS = ${BUILD_LDFLAGS}
 
 ELFLIB = -lelf
 

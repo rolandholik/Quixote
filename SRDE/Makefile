@@ -61,10 +61,7 @@ endif
 CDEBUG = -g -O2 -fomit-frame-pointer -march=core2
 CFLAGS = -Wall -fpic ${CDEBUG} ${CINCLUDE}
 
-LDFLAGS = ${STATIC} -g -L ../lib -L ../HurdLib
-ifneq (${CC}, musl-gcc)
-LDFLAGS += -Wl,-rpath=/usr/local/ESD/lib -L /usr/local/ESD/lib
-endif
+LDFLAGS = ${BUILD_LDFLAGS}
 
 # OpenSSL crypto library
 ifeq (${CC}, musl-gcc)
