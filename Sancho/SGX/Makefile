@@ -78,15 +78,6 @@ NAAAIMLIB      = -L ../../lib -lNAAAIM
 RDK_LIBRARY = ../libSRDEruntime.a
 RDKLIB	    = -L ${SGXDIR} -lSRDEruntime
 
-ifeq (${CC}, musl-gcc)
-SSL_INCLUDE = /usr/local/musl/include
-SSL_CRYPTO = -L /usr/local/musl/lib -lcrypto
-else
-SSL_INCLUDE = /usr/local/ESD/include
-SSL_CRYPTO = -Wl,-rpath=/usr/local/ESD/lib -L /usr/local/ESD/lib \
-	-lcrypto -ldl -lpthread
-endif
-
 LIBRARY_DEPENDS = ${HURD_LIBRARY} ${NAAAIM_LIBRARY} ${RDK_LIBRARY}
 LIBS		= ${RDKLIB} ${BUILD_ELFLIB} ${NAAAIMLIB} ${HURDLIB}
 
@@ -145,7 +136,7 @@ ldscript:
 tools: ${TOOLS}
 
 test-ISOidentity-enclave: test-ISOidentity-enclave.o SanchoSGX.o
-	${CC} ${LDFLAGS} -o $@ $< SanchoSGX.o ${LIBS} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $< SanchoSGX.o ${LIBS} ${BUILD_LIBCRYPTO};
 
 test-ISOidentity-enclave.o: test-ISOidentity-enclave.c
 	${CC} ${CFLAGS} -c $< -o $@;

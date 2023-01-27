@@ -32,19 +32,6 @@ else
 MUSL_INCLUDE = /usr/local/ESD/include
 endif
 
-#
-# Locations of SSL include files and libraries
-#
-ifeq (${CC}, musl-gcc)
-SSL_INCLUDE = /usr/local/musl/include
-SSL_CRYPTO = -L /usr/local/musl/lib -lcrypto
-SSL_LIBRARY = -L /usr/local/musl/lib -lssl -lcrypto
-else
-SSL_INCLUDE = /usr/local/ESD/include
-SSL_CRYPTO = -L /usr/local/ESD/lib -lcrypto -ldl -lpthread
-SSL_LIBRARY = -L /usr/local/ESD/lib -lssl ${SSL_CRYPTO}
-endif
-
 # Location of smartcard library.
 PCSC_LIBRARY = -L/usr/local/lib -lpcsclite
 
@@ -75,8 +62,8 @@ COBJS = ${CSRC:.c=.o}
 
 LIBS = -lNAAAIM -lHurdLib 
 
-CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I${SSL_INCLUDE} \
-	-I${MUSL_INCLUDE}/tpm_tools -I${MUSL_INCLUDE}/tss -I${QUIXOTE_INCLUDE}
+CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I${MUSL_INCLUDE}/tpm_tools \
+	-I${MUSL_INCLUDE}/tss -I${QUIXOTE_INCLUDE}
 
 
 #
@@ -90,64 +77,65 @@ all: ${COBJS} tools
 tools: ${TOOLS}
 
 gen-image: gen-image.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO};
 
 load-image: load-image.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltpm_unseal -ltspi ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltpm_unseal -ltspi \
+		${BUILD_LIBCRYPTO};
 
 boot: boot.o Netconfig.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO};
 
 sboot: sboot.o Netconfig.o SoftwareTPM.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO};
 
 init: init.o Netconfig.o SoftwareTPM.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl -ltspi ${SSL_CRYPTO} -lssl;
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -lfl -ltspi ${BUILD_LIBCRYPTO} -lssl;
 
 possum: possum.o Netconfig.o IPsec.o
-	${CC} ${LDFLAGS} -o $@ $^ ${SSL_CRYPTO} ${LIBS} -ltspi -lfl;
+	${CC} ${LDFLAGS} -o $@ $^ ${BUILD_LIBCRYPTO} ${LIBS} -ltspi -lfl;
 
 gen-id-verifier: gen-id-verifier.o
-	${CC} ${LDFLAGS} -o $@ $< ${SSL_CRYPTO} ${LIBS} -ltspi;
+	${CC} ${LDFLAGS} -o $@ $< ${BUILD_LIBCRYPTO} ${LIBS} -ltspi;
 
 software-status: software-status.o
-	${CC} ${LDFLAGS} -o $@ $^ ${SSL_CRYPTO} ${LIBS};
+	${CC} ${LDFLAGS} -o $@ $^ ${BUILD_LIBCRYPTO} ${LIBS};
 
 software-tpm: software-tpm.o SoftwareTPM.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
 tpm-cmd: tpm-cmd.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -ltspi ${BUILD_LIBCRYPTO};
 
 id-set: id-set.o
-	${CC} ${LDFLAGS} -o $@ $< ${LIBS} -ltspi ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS} -ltspi ${BUILD_LIBCRYPTO};
 
 idmgr: idmgr.o
-	${CC} ${LDFLAGS} -o $@ $< ${LIBS} -ltspi ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS} -ltspi ${BUILD_LIBCRYPTO};
 
 net-config: net-config.o Netconfig.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
 idtest: idtest.o
-	${CC} ${LDFLAGS} -o $@ $< ${LIBS} -ltspi ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS} -ltspi ${BUILD_LIBCRYPTO};
 
 device-supvr: device-supvr.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
 mgmt-supvr: mgmt-supvr.o MGMTsupvr.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO} ${PCSC_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO} ${PCSC_LIBRARY};
 
 vm-supvr: vm-supvr.o MGMTsupvr.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO} ${PCSC_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO} ${PCSC_LIBRARY};
 
 copy-edid: copy-edid.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
 mgmt-set-key: mgmt-set-key.o MGMTsupvr.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO} ${PCSC_LIBRARY};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO} ${PCSC_LIBRARY};
 
 tpm2-cmd: tpm2-cmd.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -libmtssmin_nf ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} -libmtssmin_nf ${BUILD_LIBCRYPTO};
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};

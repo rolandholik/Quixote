@@ -80,14 +80,6 @@ NAAAIMLIB      = -L ../../lib -lNAAAIM
 RDK_LIBRARY = ../libSRDEruntime.a
 RDKLIB	    = -L ../ -lSRDEruntime
 
-ifeq (${CC}, musl-gcc)
-SSL_INCLUDE = /usr/local/musl/include
-SSL_CRYPTO = -L /usr/local/musl/lib -lcrypto
-else
-SSL_INCLUDE = /usr/local/ESD/include
-SSL_CRYPTO = -L /usr/local/ESD/lib -lcrypto -ldl -lpthread
-endif
-
 LIBRARY_DEPENDS = ${HURD_LIBRARY} ${NAAAIM_LIBRARY} ${RDK_LIBRARY}
 LIBS		= ${RDKLIB} ${BUILD_ELFLIB} ${NAAAIMLIB} ${HURDLIB}
 
@@ -158,25 +150,25 @@ ldscript:
 tools: ${TOOLS}
 
 test-local-target: test-local-target.o ${LIBRARY_DEPENDS}
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO};
 
 test-local-target.o: test-local-target.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
 test-remote-target: test-remote-target.o ${LIBRARY_DEPENDS}
-	${CC} ${LDFLAGS} -o $@ $< ${LIBS} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS} ${BUILD_LIBCRYPTO};
 
 test-remote-target.o: test-remote-target.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
 srde-provisioner: srde-provisioner.o ${LIBRARY_DEPENDS}
-	${CC} ${LDFLAGS} -o $@ $< ${LIBS} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS} ${BUILD_LIBCRYPTO};
 
 srde-provisioner.o: srde-provisioner.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
 srde-attestation: srde-attestation.o ${LIBRARY_DEPENDS}
-	${CC} ${LDFLAGS} -o $@ $< ${LIBS} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS} ${BUILD_LIBCRYPTO};
 
 srde-attestation.o: srde-attestation.c
 	${CC} ${CFLAGS} -c $< -o $@;

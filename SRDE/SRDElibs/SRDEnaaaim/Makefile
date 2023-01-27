@@ -94,14 +94,6 @@ NAAAIMLIB      = -L ../../../lib -lNAAAIM
 RDK_LIBRARY = ../../libSRDEruntime.a
 RDKLIB	    = -L ../../ -lSRDEruntime
 
-ifeq (${CC}, musl-gcc)
-SSL_INCLUDE = /usr/local/musl/include
-SSL_CRYPTO = -L /usr/local/musl/lib -lcrypto
-else
-SSL_INCLUDE = /usr/local/ESD/include
-SSL_CRYPTO = -L /usr/local/ESD/lib -lcrypto -ldl -lpthread
-endif
-
 LIBRARY_DEPENDS = ${HURD_LIBRARY} ${NAAAIM_LIBRARY} ${RDK_LIBRARY}
 LIBS		= ${RDKLIB} ${BUILD_ELFLIB} ${NAAAIMLIB} ${HURDLIB}
 
@@ -184,31 +176,31 @@ ldscript:
 tools: ${TOOLS}
 
 test-naaaim: test-naaaim.o ${LIBRARY_DEPENDS}
-	${CC} ${LDFLAGS} -o $@ $< ${LIBS} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS} ${BUILD_LIBCRYPTO};
 
 test-naaaim.o: test-naaaim.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
 test-naaaim-c++: test-naaaim-c++.o ${RDK_LIBRARY} ${HURD_LIBRARY}
-	${CXX} ${LDFLAGS} -o $@ $< ${LIBS} ${SSL_CRYPTO};
+	${CXX} ${LDFLAGS} -o $@ $< ${LIBS} ${BUILD_LIBCRYPTO};
 
 test-naaaim-c++.o: test-naaaim-c++.cpp
 	${CXX} ${CFLAGS} -c $< -o $@;
 
 test-Duct: test-Duct.o ${LIBRARY_DEPENDS}
-	${CC} ${LDFLAGS} -o $@ $< ${LIBS} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS} ${BUILD_LIBCRYPTO};
 
 test-Duct.o: test-Duct.c
 	${CC} ${CFLAGS} -I ../../../lib -c $< -o $@;
 
 test-Possum: test-Possum.o ${LIBRARY_DEPENDS}
-	${CC} ${LDFLAGS} -o $@ $< ${LIBS} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS} ${BUILD_LIBCRYPTO};
 
 test-Possum.o: test-Possum.c
 	${CC} ${CFLAGS} -I ../../../lib -c $< -o $@;
 
 test-Possum2: test-Possum2.o ${LIBRARY_DEPENDS}
-	${CC} ${LDFLAGS} -o $@ $< ${LIBS} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS} ${BUILD_LIBCRYPTO};
 
 test-Possum2.o: test-Possum2.c
 	${CC} ${CFLAGS} -I ../../../lib -c $< -o $@;

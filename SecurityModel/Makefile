@@ -36,16 +36,6 @@ CFLAGS = -Wall ${CDEBUG}
 
 LDFLAGS = ${STATIC} -g
 
-# OpenSSL crypto library
-ifeq (${CC}, musl-gcc)
-SSL_INCLUDE = /usr/local/musl/include
-SSL_CRYPTO = -L /usr/local/musl/lib -lcrypto
-else
-LDFLAGS += -Wl,-rpath=/usr/local/ESD/lib
-SSL_INCLUDE = /usr/local/ESD/include
-SSL_CRYPTO = -L /usr/local/ESD/lib -lcrypto -ldl -lpthread
-endif
-
 # libcap library
 ifeq (${CC}, musl-gcc)
 LIBCAP = -L /usr/local/musl/lib -lcap
@@ -95,42 +85,42 @@ all: ${COBJS} tools
 tools: ${TOOLS}
 
 test-COE: test-COE.o COE.o EventParser.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO};
 
 test-cell: test-cell.o Cell.o EventParser.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO};
 
 test-event: test-event.o SecurityEvent.o COE.o Cell.o EventModel.o \
 	EventParser.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO};
 
 test-TSEM: test-TSEM.o TSEM.o SecurityPoint.o SecurityEvent.o COE.o Cell.o \
 	EventModel.o EventParser.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO};
 
 generate-states: generate-states.o SecurityEvent.o EventParser.o COE.o Cell.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO};
 
 compute-measurement: compute-measurement.o COE.o Cell.o EventParser.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO};
 
 compute-aggregate: compute-aggregate.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO};
 
 bad-actor: bad-actor.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO};
 
 sha-tool: sha-tool.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO};
 
 set-behavior: set-behavior.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS}
 
 sign-model: sign-model.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO};
 
 generate-pseudonym: generate-pseudonym.o Cell.o EventParser.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO};
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};

@@ -38,22 +38,7 @@ CC = musl-gcc
 LIBNAME = NAAAIM
 LIBRARY = lib${LIBNAME}.a
 
-
-#
-# Locations of SSL include files and libraries
-#
-
-ifeq (${CC}, musl-gcc)
-SSL_INCLUDE = /usr/local/musl/include
-SSL_CRYPTO = -L /usr/local/musl/lib -lcrypto
-SC_INCLUDE = /usr/local/include/PCSC
-else
-SSL_INCLUDE = /usr/local/ESD/include
-SSL_CRYPTO = -Wl,-rpath=/usr/local/ESD/lib -L /usr/local/ESD/lib \
-	-lcrypto
 SC_INCLUDE = /usr/local/ESD/include/PCSC
-endif
-
 
 CDEBUG = -O2 -fomit-frame-pointer -march=core2
 CDEBUG = -g ${DMALLOC}
@@ -76,7 +61,7 @@ LDFLAGS = -g -L ../HurdLib
 #
 COBJS = ${CSRC:.c=.o}
 
-CINCLUDE := -I .. -I ../HurdLib -I ${SSL_INCLUDE} -I /usr/local/Quixote/include
+CINCLUDE := -I .. -I ../HurdLib -I /usr/local/Quixote/include
 
 CFLAGS := ${CFLAGS} ${CINCLUDE}
 
@@ -103,32 +88,32 @@ LocalDuct_test: LocalDuct_test.o LocalDuct.o
 	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib
 
 OTEDKS_test: OTEDKS_test.o OTEDKS.o IDtoken.o
-	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${BUILD_LIBCRYPTO};
 
 Curve25519_test: Curve25519_test.o Curve25519.o RandomBuffer.o
-	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${BUILD_LIBCRYPTO};
 
 IPC_test: IPC_test.o IPC.o
 	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib -lrt;
 
 PossumPipe_test: PossumPipe_test.o PossumPipe.o IDtoken.o
 	${CC} ${LDFLAGS} -o $@ $^ -L . -lNAAAIM -L../HurdLib -lHurdLib \
-	${SSL_CRYPTO} -lrt -ltspi;
+	${BUILD_LIBCRYPTO} -lrt -ltspi;
 
 RSAkey_test: RSAkey_test.o RSAkey.o
-	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${SSL_CRYPTO}
+	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${BUILD_LIBCRYPTO}
 
 X509cert_test: X509cert_test.o X509cert.o
-	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${SSL_CRYPTO}
+	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${BUILD_LIBCRYPTO}
 
 Prompt_test: Prompt_test.o Prompt.o
-	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${SSL_CRYPTO}
+	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${BUILD_LIBCRYPTO}
 
 AES128_cmac_test: AES128_cmac_test.o AES128_cmac.o
-	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${SSL_CRYPTO}
+	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${BUILD_LIBCRYPTO}
 
 TTYduct_test: TTYduct_test.o TTYduct.o
-	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${SSL_CRYPTO}
+	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${BUILD_LIBCRYPTO}
 
 SmartCard_test: SmartCard_test.o SmartCard.o
 	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib \

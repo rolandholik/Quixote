@@ -63,15 +63,6 @@ CFLAGS = -Wall -fpic ${CDEBUG} ${CINCLUDE}
 
 LDFLAGS = ${BUILD_LDFLAGS}
 
-# OpenSSL crypto library
-ifeq (${CC}, musl-gcc)
-SSL_INCLUDE = /usr/local/musl/include
-SSL_CRYPTO = -L /usr/local/musl/lib -lcrypto
-else
-SSL_INCLUDE = /usr/local/ESD/include
-SSL_CRYPTO = -L /usr/local/ESD/lib -lcrypto -ldl -lpthread
-endif
-
 # NAAAIM library definition
 NAAAIM_LIB = -L../lib -lNAAAIM
 
@@ -129,7 +120,7 @@ srde-check: srde-check.o
 	${CC} ${LDFLAGS} -o $@ $^;
 
 srde-metadata: srde-metadata.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${BUILD_LIBCRYPTO};
 
 srde-metadata.o: srde-metadata.c
 	$(CC) $(CFLAGS) -c $< -o $@;
@@ -153,13 +144,13 @@ srde-sigstruct.o: srde-sigstruct.c
 	$(CC) $(CFLAGS) -c $< -o $@;
 
 srde-gen-token: srde-gen-token.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${BUILD_LIBCRYPTO};
 
 srde-gen-token.o: srde-gen-token.c LE_whitelist.h
 	$(CC) $(CFLAGS) -c $< -o $@;
 
 srde-provision: srde-provision.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO} \
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${BUILD_LIBCRYPTO} \
 		${INTEL_CRYPTO};
 
 srde-provision.o: srde-provision.c
@@ -178,7 +169,7 @@ generate-array.o: generate-array.c
 	$(CC) $(CFLAGS) -c $< -o $@;
 
 srde-gen-verifier: srde-gen-verifier.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${BUILD_LIBCRYPTO};
 
 srde-gen-verifier.o: srde-gen-verifier.c
 	${CC} ${CFLAGS} -c $< -o $@;
@@ -190,13 +181,15 @@ test-pcr: test-pcr.o
 	${CC} ${LDFLAGS} -static -o $@ $^ ${LIBS};
 
 srde-fandf: srde-fandf.o
-	${CC} -static ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO};
+	${CC} -static ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} \
+		${BUILD_LIBCRYPTO};
 
 srde-fandf.o: srde-fandf.c LE_whitelist.h LE.h
 	$(CC) $(CFLAGS) -c $< -o $@;
 
 srde-fandf-unibin: srde-fandf-unibin.o
-	${CC} -static ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} ${SSL_CRYPTO};
+	${CC} -static ${LDFLAGS} -o $@ $^ ${LIBS} ${NAAAIM_LIB} \
+		${BUILD_LIBCRYPTO};
 
 srde-fandf-unibin.o: srde-fandf-unibin.c LE_whitelist.h LE.h TE.h
 	$(CC) $(CFLAGS) -c $< -o $@;

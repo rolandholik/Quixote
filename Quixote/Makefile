@@ -73,20 +73,10 @@ NAAAIMLIB      = -L ../lib -lNAAAIM
 SEDE_LIBRARY = ../libSRDEruntime.a
 SEDELIB	     = -L ${SGXDIR} -lSRDEruntime
 
-# OpenSSL crypto library
-ifeq (${CC}, musl-gcc)
-SSL_INCLUDE = /usr/local/musl/include
-SSL_CRYPTO = -L /usr/local/musl/lib -lcrypto
-else
-LDFLAGS += -Wl,-rpath=/usr/local/ESD/lib
-SSL_INCLUDE = /usr/local/ESD/include
-SSL_CRYPTO = -L /usr/local/ESD/lib -lcrypto -ldl -lpthread
-endif
-
 # libcap library
 LIBCAP = -L ../support/libcap -lcap
 
-LIBS	= ${NAAAIMLIB} ${HURDLIB} ${LIBCAP} ${SSL_CRYPTO}
+LIBS	= ${NAAAIMLIB} ${HURDLIB} ${LIBCAP} ${BUILD_LIBCRYPTO}
 LIBDEPS = ${HURD_LIBRARY} ${NAAAIM_LIBRARY}
 XENLIBS = ${shell pkg-config --libs xenstore}  \
 	${shell pkg-config --libs xengnttab}   \
@@ -126,12 +116,12 @@ quixote-us: quixote-us.o ${LIBDEPS} ${MODELDEPS}
 
 quixote-sgx: quixote-sgx.o ${SANCHOSGX}/SanchoSGX.o ${LIBDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${SANCHOSGX}/SanchoSGX.o ${SEDELIB} ${LIBS} \
-		${BUILD_ELFLIB} ${SSL_CRYPTO};
+		${BUILD_ELFLIB};
 
 quixote-sgx-u: quixote-sgx-u.o ${SANCHOSGX}/SanchoSGX.o sancho-enclave.h \
 	${LIBDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${SANCHOSGX}/SanchoSGX.o ${SEDELIB} ${LIBS} \
-		${BUILD_ELFLIB} ${SSL_CRYPTO};
+		${BUILD_ELFLIB};
 
 quixote-xen: quixote-xen.o ${LIBDEPS} ${MODELDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${MODELDEPS} ${LIBS} ${XENLIBS};
