@@ -14,7 +14,7 @@ HURDINC = HurdLib/Buffer.h HurdLib/Config.h HurdLib/Fibsequence.h \
 	HurdLib/Origin.h HurdLib/String.h
 HURDLIB = HurdLib/libHurdLib.a
 
-SUBDIRS	    = Support utils SRDE Sancho SecurityModel Quixote
+SUBDIRS	    = Support SRDE Sancho SecurityModel Quixote
 DEV_SUBDIRS = lib SRDE
 
 
