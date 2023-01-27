@@ -72,8 +72,6 @@ CFLAGS = -Wall -O2 -fpic -fomit-frame-pointer -march=core2 -I ../.. \
 
 LDFLAGS = ${BUILD_LDFLAGS}
 
-ELFLIB	= -lelf
-
 HURD_LIBRARY = ../../../HurdLib
 HURDLIB	     = -L ../../../HurdLib -lHurdLib
 
@@ -130,13 +128,13 @@ ldscript:
 tools: ${TOOLS}
 
 test-fusion: test-fusion.o ${RDK_LIBRARY} ${HURD_LIBRARY}
-	${CC} ${LDFLAGS} -o $@ $< ${RDKLIB} ${ELFLIB} ${HURDLIB};
+	${CC} ${LDFLAGS} -o $@ $< ${RDKLIB} ${BUILD_ELFLIB} ${HURDLIB};
 
 test-fusion.o: test-fusion.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
 test-fusion-c++: test-fusion-c++.o ${RDK_LIBRARY} ${HURD_LIBRARY}
-	${CXX} ${LDFLAGS} -o $@ $< ${RDKLIB} ${ELFLIB} ${HURDLIB};
+	${CXX} ${LDFLAGS} -o $@ $< ${RDKLIB} ${BUILD_ELFLIB} ${HURDLIB};
 
 test-fusion-c++.o: test-fusion-c++.cpp
 	${CXX} ${CFLAGS} -c $< -o $@;

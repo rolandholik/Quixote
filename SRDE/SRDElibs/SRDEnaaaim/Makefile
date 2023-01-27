@@ -85,8 +85,6 @@ CFLAGS = -Wall -O2 -fpic -fomit-frame-pointer -march=core2 -I ../.. \
 
 LDFLAGS = ${BUILD_LDFLAGS}
 
-ELFLIB = -lelf
-
 HURD_LIBRARY = ../../../HurdLib/libHurdLib.a
 HURDLIB	     = -L ../../../HurdLib -lHurdLib
 
@@ -105,7 +103,7 @@ SSL_CRYPTO = -L /usr/local/ESD/lib -lcrypto -ldl -lpthread
 endif
 
 LIBRARY_DEPENDS = ${HURD_LIBRARY} ${NAAAIM_LIBRARY} ${RDK_LIBRARY}
-LIBS		= ${RDKLIB} ${ELFLIB} ${NAAAIMLIB} ${HURDLIB}
+LIBS		= ${RDKLIB} ${BUILD_ELFLIB} ${NAAAIMLIB} ${HURDLIB}
 
 
 #

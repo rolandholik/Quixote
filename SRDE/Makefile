@@ -101,12 +101,10 @@ SGXSDK_INCLUDES = -I/opt/intel/sgxsdk/include				\
 COBJS = ${CSRC:.c=.o}
 AOBJS = ${ASRC:.s=.o}
 
-ELFLIB = -lelf
-
 HURDLIB = -L../lib -lHurdLib
 INTEL_CRYPTO = -L/opt/intel/sgxsdk/lib64 -lsgx_tcrypto
 
-LIBS = ${RDKLIB} ${ELFLIB} ${HURDLIB}
+LIBS = ${RDKLIB} ${BUILD_ELFLIB} ${HURDLIB}
 
 CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib
 

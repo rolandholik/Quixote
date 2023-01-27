@@ -26,10 +26,15 @@ ifdef STATIC
 BUILD_LDFLAGS += -static
 endif
 
+
+# ELF library location.
+BUILD_ELFLIB = $(shell pkg-config libelf --libs)
+
+
 # Kernel version selection.
 KERNEL_VERSION = 6.1
 
-export CC KERNEL_VERSION BUILD_LDFLAGS
+export CC KERNEL_VERSION BUILD_LDFLAGS BUILD_ELFLIB
 
 
 #

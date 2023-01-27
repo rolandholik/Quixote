@@ -73,8 +73,6 @@ NAAAIMLIB      = -L ../lib -lNAAAIM
 SEDE_LIBRARY = ../libSRDEruntime.a
 SEDELIB	     = -L ${SGXDIR} -lSRDEruntime
 
-ELFLIB = -lelf
-
 # OpenSSL crypto library
 ifeq (${CC}, musl-gcc)
 SSL_INCLUDE = /usr/local/musl/include
@@ -128,12 +126,12 @@ quixote-us: quixote-us.o ${LIBDEPS} ${MODELDEPS}
 
 quixote-sgx: quixote-sgx.o ${SANCHOSGX}/SanchoSGX.o ${LIBDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${SANCHOSGX}/SanchoSGX.o ${SEDELIB} ${LIBS} \
-		${ELFLIB} ${SSL_CRYPTO};
+		${BUILD_ELFLIB} ${SSL_CRYPTO};
 
 quixote-sgx-u: quixote-sgx-u.o ${SANCHOSGX}/SanchoSGX.o sancho-enclave.h \
 	${LIBDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${SANCHOSGX}/SanchoSGX.o ${SEDELIB} ${LIBS} \
-		${ELFLIB} ${SSL_CRYPTO};
+		${BUILD_ELFLIB} ${SSL_CRYPTO};
 
 quixote-xen: quixote-xen.o ${LIBDEPS} ${MODELDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${MODELDEPS} ${LIBS} ${XENLIBS};

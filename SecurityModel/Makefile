@@ -70,13 +70,11 @@ endif
 COBJS = ${CSRC:.c=.o}
 AOBJS = ${ASRC:.s=.o}
 
-ELFLIB = -lelf
-
 HURD_LIBRARY = ../HurdLib/libHurdLib.a
 HURDLIB	     = -L ../HurdLib -lHurdLib
 
 RDK_LIBRARY = ../SRDE/libSRDEruntime.a
-RDKLIB	    = -L ../SRDE -lSRDEruntime ${ELFLIB}
+RDKLIB	    = -L ../SRDE -lSRDEruntime ${BUILD_ELFLIB}
 
 NAAAIM_LIBRARY = ../lib/libNAAAIM.a
 NAAAIMLIB      = -L ../lib -lNAAAIM
