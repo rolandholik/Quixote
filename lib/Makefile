@@ -19,18 +19,18 @@ INSTPATH = ${DESTDIR}/opt/ESD
 INSTINCLUDE = ../NAAAIM.h AES256_cbc.h Base64.h Curve25519.h Duct.h	\
 	Duct_mgr.h HTTP.h IDmgr.h IDtoken.h IPC.h Ivy.h LocalDuct.h	\
 	OTEDKS.h PossumPacket.h PossumPipe.h RSAkey.h RandomBuffer.h	\
-	SHA256.h  SHA256_hmac.h SmartCard.h SoftwareStatus.h TPM2cmd.h	\
-	X509cert.h Prompt.h TPMcmd.h AES128_cmac.h TTYduct.h XENduct.h	\
+	SHA256.h  SHA256_hmac.h SmartCard.h SoftwareStatus.h		\
+	X509cert.h Prompt.h AES128_cmac.h TTYduct.h XENduct.h		\
 	TSEMcontrol.h
 
 CSRC = Duct.c OTEDKS.c Curve25519.c IPC.c SoftwareStatus.c Ivy.c IDmgr.c    \
-	TPMcmd.c TPM2cmd.c PossumPacket.c PossumPipe.c RSAkey.c SmartCard.c \
+	RSAkey.c SmartCard.c						    \
 	LocalDuct.c HTTP.c Base64.c Duct_mgr.c SHA256.c SHA256_hmac.c	    \
 	RandomBuffer.c AES256_cbc.c IDtoken.c X509cert.c Prompt.c	    \
 	AES128_cmac.c TTYduct.c XENduct.c TSEMcontrol.c
 
-TESTS = Duct_test Curve25519_test IPC_test PossumPipe_test RSAkey_test \
-	LocalDuct_test X509cert_test Prompt_test AES128_cmac_test      \
+TESTS = Duct_test Curve25519_test IPC_test RSAkey_test			\
+	LocalDuct_test X509cert_test Prompt_test AES128_cmac_test	\
 	TTYduct_test #SmartCard_test
 
 CC = musl-gcc
@@ -95,10 +95,6 @@ Curve25519_test: Curve25519_test.o Curve25519.o RandomBuffer.o
 
 IPC_test: IPC_test.o IPC.o
 	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib -lrt;
-
-PossumPipe_test: PossumPipe_test.o PossumPipe.o IDtoken.o
-	${CC} ${LDFLAGS} -o $@ $^ -L . -lNAAAIM -L../HurdLib -lHurdLib \
-	${BUILD_LIBCRYPTO} -lrt -ltspi;
 
 RSAkey_test: RSAkey_test.o RSAkey.o
 	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${BUILD_LIBCRYPTO}
