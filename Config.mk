@@ -32,10 +32,14 @@ BUILD_ELFLIB = $(shell pkg-config libelf --libs)
 # SSL library location.
 BUILD_LIBCRYPTO = $(shell pkg-config libcrypto --libs)
 
+# Trusted Modeling Agent implentations.
+BUILD_SANCHOS = Nordic SGX Xen # STmcu
+
 # Kernel version selection.
 KERNEL_VERSION = 6.1
 
-export CC KERNEL_VERSION BUILD_LDFLAGS BUILD_ELFLIB BUILD_LIBCRYPTO
+export CC KERNEL_VERSION BUILD_LDFLAGS BUILD_ELFLIB BUILD_LIBCRYPTO \
+	BUILD_SANCHOS
 
 
 #

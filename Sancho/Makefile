@@ -13,7 +13,7 @@ include ${shell cd ..; pwd}/Build.mk
 endif
 
 # Variable declarations.
-SUBDIRS = STmcu Nordic SGX Xen
+SUBDIRS = ${BUILD_SANCHOS}
 
 
 #
