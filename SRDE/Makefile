@@ -14,7 +14,7 @@ include ${shell cd ..; pwd}/Build.mk
 endif
 
 # Variable declarations.
-INSTPATH      = ${DESTDIR}/opt/ESD
+INSTPATH      = ${BUILD_INSTPATH}
 INSTALLBIN    = srde-check srde-gen-token srde-gen-verifier srde-load \
 	srde-metadata srde-provision
 INSTALLSCRIPT = provision-epid provision-tokens provision-verifier

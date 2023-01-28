@@ -14,7 +14,7 @@ include ${shell cd ..; pwd}/Build.mk
 endif
 
 # Variable declarations.
-INSTPATH       = ${DESTDIR}/opt/Quixote
+INSTPATH       = ${BUILD_INSTPATH}
 
 SANCHODIR = ../Sancho/SGX
 

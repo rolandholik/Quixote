@@ -7,7 +7,7 @@
 
 
 # Variable declarations.
-INSTPATH       = ${DESTDIR}/opt/ESD
+INSTPATH       = ${BUILD_INSTPATH}
 INSTALLENCLAVE = LocalTarget.signed.so Attestation.signed.so \
 	Provisioner.signed.so
 

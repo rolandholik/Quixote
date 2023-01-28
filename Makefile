@@ -8,7 +8,7 @@
 # Variable declarations.
 -include Build.mk
 
-INSTPATH = ${DESTDIR}/opt/ESD
+INSTPATH = ${BUILD_INSTPATH}
 HURDINC = HurdLib/Buffer.h HurdLib/Config.h HurdLib/Fibsequence.h \
 	HurdLib/File.h HurdLib/HurdLib.h HurdLib/Options.h	  \
 	HurdLib/Origin.h HurdLib/String.h

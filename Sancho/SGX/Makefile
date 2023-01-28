@@ -6,7 +6,7 @@
 # **************************************************************************/
 
 # Variable declarations.
-INSTPATH       = ${DESTDIR}/opt/Quixote
+INSTPATH       = ${BUILD_INSTPATH}
 INSTALLENCLAVE = SanchoSGX.signed.so # ISOmanager.signed.so
 
 ifdef SRDE_PRODUCTION

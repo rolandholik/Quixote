@@ -14,7 +14,7 @@ include ${shell cd ..; pwd}/Build.mk
 endif
 
 # Variable declarations.
-INSTPATH = ${DESTDIR}/opt/Quixote
+INSTPATH = ${BUILD_INSTPATH}
 
 ifdef SRDE_PRODUCTION
 TYPE = -DSRDE_PRODUCTION
