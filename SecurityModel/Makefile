@@ -29,12 +29,10 @@ TOOLS = test-COE test-cell test-event generate-states sha-tool		\
 INSTALLBIN  = generate-states generate-pseudonym sign-model
 INSTALLSBIN = set-behavior
 
-CC = musl-gcc
-
 CDEBUG = -g -O2 -fomit-frame-pointer -march=core2
 CFLAGS = -Wall ${CDEBUG}
 
-LDFLAGS = ${STATIC} -g
+LDFLAGS = ${BUILD_LDFLAGS}
 
 # libcap library
 ifeq (${CC}, musl-gcc)

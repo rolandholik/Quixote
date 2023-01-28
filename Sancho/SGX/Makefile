@@ -62,8 +62,6 @@ ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles   \
 	-Wl,--version-script=ldscript
 
 
-CC = musl-gcc
-
 CFLAGS = -Wall -O2 -fomit-frame-pointer -march=core2 -I ../.. -I ${SGXDIR} \
 	-I ../../HurdLib -I ../../SecurityModel -I ../../lib ${TYPE}
 

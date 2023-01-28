@@ -33,8 +33,6 @@ TESTS = Duct_test Curve25519_test IPC_test RSAkey_test			\
 	LocalDuct_test X509cert_test Prompt_test AES128_cmac_test	\
 	TTYduct_test #SmartCard_test
 
-CC = musl-gcc
-
 LIBNAME = NAAAIM
 LIBRARY = lib${LIBNAME}.a
 

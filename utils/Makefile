@@ -23,8 +23,6 @@ TOOLS = gen-image load-image boot sboot init possum gen-id-verifier	\
 	idtest device-supvr mgmt-supvr mgmt-set-key vm-supvr copy-edid	\
 	tpm2-cmd
 
-CC = musl-gcc
-
 ifeq (${CC}, musl-gcc)
 MUSL_INCLUDE = /usr/local/musl/include
 QUIXOTE_INCLUDE = /usr/local/Quixote/include

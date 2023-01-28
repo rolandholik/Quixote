@@ -70,8 +70,6 @@ ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles   \
 	-Wl,--version-script=ldscript
 
 
-CC = musl-gcc
-
 TOOLS = test-naaaim test-Duct test-Possum test-Possum2
 INSTALLBIN = ${TOOLS}
 
