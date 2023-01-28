@@ -73,7 +73,7 @@ ENCLAVE_LDFLAGS = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles   \
 TOOLS = test-naaaim test-Duct test-Possum test-Possum2
 INSTALLBIN = ${TOOLS}
 
-C++TOOLS = test-naaaim-c++
+# C++TOOLS = test-naaaim-c++
 ifneq (${CC}, musl-gcc)
 TOOLS += ${C++TOOLS}
 endif

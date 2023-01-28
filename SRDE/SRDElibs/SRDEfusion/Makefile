@@ -62,7 +62,7 @@ TOOLS = test-fusion
 INSTALLBIN = ${TOOLS}
 
 ifneq (${CC}, musl-gcc)
-TOOLS += test-fusion-c++
+# TOOLS += test-fusion-c++
 endif
 
 CFLAGS = -Wall -O2 -fpic -fomit-frame-pointer -march=core2 -I ../.. \
