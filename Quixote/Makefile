@@ -91,7 +91,7 @@ MODELDEPS = ../SecurityModel/COE.o ../SecurityModel/Cell.o		  \
 	../SecurityModel/EventParser.o
 
 CFLAGS := ${CFLAGS} -I .. -I ../SecurityModel -I ../lib -I ../HurdLib \
-	-I ${SGXDIR} -I ${SANCHOSGX}
+	-I ${SGXDIR} -I ${SANCHOSGX} ${TYPE}
 
 XENCFLAGS = ${shell pkg-config --cflags xenstore}
 

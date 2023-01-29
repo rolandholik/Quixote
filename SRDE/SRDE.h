@@ -25,16 +25,13 @@
 
 #define SGX_HASH_SIZE 32
 
-#define SPID_FILENAME	    "/opt/ESD/etc/spid.txt"
-#define SGX_TOKEN_DIRECTORY "/var/lib/ESD/tokens"
+#define SPID_FILENAME	    "/opt/Quixote/etc/spid.txt"
+#define SGX_TOKEN_DIRECTORY "/var/lib/Quixote/tokens"
 
 #if defined(SRDE_PRODUCTION)
-#if !defined(SRDE_OWNER)
-#define SRDE_OWNER "ESD"
-#endif
-#define ENCLAVE_DIR	"/opt/"SRDE_OWNER"/lib/enclaves"
-#define TOKEN_DIR	"/var/lib/"SRDE_OWNER"/tokens"
-#define ENCLAVE_DEBUG	false
+#define ENCLAVE_DIR	"/opt/Quixote/lib/enclaves"
+#define TOKEN_DIR	"/var/lib/Quixote/tokens"
+#define ENCLAVE_DEBUG	true
 #else
 #define ENCLAVE_DIR	"."
 #define TOKEN_DIR	"."
