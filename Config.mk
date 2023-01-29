@@ -18,9 +18,7 @@ CC = musl-gcc
 BUILD_CFLAGS = -O2 -fomit-frame-pointer -march=core2 -Wall
 
 # Default linker flags.
-ifeq (${CC}, musl-gcc)
-BUILD_LDFLAGS = -Wl,-rpath-link=/usr/local/musl/lib -L ${TOPDIR}/HurdLib
-endif
+BUILD_LDFLAGS = -L ${TOPDIR}/HurdLib
 
 ifdef STATIC
 BUILD_LDFLAGS += -static
