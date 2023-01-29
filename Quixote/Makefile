@@ -36,6 +36,7 @@ TOOLS = quixote quixote-mcu quixote-us quixote-sgx quixote-sgx-u quixote-xen \
 INSTALLBIN  = quixote-console
 INSTALLSBIN = quixote quixote-mcu quixote-us quixote-sgx quixote-sgx-u \
 	quixote-xen
+INSTALLSCRIPTS = xen-setup
 
 ifeq ("${KERNEL_VERSION}","5.4")
 DEFINES = -DCAP_TRUST=38
@@ -149,10 +150,9 @@ test-domain-creation: test-domain-creation.o ${LIBDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
 
 install-bin:
-	[ -d ${INSTPATH}/bin ] || mkdir -p ${INSTPATH}/bin;
 	install -s ${INSTALLBIN} ${INSTPATH}/bin;
-	[ -d ${INSTPATH}/sbin ] || mkdir -p ${INSTPATH}/sbin;
 	install -s ${INSTALLSBIN} ${INSTPATH}/sbin;
+	install ${INSTALLSCRIPTS} ${INSTPATH}/sbin;
 
 clean:
 	rm -f *.o *~;

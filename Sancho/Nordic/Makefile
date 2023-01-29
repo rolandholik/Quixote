@@ -9,6 +9,8 @@
 #
 # Variable declarations.
 #
+INSTPATH = ${BUILD_INSTPATH}/share
+
 export MCUCFGDIR=${shell pwd}
 
 SUBDIRS = HurdLib NAAAIM NRF52840-DK NRF52840-DONGLE
@@ -36,6 +38,15 @@ NRF52840-DK:
 
 NRF52840-DONGLE:
 	${MAKE} -C $@;
+
+
+#
+# Installation targets.
+#
+install-bin:
+	install NRF52840-DK/Sancho/sancho.elf ${INSTPATH}/sancho-nrf-dk.elf;
+	install NRF52840-DONGLE/Sancho/sancho.elf \
+		${INSTPATH}/sancho-nrf-dongle.elf;
 
 
 #

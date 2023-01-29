@@ -66,10 +66,10 @@ Build.mk:
 	echo "export BUILD_CONFIG=true" >> Build.mk;
 	echo 'include $${TOPDIR}/Config.mk' >> Build.mk;
 
-install-bin:
+install-bin: install-path
 	set -e; for dir in ${SUBDIRS}; do ${MAKE} -C $$dir $@; done;
 
-install-dev:
+install-dev: install-path
 	[ -d ${INSTPATH}/share ] || mkdir -p ${INSTPATH}/share;
 	install -m 644 Documentation/COPYRIGHT ${INSTPATH}/share;
 	[ -d ${INSTPATH}/include ] || mkdir -p ${INSTPATH}/include;
@@ -79,6 +79,12 @@ install-dev:
 	[ -d ${INSTPATH}/lib ] || mkdir -p ${INSTPATH}/lib;
 	install -m 644 ${HURDLIB} ${INSTPATH}/lib;
 	set -e; for dir in ${DEV_SUBDIRS}; do ${MAKE} -C $$dir $@; done;
+
+install-path:
+	[ -d ${INSTPATH} ]       || mkdir -p ${INSTPATH};
+	[ -d ${INSTPATH}/bin ]   || mkdir ${INSTPATH}/bin;
+	[ -d ${INSTPATH}/sbin ]  || mkdir ${INSTPATH}/sbin;
+	[ -d ${INSTPATH}/share ] || mkdir ${INSTPATH}/share;
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};

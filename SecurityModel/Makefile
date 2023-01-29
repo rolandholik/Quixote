@@ -14,7 +14,7 @@ include ${shell cd ..; pwd}/Build.mk
 endif
 
 # Variable declarations.
-INSTPATH       = ${BUILD_INSTPATH}
+INSTPATH = ${BUILD_INSTPATH}
 
 SANCHODIR = ../Sancho/SGX
 
@@ -124,12 +124,8 @@ tags:
 	/opt/emacs/bin/etags *.{h,c};
 
 install-bin:
-	[ -d ${INSTPATH}/bin ] || mkdir -p ${INSTPATH}/bin;
 	install -s ${INSTALLBIN} ${INSTPATH}/bin;
-	[ -d ${INSTPATH}/sbin ] || mkdir -p ${INSTPATH}/sbin;
 	install -s ${INSTALLSBIN} ${INSTPATH}/sbin;
-	[ -e /distrib/SRDE/opt/ESD/sbin/runc ] && \
-		install /distrib/SRDE/opt/ESD/sbin/runc ${INSTPATH}/sbin;
 
 clean:
 	rm -f *.o *~ TAGS;

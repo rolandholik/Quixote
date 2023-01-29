@@ -77,6 +77,13 @@ ${LIBRARY}: ${COBJS}
 	${AR} r ${LIBRARY} $^;
 	${RANLIB} ${LIBRARY};
 
+
+#
+# Installation targets.
+#
+install-bin:
+	install sancho.elf ${INSTPATH}/share;
+
 clean:
 	rm -f ${COBJS} *~;
 

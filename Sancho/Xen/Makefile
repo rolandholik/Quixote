@@ -6,6 +6,8 @@
 # **************************************************************************/
 
 
+INSTPATH = ${BUILD_INSTPATH}/share
+
 SUBDIRS = HurdLib NAAAIM
 
 export stubdom=y
@@ -176,6 +178,13 @@ HurdLib: mini-os.stamp
 
 NAAAIM: mini-os.stamp
 	${MAKE} -C $@;
+
+
+#
+# Installation targets.
+#
+install-bin:
+	install Sancho/sancho.elf ${INSTPATH}/sancho-xen.elf;
 
 
 #

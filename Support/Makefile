@@ -13,6 +13,10 @@ include ${shell cd ..; pwd}/Build.mk
 endif
 
 
+# Installation path.
+INSTPATH = ${BUILD_INSTPATH}
+
+
 # Definitions for building libcap.
 LIBCAP_VERSION = 2.66
 LIBCAP_FILE    = libcap-${LIBCAP_VERSION}.tar.gz
@@ -56,6 +60,13 @@ libcap: ${LIBCAP_TAR}
 
 ${LIBCAP_TAR}:
 	wget -O $@ ${LIBCAP_URL};
+
+
+#
+# Installation target.
+#
+install-bin:
+	install -s libcap/progs/capsh ${INSTPATH}/sbin;
 
 
 #

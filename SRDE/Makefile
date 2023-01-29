@@ -15,8 +15,7 @@ endif
 
 # Variable declarations.
 INSTPATH      = ${BUILD_INSTPATH}
-INSTALLBIN    = srde-check srde-gen-token srde-gen-verifier srde-load \
-	srde-metadata srde-provision
+INSTALLBIN    = srde-gen-token
 INSTALLSCRIPT = provision-epid provision-tokens provision-verifier
 
 INSTALLDEV    = srde-sign
@@ -232,24 +231,7 @@ Sample:
 	${MAKE} -C $@;
 
 install-bin:
-	[ -d ${INSTPATH}/etc ] || mkdir -p ${INSTPATH}/etc;
-	touch ${INSTPATH}/etc/host.idt ${INSTPATH}/etc/ias-cert.pem \
-		${INSTPATH}/etc/ias-key.pem ${INSTPATH}/etc/spid.txt;
-	[ -d ${INSTPATH}/etc/verifiers ] || mkdir -p ${INSTPATH}/etc/verifiers;
-	[ -d ${INSTPATH}/etc/verifiers/ISOidentity ] || \
-		mkdir -p ${INSTPATH}/etc/verifiers/ISOidentity;
-	[ -d ${INSTPATH}/etc/verifiers/ISOmanager ] || \
-		mkdir ${INSTPATH}/etc/verifiers/ISOmanager;
-	[ -e /distrib/SRDE/opt/ESD/etc/ca-bundle.pem ] &&		    \
-		install -m 644 /distrib/SRDE/opt/ESD/etc/ca-bundle.pem \
-			${INSTPATH}/etc;
-	[ -d ${INSTPATH}/lib ] || mkdir -p ${INSTPATH}/lib;
-	[ -d ${INSTPATH}/lib ] || mkdir -p ${INSTPATH}/lib/enclaves;
-	[ -d ${INSTPATH}/bin ] || mkdir -p ${INSTPATH}/bin;
 	install -s ${INSTALLBIN} ${INSTPATH}/bin;
-	install ${INSTALLSCRIPT} ${INSTPATH}/bin;
-	${MAKE} -C SRDElibs $@;
-	${MAKE} -C Attestation $@;
 
 install-dev:
 	[ -d ${INSTPATH}/include ] || mkdir -p ${INSTPATH}/include;

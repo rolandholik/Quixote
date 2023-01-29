@@ -41,6 +41,15 @@ Xen:
 
 
 #
+# Installation targets.
+#
+install-bin:
+	${MAKE} -C SGX install-bin;
+	${MAKE} -C Xen install-bin;
+	${MAKE} -C Nordic install-bin;
+
+
+#
 # Utility targets.
 #
 clean:
