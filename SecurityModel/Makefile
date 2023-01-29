@@ -22,12 +22,11 @@ CSRC = COE.c Cell.c SecurityEvent.c SecurityPoint.c TSEM.c EventModel.c \
 	EventParser.c compute-aggregate.c generate-pseudonym.c		\
 	generate-states.c
 
-TOOLS = test-COE test-cell test-event generate-states sha-tool		\
-	compute-measurement set-behavior test-TSEM compute-aggregate	\
-	bad-actor sign-model generate-pseudonym
+TOOLS = test-COE test-cell test-event generate-states sha-tool	   \
+	compute-measurement test-TSEM compute-aggregate	sign-model \
+	generate-pseudonym
 
 INSTALLBIN  = generate-states generate-pseudonym sign-model
-INSTALLSBIN = set-behavior
 
 CDEBUG = -g -O2 -fomit-frame-pointer -march=core2
 CFLAGS = -Wall ${CDEBUG}
@@ -105,14 +104,8 @@ compute-measurement: compute-measurement.o COE.o Cell.o EventParser.o
 compute-aggregate: compute-aggregate.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO};
 
-bad-actor: bad-actor.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO};
-
 sha-tool: sha-tool.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO};
-
-set-behavior: set-behavior.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS}
 
 sign-model: sign-model.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO};
