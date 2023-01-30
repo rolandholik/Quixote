@@ -65,7 +65,8 @@ Build.mk:
 	echo "export TOPDIR=`pwd`" > Build.mk;
 	echo "export BUILD_CONFIG=true" >> Build.mk;
 	echo 'include $${TOPDIR}/Config.mk' >> Build.mk;
-	echo -e "\n# Local variable modifications here." >> Build.mk;
+	echo >> Build.mk;
+	echo "# Local variable modifications here." >> Build.mk;
 	[ -e .config ] && cat .config >> Build.mk; echo >> Build.mk \
 		|| echo >> Build.mk;
 	echo 'include $${TOPDIR}/Setup.mk' >> Build.mk;
