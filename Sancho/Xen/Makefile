@@ -19,6 +19,9 @@ GCCLIB=-L ${shell dirname ${shell ${CC} -print-libgcc-file-name}} -lgcc
 
 XEN_INCLUDE = ${shell pkg-config xenstore --cflags-only-I | \
 	sed -e 's/-I//'}
+ifeq (${XEN_INCLUDE},)
+	XEN_INCLUDE = /usr/include
+endif
 
 MINIOS_URL = git://xenbits.xen.org/mini-os.git
 
@@ -127,7 +130,9 @@ ${NEWLIB}/lib/libpci.a: pciutils mini-os.stamp
 	  cp ${PCI_INCLUDE} ${PCI_LIB}/config.h		&& \
 	  ${MAKE} CC="${PCI_CC}" lib/libpci.a		&& \
 	  cp ${PCI_LIB}/libpci.a ${NEWLIB}/lib		&& \
-	  cp ${PCI_LIB}/{config,header,pci,types}.h ${NEWLIB}/include );
+	  cp ${PCI_LIB}/config.h ${NEWLIB}/include	&& \
+	  cp ${PCI_LIB}/header.h ${NEWLIB}/include	&& \
+	  cp ${PCI_LIB}/types.h  ${NEWLIB}/include );
 
 pciutils: ${PCI_TAR}
 	tar xvf $<;
