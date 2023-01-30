@@ -11,7 +11,7 @@ TOOLDIR = /opt/ESDembedded
 
 STMDIR	= /opt/ESDembedded/share/SDK/STM32CubeExpansion_CELLULAR_V6.0.0
 RTOSDIR = ${STMDIR}/Middlewares/Third_Party/FreeRTOS/Source
-MBEDDIR = /u/usr/sources/Development_STM/mbedtls-2.16.11
+MBEDDIR = ${BUILD_MBEDDIR}
 
 CC	= ${TOOLDIR}/bin/arm-none-eabi-gcc
 AS	= ${TOOLDIR}/bin/arm-none-eabi-as

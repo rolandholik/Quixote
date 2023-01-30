@@ -29,8 +29,9 @@ DEFINES = -DMBEDTLS_CONFIG_FILE=\"mbedtls_config.h\"
 #
 LIBSRC = Base64.c RSAkey.c SHA256.c
 
-MBEDSRC = base64.c rsa.c rsa_internal.c bignum.c oid.c platform_util.c \
-	pem.c pk.c pk_wrap.c pkparse.c asn1parse.c sha256.c md.c md_wrap.c
+MBEDSRC = base64.c rsa.c rsa_internal.c bignum.c oid.c platform_util.c	\
+	pem.c pk.c pk_wrap.c pkparse.c asn1parse.c sha256.c md.c	\
+	constant_time.c
 
 CSRC = ${LIBSRC} ${MBEDSRC}
 

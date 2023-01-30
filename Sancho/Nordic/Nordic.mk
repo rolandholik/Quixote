@@ -11,7 +11,7 @@ TOOLDIR = /opt/ESDembedded
 
 NORDICDIR = ${TOOLDIR}/share/SDK/nRF5_SDK_17.1.0_ddde560
 RTOSDIR	  = ${NORDICDIR}/external/freertos
-MBEDDIR	  = /u/usr/sources/Development_STM/mbedtls-2.16.11
+MBEDDIR	  = ${BUILD_MBEDDIR}
 
 CC	= ${TOOLDIR}/bin/arm-none-eabi-gcc
 AS	= ${TOOLDIR}/bin/arm-none-eabi-as

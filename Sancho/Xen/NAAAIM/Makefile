@@ -27,7 +27,7 @@ TARGET_CPPFLAGS = -U __linux__ -U __FreeBSD__ -U __sun__ -nostdinc	\
 
 DEFINES = -DHAVE_LIBC -D__MINIOS__ -DMBEDTLS_CONFIG_FILE=\"mbedtls_config.h\"
 
-MBEDDIR	  = /u/usr/sources/Development_STM/mbedtls-2.16.11
+MBEDDIR = ${BUILD_MBEDDIR}
 
 
 #
@@ -35,8 +35,9 @@ MBEDDIR	  = /u/usr/sources/Development_STM/mbedtls-2.16.11
 #
 LIBSRC = Base64.c RSAkey.c SHA256.c
 
-MBEDSRC = base64.c rsa.c rsa_internal.c bignum.c oid.c platform_util.c \
-	pem.c pk.c pk_wrap.c pkparse.c asn1parse.c sha256.c md.c md_wrap.c
+MBEDSRC = base64.c rsa.c rsa_internal.c bignum.c oid.c platform_util.c	\
+	pem.c pk.c pk_wrap.c pkparse.c asn1parse.c sha256.c md.c	\
+	constant_time.c
 
 CSRC = ${LIBSRC} ${MBEDSRC}
 
