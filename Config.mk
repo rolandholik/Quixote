@@ -31,7 +31,8 @@ BUILD_ELFLIB = $(shell pkg-config libelf --libs)
 BUILD_LIBCRYPTO = $(shell pkg-config libcrypto --libs)
 
 # Trusted Modeling Agent implentations.
-BUILD_SANCHOS = Nordic SGX Xen # STmcu
+BUILD_SANCHOS     = Nordic SGX Xen # STmcu
+BUILD_XEN_VERSION = 4.15
 
 # Kernel version selection.
 KERNEL_VERSION = 6.1
@@ -43,7 +44,7 @@ BUILD_INSTPATH = ${DESTDIR}/opt/Quixote
 BUILD_MBEDDIR = ${TOPDIR}/Support/mbedtls
 
 export CC KERNEL_VERSION BUILD_LDFLAGS BUILD_ELFLIB BUILD_LIBCRYPTO \
-	BUILD_SANCHOS BUILD_INSTPATH BUILD_MBEDDIR
+	BUILD_SANCHOS BUILD_INSTPATH BUILD_MBEDDIR BUILD_XEN_VERSION
 
 
 #

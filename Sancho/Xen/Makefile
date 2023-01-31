@@ -5,6 +5,8 @@
 # * the source tree for copyright and licensing information.
 # **************************************************************************/
 
+include Config.mk
+TARGET_CFLAGS = ${PLATFORM}
 
 INSTPATH = ${BUILD_INSTPATH}/share
 
@@ -23,7 +25,14 @@ ifeq (${XEN_INCLUDE},)
 	XEN_INCLUDE = /usr/include
 endif
 
-MINIOS_URL = git://xenbits.xen.org/mini-os.git
+MINIOS_URL    = git://xenbits.xen.org/mini-os.git
+MINIOS_SANCHO = sancho_${BUILD_XEN_VERSION}
+ifeq ("${BUILD_XEN_VERSION}","4.15")
+MINIOS_VERSION = xen-RELEASE-4.15.4
+endif
+ifeq ("${BUILD_XEN_VERSION}","4.16")
+MINIOS_VERSION = xen-RELEASE-4.16.3
+endif
 
 NEWLIB_VERSION = 1.16.0
 NEWLIB_URL     = ftp://sourceware.org/pub/newlib/newlib-${NEWLIB_VERSION}.tar.gz
@@ -51,12 +60,9 @@ TARGET_CPPFLAGS = -U __linux__ -U __FreeBSD__ -U __sun__ -nostdinc	\
 	-isystem ${CURDIR}/mini-os/include/x86
 
 NEWLIB_CPPFLAGS = -isystem ${CURDIR}/mini-os -D__MINIOS__ -DHAVE_LIBC	\
-	${TARGET_CPPFLAGS}
-
-NEWLIB_DEFINES = -D_I386MACH_ALLOW_HW_INTERRUPTS
+	-D_I386MACH_ALLOW_HW_INTERRUPTS ${TARGET_CPPFLAGS}
 
 TARGET_LDFLAGS = -nostdlib -L ${CURDIR}/newlib-root/x86_64-xen-elf/lib
-TARGET_CFLAGS  = -mno-red-zone
 
 ZLIB_CPPFLAGS = -D__MINIOS__ -DHAVE_LIBC ${TARGET_CPPFLAGS}
 
@@ -170,9 +176,9 @@ mini-os.stamp: mini-os
 
 mini-os:
 	git clone -v ${MINIOS_URL};
-	( cd $@ 					&& \
-		git branch sancho ${MINIOS_VERSION}	&& \
-		git checkout sancho );
+	( cd $@ 					      && \
+		git branch ${MINIOS_SANCHO} ${MINIOS_VERSION} && \
+		git checkout ${MINIOS_SANCHO} );
 
 
 #

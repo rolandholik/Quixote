@@ -11,4 +11,5 @@ CC=gcc
 
 RANLIB = ranlib
 
-PLATFORM = -mno-red-zone -O1
+PLATFORM = -mno-red-zone -O1 -fno-omit-frame-pointer -fno-pie \
+	-fno-stack-protector -fno-exceptions -fno-asynchronous-unwind-tables
