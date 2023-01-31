@@ -57,3 +57,6 @@ clean:
 
 distclean:
 	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i distclean; done;
+
+purge: distclean
+	${MAKE} -C Xen purge;

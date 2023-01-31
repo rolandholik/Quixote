@@ -104,3 +104,7 @@ distclean: clean
 	${MAKE} -C HurdLib distclean;
 	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i distclean; done;
 	rm -f Build.mk;
+
+purge: distclean
+	${MAKE} -C Support purge;
+	${MAKE} -C Sancho purge;

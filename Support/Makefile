@@ -78,4 +78,6 @@ clean:
 distclean: clean
 	[ -d libcap ] && rm -rf libcap || true;
 	rm -f *.stamp;
+
+purge: distclean
 	rm -f Build/*.tar.gz;

@@ -216,7 +216,9 @@ distclean: clean
 	[ -d newlib ] && rm -frv newlib || true;
 	[ -d zlib ] && rm -rvf zlib || true;
 	[ -d pciutils ] && rm -frv pciutils || true;
-	[ -d mini-os ] && rm -frv mini-os || true;
 	rm -f *.stamp;
-	rm -frv Build/*.tar.gz;
 	make -C Sancho distclean;
+
+purge: distclean
+	[ -d mini-os ] && rm -frv mini-os || true;
+	rm -frv Build/*.tar.gz;
