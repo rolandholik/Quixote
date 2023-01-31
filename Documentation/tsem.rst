@@ -28,13 +28,6 @@ A second objective, is to reduce the skill, complexity and
 infrastructure needed to create remotely attestable platforms and/or
 workloads.
 
-The final objective is to provide a framework for the open development
-of hardware assisted security technology.  Secondary to economic
-factors, specialized security technology has frequently been 'SKUed'
-to limit its availability to select OEM's and/or verticals.  This
-introduces both technical and accessibility barriers that prevent the
-needed widespread availability and utility of the technologies.
-
 To achieve these objectives, TSEM implements the concept of a modeling
 domain, nee namespace, that reduces the complexity of a security model
 and allows it to be scoped to the level of a single process or a
@@ -48,7 +41,10 @@ modeling domains/namespaces in a known trust state.
 
 TSEM is implemented as a Linux Security Module (LSM) and is designed
 to be self-contained with little or no dependency on kernel
-infrastructure, other than the LSM hooks themselves.
+infrastructure, other than the LSM hooks themselves.  It can be
+stacked in any order with existing LSM's.  Integrity modeling of
+extended attributes would require that TSEM be earlier in the LSM call
+chain then any LSM's that consume the modeled attributes.
 
 In addition, TSEM implements its equivalent of mandatory access
 controls, without a requirement for extended attributes, filesystem
@@ -73,6 +69,13 @@ filesystem, that after boot, can be mounted with the following
 command:
 
 mount -t tsemfs tsemfs /sys/fs/tsem
+
+For experimentation, or integrating TSEM modeling into a CI
+development workflow, modeling can be restricted to subordinate
+modeling domains by booting a kernel with the following kernel
+command-line option:
+
+tsem_mode=1
 
 The Quixote trust orchestration utilities either need to be built or
 the statically compiled demonstration system needs to be installed.
