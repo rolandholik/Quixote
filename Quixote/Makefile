@@ -155,7 +155,7 @@ install-bin:
 	install ${INSTALLSCRIPTS} ${INSTPATH}/sbin;
 
 clean:
-	rm -f *.o *~;
+	rm -f *.o *~ sancho-enclave.h;
 	rm -f ${TOOLS};
 
 distclean: clean
