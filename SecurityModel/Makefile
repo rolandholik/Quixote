@@ -118,7 +118,6 @@ tags:
 
 install-bin:
 	install -s ${INSTALLBIN} ${INSTPATH}/bin;
-	install -s ${INSTALLSBIN} ${INSTPATH}/sbin;
 
 clean:
 	rm -f *.o *~ TAGS;
