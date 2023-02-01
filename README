@@ -1,0 +1,55 @@
+     Quixote - Orchestration for Trusted Security Event Modeling
+
+OVERVIEW:
+=========
+
+This source archive contains a userspace implementation of trust
+orchestrators, Trusted Modeling Agents (TMA's) and support utilities
+that enable use of the Linux Trusted Security Event Modeling (TSEM)
+Linux Security Module (LSM).
+
+The following documentation file is a copy of the documentation for
+the TSEM LSM that is part of the LSM documentation for the Linux
+kernel:
+
+Documentation/tsem.rst
+
+The noted document contains a complete review of the theory and
+implementation of the Linux TSEM LSM and serves as a good starting
+point for understanding the concepts surrounding security modeling.
+
+The beginning of this document also contains a QuickStart summary for
+the basic use of the Quixote trust orchestrators.
+
+The following URL is the download site for the Quixote Trust
+Orchestration system:
+
+ftp://ftp.enjellic.com/pub/Quixote
+
+Users who may want to experiment with trust orchestration, without
+moving forward with a full compilation, will find packages that
+contain pre-compiled binaries. These binares are statically compiled
+and linked against the MUSL C library and should run on any x86_64
+platform with a TSEM enabled kernel.
+
+The FTP site also contains patches against long term stable kernels.
+
+Trust Orchestrators:
+====================
+
+Trust orchestrators are utilities that run in a process in a
+subordinate security modeling domain coupled with a Trusted Modeling
+Agent (TMA).  The root of trust for a modeling domain is determined by
+where the TMA is implemented.
+
+The following trust orchestrators are currently implemented:
+
+Utility			TMA Location
+-------			------------
+quixote			Kernel
+quixote-us		Userspace process
+quixote-sgx		SGX enclave
+quixote-sgx-u		SGX enclave (unified binary)
+quixote-xen		Xen hypervisor stub domain
+quixote-mcu		Micro-controller
+
