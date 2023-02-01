@@ -9,6 +9,8 @@
 -include Build.mk
 
 INSTPATH = ${BUILD_INSTPATH}
+VARPATH  = ${BUILD_VARPATH}
+
 HURDINC = HurdLib/Buffer.h HurdLib/Config.h HurdLib/Fibsequence.h \
 	HurdLib/File.h HurdLib/HurdLib.h HurdLib/Options.h	  \
 	HurdLib/Origin.h HurdLib/String.h
@@ -84,10 +86,16 @@ install-dev: install-path
 	set -e; for dir in ${DEV_SUBDIRS}; do ${MAKE} -C $$dir $@; done;
 
 install-path:
-	[ -d ${INSTPATH} ]       || mkdir -p ${INSTPATH};
-	[ -d ${INSTPATH}/bin ]   || mkdir ${INSTPATH}/bin;
-	[ -d ${INSTPATH}/sbin ]  || mkdir ${INSTPATH}/sbin;
-	[ -d ${INSTPATH}/share ] || mkdir ${INSTPATH}/share;
+	[ -d ${INSTPATH} ]		  || mkdir -p ${INSTPATH};
+	[ -d ${INSTPATH}/bin ]		  || mkdir ${INSTPATH}/bin;
+	[ -d ${INSTPATH}/sbin ]		  || mkdir ${INSTPATH}/sbin;
+	[ -d ${INSTPATH}/share ]	  || mkdir ${INSTPATH}/share;
+	[ -d ${VARPATH} ]		  || mkdir -p ${VARPATH};
+	[ -d ${VARPATH}/Magazine]	  || mkdir ${VARPATH}/Magazine;
+	[ -d ${VARPATH}/mgmt		  || mkdir ${VARPATH}/mgmt;
+	[ -d ${VARPATH}/mgmt/cartridges ] || mkdir ${VARPATH}/mgmt/cartridges;
+	[ -d ${VARPATH}/mgmt/processes ]  || mkdir ${VARPATH}/mgmt/processes;
+	[ -d ${VARPATH}/tokens ]	  || mkdir ${VARPATH}/tokens;
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};

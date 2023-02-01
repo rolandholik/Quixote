@@ -37,8 +37,9 @@ BUILD_XEN_VERSION = 4.15
 # Kernel version selection.
 KERNEL_VERSION = 6.1
 
-# Installation path.
+# Installation paths.
 BUILD_INSTPATH = ${DESTDIR}/opt/Quixote
+BUILD_VARPATH  = ${DESTDIR}/var/lib/Quixote
 
 # Path to mbedtls source.
 BUILD_MBEDDIR = ${TOPDIR}/Support/mbedtls
