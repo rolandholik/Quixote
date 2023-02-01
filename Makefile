@@ -71,6 +71,8 @@ Build.mk: .config
 		|| echo >> Build.mk;
 	echo 'include $${TOPDIR}/Setup.mk' >> Build.mk;
 
+install: install-bin
+
 install-bin: install-path
 	set -e; for dir in ${SUBDIRS}; do ${MAKE} -C $$dir $@; done;
 
