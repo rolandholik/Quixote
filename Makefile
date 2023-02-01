@@ -25,7 +25,7 @@ DEV_SUBDIRS = lib SRDE
 
 
 # Targets
-all: config HurdLib/libHurdLib.a lib ${SUBDIRS}
+all: HurdLib/libHurdLib.a lib ${SUBDIRS}
 
 HurdLib/libHurdLib.a:
 	cd HurdLib && CC=${CC} CFLAGS="${BUILD_CFLAGS}" ./configure;
@@ -59,9 +59,7 @@ Sancho:
 Support:
 	${MAKE} -C $@;
 
-config: Build.mk
-
-Build.mk:
+Build.mk: .config
 	echo "export TOPDIR=`pwd`" > Build.mk;
 	echo "export BUILD_CONFIG=true" >> Build.mk;
 	echo 'include $${TOPDIR}/Config.mk' >> Build.mk;
