@@ -5,11 +5,9 @@
 # * the source tree for copyright and licensing information.
 # **************************************************************************
 
-
-# Variable declarations.
 TOOLDIR = /opt/ESDembedded
 
-NORDICDIR = ${TOOLDIR}/share/SDK/nRF5_SDK_17.1.0_ddde560
+NORDICDIR = ${BUILD_NORDIC_DIR}
 RTOSDIR	  = ${NORDICDIR}/external/freertos
 MBEDDIR	  = ${BUILD_MBEDDIR}
 

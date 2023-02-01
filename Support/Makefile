@@ -36,11 +36,17 @@ LIBCAP_PATCH = Build/libcap-2.66_cap_41.patch
 endif
 
 
-# Definitions for the mbedtls source package
+# Definitions for the mbedtls source package.
 MBEDTLS_VERSION = 2.28.1
 MBEDTLS_FILE    = v${MBEDTLS_VERSION}.tar.gz
 MBEDTLS_TAR     = Build/${MBEDTLS_FILE}
 MBEDTLS_URL     = ${BUILD_MBEDURL}/${MBEDTLS_FILE}
+
+
+# Definitions for the Nordic Software Development kit.
+NORDIC_FILE = nRF5_SDK_17.1.0_ddde560.zip
+NORDIC_ZIP  = Build/${NORDIC_FILE}
+NORDIC_URL  = ${BUILD_NORDIC_URL}/${NORDIC_FILE}
 
 
 #
@@ -48,7 +54,7 @@ MBEDTLS_URL     = ${BUILD_MBEDURL}/${MBEDTLS_FILE}
 #
 .PHONY: all
 
-all: libcap.stamp mbedtls.stamp
+all: libcap.stamp mbedtls.stamp nordic.stamp
 
 
 #
@@ -84,6 +90,20 @@ ${MBEDTLS_TAR}:
 
 
 #
+# Nordic SDK sources.
+#
+nordic.stamp: nRF5_SDK
+	touch $@;
+
+nRF5_SDK: ${NORDIC_ZIP}
+	unzip -x $<;
+	mv nRF5_SDK_17.1.0_ddde560 nRF5_SDK;
+
+${NORDIC_ZIP}:
+	wget -O $@ ${NORDIC_URL};
+
+
+#
 # Installation target.
 #
 install-bin:
@@ -95,10 +115,11 @@ install-bin:
 #
 clean:
 	[ -d libcap ] && make -C libcap clean || true;
-	[ -d mbedtls ] && rm -rf mbedtls || true;
 
 distclean: clean
 	[ -d libcap ] && rm -rf libcap || true;
+	[ -d mbedtls ] && rm -rf mbedtls || true;
+	[ -d nRF5_SDK ] && rm -rf nRF5_SDK || true;
 	rm -f *.stamp;
 
 purge: distclean

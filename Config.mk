@@ -46,9 +46,15 @@ BUILD_MBEDDIR = ${TOPDIR}/Support/mbedtls
 # URL for mbedtls download.
 BUILD_MBEDURL = https://github.com/Mbed-TLS/mbedtls/archive/refs/tags
 
+# URL for Nordic Software Development Kit.
+BUILD_NORDIC_URL = https://developer.nordicsemi.com/nRF5_SDK/nRF5_SDK_v17.x.x
+
+# Source location for Nordic SDK.
+BUILD_NORDIC_DIR = ${TOPDIR}/Support/nRF5_SDK
+
 export CC KERNEL_VERSION BUILD_LDFLAGS BUILD_ELFLIB BUILD_LIBCRYPTO \
 	BUILD_SANCHOS BUILD_INSTPATH BUILD_MBEDDIR BUILD_MBEDURL    \
-	BUILD_XEN_VERSION
+	BUILD_XEN_VERSION BUILD_NORDIC_URL BUILD_NORDIC_DIR
 
 
 #

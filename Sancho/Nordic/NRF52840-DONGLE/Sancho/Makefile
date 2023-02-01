@@ -6,8 +6,12 @@
 # **************************************************************************
 
 #
-# Include micro-controller build definitions.
+# Include global and sub-system build configuration.
 #
+ifndef BUILD_CONFIG
+include ${shell cd ../../../..; pwd}/Build.mk
+endif
+
 ifndef MCUCFGDIR
 MCUCFGDIR=${shell cd ../..; pwd}
 endif
