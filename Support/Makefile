@@ -36,12 +36,19 @@ LIBCAP_PATCH = Build/libcap-2.66_cap_41.patch
 endif
 
 
+# Definitions for the mbedtls source package
+MBEDTLS_VERSION = 2.28.1
+MBEDTLS_FILE    = v${MBEDTLS_VERSION}.tar.gz
+MBEDTLS_TAR     = Build/${MBEDTLS_FILE}
+MBEDTLS_URL     = ${BUILD_MBEDURL}/${MBEDTLS_FILE}
+
+
 #
 # Generic build targets.
 #
 .PHONY: all
 
-all: libcap.stamp
+all: libcap.stamp mbedtls.stamp
 
 
 #
@@ -63,6 +70,20 @@ ${LIBCAP_TAR}:
 
 
 #
+# mbedtls source.
+#
+mbedtls.stamp: mbedtls
+	touch $@;
+
+mbedtls: ${MBEDTLS_TAR}
+	tar xf $<;
+	mv mbedtls-${MBEDTLS_VERSION} mbedtls;
+
+${MBEDTLS_TAR}:
+	wget -O $@ ${MBEDTLS_URL};
+
+
+#
 # Installation target.
 #
 install-bin:
@@ -74,6 +95,7 @@ install-bin:
 #
 clean:
 	[ -d libcap ] && make -C libcap clean || true;
+	[ -d mbedtls ] && rm -rf mbedtls || true;
 
 distclean: clean
 	[ -d libcap ] && rm -rf libcap || true;
