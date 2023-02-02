@@ -20,10 +20,6 @@ BUILD_CFLAGS = -O2 -fomit-frame-pointer -march=core2 -Wall
 # Default linker flags.
 BUILD_LDFLAGS = -L ${TOPDIR}/HurdLib
 
-ifdef STATIC
-BUILD_LDFLAGS += -static
-endif
-
 # ELF library location.
 BUILD_ELFLIB = $(shell pkg-config libelf --libs)
 

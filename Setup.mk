@@ -15,3 +15,7 @@
 ifeq (${CC}, musl-gcc)
 BUILD_LDFLAGS += -Wl,-rpath-link=/usr/local/musl/lib
 endif
+
+ifdef BUILD_STATIC
+BUILD_LDFLAGS += -static
+endif
