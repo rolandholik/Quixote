@@ -71,6 +71,9 @@ Build.mk: .config
 		|| echo >> Build.mk;
 	echo 'include $${TOPDIR}/Setup.mk' >> Build.mk;
 
+.config:
+	[ ! -e $@ ] && touch $@ || true;
+
 install: install-bin
 
 install-bin: install-path
