@@ -46,7 +46,7 @@ endif
 ifeq ("${KERNEL_VERSION}","5.15")
 DEFINES = -DCAP_TRUST=41
 endif
-ifeq ("${KERNEL_VERSION}","6.1")
+ifeq ("${KERNEL_VERSION}","6.x")
 DEFINES = -DCAP_TRUST=41
 endif
 

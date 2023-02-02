@@ -33,7 +33,7 @@ ifeq ("${KERNEL_VERSION}","5.15")
 LIBCAP_PATCH = Build/libcap-2.66_cap_41.patch
 endif
 
-ifeq ("${KERNEL_VERSION}","6.1")
+ifeq ("${KERNEL_VERSION}","6.x")
 LIBCAP_PATCH = Build/libcap-2.66_cap_41.patch
 endif
 
