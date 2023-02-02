@@ -20,7 +20,7 @@
 
 /* Local defines. */
 #define DEVICE	"/dev/isgx"
-#define ENCLAVE	"/opt/intel/sgxpsw/aesm/libsgx_qe.signed.so"
+#define ENCLAVE	"/opt/Quixote/share/intel/sgxpsw/aesm/libsgx_qe.signed.so"
 
 
 /* Include files. */

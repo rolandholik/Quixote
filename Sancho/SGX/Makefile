@@ -28,7 +28,7 @@ ENCLAVE_CC = gcc
 SGXDIR = ../../SRDE
 include ${SGXDIR}/Make.enclave
 
-SGX_SSL = /opt/intel/sgxssl
+SGX_SSL = /opt/Quixote/share/intel/sgxssl
 
 SGX_INCLUDE = -I $(SGX_SDK)/include -I $(SGX_SDK)/include/tlibc		  \
 	-I $(SGX_SDK)/include/stlport -I ../../SecurityModel		  \

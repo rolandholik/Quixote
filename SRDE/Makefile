@@ -42,9 +42,9 @@ TOOLS = srde-check srde-metadata srde-loader srde-load srde-sigstruct	\
 	srde-provision srde-gen-verifier
 
 
-LE	     = /opt/intel/sgxpsw/aesm/libsgx_le.signed.so
-LE_WHITELIST = /opt/intel/sgxpsw/aesm/sgx_white_list_cert.bin
-LE_SIGSTRUCT = /opt/intel/sgxpsw/aesm/le_prod_css.bin
+LE	     = /opt/Quixote/share/intel/sgxpsw/aesm/libsgx_le.signed.so
+LE_WHITELIST = /opt/Quixote/share/intel/sgxpsw/aesm/sgx_white_list_cert.bin
+LE_SIGSTRUCT = /opt/Quixote/share/intel/sgxpsw/aesm/le_prod_css.bin
 
 SGXKEY = ${CURDIR}/Signing-key.pem
 export SGXKEY
@@ -70,7 +70,7 @@ RDKLIB = -L . -lSRDEruntime
 
 # Sources for SGX include files, used by sdk-compute-size utility.
 SGXSDK = /u/usr/src/SGX/linux-sgx
-SGXSDK_INCLUDES = -I/opt/intel/sgxsdk/include				\
+SGXSDK_INCLUDES = -I/opt/Quixote/share/intel/sgxsdk/include		\
 	-I ${SGXSDK}/psw/ae/inc/internal -I ${SGXSDK}/external/epid-sdk \
 	-I ${SGXSDK}/common/inc/internal -I ${SGXSDK}/psw/ae/pve
 
@@ -92,7 +92,7 @@ COBJS = ${CSRC:.c=.o}
 AOBJS = ${ASRC:.s=.o}
 
 HURDLIB = -L../lib -lHurdLib
-INTEL_CRYPTO = -L/opt/intel/sgxsdk/lib64 -lsgx_tcrypto
+INTEL_CRYPTO = -L/opt/Quixote/share/intel/sgxsdk/lib64 -lsgx_tcrypto
 
 LIBS = ${RDKLIB} ${BUILD_ELFLIB} ${HURDLIB}
 
@@ -194,13 +194,13 @@ srde-fandf-unibin.o: srde-fandf-unibin.c LE_whitelist.h LE.h TE.h
 	$(CC) $(CFLAGS) -c $< -o $@;
 
 SRDEecdsa.o: SRDEecdsa.c
-	$(CC) $(CFLAGS) -I /opt/intel/sgxsdk/include -c $< -o $@;
+	$(CC) $(CFLAGS) -I /opt/Quixote/share/intel/sgxsdk/include -c $< -o $@;
 
 SRDEcmac.o: SRDEcmac.c
-	$(CC) $(CFLAGS) -I /opt/intel/sgxsdk/include -c $< -o $@;
+	$(CC) $(CFLAGS) -I /opt/Quixote/share/intel/sgxsdk/include -c $< -o $@;
 
 SRDEaesgcm.o: SRDEaesgcm.c
-	$(CC) $(CFLAGS) -I /opt/intel/sgxsdk/include -c $< -o $@;
+	$(CC) $(CFLAGS) -I /opt/Quixote/share/intel/sgxsdk/include -c $< -o $@;
 
 
 sigstruct.h: generate-array

@@ -13,7 +13,7 @@
 
 /* Local defines. */
 #define DEVICE	"/dev/isgx"
-#define ENCLAVE	"/opt/intel/sgxpsw/aesm/libsgx_pce.signed.so"
+#define ENCLAVE	"/opt/Quixote/share/intel/sgxpsw/aesm/libsgx_pce.signed.so"
 
 #define XID_SIZE 8
 #define MAX_HEADER_SIZE 6

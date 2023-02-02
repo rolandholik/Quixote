@@ -18,6 +18,8 @@
 #define DATE		"2020"
 #define COMPANY		"Enjellic Systems Development, LLC"
 
+#define LAUNCH_ENCLAVE	"/opt/Quixote/share/intel/sgxpsw/aesm/libsgx_le.signed.so"
+
 
 /* Include files. */
 #include <stdio.h>
@@ -106,8 +108,8 @@ static void usage(char *err)
 	fputs("\t-p:\tGenerate token for a non-debug enclave.\n\n", stdout);
 
 	fputs("\t-e:\tEnclave to generate token for.\n", stdout);
-	fputs("\t-l:\tLocation of launch enclave.\n\t\t\tdefault = "	\
-	      "/opt/intel/sgxpsw/aesm/libsgx_le.signed.so\n", stdout);
+	fputs("\t-l:\tLocation of launch enclave.\n\t\t\tdefault = " \
+	      LAUNCH_ENCLAVE, stdout);
 	fputs("\t-n:\tSGX device node.\n\t\t\tdefault = /dev/isgx\n", stdout);
 	fputs("\t-o:\tOutput file.\n\t\t\tdefault = stdout\n", stdout);
 
@@ -303,7 +305,7 @@ extern int main(int argc, char *argv[])
 	      debug_enclave = true;
 
 	char *sgx_device     = "/dev/isgx",
-	     *launch_enclave = "/opt/intel/sgxpsw/aesm/libsgx_le.signed.so",
+	     *launch_enclave = LAUNCH_ENCLAVE,
 	     *output_file    = "-",
 	     *init_enclave   = NULL;
 
