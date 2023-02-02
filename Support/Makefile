@@ -12,6 +12,8 @@ ifndef BUILD_CONFIG
 include ${shell cd ..; pwd}/Build.mk
 endif
 
+KERNEL_VERSION = ${BUILD_KERNEL_VERSION}
+
 
 # Installation path.
 INSTPATH = ${BUILD_INSTPATH}
