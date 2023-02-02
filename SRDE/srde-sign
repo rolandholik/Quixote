@@ -103,7 +103,7 @@ fi;
 
 
 # Sign the enclave using the temporary XML configuration.
-/opt/intel/sgxsdk/bin/sgx_sign sign -key $Key -enclave $Enclave \
+/opt/Quixote/share/intel/sgxsdk/bin/sgx_sign sign -key $Key -enclave $Enclave \
 	-out $Output -config $XMLfile;
 
 
