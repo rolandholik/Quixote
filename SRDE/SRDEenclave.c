@@ -1185,8 +1185,9 @@ static _Bool boot_slot(CO(SRDEenclave, this), int slot, \
 	_restore_fp_state(xsave_buffer);
 	*retc = rc;
 	--S->thread_cnt;
-	if ( rc != 0 ) {
-		fprintf(stderr, "Enter enclave returns: %d\n", rc);
+	if ( (rc != 0) && (slot != -5) ) {
+		fprintf(stderr, "Enter enclave slot %d returns: %d\n", slot, \
+			rc);
 		ERR(goto done);
 	}
 
