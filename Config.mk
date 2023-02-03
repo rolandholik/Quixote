@@ -12,7 +12,7 @@
 #
 
 # Compiler selection.
-CC = musl-gcc
+CC = gcc
 
 # Generic compiler flags to use for the build.
 BUILD_CFLAGS = -O2 -fomit-frame-pointer -march=core2 -Wall
