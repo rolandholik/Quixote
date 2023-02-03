@@ -38,7 +38,7 @@ TOOLS = quixote quixote-mcu quixote-us quixote-sgx quixote-sgx-u quixote-xen \
 INSTALLBIN  = quixote-console
 INSTALLSBIN = quixote quixote-mcu quixote-us quixote-sgx quixote-sgx-u \
 	quixote-xen
-INSTALLSCRIPTS = xen-setup
+INSTALLSCRIPTS = setup-quixote-xen
 
 ifeq ("${KERNEL_VERSION}","5.4")
 DEFINES = -DCAP_TRUST=38
