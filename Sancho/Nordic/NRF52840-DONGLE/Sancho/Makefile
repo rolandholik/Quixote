@@ -200,9 +200,8 @@ link-script:
 
 flash: sancho.elf
 	${OBJCOPY} -O ihex $^ $^.hex;
-
-reset:
-	${PROGRAMMER} -r;
+	./nrf-flash "${BUILD_NRFUTIL}" $^.hex;
+	rm $^.hex;
 
 clean:
 	rm -f *.o;
