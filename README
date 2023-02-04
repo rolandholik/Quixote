@@ -361,6 +361,25 @@ functionality that is most useful for development work on the Nordic
 SanchoMCU implementation itself.  It requires a separate programming
 utility to be installed, something currently left to interested users.
 
+The source distribution accepts the following targets for returning
+the source tree to its original state:
+
+clean
+
+distclean
+
+purge
+
+The 'clean' target conducts a general clean of the source tree that
+will cause a re-compilation of the source tree.  It removes binaries
+and object files.
+
+The 'distclean' target invokes the 'clean' target and removes generated
+files that do not change after their creation.
+
+The 'purge' target invokes the 'distclean' target and in addition
+removes any downloaded files.
+
 
 Trust Orchestrator Console Access:
 ==================================
