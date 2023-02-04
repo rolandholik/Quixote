@@ -227,8 +227,9 @@ clean:
 	rm -f ${LIBRARY};
 
 distclean: clean
-	rm -f test-naaaim.so test-naaaim.signed.so test-Duct.so \
-		test-Duct.signed.so test-Possum.so test-Possum.signed.so;
+	rm -f test-naaaim.so test-naaaim.signed.so test-Duct.so;
+	rm -f test-Duct.signed.so test-Possum.so test-Possum.signed.so;
+	rm -f test-Possum2.so test-Possum2.signed.so;
 
 
 # Source dependencies.

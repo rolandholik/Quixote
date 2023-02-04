@@ -45,8 +45,10 @@ install-dev:
 	cp Makefile.sample ${TESTPATH}/Makefile;
 
 clean:
-	rm -f test-fusion.c test-fusion-enclave.c test-fusion-interface.{c,h};
-	rm -f test-naaaim.c test-naaaim-enclave.c test-naaaim-interface.{c,h};
+	rm -f test-fusion.c test-fusion-enclave.c;
+	rm -f test-fusion-interface.c test-fusion-interface.h;
+	rm -f test-naaaim.c test-naaaim-enclave.c;
+	rm -f test-naaaim-interface.c test-naaaim-interface.h;
 
 distclean: clean
 	rm -f test-fusion-enclave.xml
