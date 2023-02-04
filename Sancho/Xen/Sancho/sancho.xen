@@ -1,7 +1,16 @@
-name = "sancho"
-kernel = "/u/usr/sources/NAAAIM/Sancho/Xen/Sancho/sancho.elf"
-memory = 8
+#
+# Sample configuration file to execute the SanchoXen Trusted Modeling
+# Agent.
+#
+# After executing both the SanchoXen implementation and the domU
+# instance that will use the implementation the following command
+# should be run:
+#
+# setup-quixote-xen sancho DOMU
+#
+# Where DOMU is replaced with the name of the domU instance.
+#
 
-# disk = [ "file:/var/lib/Xesd/Quixote/vtpm.vd,vdev=hda,access=rw" ]
-# vtpm = [ "backend=vtpm-mgr, uuid=47425db6-0953-4ec8-b2f2-333290808b99" ]
-# extra = "loglevel=debug"
+name = "sancho"
+kernel = "/opt/Quixote/share/sancho-xen.elf"
+memory = 8

@@ -9,6 +9,7 @@ include Config.mk
 TARGET_CFLAGS = ${PLATFORM}
 
 INSTPATH = ${BUILD_INSTPATH}/share
+ETCPATH  = ${BUILD_INSTPATH}/etc
 
 SUBDIRS = HurdLib NAAAIM
 
@@ -196,6 +197,7 @@ NAAAIM: mini-os.stamp
 #
 install-bin:
 	install Sancho/sancho.elf ${INSTPATH}/sancho-xen.elf;
+	install Sancho/sancho.xen ${ETCPATH}/sancho.xen;
 
 
 #
