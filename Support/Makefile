@@ -126,3 +126,4 @@ distclean: clean
 
 purge: distclean
 	rm -f Build/*.tar.gz;
+	rm -f Build/${NORDIC_FILE};
