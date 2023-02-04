@@ -75,6 +75,7 @@ Build.mk: .config
 	[ ! -e $@ ] && touch $@ || true;
 
 install: install-bin
+	cp README ${INSTPATH}/share/doc;
 
 install-bin: install-path
 	set -e; for dir in ${SUBDIRS}; do ${MAKE} -C $$dir $@; done;
@@ -92,9 +93,11 @@ install-dev: install-path
 
 install-path:
 	[ -d ${INSTPATH} ]		  || mkdir -p ${INSTPATH};
+	[ -d ${INSTPATH}/etc ]		  || mkdir ${INSTPATH}/etc;
 	[ -d ${INSTPATH}/bin ]		  || mkdir ${INSTPATH}/bin;
 	[ -d ${INSTPATH}/sbin ]		  || mkdir ${INSTPATH}/sbin;
 	[ -d ${INSTPATH}/share ]	  || mkdir ${INSTPATH}/share;
+	[ -d ${INSTPATH}/share/doc ]	  || mkdir ${INSTPATH}/share/doc;
 	[ -d ${VARPATH} ]		  || mkdir -p ${VARPATH};
 	[ -d ${VARPATH}/Magazine]	  || mkdir ${VARPATH}/Magazine;
 	[ -d ${VARPATH}/mgmt		  || mkdir ${VARPATH}/mgmt;
