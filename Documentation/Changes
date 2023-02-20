@@ -118,3 +118,45 @@ Version 1.3:
 	* Optimize SecurityModel regex implementation.
 
 	* Kernel driver naming convention changes.
+
+Version 1.4:
+	* Supports initial open-source release of TSEM.
+
+	* Expand number of modeled security events.
+
+	* Replace system call interface with pseudo-filesystem interface.
+
+	* Updated functional definition of security state points.
+
+	* Implement generic event modeling.
+
+	* Support explicit naming of control sockets for process based
+	  domains.
+
+	* Implement model/trajectory output on domain completion.
+
+	* Move all functional to independent filesystem implementation
+	  in /sys/fs/tsem
+
+	* Implement build of custom libcap to support CAP_TRUST.
+
+	* Initial implementation of custom build configuration.
+
+	* Validate build against Ubuntu 22.04.
+
+	* Drop regular expression based event parsing.
+
+	* Drop saving of event descriptions for SanchoMCU implementations.
+
+	* Update SRDE to work with enclaves built against version 2.18
+	  of Intel SGX PSW/SDK.
+
+	* Convert SRDE build to use elf-utils rather than libelf.
+
+	* Automatically download mbedtls source.
+
+	* Automatically download Nordic SDK sources.
+
+	* Use BSD 2-clause plus patent license.
+
+	* Add a README file to explain basic use and functionality.
