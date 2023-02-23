@@ -20,12 +20,12 @@
  * Copyright (c) 2020, Enjellic Systems Development, LLC. All rights reserved.
  **************************************************************************/
 
-#define MEASUREMENT_FILE "/sys/fs/tsem/measurement"
-#define STATE_FILE	 "/sys/fs/tsem/state"
-#define TRAJECTORY_FILE	 "/sys/fs/tsem/trajectory"
-#define POINTS_FILE	 "/sys/fs/tsem/points"
-#define FORENSICS_FILE	 "/sys/fs/tsem/forensics"
-#define AGGREGATE_FILE	 "/sys/fs/tsem/aggregate"
+#define MEASUREMENT_FILE "/sys/kernel/security/tsem/measurement"
+#define STATE_FILE	 "/sys/kernel/security/tsem/state"
+#define TRAJECTORY_FILE	 "/sys/kernel/security/tsem/trajectory"
+#define POINTS_FILE	 "/sys/kernel/security/tsem/points"
+#define FORENSICS_FILE	 "/sys/kernel/security/tsem/forensics"
+#define AGGREGATE_FILE	 "/sys/kernel/security/tsem/aggregate"
 
 #define READ_SIDE  0
 #define WRITE_SIDE 1

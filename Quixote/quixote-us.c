@@ -1512,7 +1512,7 @@ static _Bool setup_namespace(int *fdptr, _Bool enforce)
 
 	/* Create the pathname to the event update file. */
 	memset(fname, '\0', sizeof(fname));
-	if ( snprintf(fname, sizeof(fname), SYSFS_UPDATES, \
+	if ( snprintf(fname, sizeof(fname), TSEM_UPDATE_FILE, \
 		      (long long int) id) >= sizeof(fname) )
 		ERR(goto done);
 	if ( Debug )

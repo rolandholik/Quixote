@@ -12,8 +12,8 @@
  **************************************************************************/
 
 /* Local definitions. */
-#define CONTROL_FILE	"/sys/fs/tsem/control"
-#define ID_FILE		"/sys/fs/tsem/id"
+#define CONTROL_FILE	"/sys/kernel/security/tsem/control"
+#define ID_FILE		"/sys/kernel/security/tsem/id"
 
 
 /* Include files. */
