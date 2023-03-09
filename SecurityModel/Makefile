@@ -20,11 +20,11 @@ SANCHODIR = ../Sancho/SGX
 
 CSRC = COE.c Cell.c SecurityEvent.c SecurityPoint.c TSEM.c EventModel.c \
 	EventParser.c compute-aggregate.c generate-pseudonym.c		\
-	generate-states.c
+	generate-states.c test-parser.c
 
 TOOLS = test-COE test-cell test-event generate-states sha-tool	   \
 	compute-measurement test-TSEM compute-aggregate	sign-model \
-	generate-pseudonym
+	generate-pseudonym test-parser
 
 INSTALLBIN  = generate-states generate-pseudonym sign-model
 
@@ -112,6 +112,9 @@ sign-model: sign-model.o
 
 generate-pseudonym: generate-pseudonym.o Cell.o EventParser.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO};
+
+test-parser: test-parser.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
 tags:
 	/opt/emacs/bin/etags *.{h,c};

@@ -107,3 +107,5 @@
 #define NAAAIM_XENduct_OBJID		67
 #define NAAAIM_TSEMcontrol_OBJID	68
 #define NAAAIM_EventParser_OBJID	69
+#define NAAAIM_TSEMparser_OBJID		70
+#define NAAAIM_TSEMevent_OBJID		71
