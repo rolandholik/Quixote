@@ -41,6 +41,7 @@ struct NAAAIM_TSEMcontrol
 
 	_Bool (*id)(const TSEMcontrol, uint64_t *);
 
+	_Bool (*generate_key)(const TSEMcontrol);
 	void (*whack)(const TSEMcontrol);
 
 	/* Private state. */

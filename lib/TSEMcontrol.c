@@ -31,6 +31,7 @@
 #include <File.h>
 
 #include "NAAAIM.h"
+#include "RandomBuffer.h"
 #include "TSEMcontrol.h"
 
 
@@ -69,6 +70,9 @@ struct NAAAIM_TSEMcontrol_State
 	/* String object used to compose the command. */
 	String cmdstr;
 
+	/* String object used to hold the TMA authentication key. */
+	String key;
+
 	/* File object that implements I/O to the control file. */
 	File file;
 };
@@ -90,6 +94,8 @@ static void _init_state(CO(TSEMcontrol_State, S)) {
 	S->objid = NAAAIM_TSEMcontrol_OBJID;
 
 	S->poisoned = false;
+
+	S->key = NULL;
 
 	return;
 }
@@ -191,7 +197,11 @@ static _Bool external(CO(TSEMcontrol, this))
 	_Bool retn = false;
 
 
-	if ( !S->cmdstr->add(S->cmdstr, "external\n") )
+	if ( S->key == NULL )
+		ERR(goto done);
+
+	if ( !S->cmdstr->add_sprintf(S->cmdstr, "external %s\n", \
+				     S->key->get(S->key)) )
 		ERR(goto done);
 
 	if ( !_write_cmd(S) )
@@ -300,7 +310,11 @@ static _Bool discipline(CO(TSEMcontrol, this), pid_t pid)
 	_Bool retn = false;
 
 
-	if ( !S->cmdstr->add_sprintf(S->cmdstr, "untrusted %d\n", pid) )
+	if ( S->key == NULL )
+		ERR(goto done);
+
+	if ( !S->cmdstr->add_sprintf(S->cmdstr, "untrusted %d %s\n", pid, \
+				     S->key->get(S->key)) )
 		ERR(goto done);
 
 	if ( !_write_cmd(S) )
@@ -339,7 +353,11 @@ static _Bool release(CO(TSEMcontrol, this), pid_t pid)
 	_Bool retn = false;
 
 
-	if ( !S->cmdstr->add_sprintf(S->cmdstr, "trusted %d\n", pid) )
+	if ( S->key == NULL )
+		ERR(goto done);
+
+	if ( !S->cmdstr->add_sprintf(S->cmdstr, "trusted %d %s\n", pid, \
+				     S->key->get(S->key)) )
 		ERR(goto done);
 
 	if ( !_write_cmd(S) )
@@ -522,12 +540,68 @@ static _Bool pseudonym(CO(TSEMcontrol, this), CO(Buffer, pseudonym))
 /**
  * External public method.
  *
+ * This method is used to generate the authentication key that will
+ * be used to authenticate trust release commands issued by this
+ * object.
+ *
+ * \param this	The object that is generating the authentication key.
+ *
+ * \return	A boolean value is used to indicate the status of
+ *		the key generation.  A false value indicates an error
+ *		occured and the object cannot be trusted to have
+ *		a valid key.  A true value indicates the object has
+ *		a key.
+ */
+
+static _Bool generate_key(CO(TSEMcontrol, this))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	uint8_t *p;
+
+	size_t lp;
+
+	Buffer bufr;
+
+	RandomBuffer rnd = NULL;
+
+
+	INIT(NAAAIM, RandomBuffer, rnd, ERR(goto done));
+	if ( !rnd->generate(rnd, 256 / 8) )
+		ERR(goto done);
+	bufr = rnd->get_Buffer(rnd);
+
+	/* Convert the key into its ASCII equivalent. */
+	INIT(HurdLib, String, S->key, ERR(goto done));
+
+	p = bufr->get(bufr);
+	for (lp= 0; lp < bufr->size(bufr); ++lp)
+		S->key->add_sprintf(S->key, "%02x", *(p + lp));
+
+	if ( S->key->poisoned(S->key) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	WHACK(rnd);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a destructor for a TSEMcontrol object.
  *
  * \param this	A pointer to the object which is to be destroyed.
  */
 
-static void whack(const TSEMcontrol const this)
+static void whack(CO(TSEMcontrol, this))
 
 {
 	STATE(S);
@@ -535,6 +609,7 @@ static void whack(const TSEMcontrol const this)
 
 	WHACK(S->bufr);
 	WHACK(S->cmdstr);
+	WHACK(S->key);
 	WHACK(S->file);
 
 	S->root->whack(S->root, this, S);
@@ -599,6 +674,7 @@ extern TSEMcontrol NAAAIM_TSEMcontrol_Init(void)
 
 	this->id = id;
 
+	this->generate_key = generate_key;
 	this->whack = whack;
 
 	return this;

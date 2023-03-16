@@ -2085,8 +2085,11 @@ extern int main(int argc, char *argv[])
 
 	/* Initialize the security model and its controller. */
 	INIT(NAAAIM, TSEM, Model, ERR(goto done));
-	INIT(NAAAIM, TSEMcontrol, Control, ERR(goto done));
 	INIT(NAAAIM, TSEMevent, Event, ERR(goto done));
+
+	INIT(NAAAIM, TSEMcontrol, Control, ERR(goto done));
+	if ( !Control->generate_key(Control) )
+		ERR(goto done);
 
 
 	/* Load and seal a security model if specified. */
