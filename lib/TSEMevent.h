@@ -38,6 +38,7 @@ struct NAAAIM_TSEMevent
 	_Bool (*read_event)(const TSEMevent, const int fd);
 
 	enum TSEM_export_type (*extract_export)(const TSEMevent);
+	_Bool (*extract_event)(const TSEMevent);
 	_Bool (*extract_field)(const TSEMevent, const char *);
 
 	_Bool (*get_text)(const TSEMevent, const char *, const String);

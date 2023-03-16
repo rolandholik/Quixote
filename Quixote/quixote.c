@@ -70,6 +70,7 @@
 #include "Base64.h"
 #include "RSAkey.h"
 #include "TSEMcontrol.h"
+#include "TSEMevent.h"
 
 #include "SecurityPoint.h"
 #include "SecurityEvent.h"
@@ -366,11 +367,14 @@ static _Bool send_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 	File ef = NULL;
 
+	TSEMevent event = NULL;
+
 
 	/*
 	 * Compute the number of lines in the trajectory.
 	 */
 	INIT(HurdLib, String, es, ERR(goto done));
+	INIT(NAAAIM, TSEMevent, event, ERR(goto done));
 
 	INIT(HurdLib, File, ef, ERR(goto done));
 	if ( !ef->open_ro(ef, FORENSICS_FILE) )
@@ -398,6 +402,15 @@ static _Bool send_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 		es->reset(es);
 		ef->read_String(ef, es);
 
+		if ( !event->set_event(event, es) )
+			ERR(goto done);
+		if ( !event->extract_event(event) )
+			ERR(goto done);
+
+		es->reset(es);
+		if ( !event->encode_event(event, es) )
+			ERR(goto done);
+
 		cmdbufr->reset(cmdbufr);
 		cmdbufr->add(cmdbufr, (void *) es->get(es), es->size(es) + 1);
 		if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
@@ -410,6 +423,7 @@ static _Bool send_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
  done:
 	WHACK(es);
 	WHACK(ef);
+	WHACK(event);
 
 	return retn;
 }
@@ -527,11 +541,14 @@ static _Bool send_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 	File ef = NULL;
 
+	TSEMevent event = NULL;
+
 
 	/*
 	 * Compute the number of lines in the trajectory.
 	 */
 	INIT(HurdLib, String, es, ERR(goto done));
+	INIT(NAAAIM, TSEMevent, event, ERR(goto done));
 
 	INIT(HurdLib, File, ef, ERR(goto done));
 	if ( !ef->open_ro(ef, TRAJECTORY_FILE) )
@@ -559,10 +576,20 @@ static _Bool send_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 		es->reset(es);
 		ef->read_String(ef, es);
 
+		if ( !event->set_event(event, es) )
+			ERR(goto done);
+		if ( !event->extract_event(event) )
+			ERR(goto done);
+
+		es->reset(es);
+		if ( !event->encode_event(event, es) )
+			ERR(goto done);
+
 		cmdbufr->reset(cmdbufr);
 		cmdbufr->add(cmdbufr, (void *) es->get(es), es->size(es) + 1);
 		if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
 			ERR(goto done);
+		event->reset(event);
 	}
 
 	retn = true;
@@ -571,6 +598,7 @@ static _Bool send_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
  done:
 	WHACK(es);
 	WHACK(ef);
+	WHACK(event);
 
 	return retn;
 }

@@ -252,6 +252,45 @@ static enum TSEM_export_type extract_export(CO(TSEMevent, this))
 /**
  * External public method.
  *
+ * This method implements setting up for the extraction of the event
+ * description.  This allows the object to parse a security event
+ * description that is output by an internally modeled domain in the
+ * trajectory and forensics pseudo-files.
+ *
+ * \param this	A pointer to the object whose export event is to
+ *		be interrogated.
+ *
+ * \return	A boolean value is used to indicate the status of
+ *		the event extraction.  A false value indicates that
+ *		an error occurred during the extraction of the event.
+ *		A true value indicates the event description was
+ *		extracted and the event can undergo further
+ *		decoding.
+ */
+
+static _Bool extract_event(CO(TSEMevent, this))
+
+{
+	STATE(S);
+
+	_Bool retn = true;
+
+	S->parser->reset(S->parser);
+	if ( !S->parser->extract_field(S->parser, S->event, "event") )
+		ERR(goto done);
+
+	S->type = TSEM_EVENT_EVENT;
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements the retrieval of the event description
  * from the object.  The TSEMevent->extract_export() method must have
  * been successfully called before this method will succeed.
@@ -678,6 +717,7 @@ extern TSEMevent NAAAIM_TSEMevent_Init(void)
 	this->set_event	 = set_event;
 
 	this->extract_export = extract_export;
+	this->extract_event  = extract_event;
 	this->extract_field  = extract_field;
 
 	this->get_text	    = get_text;
