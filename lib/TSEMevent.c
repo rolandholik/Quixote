@@ -625,6 +625,60 @@ static _Bool encode_event(CO(TSEMevent, this), CO(String, output))
 /**
  * External public method.
  *
+ * This method encodes a JSON encoded security violation description into
+ * a Quixote encoded field description that can be interpreted by
+ * the EventParser object.
+ *
+ * \param this	A pointer to the object whose field is to be encoded.
+ *
+ * \param str	A pointer to the object that the encoded field will
+ *		be placed in.
+ *
+ * \return	A boolean value is used to indicate the success or failure
+ *		of the encoding.  A false value indicates an error was
+ *		encountered during the encoding while a true value
+ *		indicates the supplied str object contains a validly
+ *		encoded field.
+ */
+
+static _Bool encode_log(CO(TSEMevent, this), CO(String, output))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	String str = NULL;
+
+
+	if ( S->type != TSEM_EVENT_LOG )
+		ERR(goto done);
+
+	INIT(HurdLib, String, str, ERR(goto done));
+
+	output->reset(output);
+	if ( !output->add(output, "log{") )
+		ERR(goto done);
+	if ( !_add_key(S->parser, ", ", "process", str, output) )
+		ERR(goto done);
+	if ( !_add_key(S->parser, ", ", "event", str, output) )
+		ERR(goto done);
+	if ( !_add_key(S->parser, "}", "action", str, output) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	WHACK(str);
+
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements the reset of the TSEMevent object to prepare
  * it for another event description read.  The Buffer object is not
  * reset in order to preserve its size as it is being used as a
@@ -724,6 +778,7 @@ extern TSEMevent NAAAIM_TSEMevent_Init(void)
 	this->get_integer   = get_integer;
 
 	this->encode_event = encode_event;
+	this->encode_log   = encode_log;
 
 	this->reset = reset;
 	this->whack = whack;

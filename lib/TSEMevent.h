@@ -44,6 +44,7 @@ struct NAAAIM_TSEMevent
 	_Bool (*get_text)(const TSEMevent, const char *, const String);
 	_Bool (*get_integer)(const TSEMevent, const char *, long long int *);
 	_Bool (*encode_event)(const TSEMevent, const String);
+	_Bool (*encode_log)(const TSEMevent, const String);
 
 	void (*reset)(const TSEMevent);
 	void (*whack)(const TSEMevent);

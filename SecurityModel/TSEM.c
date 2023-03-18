@@ -893,6 +893,8 @@ static _Bool add_TSEM_event(CO(TSEM, this), CO(String, event))
 
 	_Bool retn = false;
 
+	String str = NULL;
+
 
 	/* Verify object status. */
 	if ( S->poisoned )
@@ -907,7 +909,11 @@ static _Bool add_TSEM_event(CO(TSEM, this), CO(String, event))
 	}
 
 	/* Log the security violation. */
-	if ( !GADD(S->TE_events, event) )
+	INIT(HurdLib, String, str, ERR(goto done));
+	if ( !str->add(str, event->get(event)) )
+		ERR(goto done);
+
+	if ( !GADD(S->TE_events, str) )
 		ERR(goto done);
 	retn = true;
 

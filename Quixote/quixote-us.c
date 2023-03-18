@@ -495,7 +495,7 @@ static _Bool add_aggregate(String str)
  * Private function.
  *
  * This function carries out the addition of a description of an
- * intercepted LSM event to the current security domain model.
+ * intercepted LSM security violation event.
  *
  * \param TSEM_event	A pointer to the character buffer containing
  *			the ASCII encoded event.
@@ -506,19 +506,18 @@ static _Bool add_aggregate(String str)
  *			the addition succeeded.
  */
 
-static _Bool add_TSEM_event(CO(String, event))
+static _Bool add_log(CO(String, event))
 
 {
 	_Bool retn = false;
 
 
 	event->reset(event);
-	if ( !Event->get_text(Event, "log", event) )
+	if ( !Event->encode_log(Event, event) )
 		ERR(goto done);
 
 	if ( !Model->add_TSEM_event(Model, event) )
 		ERR(goto done);
-
 	retn = true;
 
 
@@ -574,7 +573,7 @@ static _Bool process_event(const char *event)
 			break;
 
 		case TSEM_EVENT_LOG:
-			retn = add_TSEM_event(str);
+			retn = add_log(str);
 			break;
 
 		default:
@@ -1931,7 +1930,8 @@ static _Bool fire_cartridge(CO(LocalDuct, mgmt), CO(char *, cartridge), \
 
 			rc = poll(poll_data, 1, -1);
 			if ( Debug )
-				fprintf(Debug, "Poll returns: %d\n", rc);
+				fprintf(Debug, "%s(%d): Poll returns: %d\n",
+					__func__, getpid(), rc);
 			if ( rc < 0 ) {
 				if ( errno == -EINTR ) {
 					fputs("poll interrupted.\n", stderr);
