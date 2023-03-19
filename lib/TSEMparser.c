@@ -237,14 +237,33 @@ static _Bool get_field(CO(TSEMparser, this), CO(String, str))
 static char * _find_key(CO(TSEMparser_State, S), CO(char *, key))
 
 {
+	char *p,
+	     *type,
+	     add[2];
+
+
 	/* Create the key descriptor. */
 	S->key_value->reset(S->key_value);
-	if ( !S->key_value->add_sprintf(S->key_value, "\"%s\": \"", key) )
+	if ( !S->key_value->add_sprintf(S->key_value, "\"%s\": ", key) )
 		return NULL;
 
-	/* Return the start of the key descriptor. */
-	return strstr(S->field->get(S->field), \
-		      S->key_value->get(S->key_value));
+	/* Verify that the key is found and terminate it appropriately. */
+	p = strstr(S->field->get(S->field), S->key_value->get(S->key_value));
+	if ( p == NULL )
+		return NULL;
+
+	type = p + S->key_value->size(S->key_value);
+	if ( *type == '\0' )
+		return NULL;
+	if ( (*type != '"') && (*type != '{') )
+		return NULL;
+
+	add[0] = *type;
+	add[1] = '\0';
+	if ( !S->key_value->add(S->key_value, add) )
+		return NULL;
+
+	return p;
 }
 
 

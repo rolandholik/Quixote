@@ -447,6 +447,66 @@ static _Bool _add_key(CO(TSEMparser, parser), CO(char *, term),
 
 
 /**
+ * Internal private function.
+ *
+ * This function is a helper function for the convert_field method that
+ * carries out the copying of a JSON encoded event description into
+ * its Quixote encoded equivalent.
+ *
+ * \param S		A pointer to the state object that the method
+ *			is acting on.
+ *
+ * \param in		The object containing the JSON encoded description.
+ *
+ * \param out		The object to which the encoded field will be
+ *			copied to.
+ *
+ * \return		A boolean value is used to indicate the result
+ *			of the copy.  A false value indicates a
+ *			failure ocurred while a true value indicates the
+ *			output object has a valid string.
+ */
+
+static _Bool _copy_field(CO(String, in), CO(String, out))
+
+{
+	_Bool retn = false;
+
+	char *p,
+	     str[2];
+
+	p = in->get(in);
+	str[1] = '\0';
+	while ( *p != '\0' ) {
+		if ( *p == '"' ) {
+			++p;
+			continue;
+		}
+		if ( (*p == ' ') && (*(p-1) == ':') ) {
+			++p;
+			continue;
+	       }
+	       if ( *p == ':' ) {
+		       if ( *(p+2) == '{' )
+			       break;
+		       str[0] = '=';
+	       }
+	       else
+		       str[0] = *p;
+	       if ( !out->add(out, str) )
+		       ERR(goto done);
+	       ++p;
+	}
+
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
  * Internal public method.
  *
  * This function is a helper methodfor the ->encode_event method.
@@ -479,9 +539,6 @@ static _Bool _convert_field(CO(TSEMevent_State, S), CO(char *, field), \
 {
 	_Bool retn = false;
 
-	char *p,
-	     in[2];
-
 
        if ( !S->parser->extract_field(S->parser, S->event, field) )
 	       ERR(goto done);
@@ -493,26 +550,8 @@ static _Bool _convert_field(CO(TSEMevent_State, S), CO(char *, field), \
        if ( !output->add_sprintf(output, "%s", field) )
 	       ERR(goto done);
 
-       p = str->get(str);
-       in[1] = '\0';
-       while ( *p != '\0' ) {
-	       if ( *p == '"' ) {
-		       ++p;
-		       continue;
-	       }
-	       if ( (*p == ' ') && (*(p-1) == ':') ) {
-		       ++p;
-		       continue;
-	       }
-	       if ( *p == ':' )
-		       in[0] = '=';
-	       else
-		       in[0] = *p;
-	       if ( !output->add(output, in) )
-		       ERR(goto done);
-	       ++p;
-       }
-
+       if ( !_copy_field(str, output) )
+	       ERR(goto done);
        retn = true;
 
 
@@ -549,10 +588,10 @@ static _Bool encode_event(CO(TSEMevent, this), CO(String, output))
 {
 	STATE(S);
 
-	_Bool have_file,
-	      retn = false;
+	_Bool retn = false;
 
-	char type[64];
+	char *p,
+	     type[64];
 
 	String str = NULL;
 
@@ -571,7 +610,6 @@ static _Bool encode_event(CO(TSEMevent, this), CO(String, output))
 	str->reset(str);
 	if ( !S->parser->get_text(S->parser, "filename", str) )
 		ERR(goto done);
-	have_file = strcmp(str->get(str), "none") != 0;
 
 	if ( S->parser->has_key(S->parser, "pid") ) {
 		str->reset(str);
@@ -598,16 +636,54 @@ static _Bool encode_event(CO(TSEMevent, this), CO(String, output))
 	str->reset(str);
 	if ( !output->add(output, " ") )
 		ERR(goto done);
-	if ( strcmp(type, "file_open") == 0 )
-		strcpy(type, "file");
-	if ( !_convert_field(S, type, str, output) )
-		ERR(goto done);
 
-	if ( (strcmp(type, "mmap_file") == 0) && have_file ) {
-		str->reset(str);
-		if ( !output->add(output, " ") )
+	if ( strcmp(type, "file_open") == 0 ) {
+		strcpy(type, "file");
+		if ( !_convert_field(S, type, str, output) )
 			ERR(goto done);
-		if ( !_convert_field(S, "file", str, output) )
+	} else if ( strcmp(type, "mmap_file") == 0 ) {
+		if ( !S->parser->extract_field(S->parser, S->event, \
+					       "mmap_file") )
+			ERR(goto done);
+
+		str->reset(str);
+		if ( !S->parser->has_key(S->parser, "file") ) {
+			if ( !_convert_field(S, type, str, output) )
+				ERR(goto done);
+		} else {
+			if ( !S->parser->get_field(S->parser, str) )
+				ERR(goto done);
+
+			p = strstr(str->get(str), ", \"file\"");
+			if ( p == NULL )
+				ERR(goto done);
+			*p = '\0';
+
+			if ( !output->add(output, "mmap_file") )
+				ERR(goto done);
+			if ( !_copy_field(str, output) )
+				ERR(goto done);
+
+			str->reset(str);
+			if ( !S->parser->get_field(S->parser, str) )
+				ERR(goto done);
+
+			S->parser->reset(S->parser);
+			if ( !S->parser->extract_field(S->parser, str, \
+						       "file") )
+				ERR(goto done);
+
+			str->reset(str);
+			if ( !S->parser->get_field(S->parser, str) )
+				ERR(goto done);
+
+			if ( !output->add(output, "} file") )
+				ERR(goto done);
+			if ( !_copy_field(str, output) )
+				ERR(goto done);
+		}
+	} else {
+		if ( !_convert_field(S, type, str, output) )
 			ERR(goto done);
 	}
 
