@@ -539,6 +539,8 @@ static _Bool _convert_field(CO(TSEMevent_State, S), CO(char *, field), \
 {
 	_Bool retn = false;
 
+	const char *outfield = strcmp(field, "file_open") ? field : "file";
+
 
        if ( !S->parser->extract_field(S->parser, S->event, field) )
 	       ERR(goto done);
@@ -547,7 +549,7 @@ static _Bool _convert_field(CO(TSEMevent_State, S), CO(char *, field), \
        if ( !S->parser->get_field(S->parser, str) )
 	       ERR(goto done);
 
-       if ( !output->add_sprintf(output, "%s", field) )
+       if ( !output->add_sprintf(output, "%s", outfield) )
 	       ERR(goto done);
 
        if ( !_copy_field(str, output) )
@@ -637,11 +639,7 @@ static _Bool encode_event(CO(TSEMevent, this), CO(String, output))
 	if ( !output->add(output, " ") )
 		ERR(goto done);
 
-	if ( strcmp(type, "file_open") == 0 ) {
-		strcpy(type, "file");
-		if ( !_convert_field(S, type, str, output) )
-			ERR(goto done);
-	} else if ( strcmp(type, "mmap_file") == 0 ) {
+	if ( strcmp(type, "mmap_file") == 0 ) {
 		if ( !S->parser->extract_field(S->parser, S->event, \
 					       "mmap_file") )
 			ERR(goto done);
