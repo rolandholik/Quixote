@@ -61,7 +61,7 @@ struct coe_characteristics {
 	uint32_t fsuid;
 	uint32_t fsgid;
 
-	uint64_t capability;
+	uint64_t capeff;
 };
 
 /** COE private state information. */
@@ -130,7 +130,7 @@ static void set_characteristics(CO(COE, this), const uint32_t uid,	     \
 				  const uint32_t gid, const uint32_t egid,   \
 				  const uint32_t sgid, const uint32_t fsuid, \
 				  const uint32_t fsgid, 		     \
-				  const uint64_t capability)
+				  const uint64_t capeff)
 
 {
 	STATE(S);
@@ -146,7 +146,7 @@ static void set_characteristics(CO(COE, this), const uint32_t uid,	     \
 	S->character.fsuid = fsuid;
 	S->character.fsgid = fsgid;
 
-	S->character.capability = capability;
+	S->character.capeff = capeff;
 
 	return;
 }
@@ -306,7 +306,7 @@ static _Bool parse(CO(COE, this), CO(String, entry))
 	if ( !_get_field(parser, "fsgid", &S->character.fsgid) )
 		ERR(goto done);
 
-	if ( !_get_caps(parser, "cap", &S->character.capability) )
+	if ( !_get_caps(parser, "capeff", &S->character.capeff) )
 		ERR(goto done);
 
 	retn = true;
@@ -369,8 +369,8 @@ static _Bool measure(CO(COE, this))
 		  sizeof(S->character.fsuid));
 	bufr->add(bufr, (void *) &S->character.fsuid, \
 		  sizeof(S->character.fsgid));
-	if ( !bufr->add(bufr, (void *) &S->character.capability, \
-			sizeof(S->character.capability)) )
+	if ( !bufr->add(bufr, (void *) &S->character.capeff, \
+			sizeof(S->character.capeff)) )
 		ERR(goto done);
 
 	if ( !S->identity->add(S->identity, bufr) )
@@ -482,7 +482,7 @@ static _Bool format(CO(COE, this), CO(String, event))
 		       (unsigned long int) S->character.sgid,		\
 		       (unsigned long int) S->character.fsuid,		\
 		       (unsigned long int) S->character.fsgid,		\
-		       (unsigned long long int) S->character.capability);
+		       (unsigned long long int) S->character.capeff);
 	if ( used >= sizeof(bufr) )
 		ERR(goto done);
 
@@ -549,8 +549,8 @@ static void dump(CO(COE, this))
 	fprintf(stdout, "sgid:  %lu\n", (unsigned long int) S->character.sgid);
 	fprintf(stdout, "fsuid: %lu\n", (unsigned long int) S->character.fsuid);
 	fprintf(stdout, "fsgid: %lu\n", (unsigned long int) S->character.fsgid);
-	fprintf(stdout, "caps:  %llx\n", \
-		(unsigned long long int) S->character.capability);
+	fprintf(stdout, "capeff: %llx\n", \
+		(unsigned long long int) S->character.capeff);
 
 	fputs("measurement: ", stdout);
 	S->identity->print(S->identity);
