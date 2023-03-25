@@ -178,65 +178,59 @@ static _Bool enforce(CO(TSEMcontrol, this))
 /**
  * External public method.
  *
- * This method creates a TSEM security namespace that is externally
- * evaluated.
+ * This method creates a TSEM security namespace based on the parameters
+ * provided to the function.
  *
  * \param this	The object that will be implementing the command.
  *
+ * \param type	The type of the namespace, either internal or external,
+ *		that is to be created.
+ *
+ * \param ns	The enumeration type defining what namespace should
+ *		be used as a reference for the parameters for the
+ *		security event decriptions.
+ *
  * \return	A boolean value is used to indicate the status of
- *		setting of enforcement mode.  A true value indicates
- *		the write succeeded while a false value indicates
+ *		creating the namespace.  A true value indicates
+ *		the setup succeeded while a false value indicates
  *		a failure.
  */
 
-static _Bool external(CO(TSEMcontrol, this))
+static _Bool create_ns(CO(TSEMcontrol, this),
+		       const enum TSEMcontrol_ns_config type,
+		       const enum TSEMcontrol_ns_config ns)
 
 {
 	STATE(S);
 
-	_Bool retn = false;
+	_Bool retn     = false,
+	      external = (type == TSEMcontrol_TYPE_EXTERNAL);
 
 
-	if ( S->key == NULL )
+	if ( external && (S->key == NULL) )
 		ERR(goto done);
 
-	if ( !S->cmdstr->add_sprintf(S->cmdstr, "external %s\n", \
-				     S->key->get(S->key)) )
+	if ( external )
+		S->cmdstr->add(S->cmdstr, "external ");
+	else if ( type == TSEMcontrol_TYPE_INTERNAL )
+		S->cmdstr->add(S->cmdstr, "internal ");
+	else
 		ERR(goto done);
 
-	if ( !_write_cmd(S) )
+	if ( ns == TSEMcontrol_INIT_NS )
+		S->cmdstr->add(S->cmdstr, "init");
+	else if ( ns == TSEMcontrol_CURRENT_NS )
+		S->cmdstr->add(S->cmdstr, "current");
+	else
 		ERR(goto done);
-	retn = true;
 
+	if ( external ) {
+		if ( !S->cmdstr->add_sprintf(S->cmdstr, " %s",
+					     S->key->get(S->key)) )
+			ERR(goto done);
+	}
 
- done:
-	return retn;
-}
-
-
-/**
- * External public method.
- *
- * This method creates a TSEM security namespace that is modeled
- * by a kernel based Trusted Modeling Agent.
- *
- * \param this	The object that will be implementing the command.
- *
- * \return	A boolean value is used to indicate the status of
- *		setting of enforcement mode.  A true value indicates
- *		the write succeeded while a false value indicates
- *		a failure.
- */
-
-static _Bool internal(CO(TSEMcontrol, this))
-
-{
-	STATE(S);
-
-	_Bool retn = false;
-
-
-	if ( !S->cmdstr->add(S->cmdstr, "internal\n") )
+	if ( !S->cmdstr->add(S->cmdstr, "\n") )
 		ERR(goto done);
 
 	if ( !_write_cmd(S) )
@@ -660,10 +654,9 @@ extern TSEMcontrol NAAAIM_TSEMcontrol_Init(void)
 	_init_state(this->state);
 
 	/* Method initialization. */
-	this->enforce  = enforce;
-	this->external = external;
-	this->internal = internal;
-	this->seal     = seal;
+	this->enforce	= enforce;
+	this->create_ns = create_ns;
+	this->seal	= seal;
 
 	this->discipline = discipline;
 	this->release	 = release;

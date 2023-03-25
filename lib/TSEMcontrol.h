@@ -15,6 +15,15 @@
 #ifndef NAAAIM_TSEMcontrol_HEADER
 #define NAAAIM_TSEMcontrol_HEADER
 
+/**
+ * Enumerations for setting up a TSEM namespace.
+ */
+enum TSEMcontrol_ns_config {
+	TSEMcontrol_TYPE_INTERNAL = 1,
+	TSEMcontrol_TYPE_EXTERNAL,
+	TSEMcontrol_INIT_NS,
+	TSEMcontrol_CURRENT_NS
+};
 
 /* Object type definitions. */
 typedef struct NAAAIM_TSEMcontrol * TSEMcontrol;
@@ -27,6 +36,9 @@ typedef struct NAAAIM_TSEMcontrol_State * TSEMcontrol_State;
 struct NAAAIM_TSEMcontrol
 {
 	/* External methods. */
+	_Bool (*create_ns)(const TSEMcontrol,
+			   const enum TSEMcontrol_ns_config,
+			   const enum TSEMcontrol_ns_config);
 	_Bool (*enforce)(const TSEMcontrol);
 	_Bool (*external)(const TSEMcontrol);
 	_Bool (*internal)(const TSEMcontrol);

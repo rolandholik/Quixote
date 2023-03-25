@@ -126,6 +126,13 @@ static _Bool Sealed = false;
 static _Bool Trajectory = false;
 
 /**
+ * This variable is used to control whether the security event
+ * descriptions are to reference the initial user namespace or
+ * the current user namespace that the process is running in.
+ */
+static _Bool Current_Namespace = false;
+
+/**
  * This variable is used to signal that a modeling error has occurred
  * and signals the disciplining code to unilaterally release a process
  * rather then model is status in the security domain.
@@ -1243,13 +1250,20 @@ static _Bool setup_namespace(int *fdptr, _Bool enforce)
 
 	uint64_t id;
 
+	enum TSEMcontrol_ns_config ns;
+
 	TSEMcontrol control = NULL;
 
 
 	/* Create and configure a security model namespace. */
 	INIT(NAAAIM, TSEMcontrol, control, ERR(goto done));
 
-	if ( !control->external(control) )
+	if ( Current_Namespace )
+		ns = TSEMcontrol_CURRENT_NS;
+	else
+		ns = TSEMcontrol_INIT_NS;
+
+	if ( !control->create_ns(control, TSEMcontrol_TYPE_EXTERNAL, ns) )
 		ERR(goto done);
 	if ( !control->id(control, &id) )
 		ERR(goto done);
@@ -1847,7 +1861,7 @@ extern int main(int argc, char *argv[])
 	LocalDuct mgmt = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "CPSetc:d:m:o:p:")) != EOF )
+	while ( (opt = getopt(argc, argv, "CPSetuc:d:m:o:p:")) != EOF )
 		switch ( opt ) {
 			case 'C':
 				Mode = cartridge_mode;
@@ -1863,6 +1877,9 @@ extern int main(int argc, char *argv[])
 				break;
 			case 't':
 				Trajectory = true;
+				break;
+			case 'u':
+				Current_Namespace = true;
 				break;
 
 			case 'c':

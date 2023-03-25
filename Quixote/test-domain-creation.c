@@ -43,6 +43,8 @@ int main(int argc, char *argv[])
 
 
 	INIT(NAAAIM, TSEMcontrol, Control, ERR(goto done));
+	if ( !Control->generate_key(Control) )
+		ERR(goto done);
 
 	pid = fork();
 	if (pid < 0) {
@@ -52,7 +54,8 @@ int main(int argc, char *argv[])
 
 	/* Child process. */
 	if ( pid == 0 ) {
-		if ( !Control->external(Control) )
+		if ( !Control->create_ns(Control, TSEMcontrol_TYPE_EXTERNAL,
+					 TSEMcontrol_INIT_NS) )
 			ERR(goto done);
 		fputs("Created namespace.\n", stderr);
 		if ( !Control->id(Control, &id) )

@@ -120,6 +120,13 @@ static _Bool Pause = false;
 static _Bool Trajectory = false;
 
 /**
+ * This variable is used to control whether the security event
+ * descriptions are to reference the initial user namespace or
+ * the current user namespace that the process is running in.
+ */
+static _Bool Current_Namespace = false;
+
+/**
  * The following variable holds booleans which describe signals
  * which were received.
  */
@@ -1176,9 +1183,16 @@ static _Bool setup_namespace(_Bool enforce)
 {
 	_Bool retn = false;
 
+	enum TSEMcontrol_ns_config ns;
+
 
 	/* Create an independent security event model. */
-	if ( !Control->internal(Control) )
+	if ( Current_Namespace )
+		ns = TSEMcontrol_CURRENT_NS;
+	else
+		ns = TSEMcontrol_INIT_NS;
+
+	if ( !Control->create_ns(Control, TSEMcontrol_TYPE_INTERNAL, ns) )
 		ERR(goto done);
 
 	if ( enforce ) {
@@ -1821,7 +1835,7 @@ extern int main(int argc, char *argv[])
 	     infile = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "CPSetc:d:m:o:")) != EOF )
+	while ( (opt = getopt(argc, argv, "CPSetuc:d:m:o:")) != EOF )
 		switch ( opt ) {
 			case 'C':
 				Mode = cartridge_mode;
@@ -1837,6 +1851,9 @@ extern int main(int argc, char *argv[])
 				break;
 			case 't':
 				Trajectory = true;
+				break;
+			case 'u':
+				Current_Namespace = true;
 				break;
 
 			case 'c':
