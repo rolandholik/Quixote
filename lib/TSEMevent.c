@@ -76,6 +76,9 @@ struct NAAAIM_TSEMevent_State
 	/* Buffer object to hold the read of the event description. */
 	Buffer bufr;
 
+	/* Number of bytes in buffer. */
+	size_t size;
+
 	/* String object holding the event description. */
 	String event;
 
@@ -105,6 +108,7 @@ static void _init_state(CO(TSEMevent_State, S)) {
 	S->poisoned = false;
 
 	S->type = TSEM_EVENT_UNKNOWN;
+	S->size = 0;
 
 	return;
 }
@@ -161,7 +165,7 @@ static _Bool read_event(CO(TSEMevent, this), const int fd)
 
 	_Bool retn = false;
 
-	char *p,
+	char *start,
 	     in[1];
 
 	int available;
@@ -172,28 +176,110 @@ static _Bool read_event(CO(TSEMevent, this), const int fd)
 
 	/* Expand the input buffer to match the input size. */
 	in[0] = '\0';
-	while ( S->bufr->size(S->bufr) < available )
+	while ( S->bufr->size(S->bufr) < (available + S->size) )
 		S->bufr->add(S->bufr, (void *) in, 1);
 
-	p = (char *) S->bufr->get(S->bufr);
-	memset(S->bufr->get(S->bufr), '\0', S->bufr->size(S->bufr));
+	start = (char *) (S->bufr->get(S->bufr) + S->size);
+	memset(start, '\0', S->bufr->size(S->bufr) - S->size);
 
 	/* Read the event string and convert the linefeed to a NULL. */
-	if ( read(fd, p, available) < 0 )
+	if ( read(fd, start, available) < 0 )
 		ERR(goto done);
-	if ( (p = strchr(p, '\n')) == NULL )
-		ERR(goto done);
-	*p = '\0';
-
-	/* Transfer event description to a String object. */
-	S->event->reset(S->event);
-	if ( !S->event->add(S->event, (char *) S->bufr->get(S->bufr)) )
-		ERR(goto done);
+	S->size += available;
 	retn = true;
 
 
  done:
 	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements fetching an event description string from
+ * the input buffer to the event object.
+ *
+ * \param this	A pointer to the object which is to fetch the event
+ *		description.
+ *
+ * \param more	A pointer to a boolean variable that is used to
+ *		indicate that an additional event description is
+ *		available in the input queue.
+ *
+ * \return	A boolean value is used to indicate that an event
+ *		has been fetched.  A false value indicates that an
+ *		event is present while a true value indicates the
+ *		object does not have an event description.
+ */
+
+static _Bool fetch_event(CO(TSEMevent, this), _Bool *more)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	char *p,
+	     *end,
+	     *start = (char *) S->bufr->get(S->bufr);
+
+	size_t amt;
+
+
+	/* Check for the presence of an event description. */
+	if ( (p = strchr(start, '\n')) == NULL ) {
+		return false;
+	}
+	*p = '\0';
+
+	/* Transfer event description to a String object. */
+	S->event->reset(S->event);
+	if ( !S->event->add(S->event, start) ) {
+		*p = '\n';
+		goto done;
+	}
+
+	/* Move remaining data to beginning of buffer. */
+	amt = S->event->size(S->event) + 1;
+	S->size -= amt;
+	end = start + amt;
+	if ( S->size > 0 ) {
+		memcpy(S->bufr->get(S->bufr), end, S->size);
+		memset(start + S->size, '\0', \
+		       S->bufr->size(S->bufr) - S->size);
+		if ( strchr(start, '\n') != NULL )
+			*more = true;
+	}
+	else
+		*more = false;
+
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements returning a pointer to the character buffer
+ * containing the ASCII representation of the event.
+ *
+ * \param this	A pointer to the object which is to fetch the event
+ *		description.
+ *
+ * \return	A character pointer to the event string is returned.
+ */
+
+static char * get_event(CO(TSEMevent, this))
+
+{
+	STATE(S);
+
+	return S->event->get(S->event);
 }
 
 
@@ -768,7 +854,6 @@ static void reset(CO(TSEMevent, this))
 
 	S->type = TSEM_EVENT_UNKNOWN;
 
-	S->event->reset(S->event);
 	S->field->reset(S->field);
 	S->parser->reset(S->parser);
 
@@ -841,8 +926,10 @@ extern TSEMevent NAAAIM_TSEMevent_Init(void)
 	_init_state(this->state);
 
 	/* Method initialization. */
-	this->read_event = read_event;
-	this->set_event	 = set_event;
+	this->set_event	  = set_event;
+	this->read_event  = read_event;
+	this->fetch_event = fetch_event;
+	this->get_event	  = get_event;
 
 	this->extract_export = extract_export;
 	this->extract_event  = extract_event;

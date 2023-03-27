@@ -479,7 +479,7 @@ static _Bool add_aggregate(String str)
 		ERR(goto done);
 
 	if ( Debug )
-		fprintf(Debug, "aggregate %s", str->get(str));
+		fprintf(Debug, "aggregate %s\n", str->get(str));
 
 	if ( Aggregate == NULL ) {
 		INIT(HurdLib, Buffer, Aggregate, ERR(goto done));
@@ -550,7 +550,7 @@ static _Bool add_log(CO(String, event))
  *			event processing has succeeded.
  */
 
-static _Bool process_event(const char *event)
+static _Bool process_event()
 
 {
 	_Bool retn = false;
@@ -559,17 +559,13 @@ static _Bool process_event(const char *event)
 
 
 	if ( Debug )
-		fprintf(Debug, "Processing event: '%s'\n", event);
-
-	INIT(HurdLib, String, str, ERR(goto done));
-	if ( !str->add(str, event) )
-		ERR(goto done);
-
-	Event->reset(Event);
-	if ( !Event->set_event(Event, str) )
-		ERR(goto done);
+		fprintf(Debug, "Processing event: '%s'\n",
+			Event->get_event(Event));
 
 	/* Dispatch the event. */
+	INIT(HurdLib, String, str, ERR(goto done));
+	Event->reset(Event);
+
 	switch ( Event->extract_export(Event) ) {
 		case TSEM_EVENT_AGGREGATE:
 			retn = add_aggregate(str);
@@ -584,7 +580,8 @@ static _Bool process_event(const char *event)
 			break;
 
 		default:
-			fprintf(stderr, "Unknown event: %s\n", event);
+			fprintf(stderr, "Unknown event: %s\n", \
+				Event->get_event(Event));
 			break;
 	}
 
@@ -1619,11 +1616,9 @@ static void kill_cartridge(const char *cartridge, const _Bool wait)
 static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int fd)
 
 {
-	_Bool retn = false,
+	_Bool event,
+	      retn = false,
 	      connected = false;
-
-	char *p,
-	     bufr[2048];
 
 	int rc;
 
@@ -1704,33 +1699,29 @@ static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int fd)
 		}
 
 		if ( poll_data[0].revents & POLLIN ) {
-			p = bufr;
-			memset(bufr, '\0', sizeof(bufr));
-			while ( 1 ) {
-				rc = read(fd, p, 1);
-				if ( rc < 0 ) {
-					if ( errno != ENODATA )
-						fprintf(stderr, "Have "	    \
-							"error: retn=%d, "  \
-							"error=%s\n", retn, \
-							strerror(errno));
+			if ( !Event->read_event(Event, fd) ) {
+				kill_cartridge(cartridge, false);
+				break;
+			}
+
+			event = true;
+			while ( event ) {
+				if ( !Event->fetch_event(Event, &event) ) {
+					kill_cartridge(cartridge, false);
+					break;
 				}
-				if ( *p != '\n' ) {
-					++p;
-					continue;
-				}
-				else
-					*p = '\0';
-				if ( !process_event(bufr) ) {
+				if ( !process_event() ) {
 					if ( Debug )
 						fprintf(Debug, "Event "	     \
 							"processing error, " \
 							"%u killing %u\n",   \
 							getpid(), Monitor_pid);
 					Model_Error = true;
+					break;
 				}
-				if ( Model_Error )
-					kill_cartridge(cartridge, false);
+			}
+			if ( Model_Error ) {
+				kill_cartridge(cartridge, false);
 				break;
 			}
 		}
@@ -1873,7 +1864,7 @@ static _Bool fire_cartridge(CO(LocalDuct, mgmt), CO(char *, cartridge), \
 			exit(1);
 
 		/* Child process - run the cartridge. */
-		if ( cartridge_pid == 0 ) {
+	if ( cartridge_pid == 0 ) {
 			if ( Debug )
 				fprintf(Debug, "Workload process: %d\n",
 					getpid());
@@ -1943,9 +1934,6 @@ static _Bool fire_cartridge(CO(LocalDuct, mgmt), CO(char *, cartridge), \
 			memset(bufr, '\0', sizeof(bufr));
 
 			rc = poll(poll_data, 1, -1);
-			if ( Debug )
-				fprintf(Debug, "%s(%d): Poll returns: %d\n",
-					__func__, getpid(), rc);
 			if ( rc < 0 ) {
 				if ( errno == -EINTR ) {
 					fputs("poll interrupted.\n", stderr);
