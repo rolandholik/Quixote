@@ -137,6 +137,7 @@ static _Bool set_event(CO(TSEMevent, this), CO(String, event))
 	STATE(S);
 
 
+	S->event->reset(S->event);
 	return S->event->add(S->event, event->get(event));
 }
 
