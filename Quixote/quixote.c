@@ -1738,6 +1738,99 @@ static _Bool fire_cartridge(CO(LocalDuct, mgmt), CO(char *, cartridge),
 /**
  * Private function.
  *
+ * This function is responsible for receiving a security model from a
+ * terminated domain and writing the model to the designated output file.
+ *
+ * \param filename	A null terminated buffer containing the
+ *			name of the output file.
+ *
+ * \param fd		The file descriptor that the map is to be
+ *			read from.
+ *
+ * \return	A boolean value is returned to reflect the status of
+ *		the receipt and out of the model.  A false value indicates
+ *		an error was encountered while a true value indicates the
+ *		model was received and written.
+ */
+
+static _Bool receive_trajectory(CO(char *, filename), const int fd)
+
+{
+	_Bool retn = false;
+
+	char inchar[2];
+
+	int rc;
+
+	Buffer bufr = NULL;
+
+	String str = NULL;
+
+	File outfile = NULL;
+
+	TSEMevent event = NULL;
+
+
+	INIT(HurdLib, String, str, ERR(goto done));
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	INIT(NAAAIM, TSEMevent, event, ERR(goto done));
+
+	INIT(HurdLib, File, outfile, ERR(goto done));
+	truncate(filename, 0);
+	if ( !outfile->open_rw(outfile, filename) )
+		ERR(goto done);
+
+	inchar[1] = '\0';
+	while ( 1 ) {
+		rc = read(fd, inchar, sizeof(inchar));
+		if ( rc < 0 )
+			goto done;
+		if ( rc == 0 ) {
+			retn = true;
+			goto done;
+		}
+
+		if ( inchar[0] != '\n' ) {
+			if ( !str->add(str, inchar) )
+				ERR(goto done);
+			continue;
+		}
+
+		if ( !event->set_event(event, str) )
+			ERR(goto done);
+		if ( !event->extract_event(event) )
+			ERR(goto done);
+
+		str->reset(str);
+		if ( !event->encode_event(event, str) )
+			ERR(goto done);
+		if ( !str->add(str, "\n") )
+			ERR(goto done);
+
+		if ( !bufr->add(bufr, (void *) str->get(str), str->size(str)) )
+			ERR(goto done);
+		if ( !outfile->write_Buffer(outfile, bufr) )
+			ERR(goto done);
+
+		str->reset(str);
+		bufr->reset(bufr);
+		event->reset(event);
+	}
+
+
+ done:
+	WHACK(bufr);
+	WHACK(str);
+	WHACK(outfile);
+	WHACK(event);
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
  * This function is responsible for receiving a security state map
  * from a terminated domain and writing the map to the designated
  * output file.
@@ -1948,13 +2041,16 @@ extern int main(int argc, char *argv[])
 
 	/* Wait for a security event map to be generated. */
 	if ( Pause ) {
-		if ( !receive_model(outfile, mapfd) )
-			ERR(goto done);
 
-		if ( Trajectory )
+		if ( Trajectory ) {
+			if ( !receive_trajectory(outfile, mapfd) )
+				ERR(goto done);
 			fputs("Wrote execution trajectory to: ", stdout);
-		else
+		} else {
+			if ( !receive_model(outfile, mapfd) )
+				ERR(goto done);
 			fputs("Wrote security map to: ", stdout);
+		}
 		fprintf(stdout, "%s\n", outfile);
 	} else {
 		while ( 1 ) {
