@@ -183,12 +183,17 @@ static _Bool enforce(CO(TSEMcontrol, this))
  *
  * \param this	The object that will be implementing the command.
  *
- * \param type	The type of the namespace, either internal or external,
- *		that is to be created.
+ * \param digest	A pointer to a null-terminated character buffer
+ *			containing the name of the hash function to
+ *			use.  A null pointer will cause SHA256 to
+ *			be used.
  *
- * \param ns	The enumeration type defining what namespace should
- *		be used as a reference for the parameters for the
- *		security event decriptions.
+ * \param type		The type of the namespace, either internal or
+ *			external, that is to be created.
+ *
+ * \param ns		The enumeration type defining what namespace should
+ *			be used as a reference for the parameters for the
+ *			security event decriptions.
  *
  * \return	A boolean value is used to indicate the status of
  *		creating the namespace.  A true value indicates
@@ -197,7 +202,7 @@ static _Bool enforce(CO(TSEMcontrol, this))
  */
 
 static _Bool create_ns(CO(TSEMcontrol, this),
-		       const enum TSEMcontrol_ns_config type,
+		       const enum TSEMcontrol_ns_config type, char *digest,
 		       const enum TSEMcontrol_ns_config ns)
 
 {
@@ -216,6 +221,11 @@ static _Bool create_ns(CO(TSEMcontrol, this),
 		S->cmdstr->add(S->cmdstr, "internal ");
 	else
 		ERR(goto done);
+
+	if ( digest == NULL )
+		S->cmdstr->add(S->cmdstr, "sha256 ");
+	else
+		S->cmdstr->add_sprintf(S->cmdstr, "%s ", digest);
 
 	if ( ns == TSEMcontrol_INIT_NS )
 		S->cmdstr->add(S->cmdstr, "init");

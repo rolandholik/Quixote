@@ -133,6 +133,11 @@ static _Bool Trajectory = false;
 static _Bool Current_Namespace = false;
 
 /**
+ * The name of the hash function to be used for the namespace.
+ */
+static char *Digest = "sha256";
+
+/**
  * This variable is used to signal that a modeling error has occurred
  * and signals the disciplining code to unilaterally release a process
  * rather then model is status in the security domain.
@@ -1263,7 +1268,8 @@ static _Bool setup_namespace(int *fdptr, _Bool enforce)
 	else
 		ns = TSEMcontrol_INIT_NS;
 
-	if ( !control->create_ns(control, TSEMcontrol_TYPE_EXTERNAL, ns) )
+	if ( !control->create_ns(control, TSEMcontrol_TYPE_EXTERNAL, Digest, \
+				 ns) )
 		ERR(goto done);
 	if ( !control->id(control, &id) )
 		ERR(goto done);
@@ -1861,7 +1867,7 @@ extern int main(int argc, char *argv[])
 	LocalDuct mgmt = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "CPSetuc:d:m:o:p:")) != EOF )
+	while ( (opt = getopt(argc, argv, "CPSetuc:d:h:m:o:p:")) != EOF )
 		switch ( opt ) {
 			case 'C':
 				Mode = cartridge_mode;
@@ -1887,6 +1893,9 @@ extern int main(int argc, char *argv[])
 				break;
 			case 'd':
 				debug = optarg;
+				break;
+			case 'h':
+				Digest = optarg;
 				break;
 			case 'm':
 				model = optarg;

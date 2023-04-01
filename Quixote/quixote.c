@@ -127,6 +127,11 @@ static _Bool Trajectory = false;
 static _Bool Current_Namespace = false;
 
 /**
+ * The name of the hash function to be used for the namespace.
+ */
+static char *Digest = "sha256";
+
+/**
  * The following variable holds booleans which describe signals
  * which were received.
  */
@@ -1192,7 +1197,8 @@ static _Bool setup_namespace(_Bool enforce)
 	else
 		ns = TSEMcontrol_INIT_NS;
 
-	if ( !Control->create_ns(Control, TSEMcontrol_TYPE_INTERNAL, ns) )
+	if ( !Control->create_ns(Control, TSEMcontrol_TYPE_INTERNAL, Digest,
+				 ns) )
 		ERR(goto done);
 
 	if ( enforce ) {
@@ -1928,7 +1934,7 @@ extern int main(int argc, char *argv[])
 	     infile = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "CPSetuc:d:m:o:")) != EOF )
+	while ( (opt = getopt(argc, argv, "CPSetuc:d:h:m:o:")) != EOF )
 		switch ( opt ) {
 			case 'C':
 				Mode = cartridge_mode;
@@ -1954,6 +1960,9 @@ extern int main(int argc, char *argv[])
 				break;
 			case 'd':
 				debug = optarg;
+				break;
+			case 'h':
+				Digest = optarg;
 				break;
 			case 'm':
 				mapfile = optarg;

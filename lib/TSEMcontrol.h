@@ -37,7 +37,7 @@ struct NAAAIM_TSEMcontrol
 {
 	/* External methods. */
 	_Bool (*create_ns)(const TSEMcontrol,
-			   const enum TSEMcontrol_ns_config,
+			   const enum TSEMcontrol_ns_config, char *,
 			   const enum TSEMcontrol_ns_config);
 	_Bool (*enforce)(const TSEMcontrol);
 	_Bool (*external)(const TSEMcontrol);
