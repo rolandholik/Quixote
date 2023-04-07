@@ -24,7 +24,7 @@ CSRC = COE.c Cell.c SecurityEvent.c SecurityPoint.c TSEM.c EventModel.c \
 
 TOOLS = test-COE test-cell test-event generate-states sha-tool	   \
 	compute-measurement test-TSEM compute-aggregate	sign-model \
-	generate-pseudonym test-parser
+	generate-pseudonym test-parser json2quixote
 
 INSTALLBIN  = generate-states generate-pseudonym sign-model
 
@@ -114,6 +114,9 @@ generate-pseudonym: generate-pseudonym.o Cell.o EventParser.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO};
 
 test-parser: test-parser.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
+
+json2quixote: json2quixote.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS};
 
 tags:
