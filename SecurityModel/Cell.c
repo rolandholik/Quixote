@@ -73,8 +73,7 @@ struct file_parameters {
 	uint32_t gid;
 	uint16_t mode;
 
-	uint32_t name_length;
-	char name[NAAAIM_IDSIZE];
+	String name;
 
 	uint32_t s_magic;
 	char s_id[32];
@@ -411,12 +410,7 @@ static _Bool _parse_file(CO(Cell_State, S), CO(String, entry))
 		ERR(goto done);
 	S->file.mode = value;
 
-	if ( !_get_field(parser, "name_length", &value) )
-		ERR(goto done);
-	S->file.name_length = value;
-
-	if ( !_get_digest(parser, "name", (uint8_t *) S->file.name, \
-			  NAAAIM_IDSIZE) )
+	if ( !parser->get_text(parser, "path", S->file.name) )
 		ERR(goto done);
 
 	if ( !_get_field(parser, "s_magic", &value) )
@@ -964,17 +958,36 @@ static _Bool _measure_file(CO(Cell_State, S))
 {
 	_Bool retn = false;
 
-	Buffer bufr = NULL;
+	uint32_t name_length;
 
+	Buffer b,
+	       bufr = NULL;
+
+	Sha256 sha256 = NULL;
+
+
+	/* Compute digest of filename */
+	name_length = S->file.name->size(S->file.name);
 
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	if ( !bufr->add(bufr, (void *) S->file.name->get(S->file.name), \
+			name_length) )
+		ERR(goto done);
+
+	INIT(NAAAIM, Sha256, sha256, ERR(goto done));
+	sha256->add(sha256, bufr);
+	if ( !sha256->compute(sha256) )
+		ERR(goto done);
+	b = sha256->get_Buffer(sha256);
+
+	/* Add the file characteristics. */
+	bufr->reset(bufr);
 	bufr->add(bufr, (void *) &S->file.flags, sizeof(S->file.flags));
 	bufr->add(bufr, (void *) &S->file.uid, sizeof(S->file.uid));
 	bufr->add(bufr, (void *) &S->file.gid, sizeof(S->file.gid));
 	bufr->add(bufr, (void *) &S->file.mode, sizeof(S->file.mode));
-	bufr->add(bufr, (void *) &S->file.name_length, \
-		  sizeof(S->file.name_length));
-	bufr->add(bufr, (void *) S->file.name, sizeof(S->file.name));
+	bufr->add(bufr, (void *) &name_length, sizeof(name_length));
+	bufr->add(bufr, (void *) b->get(b), b->size(b));
 	bufr->add(bufr, (void *) &S->file.s_magic, sizeof(S->file.s_magic));
 	bufr->add(bufr, (void *) S->file.s_id, sizeof(S->file.s_id));
 	bufr->add(bufr, (void *) S->file.s_uuid, sizeof(S->file.s_uuid));
@@ -989,6 +1002,7 @@ static _Bool _measure_file(CO(Cell_State, S))
 
  done:
 	WHACK(bufr);
+	WHACK(sha256);
 
 	return retn;
 }
@@ -1513,6 +1527,8 @@ static _Bool get_pseudonym(CO(Cell, this), CO(Buffer, bufr))
 
 	_Bool retn = false;
 
+	uint32_t size;
+
 	Buffer b;
 
 	Sha256 pseudonym = NULL;
@@ -1528,9 +1544,10 @@ static _Bool get_pseudonym(CO(Cell, this), CO(Buffer, bufr))
 	/* Collect the pseduonym components. */
 	bufr->reset(bufr);
 
-	bufr->add(bufr, (void *) &S->file.name_length, \
-		  sizeof(S->file.name_length));
-	if ( !bufr->add(bufr, (void *) S->file.name, sizeof(S->file.name)) )
+	size = S->file.name->size(S->file.name);
+	bufr->add(bufr, (void *) S->file.name->get(S->file.name), \
+		  sizeof(size));
+	if ( !bufr->add(bufr, (void *) S->file.name->get(S->file.name), size) )
 		ERR(goto done);
 
 
@@ -1629,25 +1646,21 @@ static _Bool _format_file(CO(Cell_State, S), CO(String, str))
 {
 	_Bool retn = false;
 
+	char *name;
+
 	unsigned int lp;
 
 
 	/* Write the formatted string to the String object. */
-	if ( !str->add_sprintf(str, "file{flags=%lu, uid=%lu, gid=%lu, mode=0%lo, name_length=%lu, name=",						\
+	name = S->file.name->get(S->file.name);
+	if ( !str->add_sprintf(str, "file{flags=%lu, uid=%lu, gid=%lu, mode=0%lo, path=%s",						\
 			       (unsigned long int) S->file.flags,	 \
 			       (unsigned long int) S->file.uid,		 \
 			       (unsigned long int) S->file.gid,		 \
 			       (unsigned long int) S->file.mode,	 \
-			       (unsigned long int) S->file.name_length) )
+			       (unsigned long int) name) )
 		ERR(goto done);
 
-
-	/* name=%*phN, s_id=%s */
-	for (lp= 0; lp < sizeof(S->file.name); ++lp) {
-		if ( !str->add_sprintf(str, "%02x", \
-				       (unsigned char) S->file.name[lp]) )
-		     ERR(goto done);
-	}
 
 	/* , s_magic=%0x, s_id=%s, s_uuid=%*phN */
 	if ( !str->add_sprintf(str, ", s_magic=0x%0x, s_id=%s, s_uuid=", \
@@ -2052,7 +2065,7 @@ static void reset(CO(Cell, this))
 	S->poisoned = false;
 	S->measured = false;
 
-	memset(&S->file, '\0', sizeof(struct file_parameters));
+	S->file.name->reset(S->file.name);
 
 	S->event->reset(S->event);
 	S->identity->reset(S->identity);
@@ -2083,15 +2096,7 @@ void _dump_file(CO(Cell_State, S))
 	fprintf(stdout, "uid:   %lu\n", (unsigned long int) S->file.uid);
 	fprintf(stdout, "gid:   %lu\n", (unsigned long int) S->file.gid);
 	fprintf(stdout, "mode:  0%lo\n",(unsigned long int) S->file.mode);
-	fprintf(stdout, "name length: %lu\n", \
-		(unsigned long int) S->file.name_length);
-
-	if ( !bufr->add(bufr, (unsigned char *) S->file.name, \
-			sizeof(S->file.name)) )
-		ERR(goto done);
-	fputs("name digest: ", stdout);
-	bufr->print(bufr);
-	bufr->reset(bufr);
+	fprintf(stdout, "name:  %s\n", S->file.name->get(S->file.name));
 
 	fprintf(stdout, "s_magic: 0x%x\n", S->file.s_magic);
 	fprintf(stdout, "s_id:    %s\n", S->file.s_id);
@@ -2387,6 +2392,7 @@ static void whack(CO(Cell, this))
 	STATE(S);
 
 
+	WHACK(S->file.name);
 	WHACK(S->event);
 	WHACK(S->identity);
 
@@ -2430,6 +2436,7 @@ extern Cell NAAAIM_Cell_Init(void)
 	_init_state(this->state);
 
 	/* Initialize aggregate objects. */
+	INIT(HurdLib, String, this->state->file.name, ERR(goto fail));
 	INIT(HurdLib, String, this->state->event, ERR(goto fail));
 	INIT(NAAAIM, Sha256, this->state->identity, ERR(goto fail));
 
@@ -2451,6 +2458,7 @@ extern Cell NAAAIM_Cell_Init(void)
 	return this;
 
 fail:
+	WHACK(this->state->file.name);
 	WHACK(this->state->event);
 	WHACK(this->state->identity);
 

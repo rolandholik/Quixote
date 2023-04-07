@@ -696,10 +696,6 @@ static _Bool encode_event(CO(TSEMevent, this), CO(String, output))
 		ERR(goto done);
 	strcpy(type, str->get(str));
 
-	str->reset(str);
-	if ( !S->parser->get_text(S->parser, "filename", str) )
-		ERR(goto done);
-
 	if ( S->parser->has_key(S->parser, "pid") ) {
 		str->reset(str);
 		if ( !S->parser->get_text(S->parser, "pid", str) )
@@ -711,8 +707,6 @@ static _Bool encode_event(CO(TSEMevent, this), CO(String, output))
 	if ( !output->add(output, "event{") )
 		ERR(goto done);
 	if ( !_add_key(S->parser, ", ", "process", str, output) )
-		ERR(goto done);
-	if ( !_add_key(S->parser, ", ", "filename", str, output) )
 		ERR(goto done);
 	if ( !_add_key(S->parser, ", ", "type", str, output) )
 		ERR(goto done);
