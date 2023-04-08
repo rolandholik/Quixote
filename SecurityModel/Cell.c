@@ -13,8 +13,11 @@
  **************************************************************************/
 
 /* Local defines. */
+#define AF_UNIX	 1
 #define AF_INET	 2
 #define AF_INET6 10
+
+#define UNIX_PATH_MAX 108
 
 
 /* Include files. */
@@ -107,6 +110,7 @@ struct socket_connect_parameters {
 	union {
 		uint32_t ipv4_addr;
 		uint8_t ipv6_addr[16];
+		char unix_addr[UNIX_PATH_MAX + 1];
 		uint8_t addr[32];
 	} u;
 };
@@ -119,6 +123,7 @@ struct socket_accept_parameters {
 	union {
 		uint32_t ipv4_addr;
 		uint8_t ipv6_addr[16];
+		char unix_addr[UNIX_PATH_MAX + 1];
 		uint8_t addr[32];
 	} u;
 };
@@ -580,6 +585,8 @@ static _Bool _parse_socket(CO(Cell_State, S), CO(String, entry))
 
 	uint32_t value;
 
+	String str = NULL;
+
 	EventParser parser = NULL;
 
 	static char *type[2] = {
@@ -642,6 +649,19 @@ static _Bool _parse_socket(CO(Cell_State, S), CO(String, entry))
 				ERR(goto done);
 			break;
 
+		case AF_UNIX:
+			cnt = sizeof(S->socket_connect.u.unix_addr);
+			memset(S->socket_connect.u.unix_addr, '\0', cnt);
+
+			INIT(HurdLib, String, str, ERR(goto done));
+			if ( !parser->get_text(parser, "addr" ,str) )
+				ERR(goto done);
+			if ( str->size(str) >= cnt )
+				ERR(goto done);
+
+			strcpy(S->socket_connect.u.unix_addr, str->get(str));
+			break;
+
 		default:
 			p = S->socket_connect.u.addr;
 			cnt = sizeof(S->socket_connect.u.addr);
@@ -654,6 +674,7 @@ static _Bool _parse_socket(CO(Cell_State, S), CO(String, entry))
 
 
  done:
+	WHACK(str);
 	WHACK(parser);
 
 	return retn;
@@ -689,6 +710,8 @@ static _Bool _parse_socket_accept(CO(Cell_State, S), CO(String, entry))
 	uint32_t value;
 
 	unsigned int cnt;
+
+	String str = NULL;
 
 	EventParser parser = NULL;
 
@@ -727,6 +750,19 @@ static _Bool _parse_socket_accept(CO(Cell_State, S), CO(String, entry))
 				ERR(goto done);
 			break;
 
+		case AF_UNIX:
+			cnt = sizeof(S->socket_accept.u.unix_addr);
+			memset(S->socket_accept.u.unix_addr, '\0', cnt);
+
+			INIT(HurdLib, String, str, ERR(goto done));
+			if ( !parser->get_text(parser, "addr" ,str) )
+				ERR(goto done);
+			if ( str->size(str) >= cnt )
+				ERR(goto done);
+
+			strcpy(S->socket_accept.u.unix_addr, str->get(str));
+			break;
+
 		default:
 			p = S->socket_accept.u.addr;
 			cnt = sizeof(S->socket_accept.u.addr);
@@ -739,6 +775,7 @@ static _Bool _parse_socket_accept(CO(Cell_State, S), CO(String, entry))
 
 
  done:
+	WHACK(str);
 	WHACK(parser);
 
 	return retn;
@@ -1173,9 +1210,15 @@ static _Bool _measure_socket_connect(CO(Cell_State, S))
 			bufr->add(bufr, p, size);
 			break;
 
+		case AF_UNIX:
+			p = (unsigned char *) S->socket_connect.u.unix_addr;
+			size = strlen(S->socket_connect.u.unix_addr);
+			bufr->add(bufr, p, size);
+			break;
+
 		default:
 			p = (unsigned char *) S->socket_connect.u.addr;
-			size = sizeof(S->socket_connect.u.addr);
+			size = sizeof(p);
 			bufr->add(bufr, p, size);
 			break;
 	}
@@ -1241,6 +1284,12 @@ static _Bool _measure_socket_accept(CO(Cell_State, S))
 		case AF_INET6:
 			p = (unsigned char *) &S->socket_accept.u.ipv6_addr;
 			size = sizeof(S->socket_accept.u.ipv6_addr);
+			bufr->add(bufr, p, size);
+			break;
+
+		case AF_UNIX:
+			p = (unsigned char *) S->socket_accept.u.unix_addr;
+			size = strlen(S->socket_accept.u.unix_addr);
 			bufr->add(bufr, p, size);
 			break;
 
@@ -1835,6 +1884,12 @@ static _Bool _format_socket_connect(CO(Cell_State, S), CO(String, str))
 			}
 			break;
 
+		case AF_UNIX:
+			if ( !str->add_sprintf(str, "addr=%s", \
+					       S->socket_connect.u.unix_addr) )
+				ERR(goto done);
+			break;
+
 		default:
 			if ( !str->add_sprintf(str, "addr=") )
 				ERR(goto done);
@@ -1907,6 +1962,12 @@ static _Bool _format_socket_accept(CO(Cell_State, S), CO(String, str))
 					ERR(goto done);
 				++p;
 			}
+			break;
+
+		case AF_UNIX:
+			if ( !str->add_sprintf(str, "addr=%s", \
+					       S->socket_connect.u.unix_addr) )
+				ERR(goto done);
 			break;
 
 		default:
@@ -2173,6 +2234,9 @@ void _dump_socket_connect(CO(Cell_State, S))
 		case AF_INET6:
 			type = "IPV6";
 			break;
+		case AF_UNIX:
+			type = "UNIX";
+			break;
 		default:
 			type = "OTHER";
 			break;
@@ -2201,6 +2265,11 @@ void _dump_socket_connect(CO(Cell_State, S))
 				fprintf(stdout, "%02x", *p++);
 			fputs("\n", stdout);
 			break;
+		case AF_UNIX:
+			fprintf(stdout, "path:   %s", \
+				S->socket_connect.u.unix_addr);
+			break;
+
 		default:
 			fputs("addr:   ", stdout);
 			p = S->socket_connect.u.addr;
@@ -2246,6 +2315,9 @@ void _dump_socket_accept(CO(Cell_State, S))
 		case AF_INET6:
 			type = "IPV6";
 			break;
+		case AF_UNIX:
+			type = "UNIX";
+			break;
 		default:
 			type = "OTHER";
 			break;
@@ -2270,6 +2342,10 @@ void _dump_socket_accept(CO(Cell_State, S))
 				goto done;
 			bufr->print(bufr);
 			fputs("\n", stdout);
+			break;
+		case AF_UNIX:
+			fprintf(stdout, "path:   %s", \
+				S->socket_accept.u.unix_addr);
 			break;
 		default:
 			fputs("addr:   ", stdout);
