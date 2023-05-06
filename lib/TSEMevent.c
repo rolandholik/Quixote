@@ -49,10 +49,11 @@ static struct cmd_definition {
 	int command;
 	char *syntax;
 } TSEM_events[] = {
-	{TSEM_EVENT_AGGREGATE,	"aggregate"},
-	{TSEM_EVENT_EVENT,	"event"},
-	{TSEM_EVENT_LOG,	"log" },
-	{0,			NULL}
+	{TSEM_EVENT_AGGREGATE,		"aggregate"},
+	{TSEM_EVENT_EVENT,		"event"},
+	{TSEM_EVENT_ASYNC_EVENT,	"async_event"},
+	{TSEM_EVENT_LOG,		"log" },
+	{0,				NULL}
 };
 
 /** TSEMevent private state information. */
@@ -324,6 +325,11 @@ static enum TSEM_export_type extract_export(CO(TSEMevent, this))
 		goto done;
 
 	S->type = retn = cp->command;
+	if ( S->type == TSEM_EVENT_ASYNC_EVENT ) {
+		S->field->reset(S->field);
+		if ( !S->field->add(S->field, "event") )
+			goto done;
+	}
 
 	S->parser->reset(S->parser);
 	if ( !S->parser->extract_field(S->parser, S->event, \

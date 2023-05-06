@@ -461,6 +461,29 @@ static _Bool add_event(CO(String, update))
 /**
  * Private function.
  *
+ * This function handles the receive of an asynchronous security event.
+ *
+ * \param update	A pointer to the object that will be used to
+ *			hold the ASCII encoded state description.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not addition of the event succeeded.  A
+ *			false value indicates the addition failed while
+ *			a true value indicates the addition succeeded.
+ */
+
+static _Bool add_async_event(CO(String, update))
+
+{
+	if ( Debug )
+		fputs("Received asynchronous event.\n", Debug);
+	return true;
+}
+
+
+/**
+ * Private function.
+ *
  * This function carries out the addition of the hardware aggregate
  * measurement to the current security state model.
  *
@@ -578,6 +601,10 @@ static _Bool process_event()
 
 		case TSEM_EVENT_EVENT:
 			retn = add_event(str);
+			break;
+
+		case TSEM_EVENT_ASYNC_EVENT:
+			retn = add_async_event(str);
 			break;
 
 		case TSEM_EVENT_LOG:
