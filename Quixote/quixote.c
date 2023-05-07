@@ -23,7 +23,7 @@
 #define MEASUREMENT_FILE "/sys/kernel/security/tsem/measurement"
 #define STATE_FILE	 "/sys/kernel/security/tsem/state"
 #define TRAJECTORY_FILE	 "/sys/kernel/security/tsem/trajectory"
-#define POINTS_FILE	 "/sys/kernel/security/tsem/points"
+#define POINTS_FILE	 "/sys/kernel/security/tsem/trajectory_points"
 #define FORENSICS_FILE	 "/sys/kernel/security/tsem/forensics"
 #define AGGREGATE_FILE	 "/sys/kernel/security/tsem/aggregate"
 
