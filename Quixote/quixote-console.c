@@ -56,6 +56,7 @@ enum Oneshot_mode {
 	oneshot_none,
 	oneshot_state,
 	oneshot_trajectory,
+	oneshot_counts,
 	oneshot_forensics,
 	oneshot_points,
 	oneshot_events,
@@ -264,6 +265,61 @@ static _Bool receive_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 
 	/* Output each point. */
+	while ( cnt ) {
+		cmdbufr->reset(cmdbufr);
+		if ( !mgmt->receive_Buffer(mgmt, cmdbufr) )
+			ERR(goto done);
+		fprintf(stdout, "%s\n", cmdbufr->get(cmdbufr));
+		--cnt;
+	}
+
+	cmdbufr->reset(cmdbufr);
+	retn = true;
+
+ done:
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function implements the receipt of a generic list of
+ * ASCII information from the trust orchestrator. The protocol used is
+ * for the the number of records in the list, followed by the
+ * list in ASCII form.
+ *
+ * \param mgmt		The socket object used to communicate with
+ *			the cartridge management instance.
+ *
+ * \param cmdbufr	The object used to process the remote command
+ *			response.
+ *
+ * \return		A boolean value is returned to indicate the
+ *			status of processing processing the count
+ *			list.  A false value indicates an error occurred
+ *			while a true value indicates the response was
+ *			properly processed.
+ */
+
+static _Bool receive_list(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
+
+{
+	_Bool retn = false;
+
+	unsigned int cnt;
+
+
+	/* Get the number of points. */
+	cmdbufr->reset(cmdbufr);
+	if ( !mgmt->receive_Buffer(mgmt, cmdbufr) )
+		ERR(goto done);
+	cnt = *(unsigned int *) cmdbufr->get(cmdbufr);
+	if ( TTY_output )
+		fprintf(stdout, "List size: %u\n", cnt);
+
+
+	/* Output each count value. */
 	while ( cnt ) {
 		cmdbufr->reset(cmdbufr);
 		if ( !mgmt->receive_Buffer(mgmt, cmdbufr) )
@@ -557,11 +613,17 @@ static _Bool receive_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr), \
 			retn = receive_trajectory(mgmt, cmdbufr);
 			break;
 
+		case show_counts:
+		case show_forensics_counts:
+			retn = receive_list(mgmt, cmdbufr);
+			break;
+
 		case show_forensics:
 			retn = receive_forensics(mgmt, cmdbufr);
 			break;
 
 		case show_points:
+		case show_forensics_points:
 			retn = receive_points(mgmt, cmdbufr);
 			break;
 
@@ -696,6 +758,10 @@ static _Bool process_oneshot(CO(LocalDuct, mgmt), enum Oneshot_mode mode)
 			cmd = Sancho_cmd_list[show_map - 1].syntax;
 			break;
 
+		case oneshot_counts:
+			cmd = Sancho_cmd_list[show_counts - 1].syntax;
+			break;
+
 		case oneshot_none:
 			break;
 	}
@@ -737,8 +803,11 @@ extern int main(int argc, char *argv[])
 	File infile = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "EFMPSTc:p:")) != EOF )
+	while ( (opt = getopt(argc, argv, "CEFMPSTc:p:")) != EOF )
 		switch ( opt ) {
+			case 'C':
+				oneshot = oneshot_counts;
+				break;
 			case 'E':
 				oneshot = oneshot_events;
 				break;

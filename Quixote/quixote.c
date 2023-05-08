@@ -20,12 +20,16 @@
  * Copyright (c) 2020, Enjellic Systems Development, LLC. All rights reserved.
  **************************************************************************/
 
-#define MEASUREMENT_FILE "/sys/kernel/security/tsem/measurement"
-#define STATE_FILE	 "/sys/kernel/security/tsem/state"
-#define TRAJECTORY_FILE	 "/sys/kernel/security/tsem/trajectory"
-#define POINTS_FILE	 "/sys/kernel/security/tsem/trajectory_points"
-#define FORENSICS_FILE	 "/sys/kernel/security/tsem/forensics"
-#define AGGREGATE_FILE	 "/sys/kernel/security/tsem/aggregate"
+#define TSEM_DIR	 	"/sys/kernel/security/tsem/"
+#define MEASUREMENT_FILE	TSEM_DIR"measurement"
+#define STATE_FILE		TSEM_DIR"state"
+#define TRAJECTORY_FILE		TSEM_DIR"trajectory"
+#define TRAJECTORY_COUNT_FILE	TSEM_DIR"trajectory_count"
+#define TRAJECTORY_POINTS_FILE 	TSEM_DIR"trajectory_points"
+#define FORENSICS_FILE	 	TSEM_DIR"forensics"
+#define FORENSICS_COUNT_FILE	TSEM_DIR"forensics_count"
+#define FORENSICS_POINTS_FILE	TSEM_DIR"forensics_points"
+#define AGGREGATE_FILE		TSEM_DIR"aggregate"
 
 #define READ_SIDE  0
 #define WRITE_SIDE 1
@@ -452,6 +456,9 @@ static _Bool send_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
  * \param mgmt		The socket object used to communicate with
  *			the quixote-console management instance.
  *
+ * \param type		A pointer to a null-terminated buffer containing
+ *			the name of the file.
+ *
  * \param cmdbufr	The object which will be used to hold the
  *			information which will be transmitted.
  *
@@ -462,7 +469,8 @@ static _Bool send_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
  *			additional command cycle should be processed.
  */
 
-static _Bool send_points(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
+static _Bool send_points(CO(LocalDuct, mgmt), CO(char *, type), \
+			 CO(Buffer, cmdbufr))
 
 {
 	_Bool retn = false;
@@ -480,7 +488,7 @@ static _Bool send_points(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	INIT(HurdLib, String, es, ERR(goto done));
 
 	INIT(HurdLib, File, ef, ERR(goto done));
-	if ( !ef->open_ro(ef, POINTS_FILE) )
+	if ( !ef->open_ro(ef, type) )
 		ERR(goto done);
 
 	while ( ef->read_String(ef, es) ) {
@@ -498,7 +506,7 @@ static _Bool send_points(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 	/* Send each trajectory point. */
 	ef->reset(ef);
-	if ( !ef->open_ro(ef, POINTS_FILE) )
+	if ( !ef->open_ro(ef, type) )
 		ERR(goto done);
 
 	while ( cnt-- ) {
@@ -619,6 +627,93 @@ static _Bool send_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 /**
  * Private function.
  *
+ * This function is responsible for returning a list of security event
+ * counts to the management console.  This is a generic function that
+ * returns either valid or forensics counts.  The protocol used is to
+ * send the number of elements in the list followed by each count as
+ * an ASCII string.
+ *
+ * \param mgmt		The socket object used to communicate with
+ *			the quixote-console management instance.
+ *
+ * \param type		A pointer to the character buffer containing
+ *			the name of the file containing the counts
+ *			to be sent.
+ *
+ * \param cmdbufr	The object which will be used to hold the
+ *			information that will be transmitted.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not the command was processed.  A false value
+ *			indicates the processing of commands should be
+ *			terminated while a true value indicates an
+ *			additional command cycle should be processed.
+v */
+
+static _Bool send_counts(CO(LocalDuct, mgmt), CO(char *, type), \
+			 CO(Buffer, cmdbufr))
+
+{
+	_Bool retn = false;
+
+	size_t cnt = 0;
+
+	String es = NULL;
+
+	File ef = NULL;
+
+
+	/*
+	 * Compute the number of lines in the trajectory.
+	 */
+	INIT(HurdLib, String, es, ERR(goto done));
+
+	INIT(HurdLib, File, ef, ERR(goto done));
+	if ( !ef->open_ro(ef, type) )
+		ERR(goto done);
+
+	while ( ef->read_String(ef, es) ) {
+		++cnt;
+		es->reset(es);
+	}
+
+	cmdbufr->reset(cmdbufr);
+	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
+	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
+		ERR(goto done);
+	if ( Debug )
+		fprintf(Debug, "Sent count size: %zu\n", cnt);
+
+
+	/* Send each trajectory point. */
+	ef->reset(ef);
+	if ( !ef->open_ro(ef, type) )
+		ERR(goto done);
+
+	while ( cnt-- ) {
+		es->reset(es);
+		ef->read_String(ef, es);
+
+		cmdbufr->reset(cmdbufr);
+		cmdbufr->add(cmdbufr, (void *) es->get(es), es->size(es) + 1);
+		if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
+			ERR(goto done);
+	}
+
+	retn = true;
+
+
+ done:
+	WHACK(es);
+	WHACK(ef);
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
  * This function is responsible for sealing a security domain.
  *
  * \param mgmt		The socket object used to communicate with
@@ -708,7 +803,7 @@ static _Bool send_map(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 		ERR(goto done);
 
 	/* Send each point in the model. */
-	retn = send_points(mgmt, cmdbufr);
+	retn = send_points(mgmt, TRAJECTORY_POINTS_FILE, cmdbufr);
 
 
  done:
@@ -805,12 +900,28 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 			retn = send_trajectory(mgmt, cmdbufr);
 			break;
 
+		case show_counts:
+			retn = send_counts(mgmt, TRAJECTORY_COUNT_FILE, \
+					   cmdbufr);
+			break;
+
+		case show_points:
+			retn = send_points(mgmt, TRAJECTORY_POINTS_FILE, \
+					   cmdbufr);
+			break;
+
 		case show_forensics:
 			retn = send_forensics(mgmt, cmdbufr);
 			break;
 
-		case show_points:
-			retn = send_points(mgmt, cmdbufr);
+		case show_forensics_counts:
+			retn = send_counts(mgmt, FORENSICS_COUNT_FILE, \
+					   cmdbufr);
+			break;
+
+		case show_forensics_points:
+			retn = send_points(mgmt, FORENSICS_POINTS_FILE, \
+					   cmdbufr);
 			break;
 
 		case seal_event:
@@ -1402,7 +1513,7 @@ static _Bool upload_model(const int fd)
 
 	/* Send the points. */
 	INIT(HurdLib, File, ef, ERR(goto done));
-	if ( !ef->open_ro(ef, POINTS_FILE) )
+	if ( !ef->open_ro(ef, TRAJECTORY_POINTS_FILE) )
 		ERR(goto done);
 
 	str->reset(str);
