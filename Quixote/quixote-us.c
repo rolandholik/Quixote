@@ -150,7 +150,13 @@ static _Bool Current_Namespace = false;
 /**
  * The name of the hash function to be used for the namespace.
  */
-static char *Digest = "sha256";
+static char *Digest = NULL;
+
+/**
+ * A string defining the size of the atomic magazine to be
+ * allocated for a namespace.
+ */
+static unsigned long Magazine_Size = 0;
 
 /**
  * The object that will be used for parsing the TSEM events.
@@ -1437,17 +1443,15 @@ static _Bool setup_namespace(int *fdptr, _Bool enforce)
 
 	uint64_t id;
 
-	enum TSEMcontrol_ns_config ns;
+	enum TSEMcontrol_ns_config ns = 0;
 
 
 	/* Create and configure a security model namespace. */
 	if ( Current_Namespace )
 		ns = TSEMcontrol_CURRENT_NS;
-	else
-		ns = TSEMcontrol_INIT_NS;
 
 	if ( !Control->create_ns(Control, TSEMcontrol_TYPE_EXTERNAL, Digest, \
-				 ns) )
+				 ns, Magazine_Size) )
 		ERR(goto done);
 	if ( !Control->id(Control, &id) )
 		ERR(goto done);
@@ -2021,10 +2025,11 @@ extern int main(int argc, char *argv[])
 {
 	_Bool enforce = false;
 
-	char *debug	= NULL,
-	     *model	= NULL,
-	     *outfile	= NULL,
-	     *cartridge	= NULL;
+	char *debug	    = NULL,
+	     *model	    = NULL,
+	     *outfile	    = NULL,
+	     *cartridge	    = NULL,
+	     *magazine_size = NULL;
 
 	int opt,
 	    fd	 = 0,
@@ -2035,7 +2040,7 @@ extern int main(int argc, char *argv[])
 	LocalDuct mgmt = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "CPSetuc:d:h:m:o:p:")) != EOF )
+	while ( (opt = getopt(argc, argv, "CPSetuc:d:h:m:n:o:p:")) != EOF )
 		switch ( opt ) {
 			case 'C':
 				Mode = cartridge_mode;
@@ -2068,11 +2073,13 @@ extern int main(int argc, char *argv[])
 			case 'm':
 				model = optarg;
 				break;
+			case 'n':
+				magazine_size = optarg;
+				break;
 			case 'o':
 				outfile = optarg;
 				break;
 		}
-
 
 	/* Execute cartridge display mode. */
 	if ( Mode == show_mode )
@@ -2083,7 +2090,6 @@ extern int main(int argc, char *argv[])
 		goto done;
 	}
 
-
 	/* Handle a debug invocation. */
 	if ( debug ) {
 		if ( (Debug = fopen(debug, "w+")) == NULL ) {
@@ -2093,6 +2099,14 @@ extern int main(int argc, char *argv[])
 		setlinebuf(Debug);
 	}
 
+	/* Verify the magazine size if specified. */
+	if ( magazine_size != NULL ) {
+		Magazine_Size = strtoul(magazine_size, NULL, 0);
+		if ( (errno == EINVAL) || (errno == ERANGE) ) {
+			fputs("Invalid magazine size.\n", stderr);
+			goto done;
+		}
+	}
 
 	/* Setup signal handlers. */
 	if ( sigemptyset(&signal_action.sa_mask) == -1 )

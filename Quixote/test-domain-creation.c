@@ -55,7 +55,7 @@ int main(int argc, char *argv[])
 	/* Child process. */
 	if ( pid == 0 ) {
 		if ( !Control->create_ns(Control, TSEMcontrol_TYPE_EXTERNAL,
-					 NULL, TSEMcontrol_INIT_NS) )
+					 NULL, TSEMcontrol_INIT_NS, 0) )
 			ERR(goto done);
 		fputs("Created namespace.\n", stderr);
 		if ( !Control->id(Control, &id) )

@@ -195,6 +195,11 @@ static _Bool enforce(CO(TSEMcontrol, this))
  *			be used as a reference for the parameters for the
  *			security event decriptions.
  *
+ * \param cache_size	The size of the event and export magazines that
+ *			are to be used.  A value of zero uses the
+ *			default magazine size the kernel has been
+ *			compiled with.
+ *
  * \return	A boolean value is used to indicate the status of
  *		creating the namespace.  A true value indicates
  *		the setup succeeded while a false value indicates
@@ -203,7 +208,8 @@ static _Bool enforce(CO(TSEMcontrol, this))
 
 static _Bool create_ns(CO(TSEMcontrol, this),
 		       const enum TSEMcontrol_ns_config type, char *digest,
-		       const enum TSEMcontrol_ns_config ns)
+		       const enum TSEMcontrol_ns_config ns_ref,
+		       const unsigned int cache_size)
 
 {
 	STATE(S);
@@ -216,29 +222,31 @@ static _Bool create_ns(CO(TSEMcontrol, this),
 		ERR(goto done);
 
 	if ( external )
-		S->cmdstr->add(S->cmdstr, "external ");
+		S->cmdstr->add(S->cmdstr, "external");
 	else if ( type == TSEMcontrol_TYPE_INTERNAL )
-		S->cmdstr->add(S->cmdstr, "internal ");
+		S->cmdstr->add(S->cmdstr, "internal");
 	else
 		ERR(goto done);
 
-	if ( digest == NULL )
-		S->cmdstr->add(S->cmdstr, "sha256 ");
-	else
-		S->cmdstr->add_sprintf(S->cmdstr, "%s ", digest);
-
-	if ( ns == TSEMcontrol_INIT_NS )
-		S->cmdstr->add(S->cmdstr, "init");
-	else if ( ns == TSEMcontrol_CURRENT_NS )
-		S->cmdstr->add(S->cmdstr, "current");
-	else
-		ERR(goto done);
-
-	if ( external ) {
-		if ( !S->cmdstr->add_sprintf(S->cmdstr, " %s",
-					     S->key->get(S->key)) )
+	if ( ns_ref != 0 ) {
+		S->cmdstr->add(S->cmdstr, " nsref=");
+		if ( ns_ref == TSEMcontrol_INIT_NS )
+			S->cmdstr->add(S->cmdstr, "initial");
+		else if ( ns_ref == TSEMcontrol_CURRENT_NS )
+			S->cmdstr->add(S->cmdstr, "current");
+		else
 			ERR(goto done);
 	}
+
+	if ( digest != NULL )
+		S->cmdstr->add_sprintf(S->cmdstr, " digest=%s", digest);
+
+	if ( cache_size != 0 )
+		S->cmdstr->add_sprintf(S->cmdstr, " cache=%u", cache_size);
+
+	if ( external )
+		S->cmdstr->add_sprintf(S->cmdstr, " key=%s", \
+				       S->key->get(S->key));
 
 	if ( !S->cmdstr->add(S->cmdstr, "\n") )
 		ERR(goto done);
