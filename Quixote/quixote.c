@@ -24,10 +24,10 @@
 #define MEASUREMENT_FILE	TSEM_DIR"measurement"
 #define STATE_FILE		TSEM_DIR"state"
 #define TRAJECTORY_FILE		TSEM_DIR"trajectory"
-#define TRAJECTORY_COUNT_FILE	TSEM_DIR"trajectory_count"
+#define TRAJECTORY_COUNT_FILE	TSEM_DIR"trajectory_counts"
 #define TRAJECTORY_POINTS_FILE 	TSEM_DIR"trajectory_points"
 #define FORENSICS_FILE	 	TSEM_DIR"forensics"
-#define FORENSICS_COUNT_FILE	TSEM_DIR"forensics_count"
+#define FORENSICS_COUNT_FILE	TSEM_DIR"forensics_counts"
 #define FORENSICS_POINTS_FILE	TSEM_DIR"forensics_points"
 #define AGGREGATE_FILE		TSEM_DIR"aggregate"
 
