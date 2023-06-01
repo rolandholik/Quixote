@@ -691,7 +691,7 @@ static _Bool encode_event(CO(TSEMevent, this), CO(String, output))
 	String str = NULL;
 
 
-	if ( S->type != TSEM_EVENT_EVENT )
+	if ( S->type != TSEM_EVENT_EVENT && S->type != TSEM_EVENT_ASYNC_EVENT)
 		ERR(goto done);
 
 	/* Stash the type and filename status of the event. */

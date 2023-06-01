@@ -164,6 +164,11 @@ static unsigned long Magazine_Size = 0;
 static TSEMevent Event = NULL;
 
 /**
+ * The name of the runc workload.
+ */
+static const char *Runc_name = NULL;
+
+/**
  * The following variable holds booleans which describe signals
  * which were received.
  */
@@ -254,6 +259,73 @@ static _Bool child_exited(const pid_t cartridge)
 	return true;
 }
 
+
+/**
+ * Private function.
+ *
+ * This function is responsible for shutting down the workload.
+ *
+ * \param wait		A boolean flag used to indicate whether or
+ *			not a runc based workload should wait for the
+ *			termination of the run process.
+ *
+ * \return	No return value is defined.
+ */
+
+static void kill_cartridge(_Bool wait)
+
+{
+	int status;
+
+	static pid_t kill_process = 0;
+
+
+	/* Signal the monitor process to shutdown the cartridge process. */
+	if ( Mode == process_mode ) {
+		if ( Debug )
+			fprintf(Debug, "%u sending SIGHUP to %u.\n", \
+				getpid(), Monitor_pid);
+		kill(Monitor_pid, SIGTERM);
+		return;
+	}
+
+
+	/* Check to see if runc kill has finished. */
+	if ( kill_process ) {
+		waitpid(kill_process, &status, WNOHANG);
+		if ( !WIFEXITED(status) )
+			return;
+
+		if ( Debug )
+			fprintf(Debug, "Cartridge kill status: %d\n", \
+				WEXITSTATUS(status));
+		if ( WEXITSTATUS(status) == 0 ) {
+			kill_process = 0;
+			return;
+		}
+	}
+
+
+	/* Fork a process to use runc to send the termination signal. */
+	kill_process = fork();
+	if ( kill_process == -1 )
+		return;
+
+	/* Child process - execute runc in kill mode. */
+	if ( kill_process == 0 ) {
+		if ( Debug )
+			fputs("Killing runc cartridge.\n", Debug);
+		execlp("runc", "runc", "kill", Runc_name, "SIGKILL", \
+		       NULL);
+		exit(1);
+	}
+
+	/* Parent process - wait for the kill process to complete. */
+	if ( wait )
+		waitpid(kill_process, &status, 0);
+
+	return;
+}
 
 /**
  * Private function.
@@ -481,9 +553,67 @@ static _Bool add_event(CO(String, update))
 static _Bool add_async_event(CO(String, update))
 
 {
+	_Bool status,
+	      violation,
+	      sealed,
+	      retn = false;
+
+	pid_t pid;
+
+	SecurityEvent event = NULL;
+
+
+	/* Parse the event. */
+	update->reset(update);
+	if ( !Event->encode_event(Event, update) )
+		ERR(goto done);
+
+	INIT(NAAAIM, SecurityEvent, event, ERR(goto done));
+	if ( !event->parse(event, update) )
+		ERR(goto done);
+
+
+	/*
+	 * If this is a model error release the actor so the runc
+	 * instance can release the domain.
+	 */
+	if ( Model_Error ) {
+		if ( Debug )
+			fputs("Model error.\n", Debug);
+		goto done;
+	}
+
+
+	/* Proceed with modeling the event. */
+	if ( !Model->update(Model, event, &status, &violation, &sealed) )
+		ERR(goto done);
+
+	Model->discipline_pid(Model, &pid);
+
 	if ( Debug )
-		fputs("Received asynchronous event.\n", Debug);
-	return true;
+		fprintf(Debug, "Model update: status=%d, violation=%d\n",
+			status, violation);
+
+
+	/* Handle a sealed model that is in violation. */
+	if ( sealed ) {
+		if ( Debug )
+			fputs("Atomic context security violation.\n", Debug);
+		if ( violation ) {
+			fputs("Security violation in atomic context, "
+			      "shutting down workload.\n", stderr);
+			kill_cartridge(true);
+		}
+	}
+
+	retn = true;
+
+
+ done:
+	if ( !status )
+		WHACK(event);
+
+	return retn;
 }
 
 
@@ -1559,78 +1689,6 @@ static void show_magazine(CO(char *, root))
 /**
  * Private function.
  *
- * This function is responsible for issueing the runc command needed
- * to terminate a software cartridge.  The function waits until the
- * process spawned to execute the runc process terminates.
- *
- * \param name		A pointer to a character buffer containing the
- *			name of the software cartridge.
- *
- * \param wait		A boolean flag used to indicate whether or
- *			not the runc kill process should be waited for.
- *
- * \return	No return value is defined.
- */
-
-static void kill_cartridge(const char *cartridge, const _Bool wait)
-
-{
-	int status;
-
-	static pid_t kill_process = 0;
-
-
-	/* Signal the monitor process to shutdown the cartridge process. */
-	if ( Mode == process_mode ) {
-		if ( Debug )
-			fprintf(Debug, "%u sending SIGHUP to %u.\n", \
-				getpid(), Monitor_pid);
-		kill(Monitor_pid, SIGTERM);
-		return;
-	}
-
-
-	/* Check to see if runc kill has finished. */
-	if ( kill_process ) {
-		waitpid(kill_process, &status, WNOHANG);
-		if ( !WIFEXITED(status) )
-			return;
-
-		if ( Debug )
-			fprintf(Debug, "Cartridge kill status: %d\n", \
-				WEXITSTATUS(status));
-		if ( WEXITSTATUS(status) == 0 ) {
-			kill_process = 0;
-			return;
-		}
-	}
-
-
-	/* Fork a process to use runc to send the termination signal. */
-	kill_process = fork();
-	if ( kill_process == -1 )
-		return;
-
-	/* Child process - execute runc in kill mode. */
-	if ( kill_process == 0 ) {
-		if ( Debug )
-			fputs("Killing runc cartridge.\n", Debug);
-		execlp("runc", "runc", "kill", cartridge, "SIGKILL", \
-		       NULL);
-		exit(1);
-	}
-
-	/* Parent process - wait for the kill process to complete. */
-	if ( wait )
-		waitpid(kill_process, &status, 0);
-
-	return;
-}
-
-
-/**
- * Private function.
- *
  * This function is responsible for monitoring the child process that
  * is running the modeled workload.  The event loop monitors for a
  * a child exit and process management requests.
@@ -1695,7 +1753,7 @@ static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int fd)
 			if ( Signals.stop ) {
 				if ( Debug )
 					fputs("Quixote terminated.\n", Debug);
-				kill_cartridge(cartridge, true);
+				kill_cartridge(true);
 				retn = true;
 				goto done;
 			}
@@ -1707,7 +1765,7 @@ static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int fd)
 			}
 
 			fputs("Poll error.\n", stderr);
-			kill_cartridge(cartridge, true);
+			kill_cartridge(true);
 			retn = true;
 			goto done;
 		}
@@ -1737,14 +1795,14 @@ static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int fd)
 
 		if ( poll_data[0].revents & POLLIN ) {
 			if ( !Event->read_event(Event, fd) ) {
-				kill_cartridge(cartridge, false);
+				kill_cartridge(false);
 				break;
 			}
 
 			event = true;
 			while ( event ) {
 				if ( !Event->fetch_event(Event, &event) ) {
-					kill_cartridge(cartridge, false);
+					kill_cartridge(false);
 					break;
 				}
 				if ( !process_event() ) {
@@ -1758,7 +1816,7 @@ static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int fd)
 				}
 			}
 			if ( Model_Error ) {
-				kill_cartridge(cartridge, false);
+				kill_cartridge(false);
 				break;
 			}
 		}
@@ -1858,6 +1916,7 @@ static _Bool fire_cartridge(CO(LocalDuct, mgmt), CO(char *, cartridge), \
 		if ( !cartridge_dir->add(cartridge_dir, cartridge) )
 			ERR(goto done);
 		bundle = cartridge_dir->get(cartridge_dir);
+		Runc_name = cartridge;
 	}
 
 
