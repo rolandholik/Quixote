@@ -169,6 +169,12 @@ static TSEMevent Event = NULL;
 static const char *Runc_name = NULL;
 
 /**
+ * A flag to indicate whether or not the security model is to
+ * be enforced.
+ */
+static _Bool Enforce = false;
+
+/**
  * The following variable holds booleans which describe signals
  * which were received.
  */
@@ -599,7 +605,7 @@ static _Bool add_async_event(CO(String, update))
 	if ( sealed ) {
 		if ( Debug )
 			fputs("Atomic context security violation.\n", Debug);
-		if ( violation ) {
+		if ( violation && Enforce ) {
 			fputs("Security violation in atomic context, "
 			      "shutting down workload.\n", stderr);
 			kill_cartridge(true);
@@ -2112,6 +2118,7 @@ extern int main(int argc, char *argv[])
 				break;
 			case 'e':
 				enforce = true;
+				Enforce = true;
 				break;
 			case 't':
 				Trajectory = true;
