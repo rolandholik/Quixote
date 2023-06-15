@@ -81,8 +81,8 @@ static void send_reset(CO(TTYduct, duct), CO(Buffer, bufr))
 /**
  * Private function.
  *
- * This function is responsible for receiving a set of contour points
- * from the sancho.
+ * This function is responsible for receiving the current set of
+ * security coefficients from the SanchoXen implementation.
  *
  * \param duct		The communications object being used to
  *			communicate with the co-processor.
@@ -93,7 +93,7 @@ static void send_reset(CO(TTYduct, duct), CO(Buffer, bufr))
  * \return		No return value is defined.
  */
 
-static void receive_points(CO(TTYduct, duct), CO(Buffer, bufr))
+static void receive_coefficients(CO(TTYduct, duct), CO(Buffer, bufr))
 
 {
 	unsigned int cnt;
@@ -338,8 +338,8 @@ static _Bool process_command(CO(TTYduct, duct), CO(Buffer, bufr))
 			receive_forensics(duct, bufr);
 			break;
 
-		case show_points:
-			receive_points(duct, bufr);
+		case show_coefficients:
+			receive_coefficients(duct, bufr);
 			break;
 
 		case show_events:

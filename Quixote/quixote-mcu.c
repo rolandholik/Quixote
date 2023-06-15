@@ -725,7 +725,7 @@ static _Bool process_command(CO(TTYduct, duct), CO(LocalDuct, mgmt), \
 					 "show forensics");
 			break;
 
-		case show_points:
+		case show_coefficients:
 			retn = send_list(duct, mgmt, cmdbufr, \
 					 "show points");
 			break;

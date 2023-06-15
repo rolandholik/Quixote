@@ -708,7 +708,7 @@ static _Bool send_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
  *			additional command cycle should be processed.
  */
 
-static _Bool send_points(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
+static _Bool send_coefficients(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 {
 	_Bool retn = false;
@@ -873,8 +873,8 @@ static _Bool send_map(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 		ERR(goto done);
 
 
-	/* Send each point in the model. */
-	retn = send_points(mgmt, cmdbufr);
+	/* Send each coefficient in the model. */
+	retn = send_coefficients(mgmt, cmdbufr);
 
 
  done:
@@ -943,8 +943,8 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 			retn = send_forensics(mgmt, cmdbufr);
 			break;
 
-		case show_points:
-			retn = send_points(mgmt, cmdbufr);
+		case show_coefficients:
+			retn = send_coefficients(mgmt, cmdbufr);
 			break;
 
 		case show_events:

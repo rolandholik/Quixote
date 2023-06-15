@@ -20,16 +20,18 @@
  * Copyright (c) 2020, Enjellic Systems Development, LLC. All rights reserved.
  **************************************************************************/
 
-#define TSEM_DIR	 	"/sys/kernel/security/tsem/"
-#define MEASUREMENT_FILE	TSEM_DIR"measurement"
-#define STATE_FILE		TSEM_DIR"state"
-#define TRAJECTORY_FILE		TSEM_DIR"trajectory"
-#define TRAJECTORY_COUNT_FILE	TSEM_DIR"trajectory_counts"
-#define TRAJECTORY_POINTS_FILE 	TSEM_DIR"trajectory_points"
-#define FORENSICS_FILE	 	TSEM_DIR"forensics"
-#define FORENSICS_COUNT_FILE	TSEM_DIR"forensics_counts"
-#define FORENSICS_POINTS_FILE	TSEM_DIR"forensics_points"
-#define AGGREGATE_FILE		TSEM_DIR"aggregate"
+#define MODEL_DIR	 	"/sys/kernel/security/tsem/InternalTMA/model0/"
+
+#define MEASUREMENT		MODEL_DIR"measurement"
+#define STATE			MODEL_DIR"state"
+#define TRAJECTORY		MODEL_DIR"trajectory"
+#define TRAJECTORY_COUNTS	MODEL_DIR"trajectory_counts"
+#define TRAJECTORY_COEFFICIENTS MODEL_DIR"trajectory_coefficients"
+#define FORENSICS	 	MODEL_DIR"forensics"
+#define FORENSICS_COUNTS	MODEL_DIR"forensics_counts"
+#define FORENSICS_COEFFICIENTS	MODEL_DIR"forensics_coefficients"
+
+#define AGGREGATE	        "/sys/kernel/security/tsem/aggregate"
 
 #define READ_SIDE  0
 #define WRITE_SIDE 1
@@ -399,7 +401,7 @@ static _Bool send_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	INIT(NAAAIM, TSEMevent, event, ERR(goto done));
 
 	INIT(HurdLib, File, ef, ERR(goto done));
-	if ( !ef->open_ro(ef, FORENSICS_FILE) )
+	if ( !ef->open_ro(ef, FORENSICS) )
 		ERR(goto done);
 
 	while ( ef->read_String(ef, es) ) {
@@ -417,7 +419,7 @@ static _Bool send_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 	/* Send each trajectory point. */
 	ef->reset(ef);
-	if ( !ef->open_ro(ef, FORENSICS_FILE) )
+	if ( !ef->open_ro(ef, FORENSICS) )
 		ERR(goto done);
 
 	while ( cnt-- ) {
@@ -475,8 +477,8 @@ static _Bool send_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
  *			additional command cycle should be processed.
  */
 
-static _Bool send_points(CO(LocalDuct, mgmt), CO(char *, type), \
-			 CO(Buffer, cmdbufr))
+static _Bool send_coefficients(CO(LocalDuct, mgmt), CO(char *, type), \
+			       CO(Buffer, cmdbufr))
 
 {
 	_Bool retn = false;
@@ -577,7 +579,7 @@ static _Bool send_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	INIT(NAAAIM, TSEMevent, event, ERR(goto done));
 
 	INIT(HurdLib, File, ef, ERR(goto done));
-	if ( !ef->open_ro(ef, TRAJECTORY_FILE) )
+	if ( !ef->open_ro(ef, TRAJECTORY) )
 		ERR(goto done);
 
 	while ( ef->read_String(ef, es) ) {
@@ -595,7 +597,7 @@ static _Bool send_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 	/* Send each trajectory point. */
 	ef->reset(ef);
-	if ( !ef->open_ro(ef, TRAJECTORY_FILE) )
+	if ( !ef->open_ro(ef, TRAJECTORY) )
 		ERR(goto done);
 
 	while ( cnt-- ) {
@@ -798,7 +800,7 @@ static _Bool send_map(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	INIT(HurdLib, String, as, ERR(goto done));
 
 	INIT(HurdLib, File, af, ERR(goto done));
-	if ( !af->open_ro(af, AGGREGATE_FILE) )
+	if ( !af->open_ro(af, AGGREGATE) )
 		ERR(goto done);
 	if ( !af->read_String(af, as) )
 		ERR(goto done);
@@ -809,7 +811,7 @@ static _Bool send_map(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 		ERR(goto done);
 
 	/* Send each point in the model. */
-	retn = send_points(mgmt, TRAJECTORY_POINTS_FILE, cmdbufr);
+	retn = send_coefficients(mgmt, TRAJECTORY_COEFFICIENTS, cmdbufr);
 
 
  done:
@@ -875,7 +877,7 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 		case show_measurement:
 			cmdbufr->reset(cmdbufr);
 
-			if ( !efile->open_ro(efile, MEASUREMENT_FILE) )
+			if ( !efile->open_ro(efile, MEASUREMENT) )
 				ERR(goto done);
 			if ( !efile->read_String(efile, estr) )
 				ERR(goto done);
@@ -890,7 +892,7 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 		case show_state:
 			cmdbufr->reset(cmdbufr);
 
-			if ( !efile->open_ro(efile, STATE_FILE) )
+			if ( !efile->open_ro(efile, STATE) )
 				ERR(goto done);
 			if ( !efile->read_String(efile, estr) )
 				ERR(goto done);
@@ -907,13 +909,13 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 			break;
 
 		case show_counts:
-			retn = send_counts(mgmt, TRAJECTORY_COUNT_FILE, \
-					   cmdbufr);
+			retn = send_counts(mgmt, TRAJECTORY_COUNTS, cmdbufr);
 			break;
 
-		case show_points:
-			retn = send_points(mgmt, TRAJECTORY_POINTS_FILE, \
-					   cmdbufr);
+		case show_coefficients:
+			retn = send_coefficients(mgmt,			  \
+						 TRAJECTORY_COEFFICIENTS, \
+						 cmdbufr);
 			break;
 
 		case show_forensics:
@@ -921,13 +923,14 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 			break;
 
 		case show_forensics_counts:
-			retn = send_counts(mgmt, FORENSICS_COUNT_FILE, \
+			retn = send_counts(mgmt, FORENSICS_COUNTS, \
 					   cmdbufr);
 			break;
 
-		case show_forensics_points:
-			retn = send_points(mgmt, FORENSICS_POINTS_FILE, \
-					   cmdbufr);
+		case show_forensics_coefficients:
+			retn = send_coefficients(mgmt,			 \
+						 FORENSICS_COEFFICIENTS, \
+						 cmdbufr);
 			break;
 
 		case seal_event:
@@ -1506,7 +1509,7 @@ static _Bool upload_model(const int fd)
 	INIT(HurdLib, File, ef, ERR(goto done));
 
 	/* Send aggregate. */
-	if ( !ef->open_ro(ef, AGGREGATE_FILE) )
+	if ( !ef->open_ro(ef, AGGREGATE) )
 		ERR(goto done);
 	str->add(str, aggregate_tag);
 	if ( !ef->read_String(ef, str) )
@@ -1517,7 +1520,7 @@ static _Bool upload_model(const int fd)
 
 	/* Send the points. */
 	INIT(HurdLib, File, ef, ERR(goto done));
-	if ( !ef->open_ro(ef, TRAJECTORY_POINTS_FILE) )
+	if ( !ef->open_ro(ef, TRAJECTORY_COEFFICIENTS) )
 		ERR(goto done);
 
 	str->reset(str);
@@ -1571,7 +1574,7 @@ static _Bool upload_trajectory(const int fd)
 	INIT(HurdLib, File, ef, ERR(goto done));
 
 	INIT(HurdLib, File, ef, ERR(goto done));
-	if ( !ef->open_ro(ef, TRAJECTORY_FILE) )
+	if ( !ef->open_ro(ef, TRAJECTORY) )
 		ERR(goto done);
 
 	str->reset(str);

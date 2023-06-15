@@ -52,8 +52,8 @@ static double wall_time(void)
 /**
  * Private function.
  *
- * This function is responsible for receiving a set of contour points
- * from the sancho.
+ * This function is responsible for receiving the current security
+ * state coefficients from the SanchoXen implementation.
  *
  * \param duct		The communications object being used to
  *			communicate with the co-processor.
@@ -64,7 +64,7 @@ static double wall_time(void)
  * \return		No return value is defined.
  */
 
-static void receive_points(CO(XENduct, duct), CO(Buffer, bufr))
+static void receive_coefficients(CO(XENduct, duct), CO(Buffer, bufr))
 
 {
 	unsigned int cnt;
@@ -301,8 +301,8 @@ static _Bool process_command(CO(XENduct, duct), CO(Buffer, bufr))
 			receive_forensics(duct, bufr);
 			break;
 
-		case show_points:
-			receive_points(duct, bufr);
+		case show_coefficients:
+			receive_coefficients(duct, bufr);
 			break;
 
 		case show_events:

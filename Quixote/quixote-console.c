@@ -394,10 +394,10 @@ static _Bool receive_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 /**
  * Private function.
  *
- * This function implements the receipt of a contour list from
- * the cartridge management daemon.  The protocol used is for the
- * management daemon to send the number of points in the behavioral
- * field followed by point in ASCII hexadecimal form.
+ * This function implements the receipt of the current security
+ * coefficients from the trust orchestrator. The protocol used is for
+ * the management daemon to send the number of points in the
+ * behavioral field followed by point in ASCII hexadecimal form.
  *
  * \param mgmt		The socket object used to communicate with
  *			the cartridge management instance.
@@ -412,7 +412,7 @@ static _Bool receive_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
  *			properly processed.
  */
 
-static _Bool receive_points(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
+static _Bool receive_coefficients(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 {
 	_Bool retn = false;
@@ -622,9 +622,9 @@ static _Bool receive_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr), \
 			retn = receive_forensics(mgmt, cmdbufr);
 			break;
 
-		case show_points:
-		case show_forensics_points:
-			retn = receive_points(mgmt, cmdbufr);
+		case show_coefficients:
+		case show_forensics_coefficients:
+			retn = receive_coefficients(mgmt, cmdbufr);
 			break;
 
 		case show_events:
@@ -747,7 +747,7 @@ static _Bool process_oneshot(CO(LocalDuct, mgmt), enum Oneshot_mode mode)
 			break;
 
 		case oneshot_points:
-			cmd = Sancho_cmd_list[show_points - 1].syntax;
+			cmd = Sancho_cmd_list[show_coefficients - 1].syntax;
 			break;
 
 		case oneshot_events:
