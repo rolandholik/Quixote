@@ -30,8 +30,12 @@ struct NAAAIM_SecurityPoint
 	unsigned char * (*get)(const SecurityPoint);
 	_Bool (*get_Buffer)(const SecurityPoint, const Buffer);
 
+	void (*increment)(const SecurityPoint);
+	uint64_t (*get_count)(const SecurityPoint);
+
 	void (*set_invalid)(const SecurityPoint);
 	_Bool (*is_valid)(const SecurityPoint);
+
 	_Bool (*equal)(const SecurityPoint, const SecurityPoint);
 
 	void (*whack)(const SecurityPoint);

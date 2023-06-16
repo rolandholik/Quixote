@@ -909,6 +909,79 @@ static _Bool send_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 /**
  * Private function.
  *
+ * This function is responsible for returning the population counts for
+ * coefficients on the trajectory list.
+ *
+ * \param mgmt		The socket object used to communicate with
+ *			the quixote-console management instance.
+ *
+ * \param cmdbufr	The object which will be used to hold the
+ *			information that will be transmitted.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not the command was processed.  A false value
+ *			indicates the processing of commands should be
+ *			terminated while a true value indicates an
+ *			additional command cycle should be processed.
+ */
+
+static _Bool send_trajectory_counts(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
+
+{
+	_Bool retn = false;
+
+	char bufr[21];
+
+	size_t lp,
+	       cnt = 0;
+
+	SecurityPoint cp = NULL;
+
+
+	/*
+	 * Compute the number of elements in the list and send it to
+	 * the client.
+	 */
+	cnt = Model->points_size(Model);
+
+	cmdbufr->reset(cmdbufr);
+	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
+	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
+		ERR(goto done);
+	if ( Debug )
+		fprintf(Debug, "Sent coefficient counts size: %zu\n", cnt);
+
+
+	/* Send each trajectory point. */
+	Model->rewind_points(Model);
+
+	for (lp= 0; lp < cnt; ++lp ) {
+		if ( !Model->get_point(Model, &cp) )
+			ERR(goto done);
+		if ( cp == NULL )
+			continue;
+		if ( !cp->is_valid )
+			continue;
+
+		snprintf(bufr, sizeof(bufr), "%lu", cp->get_count(cp));
+
+		cmdbufr->reset(cmdbufr);
+		cmdbufr->add(cmdbufr, (unsigned char *) bufr, sizeof(bufr));
+		if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
+			ERR(goto done);
+	}
+
+	retn = true;
+
+ done:
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
  * This function is responsible for returning the current forensics
  * list to the caller.  The protocol used is to send the number of
  * elements in the list followed by each point in the forensics
@@ -1244,12 +1317,16 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 			retn = send_trajectory(mgmt, cmdbufr);
 			break;
 
-		case show_forensics:
-			retn = send_forensics(mgmt, cmdbufr);
-			break;
-
 		case show_coefficients:
 			retn = send_coefficients(mgmt, cmdbufr);
+			break;
+
+		case show_counts:
+			retn = send_trajectory_counts(mgmt, cmdbufr);
+			break;
+
+		case show_forensics:
+			retn = send_forensics(mgmt, cmdbufr);
 			break;
 
 		case show_events:

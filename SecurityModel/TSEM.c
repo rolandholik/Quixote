@@ -224,6 +224,7 @@ static _Bool _is_mapped(CO(Gaggle, map), CO(SecurityPoint, point))
 		if ( point->equal(point, cp) ) {
 			if ( !cp->is_valid(cp) )
 				point->set_invalid(point);
+			cp->increment(cp);
 			return true;
 		}
 	}
@@ -412,6 +413,7 @@ static _Bool update(CO(TSEM, this), CO(SecurityEvent, event), _Bool *status, \
 	/* Add the security state point. */
 	if ( !GADD(S->points, cp) )
 		ERR(goto done);
+	cp->increment(cp);
 	release_point = false;
 
 	if ( S->sealed ) {

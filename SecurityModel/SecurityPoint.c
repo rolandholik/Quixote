@@ -55,6 +55,9 @@ struct NAAAIM_SecurityPoint_State
 	/* Flag to indicate this point represents a behavior violation. */
 	_Bool violation;
 
+	/* The number of times this event occurred. */
+	uint64_t count;
+
 	/* The measurement */
 	unsigned char point[NAAAIM_IDSIZE];
 };
@@ -77,6 +80,7 @@ static void _init_state(CO(SecurityPoint_State, S))
 	S->libid = NAAAIM_LIBID;
 	S->objid = NAAAIM_SecurityPoint_OBJID;
 
+	S->count     = 0;
 	S->poisoned  = false;
 	S->violation = false;
 
@@ -181,6 +185,48 @@ static _Bool get_Buffer(CO(SecurityPoint, this), CO(Buffer, bufr))
 
  done:
 	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements a method for incrementing the count of how
+ * many times this coefficient has been witnessed.
+ *
+ * \param this		The object whose count is to be incremented.
+ *
+ */
+
+static void increment(CO(SecurityPoint, this))
+
+{
+	STATE(S);
+
+	++S->count;
+	return;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements an accessor method for returning the number
+ * of times this security coefficient has been witnessed.
+ *
+ * \param this		The object whose count is to be incremented.
+ *
+ * \return	A 64-bit integer count of the number of times the
+ *		security state coefficient represented by this object
+ *		has occurred.
+ */
+
+static uint64_t get_count(CO(SecurityPoint, this))
+
+{
+	STATE(S);
+
+	return S->count;
 }
 
 
@@ -309,6 +355,9 @@ extern SecurityPoint NAAAIM_SecurityPoint_Init(void)
 	this->get = get;
 
 	this->get_Buffer = get_Buffer;
+
+	this->increment = increment;
+	this->get_count = get_count;
 
 	this->set_invalid = set_invalid;
 	this->is_valid	  = is_valid;
