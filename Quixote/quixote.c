@@ -1430,9 +1430,9 @@ static void kill_cartridge(const char *cartridge, const _Bool wait)
 	/* Signal the monitor process to shutdown the cartridge process. */
 	if ( Mode == process_mode ) {
 		if ( Debug )
-			fprintf(Debug, "%u sending SIGHUP to %u.\n", \
+			fprintf(Debug, "%u sending SIGKILL to %u.\n", \
 				getpid(), Cartridge_pid);
-		kill(Cartridge_pid, SIGTERM);
+		kill(Cartridge_pid, SIGKILL);
 		return;
 	}
 
@@ -1461,7 +1461,8 @@ static void kill_cartridge(const char *cartridge, const _Bool wait)
 	/* Child process - execute runc in kill mode. */
 	if ( kill_process == 0 ) {
 		if ( Debug )
-			fputs("Killing runc cartridge.\n", Debug);
+			fprintf(Debug, "%u: Killing runc cartridge: %s\n", \
+			      getpid(), cartridge);
 		execlp("runc", "runc", "kill", cartridge, "SIGKILL", \
 		       NULL);
 		exit(1);
@@ -1622,6 +1623,8 @@ static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int model_fd)
 	_Bool retn	= false,
 	      connected = false;
 
+	int rc;
+
 	unsigned int opt;
 
 	struct pollfd poll_data[1];
@@ -1648,10 +1651,18 @@ static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int model_fd)
 			fprintf(Debug, "\n%d: Poll cycle: %d\n", getpid(), \
 				++opt);
 
-		retn = poll(poll_data, 1, -1);
+		rc = poll(poll_data, 1, -1);
+		if ( rc == -1 ) {
+			if ( errno != EINTR ) {
+				fprintf(stderr, "Orchestrator poll error: "
+					"%s\n", strerror(errno));
+				goto done;
+			}
+		}
+
 		if ( Debug )
 			fprintf(Debug, "Poll event: %d, Mgmt poll=%0x\n", \
-				retn, poll_data[0].revents);
+				rc, poll_data[0].revents);
 
 		/* Check for signals. */
 		if ( Signals.stop || Signals.sigterm ) {
@@ -1811,14 +1822,20 @@ static _Bool fire_cartridge(CO(LocalDuct, mgmt), CO(char *, cartridge),
 	/* Parent process - run the child monitor. */
 	if ( Cartridge_pid > 0 ) {
 		if ( Debug )
-			fprintf(Debug, "Monitor process: %d\n", getpid());
-		child_monitor(mgmt, cartridge, map_pipe[WRITE_SIDE]);
+			fprintf(Debug, "Monitor process: %d\n", Monitor_pid);
+		write(map_pipe[WRITE_SIDE], &Cartridge_pid, \
+		      sizeof(Cartridge_pid));
+		if ( !child_monitor(mgmt, cartridge, map_pipe[WRITE_SIDE]) ) {
+			fputs("Orchestrator internal error, terminating.\n",
+			      stderr);
+			_exit(1);
+		}
 		_exit(0);
 	}
 
 	/* Child process - run the cartridge. */
 	if ( Debug )
-		fprintf(Debug, "Child process: %d\n", getpid());
+		fprintf(Debug, "Workload process: %d\n", getpid());
 
 	if ( Cartridge_pid == 0 ) {
 		/* Drop the ability to modify the security event model. */
@@ -2040,6 +2057,7 @@ extern int main(int argc, char *argv[])
 	     *magazine_size = NULL;
 
 	int opt,
+	    status,
 	    mapfd = 0,
 	    retn  = 1;
 
@@ -2176,9 +2194,18 @@ extern int main(int argc, char *argv[])
 	if ( !fire_cartridge(mgmt, cartridge, state, &mapfd, enforce) )
 		ERR(goto done);
 
+	/* Read the PID of the workload process. */
+	if ( read(mapfd, &Cartridge_pid, sizeof(Cartridge_pid)) != \
+	     sizeof(Cartridge_pid) ) {
+		fputs("Failed to read cartridge pid.\n", stderr);
+		Cartridge_pid = 0;
+	}
+	if ( Debug )
+		fprintf(Debug, "Workload pid from monitor: %u\n", \
+			Cartridge_pid);
+
 	/* Wait for a security event map to be generated. */
 	if ( Pause ) {
-
 		if ( Trajectory ) {
 			if ( !receive_trajectory(outfile, mapfd) )
 				ERR(goto done);
@@ -2192,11 +2219,22 @@ extern int main(int argc, char *argv[])
 	} else {
 		while ( 1 ) {
 			if ( Debug )
-				fprintf(Debug, "%d: Waiting for monitor.\n",
-					getpid());
+				fprintf(Debug, "%u: Waiting for monitor, "
+					"monitor=%u, cartridge=%u\n",
+					getpid(), Monitor_pid, Cartridge_pid);
 			pause();
-			if ( child_exited(Monitor_pid) )
+			if ( waitpid(Monitor_pid, &status, WNOHANG) == \
+			     Monitor_pid ) {
+				if ( !WIFEXITED(status) )
+					goto done;
+				if ( Debug )
+					fprintf(Debug, "Orchestrator error "  \
+						"%d, terminating workload\n", \
+						WEXITSTATUS(status));
+				if ( WEXITSTATUS(status) > 0 )
+					kill_cartridge(cartridge, true);
 				goto done;
+			}
 		}
 	}
 

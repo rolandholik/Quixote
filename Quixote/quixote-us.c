@@ -1931,8 +1931,10 @@ static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int fd)
 				continue;
 			}
 
-			if ( !process_command(mgmt, cmdbufr) )
-				ERR(goto done);
+			if ( !process_command(mgmt, cmdbufr) ) {
+				Model_Error = true;
+				kill_cartridge(false);
+			}
 			cmdbufr->reset(cmdbufr);
 		}
 	}
@@ -2014,7 +2016,8 @@ static _Bool fire_cartridge(CO(LocalDuct, mgmt), CO(char *, cartridge), \
 	/* Monitor parent process. */
 	if ( Monitor_pid > 0 ) {
 		if ( Debug )
-			fprintf(Debug, "Monitor process: %d\n", getpid());
+			fprintf(Debug, "Monitor process: %d\n", Monitor_pid);
+
 		close(event_pipe[WRITE_SIDE]);
 		if ( !child_monitor(mgmt, cartridge, event_pipe[READ_SIDE]) )
 			ERR(goto done);
@@ -2096,10 +2099,8 @@ static _Bool fire_cartridge(CO(LocalDuct, mgmt), CO(char *, cartridge), \
 			}
 
 			if ( Signals.sigterm ) {
-				if ( Debug )
-					fputs("Monitor procss terminated.\n", \
-					      Debug);
-				kill(cartridge_pid, SIGHUP);
+				fputs("Monitor procss terminated.\n", Debug);
+				kill_cartridge(false);
 			}
 
 			if ( Signals.sigchild ) {
