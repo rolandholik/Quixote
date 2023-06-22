@@ -729,8 +729,9 @@ static _Bool process_event()
 
 
 	if ( Debug )
-		fprintf(Debug, "Processing event: '%s'\n",
+		fprintf(Debug, "Processing event: '%s'\n", \
 			Event->get_event(Event));
+
 
 	/* Dispatch the event. */
 	INIT(HurdLib, String, str, ERR(goto done));
@@ -2099,7 +2100,9 @@ static _Bool fire_cartridge(CO(LocalDuct, mgmt), CO(char *, cartridge), \
 			}
 
 			if ( Signals.sigterm ) {
-				fputs("Monitor procss terminated.\n", Debug);
+				if ( Debug )
+					fputs("Monitor process terminated.\n",\
+					      Debug);
 				kill_cartridge(false);
 			}
 
@@ -2156,7 +2159,6 @@ static _Bool fire_cartridge(CO(LocalDuct, mgmt), CO(char *, cartridge), \
 
 	return retn;
 }
-
 
 
 /*
