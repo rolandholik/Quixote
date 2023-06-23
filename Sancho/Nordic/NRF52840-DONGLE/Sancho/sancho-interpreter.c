@@ -652,12 +652,12 @@ extern void sancho_interpreter(const TTYduct duct)
 				send_trajectory(duct, model, bufr);
 				break;
 
-			case show_forensics:
-				send_forensics(duct, model, bufr);
+			case show_coefficients:
+				send_points(duct, model, bufr);
 				break;
 
-			case show_points:
-				send_points(duct, model, bufr);
+			case show_forensics:
+				send_forensics(duct, model, bufr);
 				break;
 
 			case show_events:
