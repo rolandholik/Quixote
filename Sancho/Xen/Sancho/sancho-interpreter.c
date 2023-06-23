@@ -371,6 +371,12 @@ static void send_trajectory(CO(XENduct, duct), CO(TSEM, model), \
  * \param model		The model instance whose contours are to be
  *			displayed.
  *
+ * \param type		A flag variable indicating the type of the
+ *			coefficients to be sent.  A true value indicates
+ *			that valid coefficients should be sent while a
+ *			false value indicates that the forensics
+ *			coefficients are to be sent.
+ *
  * \param bufr		A Buffer object to be used for displaying
  *			the behavioral identities.
  *
@@ -378,7 +384,7 @@ static void send_trajectory(CO(XENduct, duct), CO(TSEM, model), \
  */
 
 static void send_trajectory_coefficients(CO(XENduct, duct), CO(TSEM, model), \
-					 CO(Buffer, bufr))
+					 const _Bool type, CO(Buffer, bufr))
 
 {
 	uint8_t *p,
@@ -396,7 +402,12 @@ static void send_trajectory_coefficients(CO(XENduct, duct), CO(TSEM, model), \
 	 * Compute the number of elements in the list and send it to
 	 * the client.
 	 */
-	cnt = model->points_size(model);
+	if ( type ) {
+		cnt = model->points_size(model);
+		cnt -= model->forensics_size(model);
+	}
+	else
+		cnt = model->forensics_size(model);
 
 
 	bufr->reset(bufr);
@@ -408,10 +419,12 @@ static void send_trajectory_coefficients(CO(XENduct, duct), CO(TSEM, model), \
 	/* Send each trajectory point. */
 	model->rewind_points(model);
 
-	for (lp= 0; lp < cnt; ++lp ) {
+	for (lp= 0; lp < model->points_size(model); ++lp ) {
 		if ( !model->get_point(model, &cp) )
 			ERR(goto done);
 		if ( cp == NULL )
+			continue;
+		if ( cp->is_valid(cp) != type )
 			continue;
 
 		memset(point, '\0', sizeof(point));
@@ -443,6 +456,9 @@ static void send_trajectory_coefficients(CO(XENduct, duct), CO(TSEM, model), \
  * \param model		The model instance whose contours are to be
  *			displayed.
  *
+ * \param type		A flag variable indicating the type of counts
+ *			to be returned.
+ *
  * \param bufr		A Buffer object to be used for displaying
  *			the behavioral identities.
  *
@@ -450,7 +466,7 @@ static void send_trajectory_coefficients(CO(XENduct, duct), CO(TSEM, model), \
  */
 
 static void send_trajectory_counts(CO(XENduct, duct), CO(TSEM, model),
-				   CO(Buffer, cmdbufr))
+				   const _Bool type, CO(Buffer, cmdbufr))
 
 {
 	char bufr[21];
@@ -465,7 +481,12 @@ static void send_trajectory_counts(CO(XENduct, duct), CO(TSEM, model),
 	 * Compute the number of elements in the list and send it to
 	 * the client.
 	 */
-	cnt = model->points_size(model);
+	if ( type ) {
+		cnt = model->points_size(model);
+		cnt -= model->forensics_size(model);
+	}
+	else
+		cnt = model->forensics_size(model);
 
 
 	cmdbufr->reset(cmdbufr);
@@ -477,12 +498,12 @@ static void send_trajectory_counts(CO(XENduct, duct), CO(TSEM, model),
 	/* Send each trajectory point. */
 	model->rewind_points(model);
 
-	for (lp= 0; lp < cnt; ++lp ) {
+	for (lp= 0; lp < model->points_size(model); ++lp ) {
 		if ( !model->get_point(model, &cp) )
 			ERR(goto done);
 		if ( cp == NULL )
 			continue;
-		if ( !cp->is_valid )
+		if ( cp->is_valid(cp) != type )
 			continue;
 
 		snprintf(bufr, sizeof(bufr), "%lu", cp->get_count(cp));
@@ -717,15 +738,29 @@ extern void sancho_interpreter(const XENduct duct)
 
 			case show_coefficients:
 				send_trajectory_coefficients(duct, model, \
-							     bufr);
+							     true, bufr);
 				break;
 
 			case show_counts:
-				send_trajectory_counts(duct, model, bufr);
+				send_trajectory_counts(duct, model, true, \
+						       bufr);
 				break;
 
 			case show_forensics:
+				fputs("show forensics.\n", stdout);
 				send_forensics(duct, model, bufr);
+				break;
+
+			case show_forensics_coefficients:
+				fputs("show forensics coefficients\n", stdout);
+				send_trajectory_coefficients(duct, model, \
+							     false, bufr);
+				break;
+
+			case show_forensics_counts:
+				fputs("show forensics counts\n", stdout);
+				send_trajectory_counts(duct, model, false, \
+						       bufr);
 				break;
 
 			case show_events:

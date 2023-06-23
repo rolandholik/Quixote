@@ -919,6 +919,12 @@ static _Bool send_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
  * \param cmdbufr	The object which will be used to hold the
  *			information that will be transmitted.
  *
+ * \param type		A flag used to indicate what type of counts
+ *			are to be set.  A true value indicates that
+ *			the counts of valid points are to be returned
+ *			while a false value indicates that invalid
+ *			points are to be returned.
+ *
  * \return		A boolean value is returned to indicate whether
  *			or not the command was processed.  A false value
  *			indicates the processing of commands should be
@@ -926,7 +932,8 @@ static _Bool send_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
  *			additional command cycle should be processed.
  */
 
-static _Bool send_trajectory_counts(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
+static _Bool send_trajectory_counts(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr), \
+				    const _Bool type)
 
 {
 	_Bool retn = false;
@@ -943,7 +950,12 @@ static _Bool send_trajectory_counts(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	 * Compute the number of elements in the list and send it to
 	 * the client.
 	 */
-	cnt = Model->points_size(Model);
+	if ( type ) {
+		cnt = Model->points_size(Model);
+		cnt -= Model->forensics_size(Model);
+	}
+	else
+		cnt = Model->forensics_size(Model);
 
 	cmdbufr->reset(cmdbufr);
 	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
@@ -952,16 +964,15 @@ static _Bool send_trajectory_counts(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	if ( Debug )
 		fprintf(Debug, "Sent coefficient counts size: %zu\n", cnt);
 
-
 	/* Send each trajectory point. */
 	Model->rewind_points(Model);
 
-	for (lp= 0; lp < cnt; ++lp ) {
+	for (lp= 0; lp < Model->points_size(Model); ++lp ) {
 		if ( !Model->get_point(Model, &cp) )
 			ERR(goto done);
 		if ( cp == NULL )
 			continue;
-		if ( !cp->is_valid )
+		if ( cp->is_valid(cp) != type )
 			continue;
 
 		snprintf(bufr, sizeof(bufr), "%lu", cp->get_count(cp));
@@ -1084,6 +1095,11 @@ static _Bool send_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
  * \param cmdbufr	The object which will be used to hold the
  *			information which will be transmitted.
  *
+ * \param type		A boolean variable used to indicate which
+ *			security state coefficients are to be returned.
+ *			A true value sends valid coefficients while
+ *			a false value sends invalid coefficients.
+ *
  * \return		A boolean value is returned to indicate whether
  *			or not the command was processed.  A false value
  *			indicates the processing of commands should be
@@ -1091,7 +1107,9 @@ static _Bool send_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
  *			additional command cycle should be processed.
  */
 
-static _Bool send_coefficients(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
+static _Bool send_trajectory_coefficients(CO(LocalDuct, mgmt), \
+					  CO(Buffer, cmdbufr), \
+					  const _Bool type)
 
 {
 	_Bool retn = false;
@@ -1111,23 +1129,30 @@ static _Bool send_coefficients(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	 * Compute the number of elements in the list and send it to
 	 * the client.
 	 */
-	cnt = Model->points_size(Model);
+	if ( type ) {
+		cnt = Model->points_size(Model);
+		cnt -= Model->forensics_size(Model);
+	}
+	else
+		cnt = Model->forensics_size(Model);
 
 	cmdbufr->reset(cmdbufr);
 	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
 	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
 		ERR(goto done);
 	if ( Debug )
-		fprintf(Debug, "Sent contour size: %zu\n", cnt);
+		fprintf(Debug, "Sent coefficient size: %zu\n", cnt);
 
 
 	/* Send each trajectory point. */
 	Model->rewind_points(Model);
 
-	for (lp= 0; lp < cnt; ++lp ) {
+	for (lp= 0; lp < Model->points_size(Model); ++lp ) {
 		if ( !Model->get_point(Model, &cp) )
 			ERR(goto done);
 		if ( cp == NULL )
+			continue;
+		if ( cp->is_valid(cp) != type )
 			continue;
 
 		memset(point, '\0', sizeof(point));
@@ -1253,7 +1278,7 @@ static _Bool send_map(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 
 	/* Send each point in the model. */
-	retn = send_coefficients(mgmt, cmdbufr);
+	retn = send_trajectory_coefficients(mgmt, cmdbufr, true);
 
 
  done:
@@ -1319,15 +1344,25 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 			break;
 
 		case show_coefficients:
-			retn = send_coefficients(mgmt, cmdbufr);
+			retn = send_trajectory_coefficients(mgmt, cmdbufr, \
+							    true);
 			break;
 
 		case show_counts:
-			retn = send_trajectory_counts(mgmt, cmdbufr);
+			retn = send_trajectory_counts(mgmt, cmdbufr, true);
 			break;
 
 		case show_forensics:
 			retn = send_forensics(mgmt, cmdbufr);
+			break;
+
+		case show_forensics_coefficients:
+			retn = send_trajectory_coefficients(mgmt, cmdbufr, \
+							    false);
+			break;
+
+		case show_forensics_counts:
+			retn = send_trajectory_counts(mgmt, cmdbufr, false);
 			break;
 
 		case show_events:
@@ -1918,8 +1953,11 @@ static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int fd)
 				connected = true;
 				continue;
 			}
-			if ( !mgmt->receive_Buffer(mgmt, cmdbufr) )
-				continue;
+			if ( !mgmt->receive_Buffer(mgmt, cmdbufr) ) {
+				fputs("Orchestrator manager error.\n", stderr);
+				Model_Error = true;
+				kill_cartridge(false);
+			}
 			if ( mgmt->eof(mgmt) ) {
 				if ( Debug )
 					fputs("Terminating management.\n", \

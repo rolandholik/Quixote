@@ -947,6 +947,17 @@ static _Bool process_command(CO(XENduct, duct), CO(LocalDuct, mgmt), \
 			retn = send_list(duct, mgmt, cmdbufr, \
 					 "show forensics");
 			break;
+
+		case show_forensics_coefficients:
+			retn = send_list(duct, mgmt, cmdbufr, \
+					 "show forensics_coefficients");
+			break;
+
+		case show_forensics_counts:
+			retn = send_list(duct, mgmt, cmdbufr, \
+					 "show forensics_counts");
+			break;
+
 		case show_events:
 			retn = send_list(duct, mgmt, cmdbufr, \
 					 "show events");
