@@ -659,7 +659,8 @@ static _Bool _parse_socket(CO(Cell_State, S), CO(String, entry))
 			if ( str->size(str) >= cnt )
 				ERR(goto done);
 
-			strcpy(S->socket_connect.u.unix_addr, str->get(str));
+			memcpy(S->socket_connect.u.unix_addr, str->get(str), \
+			       str->size(str));
 			break;
 
 		default:
@@ -760,7 +761,8 @@ static _Bool _parse_socket_accept(CO(Cell_State, S), CO(String, entry))
 			if ( str->size(str) >= cnt )
 				ERR(goto done);
 
-			strcpy(S->socket_accept.u.unix_addr, str->get(str));
+			memcpy(S->socket_accept.u.unix_addr, str->get(str), \
+			       str->size(str));
 			break;
 
 		default:
