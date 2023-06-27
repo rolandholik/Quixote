@@ -38,6 +38,7 @@ struct ISOidentity_ecall1_interface {
 	_Bool retn;
 	_Bool debug;
 
+	_Bool async;
 	_Bool discipline;
 	_Bool sealed;
 	char *update;
@@ -120,6 +121,8 @@ struct ISOidentity_ecall14 {
 struct SanchoSGX_ecall15 {
 	_Bool retn;
 
+	_Bool violation;
+	uint64_t count;
 	uint8_t point[NAAAIM_IDSIZE];
 };
 

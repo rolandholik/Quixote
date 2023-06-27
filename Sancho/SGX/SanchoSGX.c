@@ -109,6 +109,7 @@ struct NAAAIM_SanchoSGX_State
 	/* Enclave error code. */
 	int enclave_error;
 
+	/* TSEM control plane object. */
 	TSEMcontrol control;
 
 	/* SGX enclave object. */
@@ -140,7 +141,6 @@ static void _init_state(CO(SanchoSGX_State, S))
 	S->debug	 = false;
 	S->enclave_error = 0;
 
-	S->control = NULL;
 	S->enclave = NULL;
 	S->ocall   = NULL;
 
@@ -164,6 +164,9 @@ static void _init_state(CO(SanchoSGX_State, S))
  *			of the file containing the initialization
  *			token.
  *
+ * \param control	A pointer to the object that will be used to
+ *			manage the TSEM control plane.
+ *
  * \return	A boolean value is used to indicate whether or not
  *		the enclave was successfully loaded..  A false value
  *		indicates a failure while a true value indicates
@@ -171,7 +174,7 @@ static void _init_state(CO(SanchoSGX_State, S))
  */
 
 static _Bool load_enclave(CO(SanchoSGX, this), CO(char *, enclave), \
-			  CO(char *, token))
+			  CO(char *, token), CO(TSEMcontrol, control))
 
 {
 	STATE(S);
@@ -190,6 +193,9 @@ static _Bool load_enclave(CO(SanchoSGX, this), CO(char *, enclave), \
 
 	File token_file = NULL;
 
+
+	/* Stash the control plane object. */
+	S->control = control;
 
 	/* Load the EINITTOKEN. */
 	INIT(HurdLib, File, token_file, ERR(goto done));
@@ -272,6 +278,9 @@ static _Bool load_enclave(CO(SanchoSGX, this), CO(char *, enclave), \
  *			of the file containing the initialization
  *			token.
  *
+ * \param control	A pointer to the object that will be used to
+ *			manage the TSEM control plane.
+ *
  * \return	A boolean value is used to indicate whether or not
  *		the enclave was successfully loaded..  A false value
  *		indicates a failure while a true value indicates
@@ -279,7 +288,8 @@ static _Bool load_enclave(CO(SanchoSGX, this), CO(char *, enclave), \
  */
 
 static _Bool load_enclave_memory(CO(SanchoSGX, this), CO(uint8_t *, enclave), \
-				 size_t size, CO(char *, token))
+				 size_t size, CO(char *, token),	      \
+				 CO(TSEMcontrol, control))
 
 {
 	STATE(S);
@@ -298,6 +308,9 @@ static _Bool load_enclave_memory(CO(SanchoSGX, this), CO(uint8_t *, enclave), \
 
 	File token_file = NULL;
 
+
+	/* Stash the control plane object. */
+	S->control = control;
 
 	/* Load the EINITTOKEN. */
 	INIT(HurdLib, File, token_file, ERR(goto done));
@@ -371,8 +384,14 @@ static _Bool load_enclave_memory(CO(SanchoSGX, this), CO(uint8_t *, enclave), \
  *
  * \param this		A pointer to the object which is being modeled.
  *
- * \param update	The object containing the event which is to be
- *			registered.
+ * \param control	The object that will be used by the enclave to
+ *			issue control requests to the TSEM driver.
+ *			This is maintained inside of the enclave after
+ *			the first control plane call.
+ *
+ * \param async		A flag variable to indicate that the event
+ *			being processed was calledin asynchronous
+ *			context.
  *
  * \param discipline	A pointer to a boolean value used to inform
  *			the caller as to whether or not the update
@@ -388,7 +407,7 @@ static _Bool load_enclave_memory(CO(SanchoSGX, this), CO(uint8_t *, enclave), \
  *		was updated.
  */
 
-static _Bool update(CO(SanchoSGX, this), CO(String, update), \
+static _Bool update(CO(SanchoSGX, this), CO(String, update), _Bool async, \
 		    _Bool *discipline, _Bool *sealed)
 
 {
@@ -416,6 +435,7 @@ static _Bool update(CO(SanchoSGX, this), CO(String, update), \
 	if ( !S->ocall->get_table(S->ocall, &ocall_table) )
 		ERR(goto done);
 
+	ecall1.async   = async;
 	ecall1.update  = update->get(update);
 	ecall1.control = S->control;
 
@@ -1174,7 +1194,9 @@ static size_t trajectory_size(CO(SanchoSGX, this))
  * \param this		A pointer to the domain whose contours are to
  *			be retrieved.
  *
- * \param point		The object which the point will be copied into.
+ * \param cp		The object that will be used to return the
+ *			parameters of the security state coefficient
+ *			to the caller.
  *
  * \return	A boolean value is used to indicate whether or not
  *		a state pointd was returned.  A false value indicates
@@ -1183,7 +1205,7 @@ static size_t trajectory_size(CO(SanchoSGX, this))
  *		contains a valid value.
  */
 
-static _Bool get_point(CO(SanchoSGX, this), Buffer point)
+static _Bool get_point(CO(SanchoSGX, this), CO(SecurityPoint, cp))
 
 {
 	STATE(S);
@@ -1196,13 +1218,13 @@ static _Bool get_point(CO(SanchoSGX, this), Buffer point)
 
 	struct SanchoSGX_ecall15 ecall15;
 
+	Buffer bufr = NULL;
+
 
 	/* Verify object and inputs. */
 	if ( S->poisoned )
 		ERR(goto done);
-	if ( point == NULL )
-		ERR(goto done);
-	if ( point->poisoned(point) )
+	if ( cp == NULL )
 		ERR(goto done);
 
 
@@ -1218,12 +1240,22 @@ static _Bool get_point(CO(SanchoSGX, this), Buffer point)
 	if ( !ecall15.retn )
 		ERR(goto done);
 
-	if ( !point->add(point, ecall15.point, sizeof(ecall15.point)) )
+	cp->set_count(cp, ecall15.count);
+
+	if ( ecall15.violation )
+		cp->set_invalid(cp);
+
+	INIT(HurdLib, Buffer, bufr, ERR(goto done));
+	if ( !bufr->add(bufr, ecall15.point, sizeof(ecall15.point)) )
 		ERR(goto done);
+	cp->add(cp, bufr);
+
 	retn = true;
 
 
  done:
+	WHACK(bufr);
+
 	return retn;
 }
 
@@ -1949,7 +1981,6 @@ static void whack(CO(SanchoSGX, this))
  done:
 	WHACK(S->enclave);
 	WHACK(S->ocall);
-	WHACK(S->control);
 
 	S->root->whack(S->root, this, S);
 	return;
@@ -1992,7 +2023,6 @@ extern SanchoSGX NAAAIM_SanchoSGX_Init(void)
 	_init_state(this->state);
 
 	/* Initialize aggregate objects. */
-	INIT(NAAAIM, TSEMcontrol, this->state->control, goto fail);
 
 	/* Method initialization. */
 	this->load_enclave	  = load_enclave;
@@ -2037,9 +2067,4 @@ extern SanchoSGX NAAAIM_SanchoSGX_Init(void)
 	this->whack		= whack;
 
 	return this;
-
-
-fail:
-	root->whack(root, this, this->state);
-	return NULL;
 }

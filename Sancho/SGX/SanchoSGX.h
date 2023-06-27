@@ -27,11 +27,13 @@ typedef struct NAAAIM_SanchoSGX_State * SanchoSGX_State;
 struct NAAAIM_SanchoSGX
 {
 	/* External methods. */
-	_Bool (*load_enclave)(const SanchoSGX, const char *, const char *);
+	_Bool (*load_enclave)(const SanchoSGX, const char *, const char *, \
+			      const TSEMcontrol);
 	_Bool (*load_enclave_memory)(const SanchoSGX, const uint8_t *, \
-				     size_t, const char *);
+				     size_t, const char *, const TSEMcontrol);
 
-	_Bool (*update)(const SanchoSGX, const String, _Bool *, _Bool *);
+	_Bool (*update)(const SanchoSGX, const String, _Bool, _Bool *, \
+			_Bool *);
 	_Bool (*load)(const SanchoSGX, const String);
 
 	_Bool (*set_aggregate)(const SanchoSGX, const Buffer);
@@ -49,7 +51,7 @@ struct NAAAIM_SanchoSGX
 	_Bool (*get_event)(const SanchoSGX, String);
 
 	void (*rewind_points)(const SanchoSGX);
-	_Bool (*get_point)(const SanchoSGX, Buffer);
+	_Bool (*get_point)(const SanchoSGX, const SecurityPoint);
 	size_t (*trajectory_size)(const SanchoSGX);
 
 	void (*rewind_forensics)(const SanchoSGX);

@@ -17,6 +17,8 @@
 
 #include <NAAAIM.h>
 
+#include <TSEMcontrol.h>
+
 #include <SRDEfusion-ocall.h>
 #include <SRDEnaaaim-ocall.h>
 
@@ -179,6 +181,12 @@ _Bool update_model(struct ISOidentity_ecall1_interface *ecall1)
 		ERR(goto done);
 	if ( !updated )
 		WHACK(event);
+	if ( ecall1->async ) {
+		retn = true;
+		goto done;
+	}
+
+	/* Set the trust status of the process */
 	if ( !Model->discipline_pid(Model, &pid) )
 		ERR(goto done);
 
@@ -671,13 +679,21 @@ _Bool get_event(char type, char *update, size_t size)
  *			references an area large enough to hold
  *			the binary value of a state point.
  *
+ * \param valid		A pointer to a boolean variable that will be
+ *			loaded with the status of the security
+ *			coefficient being retrieved.
+ *
+ * \param count		A pointer to the variable that will be loaded
+ *			with the occupancy count for the security state
+ *			coefficient being returned.
+ *
  * \return	A boolean value is used to indicate whether or not
  *		a valid value is returned.  A false value indicates
  *		a valid event is not available while a true value
  *		indicates the event return was valid.
  */
 
-_Bool get_point(unsigned char *pt)
+_Bool get_point(unsigned char *pt, _Bool *violation, uint64_t *count)
 
 {
 	_Bool retn = false;
@@ -690,7 +706,8 @@ _Bool get_point(unsigned char *pt)
 	if ( cp == NULL )
 		ERR(goto done);
 
-	cp->get(cp);
+	*violation = !cp->is_valid(cp);
+	*count = cp->get_count(cp);
 	memcpy(pt, cp->get(cp), NAAAIM_IDSIZE);
 
 	retn = true;

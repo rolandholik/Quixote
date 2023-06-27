@@ -2318,8 +2318,6 @@ extern int main(int argc, char *argv[])
 		goto done;
 	if ( sigaction(SIGCHLD, &signal_action, NULL) == -1 )
 		goto done;
-	if ( sigaction(SIGUSR1, &signal_action, NULL) == -1 )
-		goto done;
 
 
 	/* Initialize the security model and its controller. */

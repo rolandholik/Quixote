@@ -117,13 +117,16 @@ quixote-mcu: quixote-mcu.o ${LIBDEPS} ${MODELDEPS}
 quixote-us: quixote-us.o ${LIBDEPS} ${MODELDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${MODELDEPS} ${LIBS};
 
-quixote-sgx: quixote-sgx.o ${SANCHOSGX}/SanchoSGX.o ${LIBDEPS}
-	${CC} ${LDFLAGS} -o $@ $< ${SANCHOSGX}/SanchoSGX.o ${SEDELIB} ${LIBS} \
+quixote-sgx: quixote-sgx.o ${SANCHOSGX}/SanchoSGX.o \
+	../SecurityModel/SecurityPoint.o ${LIBDEPS}
+	${CC} ${LDFLAGS} -o $@ $< ${SANCHOSGX}/SanchoSGX.o	    \
+		../SecurityModel/SecurityPoint.o ${SEDELIB} ${LIBS} \
 		${BUILD_ELFLIB};
 
-quixote-sgx-u: quixote-sgx-u.o ${SANCHOSGX}/SanchoSGX.o sancho-enclave.h \
-	${LIBDEPS}
-	${CC} ${LDFLAGS} -o $@ $< ${SANCHOSGX}/SanchoSGX.o ${SEDELIB} ${LIBS} \
+quixote-sgx-u: quixote-sgx-u.o ${SANCHOSGX}/SanchoSGX.o \
+	../SecurityModel/SecurityPoint.o ${LIBDEPS}
+	${CC} ${LDFLAGS} -o $@ $< ${SANCHOSGX}/SanchoSGX.o \
+		../SecurityModel/SecurityPoint.o ${SEDELIB} ${LIBS} \
 		${BUILD_ELFLIB};
 
 quixote-xen: quixote-xen.o ${LIBDEPS} ${MODELDEPS}

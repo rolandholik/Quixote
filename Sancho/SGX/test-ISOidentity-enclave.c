@@ -43,6 +43,9 @@
 #include <SRDE.h>
 #include <SRDEenclave.h>
 #include <SecurityEvent.h>
+#include <SecurityPoint.h>
+
+#include <TSEMcontrol.h>
 
 #include <SRDEfusion-ocall.h>
 #include <SRDEnaaaim-ocall.h>
@@ -141,7 +144,7 @@ extern int main(int argc, char *argv[])
 	/* Run measurement mode. */
 	if ( mode == measure ) {
 		INIT(NAAAIM, SanchoSGX, sancho, ERR(goto done));
-		if ( !sancho->load_enclave(sancho, enclave_name, token) )
+		if ( !sancho->load_enclave(sancho, enclave_name, token, NULL) )
 			ERR(goto done);
 
 		INIT(HurdLib, Buffer, bufr, ERR(goto done));
@@ -218,7 +221,7 @@ extern int main(int argc, char *argv[])
 
 	/* Load enclave and initialize model. */
 	INIT(NAAAIM, SanchoSGX, sancho, ERR(goto done));
-	if ( !sancho->load_enclave(sancho, enclave_name, token) )
+	if ( !sancho->load_enclave(sancho, enclave_name, token, NULL) )
 		ERR(goto done);
 
 
@@ -235,7 +238,8 @@ extern int main(int argc, char *argv[])
 	INIT(HurdLib, String, input, ERR(goto done));
 
 	while ( infile->read_String(infile, input) ) {
-		if ( !sancho->update(sancho, input, &discipline, &sealed) )
+		if ( !sancho->update(sancho, input, false, &discipline, \
+				     &sealed) )
 			ERR(goto done);
 		if ( discipline ) {
 			fputs("Model needs disciplining.\n", stdout);
@@ -258,7 +262,7 @@ extern int main(int argc, char *argv[])
 	if ( !input->add(input, violation) )
 		ERR(goto done);
 
-	if ( !sancho->update(sancho, input, &discipline, &sealed) )
+	if ( !sancho->update(sancho, input, false, &discipline, &sealed) )
 		ERR(goto done);
 
 	fputs("\nForensics:\n", stdout);

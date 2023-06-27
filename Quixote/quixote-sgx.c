@@ -75,6 +75,9 @@
 #include "quixote.h"
 #include "sancho-cmd.h"
 
+#include <TSEMcontrol.h>
+#include <TSEMevent.h>
+
 #include "NAAAIM.h"
 #include "TTYduct.h"
 #include "LocalDuct.h"
@@ -83,7 +86,6 @@
 #include "SecurityPoint.h"
 #include "SecurityEvent.h"
 #include "TSEM.h"
-#include "TSEMcontrol.h"
 
 #include <SRDE.h>
 #include <SRDEocall.h>
@@ -92,6 +94,11 @@
 #include <SanchoSGX-interface.h>
 #include <SanchoSGX.h>
 
+
+/**
+ * The control object for the model.
+ */
+static TSEMcontrol Control = NULL;
 
 /**
  * Variable used to indicate that debugging is enabled and to provide
@@ -105,17 +112,14 @@ static FILE *Debug = NULL;
 static pid_t Monitor_pid;
 
 /**
+ * The process id of the workload process.
+ */
+static pid_t Workload_pid;
+
+/**
  * The modeling object for the canister.
  */
 static SanchoSGX Model = NULL;
-
-/**
- * The seal status of the domain.  This variable is set by a
- * seal event for the domain.  Updates which are not in the
- * security state will cause disciplining requests to be generated
- * for the process initiating the event.
- */
-static _Bool Sealed = false;
 
 /**
  * This variable is used to indicate that an execution trajectory
@@ -154,6 +158,22 @@ static _Bool Model_Error = false;
  */
 static Buffer Aggregate = NULL;
 
+/*
+ * The object that will be used for parsing the TSEM events.
+ */
+static TSEMevent Event = NULL;
+
+/**
+ * The name of the runc workload.
+ */
+static const char *Runc_name = NULL;
+
+/**
+ * A flag to indicate whether or not the security model is to
+ * be enforced.
+ */
+static _Bool Enforce = false;
+
 /**
  * The following variable holds booleans which describe signals
  * which were received.
@@ -172,10 +192,10 @@ struct {
  * The following enumeration type specifies whether or not
  * the measurements are being managed internally or by an SGX enclave.
  */
- enum {
-	 show_mode,
-	 process_mode,
-	 cartridge_mode,
+enum {
+	show_mode,
+	process_mode,
+	cartridge_mode,
 } Mode = cartridge_mode;
 
 
@@ -212,6 +232,29 @@ void signal_handler(int signal, siginfo_t *siginfo, void *private)
 		case SIGCHLD:
 			Signals.sigchild = true;
 			return;
+
+		case SIGSEGV:
+			if ( Workload_pid != 0 ) {
+				if ( Debug )
+					fprintf(Debug, "%u Killing workload " \
+						"%u.\n", getpid(),	      \
+						Workload_pid);
+				kill(Workload_pid, SIGSEGV);
+			} else {
+				if ( Debug )
+					fprintf(Debug, "%u no workload to "
+						"kill.\n", getpid());
+			}
+
+			if ( Monitor_pid == 0 )
+				_exit(1);
+			if ( Debug )
+				fprintf(Debug, "%u: Killing monitor %u.\n", \
+					getpid(), Monitor_pid);
+			kill(Monitor_pid, SIGSEGV);
+
+			fputs("Orchestrator segmentation fault.\n", stderr);
+			_exit(1);
 	}
 
 	return;
@@ -243,6 +286,78 @@ static _Bool child_exited(const pid_t cartridge)
 		return false;
 
 	return true;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function is responsible for issueing the runc command needed
+ * to terminate a software cartridge.  The function waits until the
+ * process spawned to execute the runc process terminates.
+ *
+ * \param name		A pointer to a character buffer containing the
+ *			name of the software cartridge.
+ *
+ * \param wait		A boolean flag used to indicate whether or
+ *			not the runc kill process should be waited for.
+ *
+ * \return	No return value is defined.
+ */
+
+static void kill_cartridge(const _Bool wait)
+
+{
+	int status;
+
+	static pid_t kill_process = 0;
+
+
+	/* Signal the monitor process to shutdown the cartridge process. */
+	if ( Mode == process_mode ) {
+		if ( Debug )
+			fprintf(Debug, "%u sending SIGHUP to %u.\n", \
+				getpid(), Monitor_pid);
+		kill(Monitor_pid, SIGTERM);
+		return;
+	}
+
+
+	/* Check to see if runc kill has finished. */
+	if ( kill_process ) {
+		waitpid(kill_process, &status, WNOHANG);
+		if ( !WIFEXITED(status) )
+			return;
+
+		if ( Debug )
+			fprintf(Debug, "Cartridge kill status: %d\n", \
+				WEXITSTATUS(status));
+		if ( WEXITSTATUS(status) == 0 ) {
+			kill_process = 0;
+			return;
+		}
+	}
+
+
+	/* Fork a process to use runc to send the termination signal. */
+	kill_process = fork();
+	if ( kill_process == -1 )
+		return;
+
+	/* Child process - execute runc in kill mode. */
+	if ( kill_process == 0 ) {
+		if ( Debug )
+			fputs("Killing runc cartridge.\n", Debug);
+
+		execlp("runc", "runc", "kill", Runc_name, "SIGKILL", NULL);
+		exit(1);
+	}
+
+	/* Parent process - wait for the kill process to complete. */
+	if ( wait )
+		waitpid(kill_process, &status, 0);
+
+	return;
 }
 
 
@@ -321,7 +436,6 @@ static _Bool setup_management(CO(LocalDuct, mgmt), const char *cartridge)
 	umask(mask);
 
 	if ( !rc ) {
-
 		fprintf(stderr, "Cannot initialize socket: %s.\n", \
 			sockpath->get(sockpath));
 		goto done;
@@ -340,40 +454,44 @@ static _Bool setup_management(CO(LocalDuct, mgmt), const char *cartridge)
 /**
  * Private function.
  *
- * This function carries out the addition of a security state event
- * to the current security state model.
+ * This function carries out the addition of the hardware aggregate
+ * measurement to the current security state model.
  *
- * \param bufr		A pointer to the character buffer containing
- *			the ASCII encoded state description.
+ * \param str	The object that will be used to extract the string
+ *		value from the event.
  *
- * \return		A boolean value is returned to indicate whether
- *			or not addition of the event succeeded.  A
- *			false value indicates the addition failed while
- *			a true value indicates the addition succeeded.
+ * \return	A boolean value is returned to indicate whether
+ *		or addition of the aggregate value succeeded.  A
+ *		false value indicates the addition failed while
+ *		a true value indicates the addition succeeded.
  */
 
-static _Bool add_event(CO(char *, inbufr))
+static _Bool add_aggregate(CO(String, str))
 
 {
-	_Bool discipline,
-	      retn = false;
-
-	String update = NULL;
+	_Bool retn = false;
 
 
-	INIT(HurdLib, String, update, ERR(goto done));
-	if ( !update->add(update, inbufr) )
+	str->reset(str);
+	if ( !Event->get_text(Event, "value", str) )
 		ERR(goto done);
 
+	if ( Debug )
+		fprintf(Debug, "aggregate %s\n", str->get(str));
 
-	if ( !Model->update(Model, update, &discipline, &Sealed) )
+	if ( Aggregate == NULL ) {
+		INIT(HurdLib, Buffer, Aggregate, ERR(goto done));
+		if ( !Aggregate->add_hexstring(Aggregate, str->get(str)) )
+			ERR(goto done);
+	}
+
+	if ( !Model->set_aggregate(Model, Aggregate) )
 		ERR(goto done);
+
 	retn = true;
 
 
  done:
-	WHACK(update);
-
 	return retn;
 }
 
@@ -381,35 +499,82 @@ static _Bool add_event(CO(char *, inbufr))
 /**
  * Private function.
  *
- * This function carries out the addition of the hardware aggregate
- * measurement to the current security state model.
+ * This function carries out the addition of a security state event
+ * to the current security state model.
  *
- * \param bufr		A pointer to the character buffer containing
- *			the ASCII hardware aggregate measurement.
+ *
+ * \param update	A pointer to the object that will be used to
+ *			hold the ASCII encoded state description.
  *
  * \return		A boolean value is returned to indicate whether
- *			or addition of the aggregate value succeeded.  A
+ *			or not addition of the event succeeded.  A
  *			false value indicates the addition failed while
  *			a true value indicates the addition succeeded.
  */
 
-static _Bool add_aggregate(CO(char *, inbufr))
+static _Bool add_event(CO(String, update))
 
 {
-	_Bool retn = false;
+	_Bool discipline,
+	      sealed,
+	      retn = false;
 
 
-	if ( Debug )
-		fprintf(Debug, "aggregate %s", inbufr);
-
-	if ( Aggregate == NULL ) {
-		INIT(HurdLib, Buffer, Aggregate, ERR(goto done));
-		if ( !Aggregate->add_hexstring(Aggregate, inbufr) )
+	/* Parse the event. */
+	update->reset(update);
+	if ( !Event->encode_event(Event, update) )
 		ERR(goto done);
+
+	if ( !Model->update(Model, update, false, &discipline, &sealed) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function handles the receive of an asynchronous security event.
+ *
+ * \param update	A pointer to the object that will be used to
+ *			hold the ASCII encoded state description.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not addition of the event succeeded.  A
+ *			false value indicates the addition failed while
+ *			a true value indicates the addition succeeded.
+ */
+
+static _Bool add_async_event(CO(String, update))
+
+{
+	_Bool violation,
+	      sealed,
+	      retn = false;
+
+
+	/* Parse the event. */
+	update->reset(update);
+	if ( !Event->encode_event(Event, update) )
+		ERR(goto done);
+
+	if ( !Model->update(Model, update, true, &violation, &sealed) )
+		ERR(goto done);
+
+	/* Handle a sealed model that is in violation. */
+	if ( sealed ) {
+		if ( Debug )
+			fputs("Atomic context security violation.\n", Debug);
+		if ( violation && Enforce ) {
+			fputs("Security violation in atomic context, "
+			      "shutting down workload.\n", stderr);
+			kill_cartridge(true);
+		}
 	}
-
-	if ( !Model->set_aggregate(Model, Aggregate) )
-		ERR(goto done);
 
 	retn = true;
 
@@ -434,16 +599,16 @@ static _Bool add_aggregate(CO(char *, inbufr))
  *			the addition succeeded.
  */
 
-static _Bool add_TSEM_event(CO(char *, TSEM_event))
+static _Bool add_TSEM_event(CO(String, event))
 
 {
 	_Bool retn = false;
 
-	String event = NULL;
 
+	event->reset(event);
+	if ( !Event->encode_log(Event, event) )
+		ERR(goto done);
 
-	INIT(HurdLib, String, event, ERR(goto done));
-	event->add(event, TSEM_event);
 	if ( !Model->add_ai_event(Model, event) )
 		ERR(goto done);
 
@@ -451,8 +616,6 @@ static _Bool add_TSEM_event(CO(char *, TSEM_event))
 
 
  done:
-	WHACK(event);
-
 	return retn;
 }
 
@@ -463,9 +626,6 @@ static _Bool add_TSEM_event(CO(char *, TSEM_event))
  * This function is responsible for the processing of Turing security
  * state events generated by the kernel.
  *
- * \param bufr		A pointer to the character buffer containing
- *			the ASCII encoded event.
- *
  * \return		A boolean value is returned to indicate whether
  *			or not processing of the event was successful.  A
  *			false value indicates a failure in event
@@ -473,59 +633,50 @@ static _Bool add_TSEM_event(CO(char *, TSEM_event))
  *			event processing has succeeded.
  */
 
-static _Bool process_event(const char *event)
+static _Bool process_event()
 
 {
 	_Bool retn = false;
 
-	const char *event_arg;
-
-	struct sancho_cmd_definition *cp;
+	String str = NULL;
 
 
-	/* Locate the event type. */
-	for (cp= Sancho_cmd_list; cp->syntax != NULL; ++cp) {
-		if ( strncmp(cp->syntax, event, strlen(cp->syntax)) == 0 )
-			break;
-	}
-
-	if ( cp->syntax == NULL ) {
-		fprintf(stderr, "Unknown event: %s\n", event);
-		goto done;
-	}
-
-	event_arg = event + strlen(cp->syntax);
+	if ( Debug )
+		fprintf(Debug, "Processing event: '%s'\n", \
+			Event->get_event(Event));
 
 
 	/* Dispatch the event. */
-	switch ( cp->command ) {
-		case export_event:
-			retn = add_event(event_arg);
+	INIT(HurdLib, String, str, ERR(goto done));
+	Event->reset(Event);
+
+	switch ( Event->extract_export(Event) ) {
+		case TSEM_EVENT_AGGREGATE:
+			retn = add_aggregate(str);
 			break;
 
-		case aggregate_event:
-			retn = add_aggregate(event_arg);
+		case TSEM_EVENT_EVENT:
+			retn = add_event(str);
 			break;
 
-		case seal_event:
-			if ( Debug )
-				fputs("Sealed domain.\n", Debug);
-
-			Model->seal(Model);
-			retn   = true;
+		case TSEM_EVENT_ASYNC_EVENT:
+			retn = add_async_event(str);
 			break;
 
-		case log_event:
-			retn = add_TSEM_event(event_arg);
+		case TSEM_EVENT_LOG:
+			retn = add_TSEM_event(str);
 			break;
 
 		default:
-			fprintf(stderr, "Unknown event: %s\n", event);
+			fprintf(stderr, "Unknown event: %s\n", \
+				Event->get_event(Event));
 			break;
 	}
 
 
  done:
+	WHACK(str);
+
 	return retn;
 }
 
@@ -596,6 +747,93 @@ static _Bool send_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
  done:
 	WHACK(es);
+
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function is responsible for returning the population counts for
+ * coefficients on the trajectory list.
+ *
+ * \param mgmt		The socket object used to communicate with
+ *			the quixote-console management instance.
+ *
+ * \param cmdbufr	The object which will be used to hold the
+ *			information that will be transmitted.
+ *
+ * \param type		A flag used to indicate what type of counts
+ *			are to be set.  A true value indicates that
+ *			the counts of valid points are to be returned
+ *			while a false value indicates that invalid
+ *			points are to be returned.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not the command was processed.  A false value
+ *			indicates the processing of commands should be
+ *			terminated while a true value indicates an
+ *			additional command cycle should be processed.
+ */
+
+static _Bool send_trajectory_counts(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr), \
+				    const _Bool type)
+
+{
+	_Bool retn = false;
+
+	char bufr[21];
+
+	size_t lp,
+	       cnt = 0;
+
+	SecurityPoint cp = NULL;
+
+
+	INIT(NAAAIM, SecurityPoint, cp, ERR(goto done));
+
+	/*
+	 * Compute the number of elements in the list and send it to
+	 * the client.
+	 */
+	if ( type ) {
+		cnt  = Model->size(Model);
+		cnt -= Model->forensics_size(Model);
+	}
+	else
+		cnt = Model->forensics_size(Model);
+
+	cmdbufr->reset(cmdbufr);
+	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
+	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
+		ERR(goto done);
+	if ( Debug )
+		fprintf(Debug, "Sent coefficient counts size: %zu\n", cnt);
+
+	/* Send each trajectory point. */
+	Model->rewind_points(Model);
+
+	for (lp= 0; lp < Model->size(Model); ++lp ) {
+		cp->reset(cp);
+
+		if ( !Model->get_point(Model, cp) )
+			ERR(goto done);
+		if ( cp->is_valid(cp) != type )
+			continue;
+
+		snprintf(bufr, sizeof(bufr), "%lu", cp->get_count(cp));
+
+		cmdbufr->reset(cmdbufr);
+		cmdbufr->add(cmdbufr, (unsigned char *) bufr, sizeof(bufr));
+		if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
+			ERR(goto done);
+	}
+
+	retn = true;
+
+ done:
+	WHACK(cp);
 
 	return retn;
 }
@@ -699,6 +937,11 @@ static _Bool send_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
  * \param cmdbufr	The object which will be used to hold the
  *			information which will be transmitted.
  *
+ * \param type		A boolean variable used to indicate which
+ *			security state coefficients are to be returned.
+ *			A true value sends valid coefficients while
+ *			a false value sends invalid coefficients.
+ *
  * \return		A boolean value is returned to indicate whether
  *			or not the command was processed.  A false value
  *			indicates the processing of commands should be
@@ -706,7 +949,9 @@ static _Bool send_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
  *			additional command cycle should be processed.
  */
 
-static _Bool send_coefficients(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
+static _Bool send_trajectory_coefficients(CO(LocalDuct, mgmt), \
+					  CO(Buffer, cmdbufr), \
+					  const _Bool type)
 
 {
 	_Bool retn = false;
@@ -719,30 +964,43 @@ static _Bool send_coefficients(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	size_t lp,
 	       cnt = 0;
 
+	SecurityPoint cp = NULL;
+
+
+	INIT(NAAAIM, SecurityPoint, cp, ERR(goto done));
 
 	/*
 	 * Compute the number of elements in the list and send it to
 	 * the client.
 	 */
-	cnt = Model->size(Model);
+	if ( type ) {
+		cnt  = Model->size(Model);
+		cnt -= Model->forensics_size(Model);
+	}
+	else
+		cnt = Model->forensics_size(Model);
 
 	cmdbufr->reset(cmdbufr);
 	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
 	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
 		ERR(goto done);
 	if ( Debug )
-		fprintf(Debug, "Sent state size: %zu\n", cnt);
+		fprintf(Debug, "Sent coefficient size: %zu\n", cnt);
 
 
 	/* Send each trajectory point. */
 	Model->rewind_points(Model);
 
-	for (lp= 0; lp < cnt; ++lp ) {
-		cmdbufr->reset(cmdbufr);
-		if ( !Model->get_point(Model, cmdbufr) )
-			ERR(goto done);
+	for (lp= 0; lp < Model->size(Model); ++lp ) {
+		cp->reset(cp);
 
-		p = cmdbufr->get(cmdbufr);
+		if ( !Model->get_point(Model, cp) )
+			ERR(goto done);
+		if ( cp->is_valid(cp) != type )
+			continue;
+
+		memset(point, '\0', sizeof(point));
+		p = cp->get(cp);
 		for (pi= 0; pi < NAAAIM_IDSIZE; ++pi)
 			snprintf(&point[pi*2], 3, "%02x", *p++);
 
@@ -755,6 +1013,7 @@ static _Bool send_coefficients(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	retn = true;
 
  done:
+	WHACK(cp);
 
 	return retn;
 }
@@ -872,7 +1131,7 @@ static _Bool send_map(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 
 	/* Send each point in the model. */
-	retn = send_coefficients(mgmt, cmdbufr);
+	retn = send_trajectory_coefficients(mgmt, cmdbufr, true);
 
 
  done:
@@ -937,12 +1196,26 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 			retn = send_trajectory(mgmt, cmdbufr);
 			break;
 
+		case show_coefficients:
+			retn = send_trajectory_coefficients(mgmt, cmdbufr, \
+							    true);
+			break;
+
+		case show_counts:
+			retn = send_trajectory_counts(mgmt, cmdbufr, true);
+			break;
+
 		case show_forensics:
 			retn = send_forensics(mgmt, cmdbufr);
 			break;
 
-		case show_coefficients:
-			retn = send_coefficients(mgmt, cmdbufr);
+		case show_forensics_coefficients:
+			retn = send_trajectory_coefficients(mgmt, cmdbufr, \
+							    false);
+			break;
+
+		case show_forensics_counts:
+			retn = send_trajectory_counts(mgmt, cmdbufr, false);
 			break;
 
 		case show_events:
@@ -1152,12 +1425,15 @@ static _Bool output_model(CO(char *, fname))
 
 	File outfile = NULL;
 
+	SecurityPoint cp = NULL;
+
 	static const char *aggregate_cmd = "aggregate ",
 			  *state_cmd	 = "state ",
 			  *seal_cmd	 = "seal\n",
 			  *end_cmd	 = "end\n";
 
 
+	INIT(NAAAIM, SecurityPoint, cp, ERR(goto done));
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 	INIT(HurdLib, String, str, ERR(goto done));
 
@@ -1180,16 +1456,15 @@ static _Bool output_model(CO(char *, fname))
 	Model->rewind_points(Model);
 	cnt = Model->size(Model);
 
-
 	for (lp= 0; lp < cnt; ++lp ) {
 		bufr->reset(bufr);
-		if ( !Model->get_point(Model, bufr) )
+		if ( !Model->get_point(Model, cp) )
 			ERR(goto done);
 
 		str->reset(str);
 		if ( !str->add(str, state_cmd) )
 			ERR(goto done);
-		_encode_buffer(str, bufr->get(bufr), NAAAIM_IDSIZE);
+		_encode_buffer(str, cp->get(cp), NAAAIM_IDSIZE);
 
 		bufr->reset(bufr);
 		bufr->add(bufr, (void *) str->get(str), str->size(str));
@@ -1222,6 +1497,7 @@ static _Bool output_model(CO(char *, fname))
 	WHACK(bufr);
 	WHACK(str);
 	WHACK(outfile);
+	WHACK(cp);
 
 	return retn;
 }
@@ -1261,22 +1537,19 @@ static _Bool setup_namespace(int *fdptr, _Bool enforce)
 
 	enum TSEMcontrol_ns_config ns = 0;
 
-	TSEMcontrol control = NULL;
-
 
 	/* Create and configure a security model namespace. */
-	INIT(NAAAIM, TSEMcontrol, control, ERR(goto done));
-
 	if ( Current_Namespace )
 		ns = TSEMcontrol_CURRENT_NS;
 
-	if ( !control->create_ns(control, TSEMcontrol_TYPE_EXTERNAL, Digest, \
+	if ( !Control->create_ns(Control, TSEMcontrol_TYPE_EXTERNAL, Digest, \
 				 ns, Magazine_Size) )
 		ERR(goto done);
-	if ( !control->id(control, &id) )
+
+	if ( !Control->id(Control, &id) )
 		ERR(goto done);
 	if ( enforce ) {
-		if ( !control->enforce(control) )
+		if ( !Control->enforce(Control) )
 			ERR(goto done);
 	}
 
@@ -1294,8 +1567,6 @@ static _Bool setup_namespace(int *fdptr, _Bool enforce)
 
 
  done:
-	WHACK(control);
-
 	if ( retn )
 		*fdptr = fd;
 	return retn;
@@ -1377,78 +1648,6 @@ static void show_magazine(CO(char *, root))
 /**
  * Private function.
  *
- * This function is responsible for issueing the runc command needed
- * to terminate a software cartridge.  The function waits until the
- * process spawned to execute the runc process terminates.
- *
- * \param name		A pointer to a character buffer containing the
- *			name of the software cartridge.
- *
- * \param wait		A boolean flag used to indicate whether or
- *			not the runc kill process should be waited for.
- *
- * \return	No return value is defined.
- */
-
-static void kill_cartridge(const char *cartridge, const _Bool wait)
-
-{
-	int status;
-
-	static pid_t kill_process = 0;
-
-
-	/* Signal the monitor process to shutdown the cartridge process. */
-	if ( Mode == process_mode ) {
-		if ( Debug )
-			fprintf(Debug, "%u sending SIGHUP to %u.\n", \
-				getpid(), Monitor_pid);
-		kill(Monitor_pid, SIGTERM);
-		return;
-	}
-
-
-	/* Check to see if runc kill has finished. */
-	if ( kill_process ) {
-		waitpid(kill_process, &status, WNOHANG);
-		if ( !WIFEXITED(status) )
-			return;
-
-		if ( Debug )
-			fprintf(Debug, "Cartridge kill status: %d\n", \
-				WEXITSTATUS(status));
-		if ( WEXITSTATUS(status) == 0 ) {
-			kill_process = 0;
-			return;
-		}
-	}
-
-
-	/* Fork a process to use runc to send the termination signal. */
-	kill_process = fork();
-	if ( kill_process == -1 )
-		return;
-
-	/* Child process - execute runc in kill mode. */
-	if ( kill_process == 0 ) {
-		if ( Debug )
-			fputs("Killing runc cartridge.\n", Debug);
-		execlp("runc", "runc", "kill", cartridge, "SIGKILL", \
-		       NULL);
-		exit(1);
-	}
-
-	/* Parent process - wait for the kill process to complete. */
-	if ( wait )
-		waitpid(kill_process, &status, 0);
-
-	return;
-}
-
-
-/**
- * Private function.
- *
  * This function is responsible for monitoring the child process that
  * is running the modeled workload.  The event loop monitors for a
  * a child exit and process management requests.
@@ -1471,11 +1670,9 @@ static void kill_cartridge(const char *cartridge, const _Bool wait)
 static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int fd)
 
 {
-	_Bool retn = false,
+	_Bool event,
+	      retn = false,
 	      connected = false;
-
-	char *p,
-	     bufr[768];
 
 	int rc;
 
@@ -1515,7 +1712,7 @@ static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int fd)
 			if ( Signals.stop ) {
 				if ( Debug )
 					fputs("Quixote terminated.\n", Debug);
-				kill_cartridge(cartridge, true);
+				kill_cartridge(true);
 				retn = true;
 				goto done;
 			}
@@ -1527,7 +1724,7 @@ static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int fd)
 			}
 
 			fputs("Poll error.\n", stderr);
-			kill_cartridge(cartridge, true);
+			kill_cartridge(true);
 			retn = true;
 			goto done;
 		}
@@ -1556,37 +1753,29 @@ static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int fd)
 		}
 
 		if ( poll_data[0].revents & POLLIN ) {
-			p = bufr;
-			memset(bufr, '\0', sizeof(bufr));
-			while ( 1 ) {
-				rc = read(fd, p, 1);
-				if ( rc < 0 ) {
-					if ( errno != ENODATA )
-						fprintf(stderr, "Have "	    \
-							"error: retn=%d, "  \
-							"error=%s\n", retn, \
-							strerror(errno));
+			if ( !Event->read_event(Event, fd) ) {
+				kill_cartridge(false);
+				break;
+			}
+
+			event = true;
+			while ( event ) {
+				if ( !Event->fetch_event(Event, &event) ) {
+					kill_cartridge(false);
+					break;
 				}
-				if ( *p != '\n' ) {
-					++p;
-					continue;
-				}
-				else
-					*p = '\0';
-				if ( Debug )
-					fprintf(Debug,			  \
-						"Processing event: %s\n", \
-						bufr);
-				if ( !process_event(bufr) ) {
+				if ( !process_event() ) {
 					if ( Debug )
 						fprintf(Debug, "Event "	     \
 							"processing error, " \
 							"%u killing %u\n",   \
 							getpid(), Monitor_pid);
 					Model_Error = true;
+					break;
 				}
-				if ( Model_Error )
-					kill_cartridge(cartridge, false);
+			}
+			if ( Model_Error ) {
+				kill_cartridge(false);
 				break;
 			}
 		}
@@ -1604,8 +1793,11 @@ static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int fd)
 				connected = true;
 				continue;
 			}
-			if ( !mgmt->receive_Buffer(mgmt, cmdbufr) )
-				continue;
+			if ( !mgmt->receive_Buffer(mgmt, cmdbufr) ) {
+				fputs("Orchestrator manager error.\n", stderr);
+				Model_Error = true;
+				kill_cartridge(false);
+			}
 			if ( mgmt->eof(mgmt) ) {
 				if ( Debug )
 					fputs("Terminating management.\n", \
@@ -1618,8 +1810,10 @@ static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int fd)
 				continue;
 			}
 
-			if ( !process_command(mgmt, cmdbufr) )
-				ERR(goto done);
+			if ( !process_command(mgmt, cmdbufr) ) {
+				Model_Error = true;
+				kill_cartridge(false);
+			}
 			cmdbufr->reset(cmdbufr);
 		}
 	}
@@ -1686,6 +1880,7 @@ static _Bool fire_cartridge(CO(LocalDuct, mgmt), CO(char *, cartridge), \
 		if ( !cartridge_dir->add(cartridge_dir, cartridge) )
 			ERR(goto done);
 		bundle = cartridge_dir->get(cartridge_dir);
+		Runc_name = cartridge;
 	}
 
 
@@ -1700,7 +1895,8 @@ static _Bool fire_cartridge(CO(LocalDuct, mgmt), CO(char *, cartridge), \
 	/* Monitor parent process. */
 	if ( Monitor_pid > 0 ) {
 		if ( Debug )
-			fprintf(Debug, "Monitor process: %d\n", getpid());
+			fprintf(Debug, "Monitor process: %d\n", Monitor_pid);
+
 		close(event_pipe[WRITE_SIDE]);
 		if ( !child_monitor(mgmt, cartridge, event_pipe[READ_SIDE]) )
 			ERR(goto done);
@@ -1783,9 +1979,9 @@ static _Bool fire_cartridge(CO(LocalDuct, mgmt), CO(char *, cartridge), \
 
 			if ( Signals.sigterm ) {
 				if ( Debug )
-					fputs("Monitor procss terminated.\n", \
+					fputs("Monitor process terminated.\n",\
 					      Debug);
-				kill(cartridge_pid, SIGHUP);
+				kill_cartridge(false);
 			}
 
 			if ( Signals.sigchild ) {
@@ -1884,6 +2080,7 @@ extern int main(int argc, char *argv[])
 				break;
 			case 'e':
 				enforce = true;
+				Enforce = true;
 				break;
 			case 't':
 				Trajectory = true;
@@ -1973,8 +2170,14 @@ extern int main(int argc, char *argv[])
 
 
 	/* Initialize the security model. */
+	INIT(NAAAIM, TSEMevent, Event, ERR(goto done));
+
+	INIT(NAAAIM, TSEMcontrol, Control, ERR(goto done));
+	if ( !Control->generate_key(Control) )
+		ERR(goto done);
+
 	INIT(NAAAIM, SanchoSGX, Model, ERR(goto done));
-	if ( !Model->load_enclave(Model, enclave, token) )
+	if ( !Model->load_enclave(Model, enclave, token, Control) )
 		ERR(goto done);
 
 
@@ -2017,6 +2220,8 @@ extern int main(int argc, char *argv[])
 
 	WHACK(Aggregate);
 	WHACK(Model);
+	WHACK(Control);
+	WHACK(Event);
 
 	if ( fd > 0 )
 		close(fd);

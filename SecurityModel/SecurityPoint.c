@@ -233,6 +233,26 @@ static uint64_t get_count(CO(SecurityPoint, this))
 /**
  * External public method.
  *
+ * This method is used to the occupancy count for the point.
+ *
+ * \param this	A pointer to the object whose count is to be set.
+ *
+ * \param count The new occupancy count for the object.
+ */
+
+static void set_count(CO(SecurityPoint, this), const uint64_t count)
+
+{
+	STATE(S);
+
+	S->count = count;
+	return;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a method for indicating the point represents
  * an invalid behavior.
  *
@@ -292,6 +312,29 @@ static _Bool equal(CO(SecurityPoint, this), CO(SecurityPoint, other))
 	STATE(S);
 
 	return memcmp(S->point, other->get(other), sizeof(S->point)) == 0;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method re-initializes the state of the object.
+ *
+ * \param this	A pointer to the object which is to be reset.
+ */
+
+static void reset(CO(SecurityPoint, this))
+
+{
+	STATE(S);
+
+	S->count     = 0;
+	S->poisoned  = false;
+	S->violation = false;
+
+	memset(S->point, '\0', sizeof(S->point));
+
+	return;
 }
 
 
@@ -358,12 +401,14 @@ extern SecurityPoint NAAAIM_SecurityPoint_Init(void)
 
 	this->increment = increment;
 	this->get_count = get_count;
+	this->set_count = set_count;
 
 	this->set_invalid = set_invalid;
 	this->is_valid	  = is_valid;
 
 	this->equal = equal;
 
+	this->reset = reset;
 	this->whack = whack;
 
 	return this;

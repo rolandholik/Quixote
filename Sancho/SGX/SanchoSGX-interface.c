@@ -48,7 +48,7 @@ extern _Bool generate_identity(uint8_t *);
 extern _Bool load(struct ISOidentity_ecall12_interface *);
 extern _Bool add_verifier(struct ISOidentity_ecall13 *);
 extern _Bool add_ai_event(struct ISOidentity_ecall14 *);
-extern _Bool get_point(uint8_t *);
+extern _Bool get_point(uint8_t *, _Bool *, uint64_t *);
 
 
 static _Bool SGXidf_untrusted_region(void *ptr, size_t size)
@@ -105,6 +105,7 @@ static sgx_status_t sgx_update_model(void *pms)
 
 	ms = (struct ISOidentity_ecall1_interface *) pms;
 	memset(&ecall1, '\0', sizeof(struct ISOidentity_ecall1_interface));
+	ecall1.async   = ms->async;
 	ecall1.debug   = ms->debug;
 	ecall1.control = ms->control;
 
@@ -600,7 +601,8 @@ static sgx_status_t sgx_get_point(void *pms)
 
 	/* Call the trusted function. */
 	memset(&ecall15, '\0', sizeof(struct SanchoSGX_ecall15));
-	ecall15.retn = get_point(ecall15.point);
+	ecall15.retn = get_point(ecall15.point, &ecall15.violation, \
+				 &ecall15.count);
 
 	*ms = ecall15;
 	status = SGX_SUCCESS;

@@ -32,12 +32,14 @@ struct NAAAIM_SecurityPoint
 
 	void (*increment)(const SecurityPoint);
 	uint64_t (*get_count)(const SecurityPoint);
+	void (*set_count)(const SecurityPoint, uint64_t);
 
 	void (*set_invalid)(const SecurityPoint);
 	_Bool (*is_valid)(const SecurityPoint);
 
 	_Bool (*equal)(const SecurityPoint, const SecurityPoint);
 
+	void (*reset)(const SecurityPoint);
 	void (*whack)(const SecurityPoint);
 
 	/* Private state. */
