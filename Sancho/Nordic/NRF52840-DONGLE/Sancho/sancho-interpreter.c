@@ -131,6 +131,7 @@ static void add_event(CO(TTYduct, duct), CO(TSEM, model), CO(Buffer, bufr))
 	if ( !model->update(model, event, &updated, &discipline, &sealed) )
 		ERR(goto done);
 
+
 	/* Send response. */
 	if ( discipline ) {
 		memset(msg, '\0', sizeof(msg));
@@ -299,76 +300,6 @@ static void do_load(CO(TTYduct, duct), CO(TSEM, model), CO(Buffer, bufr))
 /**
  * Private function.
  *
- * This function implements the output of the current behavior identities.
- *
- * \param duct		The object used to implement communications
- *			with the host.
- *
- * \param model		The model instance whose contours are to be
- *			displayed.
- *
- * \param bufr		A Buffer object to be used for displaying
- *			the behavioral identities.
- *
- * \return		No return value is defined.
- */
-
-static void send_points(CO(TTYduct, duct), CO(TSEM, model), CO(Buffer, bufr))
-
-{
-	uint8_t *p,
-		 pi;
-
-	char point[IDSIZE * 2 + 1];
-
-	size_t lp,
-	       cnt = 0;
-
-	SecurityPoint cp = NULL;
-
-
-	/*
-	 * Compute the number of elements in the list and send it to
-	 * the client.
-	 */
-	cnt = model->points_size(model);
-
-
-	bufr->reset(bufr);
-	bufr->add(bufr, (unsigned char *) &cnt, sizeof(cnt));
-	if ( !duct->send_Buffer(duct, bufr) )
-		ERR(goto done);
-
-
-	/* Send each trajectory point. */
-	model->rewind_points(model);
-
-	for (lp= 0; lp < cnt; ++lp ) {
-		if ( !model->get_point(model, &cp) )
-			ERR(goto done);
-		if ( cp == NULL )
-			continue;
-
-		memset(point, '\0', sizeof(point));
-		p = cp->get(cp);
-		for (pi= 0; pi < IDSIZE; ++pi)
-			snprintf(&point[pi*2], 3, "%02x", *p++);
-
-		bufr->reset(bufr);
-		bufr->add(bufr, (unsigned char *) point, sizeof(point));
-		if ( !duct->send_Buffer(duct, bufr) )
-			ERR(goto done);
-	}
-
-
- done:
-	return;
-}
-
-
-/**
- * Private function.
- *
  * This function implements the output of the current execution
  * trajectory of the model
  *
@@ -429,6 +360,160 @@ static void send_trajectory(CO(TTYduct, duct), CO(TSEM, model), \
  done:
 	WHACK(es);
 
+	return;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function implements the output of the current behavior identities.
+ *
+ * \param duct		The object used to implement communications
+ *			with the host.
+ *
+ * \param model		The model instance whose contours are to be
+ *			displayed.
+ *
+ * \param bufr		A Buffer object to be used for displaying
+ *			the behavioral identities.
+ *
+ * \return		No return value is defined.
+ */
+
+static void send_trajectory_coefficients(CO(TTYduct, duct), CO(TSEM, model), \
+					 const _Bool type, CO(Buffer, bufr))
+
+{
+	uint8_t *p,
+		 pi;
+
+	char point[IDSIZE * 2 + 1];
+
+	size_t lp,
+	       cnt = 0;
+
+	SecurityPoint cp = NULL;
+
+
+	/*
+	 * Compute the number of elements in the list and send it to
+	 * the client.
+	 */
+	if ( type ) {
+		cnt = model->points_size(model);
+		cnt -= model->forensics_size(model);
+	}
+	else
+		cnt = model->forensics_size(model);
+
+
+	bufr->reset(bufr);
+	bufr->add(bufr, (unsigned char *) &cnt, sizeof(cnt));
+	if ( !duct->send_Buffer(duct, bufr) )
+		ERR(goto done);
+
+
+	/* Send each trajectory point. */
+	model->rewind_points(model);
+
+	for (lp= 0; lp < model->points_size(model); ++lp ) {
+		if ( !model->get_point(model, &cp) )
+			ERR(goto done);
+		if ( cp == NULL )
+			continue;
+		if ( cp->is_valid(cp) != type )
+			continue;
+
+		memset(point, '\0', sizeof(point));
+		p = cp->get(cp);
+		for (pi= 0; pi < IDSIZE; ++pi)
+			snprintf(&point[pi*2], 3, "%02x", *p++);
+
+		bufr->reset(bufr);
+		bufr->add(bufr, (unsigned char *) point, sizeof(point));
+		if ( !duct->send_Buffer(duct, bufr) )
+			ERR(goto done);
+	}
+
+
+ done:
+	return;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function implements the output of the occupancy counts of
+ * the security state coefficients.
+ *
+ * \param duct		The object used to implement communications
+ *			with the host.
+ *
+ * \param model		The model instance whose contours are to be
+ *			displayed.
+ *
+ * \param type		A flag variable indicating the type of counts
+ *			to be returned.
+ *
+ * \param bufr		A Buffer object to be used for displaying
+ *			the behavioral identities.
+ *
+ * \return		No return value is defined.
+ */
+
+static void send_trajectory_counts(CO(TTYduct, duct), CO(TSEM, model),
+				   const _Bool type, CO(Buffer, cmdbufr))
+
+{
+	char bufr[21];
+
+	size_t lp,
+	       cnt = 0;
+
+	SecurityPoint cp = NULL;
+
+
+	/*
+	 * Compute the number of elements in the list and send it to
+	 * the client.
+	 */
+	if ( type ) {
+		cnt = model->points_size(model);
+		cnt -= model->forensics_size(model);
+	}
+	else
+		cnt = model->forensics_size(model);
+
+
+	cmdbufr->reset(cmdbufr);
+	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
+	if ( !duct->send_Buffer(duct, cmdbufr) )
+		ERR(goto done);
+
+
+	/* Send each trajectory point. */
+	model->rewind_points(model);
+
+	for (lp= 0; lp < model->points_size(model); ++lp ) {
+		if ( !model->get_point(model, &cp) )
+			ERR(goto done);
+		if ( cp == NULL )
+			continue;
+		if ( cp->is_valid(cp) != type )
+			continue;
+
+		snprintf(bufr, sizeof(bufr), "%llu", cp->get_count(cp));
+
+		cmdbufr->reset(cmdbufr);
+		cmdbufr->add(cmdbufr, (unsigned char *) bufr, sizeof(bufr));
+		if ( !duct->send_Buffer(duct, cmdbufr) )
+			ERR(goto done);
+	}
+
+
+ done:
 	return;
 }
 
@@ -653,11 +738,27 @@ extern void sancho_interpreter(const TTYduct duct)
 				break;
 
 			case show_coefficients:
-				send_points(duct, model, bufr);
+				send_trajectory_coefficients(duct, model, \
+							     true, bufr);
+				break;
+
+			case show_counts:
+				send_trajectory_counts(duct, model, true, \
+						       bufr);
 				break;
 
 			case show_forensics:
 				send_forensics(duct, model, bufr);
+				break;
+
+			case show_forensics_coefficients:
+				send_trajectory_coefficients(duct, model, \
+							     false, bufr);
+				break;
+
+			case show_forensics_counts:
+				send_trajectory_counts(duct, model, false, \
+						       bufr);
 				break;
 
 			case show_events:
