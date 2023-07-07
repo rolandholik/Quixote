@@ -459,7 +459,7 @@ static _Bool set_base(CO(TSEMcontrol, this), CO(Buffer, state))
 	_Bool retn = false;
 
 
-	if ( !S->cmdstr->add_sprintf(S->cmdstr, "base %s\n", \
+	if ( !S->cmdstr->add_sprintf(S->cmdstr, "base value=%s\n", \
 				     (char *) state->get(state)) )
 		ERR(goto done);
 
@@ -497,7 +497,7 @@ static _Bool add_state(CO(TSEMcontrol, this), CO(Buffer, state))
 	_Bool retn = false;
 
 
-	if ( !S->cmdstr->add_sprintf(S->cmdstr, "state %s\n", \
+	if ( !S->cmdstr->add_sprintf(S->cmdstr, "state value=%s\n", \
 				     (char *) state->get(state)) )
 		ERR(goto done);
 
@@ -535,7 +535,7 @@ static _Bool pseudonym(CO(TSEMcontrol, this), CO(Buffer, pseudonym))
 	_Bool retn = false;
 
 
-	if ( !S->cmdstr->add_sprintf(S->cmdstr, "pseudonym %s\n", \
+	if ( !S->cmdstr->add_sprintf(S->cmdstr, "pseudonym value=%s\n", \
 				     (char *) pseudonym->get(pseudonym)) )
 		ERR(goto done);
 
