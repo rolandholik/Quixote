@@ -1068,15 +1068,18 @@ representation of the key that is to be used.  The length of the key
 must be equal to the size of the digest function requested for the
 namespace.
 
-The following keywords are used by trust orchestrators to set the
-trust status of a process after the processing of a security event by
-an external TMA:
+The following keywords and arguments are used by trust orchestrators
+to set the trust status of a process after the processing of a
+security event by an external TMA:
 
-	trusted PID
-	untrusted PID
+	trusted pid=PID key=HEXID
+	untrusted pid=PID key=HEXID
 
-	Where PID is the process identifier that is provided to the
-	TMA in the security event description.
+	PID is the process identifier that is provided to the TMA in
+	the security event description.  HEXID is the base16 ASCII
+	representation of the authentication key that the security
+	modeling namespace was configured with when the namespace was
+	created.
 
 By default a modeling namespace runs in free modeling mode.  The modeling
 mode is changed by writing the following keywords to the control file:
