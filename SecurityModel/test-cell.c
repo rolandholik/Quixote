@@ -14,7 +14,8 @@
 
 #define PGM "test-cell"
 
-#define FILE_OPEN "event{process=swapper/0, filename=/sbin/init, type=file_open, task_id=0000000000000000000000000000000000000000000000000000000000000000} COE{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=0x7fffffffff} file{flags=32800, uid=0, gid=0, mode=0100755, name_length=10, name=cadb8688009d5594acdf21564a7ac45aa93d7ef7d87c303615c3f73f0ab34278, s_magic=0xef53, s_id=xvda, s_uuid=feadbeaffeadbeaffeadbeaffeadbeaf, digest=f8e016c6946526d8a0f40a64725f793fef7688c964ed480e73d91c3f419840f9}"
+#define FILE_OPEN "event{process=bash, type=file_open, task_id=f01142cb77a817d19984adbcee8bcfcf8aee02486f4932c4b1a4aed85f99d7ca} COE{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, capeff=0x20000420} file{flags=32768, uid=0, gid=0, mode=0100644, path=/.bash_history, s_magic=0xef53, s_id=xvdb, s_uuid=a953e99a39e54e478c9edf24815ddc49, digest=21c0f702ae2ad18b5b135b9039c700d2bb6f7542f44ad6d70b88349e6584131d}"
+
 
 #define MMAP_FILE "event{process=bash, filename=/lib/ld-2.24.so, type=mmap_file, task_id=77e90dbb8ae1da51e8dd0dc5f1500d9f6c26332252afa8fb8a4ca91a1ef60cac} COE{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=0x20000420} mmap_file{type=0, reqprot=3, prot=7, flags=18} file{uid=0, gid=0, mode=0100755, name_length=15, name=5aa7963f1fe8fa3cc7ca977df0773b9eafc286828a923a5307c1574ba4368a9f, s_id=xvdb, s_uuid=a953e99a39e54e478c9edf24815ddc49, digest=1b4cd80888cfe0171d0f413caecc99831a4463c05a8f7c99ab8570d0684b2dc8}"
 

@@ -1594,6 +1594,8 @@ static _Bool get_pseudonym(CO(Cell, this), CO(Buffer, bufr))
 
 	/* Collect the pseduonym components. */
 	bufr->reset(bufr);
+	if ( S->file.name->get(S->file.name) == NULL )
+		return true;
 
 	size = S->file.name->size(S->file.name);
 	bufr->add(bufr, (void *) S->file.name->get(S->file.name), \
