@@ -1578,6 +1578,8 @@ static _Bool get_pseudonym(CO(Cell, this), CO(Buffer, bufr))
 
 	_Bool retn = false;
 
+	char *np;
+
 	uint32_t size;
 
 	Buffer b;
@@ -1590,23 +1592,34 @@ static _Bool get_pseudonym(CO(Cell, this), CO(Buffer, bufr))
 		ERR(goto done);
 	if ( bufr->poisoned(bufr) )
 		ERR(goto done);
-
-
-	/* Collect the pseduonym components. */
-	bufr->reset(bufr);
-	if ( S->file.name->get(S->file.name) == NULL )
+	if ( (np = S->file.name->get(S->file.name)) == NULL )
 		return true;
 
-	size = S->file.name->size(S->file.name);
-	bufr->add(bufr, (void *) S->file.name->get(S->file.name), \
-		  sizeof(size));
-	if ( !bufr->add(bufr, (void *) S->file.name->get(S->file.name), size) )
-		ERR(goto done);
-
-
-	/* Hash the pseudonym components. */
+	/* Hash the filename. */
 	INIT(NAAAIM, Sha256, pseudonym, ERR(goto done));
 
+	size = S->file.name->size(S->file.name);
+
+	bufr->reset(bufr);
+	if ( !bufr->add(bufr, (void *) np, size) )
+		ERR(goto done);
+
+	if ( !pseudonym->add(pseudonym, bufr) )
+		ERR(goto done);
+	if ( !pseudonym->compute(pseudonym) )
+		ERR(goto done);
+	b = pseudonym->get_Buffer(pseudonym);
+
+	/* Hash the pseudonym components. */
+	bufr->reset(bufr);
+
+	if ( !bufr->add(bufr, (void *) &size, sizeof(size)) )
+		ERR(goto done);
+
+	if ( !bufr->add_Buffer(bufr, b) )
+		ERR(goto done);
+
+	pseudonym->reset(pseudonym);
 	if ( !pseudonym->add(pseudonym, bufr) )
 		ERR(goto done);
 	if ( !pseudonym->compute(pseudonym) )
