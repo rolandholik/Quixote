@@ -166,7 +166,7 @@ diff -urNp v2.66/libcap-2.66/libcap/include/uapi/linux/capability.h libcap-2.66/
 +/* Allow modifications to the trust status of the system */
  
 -#define CAP_PERFMON	     38
-+#define CAP_TRUST	38
++#define CAP_ML	38
  
 -/*
 - * CAP_BPF allows the following BPF operations:
@@ -207,7 +207,7 @@ diff -urNp v2.66/libcap-2.66/libcap/include/uapi/linux/capability.h libcap-2.66/
 -#define CAP_CHECKPOINT_RESTORE 40
 -
 -#define CAP_LAST_CAP         CAP_CHECKPOINT_RESTORE
-+#define CAP_LAST_CAP         CAP_TRUST
++#define CAP_LAST_CAP         CAP_ML
  
  #define cap_valid(x) ((x) >= 0 && (x) <= CAP_LAST_CAP)
  

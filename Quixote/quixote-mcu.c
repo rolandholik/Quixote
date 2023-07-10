@@ -1729,7 +1729,7 @@ static _Bool fire_cartridge(CO(LocalDuct, mgmt), CO(char *, cartridge), \
 					getpid());
 
 			/* Drop the ability to modify the trust state. */
-			if ( cap_drop_bound(CAP_TRUST) != 0 )
+			if ( cap_drop_bound(CAP_ML) != 0 )
 				ERR(goto done);
 
 			if ( Mode == cartridge_mode ) {

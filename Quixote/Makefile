@@ -41,13 +41,13 @@ INSTALLSBIN = quixote quixote-mcu quixote-us quixote-sgx quixote-sgx-u \
 INSTALLSCRIPTS = setup-quixote-xen
 
 ifeq ("${KERNEL_VERSION}","5.4")
-DEFINES = -DCAP_TRUST=38
+DEFINES = -DCAP_ML=38
 endif
 ifeq ("${KERNEL_VERSION}","5.15")
-DEFINES = -DCAP_TRUST=41
+DEFINES = -DCAP_ML=41
 endif
 ifeq ("${KERNEL_VERSION}","6.x")
-DEFINES = -DCAP_TRUST=41
+DEFINES = -DCAP_ML=41
 endif
 
 CFLAGS = ${BUILD_CFLAGS} ${DEFINES}
