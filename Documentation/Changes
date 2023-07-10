@@ -160,3 +160,19 @@ Version 1.4:
 	* Use BSD 2-clause plus patent license.
 
 	* Add a README file to explain basic use and functionality.
+
+Version 1.5:
+	* Support new TSEM control plane layout.
+
+	* Accept JSON encoded security event descriptions.
+
+	* Implement TOS<->process authentication.
+
+	* Implement namespace configuration for the hash function, DAC
+	  namespace reference and cache sizes.
+
+	* Optimize reads from the security event export file.
+
+	* Handle security events called in atomic context.
+
+	* Improve error handling in trust orchestrators.
