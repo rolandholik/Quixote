@@ -11,6 +11,11 @@
 # for the build.
 #
 
+# Release version and name.
+RELEASE = 1
+VERSION = 5
+NAME	= Quixote-${RELEASE}.${VERSION}
+
 # Compiler selection.
 CC = gcc
 

@@ -108,6 +108,16 @@ install-path:
 tags:
 	/opt/emacs/bin/etags *.{h,c};
 
+tar:
+	mkdir distrib;
+	(cd HurdLib; git archive --prefix=./${NAME}/HurdLib/ HEAD) | \
+		tar -C distrib -x;
+	git archive --prefix=./${NAME}/ HEAD | tar -C distrib	     \
+		--exclude ./${NAME}/Attic --exclude ./${NAME}/Kernel \
+		--exclude ./${NAME}/gui --exclude ./${NAME}/.gitmodules -x;
+	tar -C distrib -czf ${NAME}.tar.gz .;
+	rm -rf distrib;
+
 clean:
 	${MAKE} -C HurdLib clean;
 	${MAKE} -C lib clean;
