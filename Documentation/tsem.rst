@@ -889,12 +889,6 @@ MEASUREMENT = HASH(CURRENT || NEW)
 		NEW	    = A new measurement value to be added to
 			      the current measurement.
 
-In TPM1 based systems, the HASH function was SHA1.  Due to well
-understood security concerns about the cryptographic vitality of this
-function, TPM2 based systems provide additional HASH functions with
-stronger integrity guarantees, most principally SHA related functions
-with longer digest values such as SHA256, SHA384 and SM3.
-
 The use of a cryptographic function produces a non-commutative sum
 that can be used to verify the integrity of a series of measurements.
 With respect to security modeling theory, this can be thought of as a
