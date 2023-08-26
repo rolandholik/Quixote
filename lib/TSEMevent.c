@@ -718,7 +718,9 @@ static _Bool encode_event(CO(TSEMevent, this), CO(String, output))
 		ERR(goto done);
 	if ( !_add_key(S->parser, ", ", "task_id", str, output) )
 		ERR(goto done);
-	if ( !_add_key(S->parser, "} ", "ttd", str, output) )
+	if ( !_add_key(S->parser, ", ", "ttd", str, output) )
+		ERR(goto done);
+	if ( !_add_key(S->parser, "} ", "ts", str, output) )
 		ERR(goto done);
 
 	if ( !_convert_field(S, "COE", str, output) )
