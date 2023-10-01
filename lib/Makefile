@@ -31,7 +31,7 @@ CSRC = Duct.c OTEDKS.c Curve25519.c IPC.c SoftwareStatus.c Ivy.c IDmgr.c     \
 
 TESTS = Duct_test Curve25519_test IPC_test RSAkey_test			\
 	LocalDuct_test X509cert_test Prompt_test AES128_cmac_test	\
-	TTYduct_test #SmartCard_test
+	TTYduct_test test-parser #SmartCard_test
 
 LIBNAME = NAAAIM
 LIBRARY = lib${LIBNAME}.a
@@ -112,6 +112,9 @@ TTYduct_test: TTYduct_test.o TTYduct.o
 SmartCard_test: SmartCard_test.o SmartCard.o
 	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib \
 		-L/usr/local/lib -lpcsclite
+
+test-parser: test-parser.o TSEMparser.o
+	${CC} ${LDFLAGS} -o $@ $^ -L ../HurdLib -lHurdLib
 
 SmartCard.o: SmartCard.c SmartCard.h
 	$(CC) $(CFLAGS) -I ${SC_INCLUDE} -c $< -o $@;
