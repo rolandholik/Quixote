@@ -866,10 +866,10 @@ static _Bool _parse_generic_event(CO(Cell_State, S), CO(String, entry))
 
 	/* Extract the generic event. */
 	INIT(NAAAIM, EventParser, parser, ERR(goto done));
-	if ( !parser->extract_field(parser, entry, "generic_event") )
+	if ( !parser->extract_field(parser, entry, "event") )
 		ERR(goto done);
 
-	/* Parse the generic event type parameter. */
+	/* Parse the event type parameter. */
 	if ( !parser->get_text(parser, "type", S->event) )
 		ERR(goto done);
 	retn = true;
@@ -958,12 +958,9 @@ static _Bool parse(CO(Cell, this), CO(String, entry), \
 				ERR(goto done);
 			break;
 
-		case TSEM_GENERIC_EVENT:
+		default:
 			if ( !_parse_generic_event(S, entry) )
 				ERR(goto done);
-			break;
-
-		default:
 			break;
 	}
 
@@ -1468,11 +1465,8 @@ static _Bool measure(CO(Cell, this))
 			retn = _measure_task_kill(S);
 			break;
 
-		case TSEM_GENERIC_EVENT:
-			retn = _measure_generic_event(S);
-			break;
-
 		default:
+			retn = _measure_generic_event(S);
 			break;
 	}
 
@@ -2112,13 +2106,9 @@ static _Bool format(CO(Cell, this), CO(String, event))
 			retn = _format_task_kill(S, event);
 			break;
 
-		case TSEM_GENERIC_EVENT:
-			retn = event->add_sprintf(event,		    \
-						  "generic_event{type=%s}", \
-						  S->event->get(S->event));
-			break;
-
 		default:
+			retn = event->add_sprintf(event, "%s{}", \
+						  S->event->get(S->event));
 			break;
 	}
 
@@ -2457,12 +2447,9 @@ static void dump(CO(Cell, this))
 			_dump_task_kill(S);
 			break;
 
-		case TSEM_GENERIC_EVENT:
+		default:
 			fputs("type: ", stdout);
 			S->event->print(S->event);
-			break;
-
-		default:
 			break;
 	}
 

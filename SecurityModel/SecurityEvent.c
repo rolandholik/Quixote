@@ -65,7 +65,6 @@
 static const char *TSEM_name[] = {
 	"undefined",
 	"bprm_set_creds",
-	"generic_event",
 	"task_kill",
 	"task_setpgid",
 	"task_getpgid",
