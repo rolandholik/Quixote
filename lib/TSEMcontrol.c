@@ -225,6 +225,8 @@ static _Bool create_ns(CO(TSEMcontrol, this),
 		S->cmdstr->add(S->cmdstr, "external");
 	else if ( type == TSEMcontrol_TYPE_INTERNAL )
 		S->cmdstr->add(S->cmdstr, "internal");
+	else if ( type == TSEMcontrol_TYPE_EXPORT )
+		S->cmdstr->add(S->cmdstr, "export");
 	else
 		ERR(goto done);
 

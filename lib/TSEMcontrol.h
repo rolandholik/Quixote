@@ -21,6 +21,7 @@
 enum TSEMcontrol_ns_config {
 	TSEMcontrol_TYPE_INTERNAL = 1,
 	TSEMcontrol_TYPE_EXTERNAL,
+	TSEMcontrol_TYPE_EXPORT,
 	TSEMcontrol_INIT_NS,
 	TSEMcontrol_CURRENT_NS
 };
