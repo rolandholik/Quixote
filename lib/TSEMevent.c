@@ -775,12 +775,24 @@ static _Bool encode_event(CO(TSEMevent, this), CO(String, output))
 			if ( !_copy_field(str, output) )
 				ERR(goto done);
 		}
-	} else {
+	} else if ( strcmp(type, "inode_getattr") == 0 ) {
+		if ( !S->parser->extract_field(S->parser, S->event, "file") )
+			ERR(goto done);
+
+		str->reset(str);
+		if ( !S->parser->get_field(S->parser, str) )
+			ERR(goto done);
+		if ( !output->add(output, "file") )
+			ERR(goto done);
+		if ( !_copy_field(str, output) )
+			ERR(goto done);
+	}
+	else {
 		if ( !_convert_field(S, type, str, output) )
 			ERR(goto done);
 	}
 
-       retn = true;
+	retn = true;
 
 
  done:
