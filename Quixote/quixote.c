@@ -426,15 +426,6 @@ static _Bool send_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 		es->reset(es);
 		ef->read_String(ef, es);
 
-		if ( !event->set_event(event, es) )
-			ERR(goto done);
-		if ( !event->extract_event(event) )
-			ERR(goto done);
-
-		es->reset(es);
-		if ( !event->encode_event(event, es) )
-			ERR(goto done);
-
 		cmdbufr->reset(cmdbufr);
 		cmdbufr->add(cmdbufr, (void *) es->get(es), es->size(es) + 1);
 		if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
@@ -556,7 +547,7 @@ static _Bool send_coefficients(CO(LocalDuct, mgmt), CO(char *, type), \
  *			indicates the processing of commands should be
  *			terminated while a true value indicates an
  *			additional command cycle should be processed.
-v */
+ */
 
 static _Bool send_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
@@ -603,15 +594,6 @@ static _Bool send_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	while ( cnt-- ) {
 		es->reset(es);
 		ef->read_String(ef, es);
-
-		if ( !event->set_event(event, es) )
-			ERR(goto done);
-		if ( !event->extract_event(event) )
-			ERR(goto done);
-
-		es->reset(es);
-		if ( !event->encode_event(event, es) )
-			ERR(goto done);
 
 		cmdbufr->reset(cmdbufr);
 		cmdbufr->add(cmdbufr, (void *) es->get(es), es->size(es) + 1);
@@ -1937,14 +1919,6 @@ static _Bool receive_trajectory(CO(char *, filename), const int fd)
 			continue;
 		}
 
-		if ( !event->set_event(event, str) )
-			ERR(goto done);
-		if ( !event->extract_event(event) )
-			ERR(goto done);
-
-		str->reset(str);
-		if ( !event->encode_event(event, str) )
-			ERR(goto done);
 		if ( !str->add(str, "\n") )
 			ERR(goto done);
 

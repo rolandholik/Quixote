@@ -11,6 +11,8 @@
  * the source tree for copyright and licensing information.
  **************************************************************************/
 
+#define SAMPLE "{\"export\": {\"type\": \"event\"}, \"event\": {\"pid\": \"1257\", \"process\": \"quixote-us\", \"type\": \"file_open\", \"ttd\": \"230\", \"p_ttd\": \"230\", \"task_id\": \"732eee4a11f0399597915b524eb95b7e1b10a7237a476adc92a1e6b769dee5d3\", \"p_task_id\": \"732eee4a11f0399597915b524eb95b7e1b10a7237a476adc92a1e6b769dee5d3\", \"ts\": \"26963237445770\"}, \"COE\": {\"uid\": \"0\", \"euid\": \"0\", \"suid\": \"0\", \"gid\": \"0\", \"egid\": \"0\", \"sgid\": \"0\", \"fsuid\": \"0\", \"fsgid\": \"0\", \"capeff\": \"0x3ffffffffff\"}, \"file_open\": {\"flags\": \"0\", \"uid\": \"2\", \"gid\": \"2\", \"mode\": \"0100755\", \"path\": \"/opt/Quixote/sbin/runc\", \"s_magic\": \"0xef53\", \"s_id\": \"xvda\", \"s_uuid\": \"feadbeaffeadbeaffeadbeaffeadbeaf\", \"digest\": \"db772be63147a4e747b4fe286c7c16a2edc4a8458bd3092ea46aaee77750e8ce\"}}"
+
 
 /* Include files. */
 #include <stdio.h>
@@ -55,7 +57,7 @@ extern int main(int argc, char *argv[])
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 
 	INIT(HurdLib, String, entry, ERR(goto done));
-	if ( !entry->add(entry, "event{process=swapper/0, filename=/bin/bash-3.2.48, type=file_open, task_id=0000000000000000000000000000000000000000000000000000000000000000} COE{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=3fffffffff} file{uid=0, gid=0, mode=o100755, name_length=16, name=e1cb9766d47adb4d514d5590dd247504a3aab7e67839d65a6c6f4c32fc120e5d, s_id=xvda, s_uuid=feadbeaffeadbeaffeadbeaffeadbeaf, digest=d2a6bfe0d8a2346d45518dcaaf47642808d6c605506bd0b8e42a65a76735b98e}") )
+	if ( !entry->add(entry, SAMPLE) )
 		ERR(goto done);
 
 	entry->print(entry);

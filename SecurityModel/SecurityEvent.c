@@ -33,12 +33,12 @@
 #include <HurdLib.h>
 #include <Buffer.h>
 #include <String.h>
+#include <TSEMparser.h>
 
 #include "tsem_event.h"
 
 #include "NAAAIM.h"
 #include "SHA256.h"
-#include "EventParser.h"
 #include "SecurityEvent.h"
 #include "COE.h"
 #include "Cell.h"
@@ -245,7 +245,7 @@ static void _init_state(CO(SecurityEvent_State, S))
  *		has been successfuly parsed.
  */
 
-static _Bool _parse_pid(CO(SecurityEvent_State, S), CO(EventParser, parser), \
+static _Bool _parse_pid(CO(SecurityEvent_State, S), CO(TSEMparser, parser), \
 			CO(String, event))
 
 {
@@ -255,16 +255,14 @@ static _Bool _parse_pid(CO(SecurityEvent_State, S), CO(EventParser, parser), \
 
 
 	/* Verify that a pid field is present. */
-	if ( strstr(event->get(event), "pid{") == NULL ) {
+	if ( !parser->has_key(parser, "pid") ) {
 		retn = true;
 		goto done;
 	}
 
 
 	/* Extract and verify the pid. */
-	if ( !parser->extract_field(parser, event, "pid") )
-		ERR(goto done);
-	if ( !parser->get_integer(parser, NULL, &vl) )
+	if ( !parser->get_integer(parser, "pid", &vl) )
 		ERR(goto done);
 	if ( (unsigned long long int) vl > UINT32_MAX )
 		ERR(goto done);
@@ -305,7 +303,7 @@ static _Bool _parse_pid(CO(SecurityEvent_State, S), CO(EventParser, parser), \
  */
 
 static _Bool _parse_event(CO(SecurityEvent_State, S), \
-			  CO(EventParser, parser), CO(String, event))
+			  CO(TSEMparser, parser), CO(String, event))
 
 {
 	_Bool retn = false;
@@ -375,7 +373,7 @@ static _Bool parse(CO(SecurityEvent, this), CO(String, event))
 
 	_Bool retn = false;
 
-	EventParser parser = NULL;
+	TSEMparser parser = NULL;
 
 
 	/* Verify object and event state. */
@@ -386,12 +384,11 @@ static _Bool parse(CO(SecurityEvent, this), CO(String, event))
 
 
 	/* Parse the event definition. */
-	INIT(NAAAIM, EventParser, parser, ERR(goto done));
+	INIT(NAAAIM, TSEMparser, parser, ERR(goto done));
 	if ( !_parse_event(S, parser, event) )
 		ERR(goto done);
 
 	/* Parse the process id. */
-	parser->reset(parser);
 	if ( !_parse_pid(S, parser, event) )
 		ERR(goto done);
 
@@ -703,14 +700,16 @@ static _Bool format(CO(SecurityEvent, this), CO(String, event))
 
 
 	/* Add the event description, COE and Cell elements. */
-	event->add(event, "event{");
+	event->add(event, "{\"event\": ");
 	event->add(event, S->event->get(S->event));
-	event->add(event, "} ");
+	event->add(event, ", ");
 
 	S->coe->format(S->coe, event);
+	event->add(event, ", ");
 
 	if ( !S->cell->format(S->cell, event) )
 		ERR(goto done);
+	event->add(event, "}");
 
 	retn = true;
 

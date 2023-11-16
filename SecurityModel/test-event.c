@@ -12,7 +12,8 @@
  **************************************************************************/
 
 /* Local defines. */
-#define EVENT "event{process=quixote, filename=/bin/bash-3.2.57, type=file_open, task_id=0000000000000000000000000000000000000000000000000000000000000000} COE{uid=0, euid=0, suid=0, gid=0, egid=0, sgid=0, fsuid=0, fsgid=0, cap=0x3ffffffffff} file{flags=32800, uid=0, gid=0, mode=0100755, name_length=16, name=b580cfcfd5888533f011c73e863c3c2c2b2cd5c32839a66be5065118a6293f6e, s_magic=0xef53, s_id=xvda, s_uuid=feadbeaffeadbeaffeadbeaffeadbeaf, digest=575c788d39f3bc837fcfd9c083af5667ed82852b1e10f07e0db8d91988b22008}"
+
+#define EVENT "{\"export\": {\"type\": \"event\"}, \"event\": {\"pid\": \"1257\", \"process\": \"quixote-us\", \"type\": \"file_open\", \"ttd\": \"230\", \"p_ttd\": \"230\", \"task_id\": \"732eee4a11f0399597915b524eb95b7e1b10a7237a476adc92a1e6b769dee5d3\", \"p_task_id\": \"732eee4a11f0399597915b524eb95b7e1b10a7237a476adc92a1e6b769dee5d3\", \"ts\": \"26963237445770\"}, \"COE\": {\"uid\": \"0\", \"euid\": \"0\", \"suid\": \"0\", \"gid\": \"0\", \"egid\": \"0\", \"sgid\": \"0\", \"fsuid\": \"0\", \"fsgid\": \"0\", \"capeff\": \"0x3ffffffffff\"}, \"file_open\": {\"flags\": \"0\", \"uid\": \"2\", \"gid\": \"2\", \"mode\": \"0100755\", \"path\": \"/opt/Quixote/sbin/runc\", \"s_magic\": \"0xef53\", \"s_id\": \"xvda\", \"s_uuid\": \"feadbeaffeadbeaffeadbeaffeadbeaf\", \"digest\": \"db772be63147a4e747b4fe286c7c16a2edc4a8458bd3092ea46aaee77750e8ce\"}}"
 
 
 /* Include files. */
@@ -40,10 +41,11 @@
 
 
 static uint8_t pseudonym[32] = {
-	0x90, 0x95, 0x68, 0x80, 0x09, 0xb4, 0x15, 0xfa, \
-	0xa8, 0x97, 0x63, 0x23, 0x1b, 0x82, 0xf2, 0x59, \
-	0x56, 0xe7, 0x55, 0x28, 0x78, 0x94, 0xba, 0xb2, \
-	0x32, 0x87, 0x64, 0xe1, 0xa8, 0x6d, 0x64, 0xf8 };
+	0x32, 0x8d, 0x5b, 0xc9, 0xaf, 0x0b, 0x76, 0xae, \
+	0xce, 0x7d, 0x72, 0xc2, 0x61, 0x31, 0x5f, 0x68, \
+	0xd9, 0x88, 0x69, 0x4e, 0x7f, 0xc5, 0x73, 0x43, \
+	0x6d, 0xbb, 0x80, 0xbb, 0x8f, 0xf4, 0x49, 0xbe
+};
 
 
 /**

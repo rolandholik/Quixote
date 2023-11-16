@@ -33,12 +33,12 @@
 #include <HurdLib.h>
 #include <Buffer.h>
 #include <String.h>
+#include <TSEMparser.h>
 
 #include "tsem_event.h"
 
 #include "NAAAIM.h"
 #include "SHA256.h"
-#include "EventParser.h"
 #include "Cell.h"
 
 #if !defined(REG_OK)
@@ -228,7 +228,7 @@ static void _init_state(CO(Cell_State, S))
  *		value.
  */
 
-static _Bool _get_field(CO(EventParser, parser), CO(char *, field), \
+static _Bool _get_field(CO(TSEMparser, parser), CO(char *, field), \
 			uint32_t *value)
 
 {
@@ -277,7 +277,7 @@ static _Bool _get_field(CO(EventParser, parser), CO(char *, field), \
  *		variable contains a legitimate value.
  */
 
-static _Bool _get_digest(CO(EventParser, parser), CO(char *, field),
+static _Bool _get_digest(CO(TSEMparser, parser), CO(char *, field),
 			 uint8_t *fb, size_t size)
 
 {
@@ -336,7 +336,7 @@ static _Bool _get_digest(CO(EventParser, parser), CO(char *, field),
  *		variable contains a legitimate value.
  */
 
-static _Bool _get_text(CO(EventParser, parser), CO(char *, field), \
+static _Bool _get_text(CO(TSEMparser, parser), CO(char *, field), \
 		       uint8_t *fb, size_t fblen)
 
 {
@@ -376,6 +376,10 @@ static _Bool _get_text(CO(EventParser, parser), CO(char *, field), \
  * \param entry	The object containing the definition of the event that
  *		is to be parsed.
  *
+ * \param key	A pointer to the character buffer containing a
+ *		null-terminated string describing the key that is
+ *		to be used to retrieve the file information.
+ *
  * \return	A boolean value is used to indicate the success or
  *		failure of the parsing.  A false value indicates the
  *		parsing failed and the object is poisoned.  A true
@@ -383,19 +387,19 @@ static _Bool _get_text(CO(EventParser, parser), CO(char *, field), \
  *		populated.
  */
 
-static _Bool _parse_file(CO(Cell_State, S), CO(String, entry))
+static _Bool _parse_file(CO(Cell_State, S), CO(String, entry), CO(char *, key))
 
 {
 	_Bool retn = false;
 
 	uint32_t value;
 
-	EventParser parser = NULL;
+	TSEMparser parser = NULL;
 
 
 	/* Extract the file field. */
-	INIT(NAAAIM, EventParser, parser, ERR(goto done));
-	if ( !parser->extract_field(parser, entry, "file") )
+	INIT(NAAAIM, TSEMparser, parser, ERR(goto done));
+	if ( !parser->extract_field(parser, entry, key) )
 		ERR(goto done);
 
 	/* Parse field entries. */
@@ -468,11 +472,11 @@ static _Bool _parse_mmap_file(CO(Cell_State, S), CO(String, entry))
 {
 	_Bool retn = false;
 
-	EventParser parser = NULL;
+	TSEMparser parser = NULL;
 
 
 	/* Extract the field. */
-	INIT(NAAAIM, EventParser, parser, ERR(goto done));
+	INIT(NAAAIM, TSEMparser, parser, ERR(goto done));
 	if ( !parser->extract_field(parser, entry, "mmap_file") )
 		ERR(goto done);
 
@@ -524,11 +528,11 @@ static _Bool _parse_socket_create(CO(Cell_State, S), CO(String, entry))
 {
 	_Bool retn = false;
 
-	EventParser parser = NULL;
+	TSEMparser parser = NULL;
 
 
 	/* Extract the field itself. */
-	INIT(NAAAIM, EventParser, parser, ERR(goto done));
+	INIT(NAAAIM, TSEMparser, parser, ERR(goto done));
 	if ( !parser->extract_field(parser, entry, "socket_create") )
 		ERR(goto done);
 
@@ -587,7 +591,7 @@ static _Bool _parse_socket(CO(Cell_State, S), CO(String, entry))
 
 	String str = NULL;
 
-	EventParser parser = NULL;
+	TSEMparser parser = NULL;
 
 	static char *type[2] = {
 		"socket_connect",
@@ -608,7 +612,7 @@ static _Bool _parse_socket(CO(Cell_State, S), CO(String, entry))
 			break;
 
 	}
-	INIT(NAAAIM, EventParser, parser, ERR(goto done));
+	INIT(NAAAIM, TSEMparser, parser, ERR(goto done));
 	if ( !parser->extract_field(parser, entry, type[value]) )
 		ERR(goto done);
 
@@ -714,11 +718,11 @@ static _Bool _parse_socket_accept(CO(Cell_State, S), CO(String, entry))
 
 	String str = NULL;
 
-	EventParser parser = NULL;
+	TSEMparser parser = NULL;
 
 
 	/* Compile the regular expressions once. */
-	INIT(NAAAIM, EventParser, parser, ERR(goto done));
+	INIT(NAAAIM, TSEMparser, parser, ERR(goto done));
 	if ( !parser->extract_field(parser, entry, "socket_accept") )
 		ERR(goto done);
 
@@ -808,11 +812,11 @@ static _Bool _parse_task_kill(CO(Cell_State, S), CO(String, entry))
 {
 	_Bool retn = false;
 
-	EventParser parser = NULL;
+	TSEMparser parser = NULL;
 
 
 	/* Extract task_kill event. */
-	INIT(NAAAIM, EventParser, parser, ERR(goto done));
+	INIT(NAAAIM, TSEMparser, parser, ERR(goto done));
 	if ( !parser->extract_field(parser, entry, "task_kill") )
 		ERR(goto done);
 
@@ -861,11 +865,11 @@ static _Bool _parse_generic_event(CO(Cell_State, S), CO(String, entry))
 {
 	_Bool retn = false;
 
-	EventParser parser = NULL;
+	TSEMparser parser = NULL;
 
 
 	/* Extract the generic event. */
-	INIT(NAAAIM, EventParser, parser, ERR(goto done));
+	INIT(NAAAIM, TSEMparser, parser, ERR(goto done));
 	if ( !parser->extract_field(parser, entry, "event") )
 		ERR(goto done);
 
@@ -924,7 +928,7 @@ static _Bool parse(CO(Cell, this), CO(String, entry), \
 
 	switch ( S->type ) {
 		case TSEM_FILE_OPEN:
-			if ( !_parse_file(S, entry) )
+			if ( !_parse_file(S, entry, "file_open") )
 				ERR(goto done);
 			break;
 
@@ -932,7 +936,7 @@ static _Bool parse(CO(Cell, this), CO(String, entry), \
 			if ( !_parse_mmap_file(S, entry) )
 				ERR(goto done);
 			if ( !S->mmap_file.anonymous ) {
-				if ( !_parse_file(S, entry) )
+				if ( !_parse_file(S, entry, "file") )
 					ERR(goto done);
 			}
 			break;
@@ -1713,28 +1717,31 @@ static _Bool _format_file(CO(Cell_State, S), CO(String, str))
 
 	/* Write the formatted string to the String object. */
 	name = S->file.name->get(S->file.name);
-	if ( !str->add_sprintf(str, "file{flags=%lu, uid=%lu, gid=%lu, mode=0%lo, path=%s",						\
-			       (unsigned long int) S->file.flags,	 \
-			       (unsigned long int) S->file.uid,		 \
-			       (unsigned long int) S->file.gid,		 \
-			       (unsigned long int) S->file.mode,	 \
+	if ( !str->add_sprintf(str, "\"file_open\": {\"flags\": \"%lu\", " \
+			       "\"uid\": \"%lu\", \"gid\": \"%lu\", "	   \
+			       "\"mode\": \"0%lo\", \"path\": \"%s\"",	   \
+			       (unsigned long int) S->file.flags,	   \
+			       (unsigned long int) S->file.uid,		   \
+			       (unsigned long int) S->file.gid,		   \
+			       (unsigned long int) S->file.mode,	   \
 			       (unsigned long int) name) )
 		ERR(goto done);
 
 
 	/* , s_magic=%0x, s_id=%s, s_uuid=%*phN */
-	if ( !str->add_sprintf(str, ", s_magic=0x%0x, s_id=%s, s_uuid=", \
+	if ( !str->add_sprintf(str, ", \"s_magic\": \"0x%0x\", \"s_id\": " \
+			       "\"%s\", \"s_uuid\": \"", \
 			       S->file.s_magic, S->file.s_id) )
 		ERR(goto done);
 
 	for (lp= 0; lp < sizeof(S->file.s_uuid); ++lp) {
-		if ( !str->add_sprintf(str, "%02x",
+		if ( !str->add_sprintf(str, "%02x", \
 				       (unsigned char) S->file.s_uuid[lp]) )
 		     ERR(goto done);
 	}
 
 	/* , digest=%*phN */
-	if ( !str->add_sprintf(str, "%s", ", digest=") )
+	if ( !str->add_sprintf(str, "\", \"%s\": \"", "digest") )
 		ERR(goto done);
 
 	for (lp= 0; lp < sizeof(S->file.digest); ++lp) {
@@ -1744,7 +1751,7 @@ static _Bool _format_file(CO(Cell_State, S), CO(String, str))
 	}
 
 	/* } */
-	if ( !str->add_sprintf(str, "}") )
+	if ( !str->add_sprintf(str, "\"}") )
 		ERR(goto done);
 
 	retn = true;
@@ -1780,8 +1787,9 @@ static _Bool _format_mmap_file(CO(Cell_State, S), CO(String, str))
 	_Bool retn = false;
 
 
-	if ( !str->add_sprintf(str, "mmap_file{type=%u, reqprot=%u, "	      \
-			       "prot=%u, flags=%u} ", S->mmap_file.anonymous, \
+	if ( !str->add_sprintf(str, "\"mmap_file\": \"type\": \"%u\", "	      \
+			       "\"reqprot\": \"%u\", \"prot\" : \"%u\", "     \
+			       "\"flags\": \"%u\"} ", S->mmap_file.anonymous, \
 			       S->mmap_file.reqprot, S->mmap_file.prot,	      \
 			       S->mmap_file.flags) )
 		ERR(goto done);
@@ -1819,8 +1827,9 @@ static _Bool _format_socket_create(CO(Cell_State, S), CO(String, str))
 	_Bool retn = false;
 
 
-	if ( !str->add_sprintf(str, "socket_create{family=%u, type=%u, " \
-			       "protocol=%u, kern=%u}",
+	if ( !str->add_sprintf(str, "\"socket_create\": {\"family\": "	  \
+			       "\"%u\", \"type\": \"%bu\", "		  \
+			       "\"protocol\": \"%u\", \"kern\": \"%u\"}", \
 			       S->socket_create.family,
 			       S->socket_create.type,
 			       S->socket_create.protocol,
@@ -1866,21 +1875,24 @@ static _Bool _format_socket_connect(CO(Cell_State, S), CO(String, str))
 
 	type = (S->type == TSEM_SOCKET_CONNECT) ? "socket_connect" : \
 		"socket_bind";
-	if ( !str->add_sprintf(str, "%s{family=%u, ", type, \
+	if ( !str->add_sprintf(str, "\"%s\": {\"family\": \"%u\", ", type, \
 			       S->socket_connect.family) )
 		ERR(goto done);
 
 	switch ( S->socket_connect.family ) {
 		case AF_INET:
-			if ( !str->add_sprintf(str, "port=%u, addr=%u",	   \
+			if ( !str->add_sprintf(str, "\"port\": \"%u\", "   \
+					       "\"addr\": \"%u\"",	   \
 					       S->socket_connect.port,	   \
 					       S->socket_connect.u.ipv4_addr) )
 				ERR(goto done);
 			break;
 
 		case AF_INET6:
-			if ( !str->add_sprintf(str, "port=%u, flow=%u, "     \
-					       "scope=%u, addr=",	     \
+			if ( !str->add_sprintf(str, "\"port\": \"%u\", ",    \
+					       "\"flow\": \"%u\", "	     \
+					       "\"scope\": \"%u\", "	     \
+					       "\"addr\": ",		     \
 					       S->socket_connect.port,	     \
 					       S->socket_connect.flow,	     \
 					       S->socket_connect.scope) )
@@ -1896,13 +1908,13 @@ static _Bool _format_socket_connect(CO(Cell_State, S), CO(String, str))
 			break;
 
 		case AF_UNIX:
-			if ( !str->add_sprintf(str, "addr=%s", \
+			if ( !str->add_sprintf(str, "\"addr\": \"%s\"", \
 					       S->socket_connect.u.unix_addr) )
 				ERR(goto done);
 			break;
 
 		default:
-			if ( !str->add_sprintf(str, "addr=") )
+			if ( !str->add_sprintf(str, "\"addr\": ") )
 				ERR(goto done);
 
 			p = S->socket_connect.u.addr;
@@ -1953,8 +1965,9 @@ static _Bool _format_socket_accept(CO(Cell_State, S), CO(String, str))
 		     size;
 
 
-	if ( !str->add_sprintf(str, "socket_accept{family=%u, type=%u, "  \
-			       "port=%u, addr=", S->socket_accept.family, \
+	if ( !str->add_sprintf(str, "\"socket_accept\": {\"family\": "	      \
+			       "\"%u\", \"type\": \"%u\", \"port\": \"%u\""   \
+			       "\"addr\": ", S->socket_accept.family,	      \
 			       S->socket_accept.type, S->socket_accept.port) )
 		ERR(goto done);
 
@@ -1976,7 +1989,7 @@ static _Bool _format_socket_accept(CO(Cell_State, S), CO(String, str))
 			break;
 
 		case AF_UNIX:
-			if ( !str->add_sprintf(str, "addr=%s", \
+			if ( !str->add_sprintf(str, "\"addr\": %s", \
 					       S->socket_connect.u.unix_addr) )
 				ERR(goto done);
 			break;
@@ -2030,9 +2043,9 @@ static _Bool _format_task_kill(CO(Cell_State, S), CO(String, str))
 	_Bool retn = false;
 
 
-	if ( !str->add_sprintf(str, "task_kill{cross=%u, signal=%u, "	\
-			       "task_id=", S->task_kill.cross_model,	\
-			       S->task_kill.signal) )
+	if ( !str->add_sprintf(str, "\"task_kill\": {\"cross\": \"%u\", " \
+			       "\"signal\": \"%u\", \"task_id\": ",	  \
+			       S->task_kill.cross_model, S->task_kill.signal) )
 		ERR(goto done);
 
 	p    = S->task_kill.task_id;
@@ -2107,7 +2120,7 @@ static _Bool format(CO(Cell, this), CO(String, event))
 			break;
 
 		default:
-			retn = event->add_sprintf(event, "%s{}", \
+			retn = event->add_sprintf(event, "\"%s\": {}", \
 						  S->event->get(S->event));
 			break;
 	}

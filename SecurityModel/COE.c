@@ -1,6 +1,6 @@
 /** \file
  * This file contains the implementation of an object which manages the
- * parameters defining a context of execution in a Turing Security
+ * parameters defining a context of execution in the Trusted Security
  * Event Model.
  */
 
@@ -24,15 +24,11 @@
 #include <HurdLib.h>
 #include <Buffer.h>
 #include <String.h>
+#include <TSEMparser.h>
 
 #include "NAAAIM.h"
 #include "SHA256.h"
 #include "COE.h"
-#include "EventParser.h"
-
-#if !defined(REG_OK)
-#define REG_OK REG_NOERROR
-#endif
 
 
 /* Object state extraction macro. */
@@ -173,7 +169,7 @@ static void set_characteristics(CO(COE, this), const uint32_t uid,	     \
  *		value.
  */
 
-static _Bool _get_field(CO(EventParser, parser), CO(char *, field), \
+static _Bool _get_field(CO(TSEMparser, parser), CO(char *, field), \
 			uint32_t *value)
 
 {
@@ -218,7 +214,7 @@ static _Bool _get_field(CO(EventParser, parser), CO(char *, field), \
  *		the field entry has been successfully extracted.
  */
 
-static _Bool _get_caps(CO(EventParser, parser), CO(char *, field), \
+static _Bool _get_caps(CO(TSEMparser, parser), CO(char *, field), \
 		       uint64_t *value)
 
 {
@@ -265,7 +261,7 @@ static _Bool parse(CO(COE, this), CO(String, entry))
 
 	_Bool retn = false;
 
-	EventParser parser = NULL;
+	TSEMparser parser = NULL;
 
 
 	/* Verify object and caller state. */
@@ -276,7 +272,7 @@ static _Bool parse(CO(COE, this), CO(String, entry))
 
 
 	/* Extract coe field. */
-	INIT(NAAAIM, EventParser, parser, ERR(goto done));
+	INIT(NAAAIM, TSEMparser, parser, ERR(goto done));
 	if ( !parser->extract_field(parser, entry, "COE") )
 		ERR(goto done);
 
@@ -460,10 +456,6 @@ static _Bool format(CO(COE, this), CO(String, event))
 
 	_Bool retn = false;
 
-	char bufr[256];
-
-	size_t used;
-
 
 	/* Verify object status. */
 	if ( S->poisoned )
@@ -472,21 +464,23 @@ static _Bool format(CO(COE, this), CO(String, event))
 		ERR(goto done);
 
 
-	/* Generate the coe string and add it. */
-	used = snprintf(bufr, sizeof(bufr), "COE{uid=%lu, euid=%lu, suid=%lu, gid=%lu, egid=%lu, sgid=%lu, fsuid=%lu, fsgid=%lu, capeff=0x%llx} ",     \
-		       (unsigned long int) S->character.uid,		\
-		       (unsigned long int) S->character.euid,		\
-		       (unsigned long int) S->character.suid,		\
-		       (unsigned long int) S->character.gid,		\
-		       (unsigned long int) S->character.egid,		\
-		       (unsigned long int) S->character.sgid,		\
-		       (unsigned long int) S->character.fsuid,		\
-		       (unsigned long int) S->character.fsgid,		\
+	/* Generate the COE string and add it. */
+	retn = event->add_sprintf(event, "\"COE\": {\"uid\": \"%lu\", "	    \
+				  "\"euid\": \"%lu\", \"suid\": \"%lu\", "  \
+				  "\"gid\": \"%lu\", \"egid\": \"%lu\",  "  \
+				  "\"sgid\": \"%lu\", \"fsuid\": \"%lu\", " \
+				  "\"fsgidb\": \"%lu\", \"capeff\": "	    \
+				  "\"0x%llx\"}",			    \
+		       (unsigned long int) S->character.uid,		    \
+		       (unsigned long int) S->character.euid,		    \
+		       (unsigned long int) S->character.suid,		    \
+		       (unsigned long int) S->character.gid,		    \
+		       (unsigned long int) S->character.egid,		    \
+		       (unsigned long int) S->character.sgid,		    \
+		       (unsigned long int) S->character.fsuid,		    \
+		       (unsigned long int) S->character.fsgid,		    \
 		       (unsigned long long int) S->character.capeff);
-	if ( used >= sizeof(bufr) )
-		ERR(goto done);
-
-	if ( !event->add(event, bufr) )
+	if ( !retn )
 		ERR(goto done);
 	retn = true;
 

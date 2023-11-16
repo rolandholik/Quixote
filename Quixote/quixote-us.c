@@ -430,8 +430,8 @@ static _Bool setup_management(CO(LocalDuct, mgmt), const char *cartridge)
  * This function carries out the addition of a security state event
  * to the current security state model.
  *
- * \param update	A pointer to the object that will be used to
- *			hold the ASCII encoded state description.
+ * \param update	The object containing the event description
+ *			to be processed.
  *
  * \return		A boolean value is returned to indicate whether
  *			or not addition of the event succeeded.  A
@@ -453,10 +453,6 @@ static _Bool add_event(CO(String, update))
 
 
 	/* Parse the event. */
-	update->reset(update);
-	if ( !Event->encode_event(Event, update) )
-		ERR(goto done);
-
 	INIT(NAAAIM, SecurityEvent, event, ERR(goto done));
 	if ( !event->parse(event, update) )
 		ERR(goto done);
@@ -570,14 +566,9 @@ static _Bool add_async_event(CO(String, update))
 
 
 	/* Parse the event. */
-	update->reset(update);
-	if ( !Event->encode_event(Event, update) )
-		ERR(goto done);
-
 	INIT(NAAAIM, SecurityEvent, event, ERR(goto done));
 	if ( !event->parse(event, update) )
 		ERR(goto done);
-
 
 	/*
 	 * If this is a model error release the actor so the runc
@@ -628,7 +619,7 @@ static _Bool add_async_event(CO(String, update))
  *
  * This function carries out the addition of the hardware aggregate
  * measurement to the current security state model.
- *
+v *
  * \param str	The object that will be used to extract the string
  *		value from the event.
  *
@@ -689,10 +680,6 @@ static _Bool add_log(CO(String, event))
 	_Bool retn = false;
 
 
-	event->reset(event);
-	if ( !Event->encode_log(Event, event) )
-		ERR(goto done);
-
 	if ( !Model->add_TSEM_event(Model, event) )
 		ERR(goto done);
 	retn = true;
@@ -725,6 +712,8 @@ static _Bool process_event()
 {
 	_Bool retn = false;
 
+	enum TSEM_export_type type;
+
 	String str = NULL;
 
 
@@ -734,10 +723,15 @@ static _Bool process_event()
 
 
 	/* Dispatch the event. */
-	INIT(HurdLib, String, str, ERR(goto done));
 	Event->reset(Event);
+	if ( (type = Event->extract_export(Event)) == TSEM_EVENT_UNKNOWN )
+		ERR(goto done);
 
-	switch ( Event->extract_export(Event) ) {
+	INIT(HurdLib, String, str, ERR(goto done));
+	if ( !str->add(str, Event->get_event(Event)) )
+		ERR(goto done);
+
+	switch ( type ) {
 		case TSEM_EVENT_AGGREGATE:
 			retn = add_aggregate(str);
 			break;
@@ -755,8 +749,6 @@ static _Bool process_event()
 			break;
 
 		default:
-			fprintf(stderr, "Unknown event: %s\n", \
-				Event->get_event(Event));
 			break;
 	}
 
