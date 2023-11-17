@@ -520,11 +520,6 @@ static _Bool add_event(CO(String, update))
 	      retn = false;
 
 
-	/* Parse the event. */
-	update->reset(update);
-	if ( !Event->encode_event(Event, update) )
-		ERR(goto done);
-
 	if ( !Model->update(Model, update, false, &discipline, &sealed) )
 		ERR(goto done);
 	retn = true;
@@ -558,10 +553,6 @@ static _Bool add_async_event(CO(String, update))
 
 
 	/* Parse the event. */
-	update->reset(update);
-	if ( !Event->encode_event(Event, update) )
-		ERR(goto done);
-
 	if ( !Model->update(Model, update, true, &violation, &sealed) )
 		ERR(goto done);
 
@@ -604,10 +595,6 @@ static _Bool add_TSEM_event(CO(String, event))
 {
 	_Bool retn = false;
 
-
-	event->reset(event);
-	if ( !Event->encode_log(Event, event) )
-		ERR(goto done);
 
 	if ( !Model->add_ai_event(Model, event) )
 		ERR(goto done);

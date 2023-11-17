@@ -16,7 +16,7 @@ endif
 CSRC   = test-ISOidentity-enclave.c SanchoSGX.c ISOmanager.c
 ENCSRC = SanchoSGX-enclave.c SanchoSGX-interface.c ISOidentity-manager.c \
 	COE.c Cell.c SecurityPoint.c SecurityEvent.c TSEM.c EventModel.c \
-	EventParser.c
+	TSEMparser.c
 
 MGRSRC = ISOmanager-enclave.c ISOmanager-interface.c
 
@@ -87,6 +87,9 @@ LIBS		= ${RDKLIB} ${BUILD_ELFLIB} ${NAAAIMLIB} ${HURDLIB}
 	$(ENCLAVE_CC) $(ENCLAVE_CFLAGS) -c $< -o $@;
 
 %.o: ../../SecurityModel/%.c
+	$(ENCLAVE_CC) $(ENCLAVE_CFLAGS) -c $< -o $@;
+
+%.o: ../../lib/%.c
 	$(ENCLAVE_CC) $(ENCLAVE_CFLAGS) -c $< -o $@;
 
 

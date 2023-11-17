@@ -90,4 +90,4 @@
 #define NAAAIM_Report_OBJID		53
 #define NAAAIM_SRDEpipe_OBJID		54
 #define NAAAIM_Attestation_OBJID	55
-#define NAAAIM_EventParser_OBJID	56
+#define NAAAIM_TSEMparser_OBJID		70
