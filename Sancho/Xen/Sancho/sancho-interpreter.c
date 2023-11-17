@@ -225,11 +225,19 @@ static void add_aggregate(CO(XENduct, duct), CO(TSEM, model), CO(Buffer, bufr))
 static void add_security(CO(XENduct, duct), CO(TSEM, model), CO(Buffer, bufr))
 
 {
+	char *p;
+
 	String event = NULL;
 
 
+	p = (char *) bufr->get(bufr);
+	if ( (p = index(p, ' ')) == NULL )
+		ERR(goto done);
+	++p;
+
 	INIT(HurdLib, String, event, ERR(goto done));
-	event->add(event, (char *) bufr->get(bufr));
+	event->add(event, (char *) p);
+
 	if ( model->add_TSEM_event(model, event) )
 		send_ok(duct, bufr);
 
@@ -747,18 +755,15 @@ extern void sancho_interpreter(const XENduct duct)
 				break;
 
 			case show_forensics:
-				fputs("show forensics.\n", stdout);
 				send_forensics(duct, model, bufr);
 				break;
 
 			case show_forensics_coefficients:
-				fputs("show forensics coefficients\n", stdout);
 				send_trajectory_coefficients(duct, model, \
 							     false, bufr);
 				break;
 
 			case show_forensics_counts:
-				fputs("show forensics counts\n", stdout);
 				send_trajectory_counts(duct, model, false, \
 						       bufr);
 				break;

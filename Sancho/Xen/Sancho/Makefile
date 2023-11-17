@@ -23,7 +23,7 @@ DEFINES = -DMBEDTLS_CONFIG_FILE=\"mbedtls_config.h\"
 # Object and source file definitions.
 #
 CSRC = sancho_main.c sancho-interpreter.c XENduct.c COE.c Cell.c \
-	SecurityEvent.c SecurityPoint.c TSEM.c EventModel.c EventParser.c
+	SecurityEvent.c SecurityPoint.c TSEM.c EventModel.c TSEMparser.c
 
 COBJS = ${CSRC:.c=.o}
 
@@ -62,6 +62,9 @@ CFLAGS = ${CINCLUDE} ${DEFINES} ${CDEBUG} ${TARGET_CPPFLAGS} ${PLATFORM} -Wall
 	${CC} ${CFLAGS} -c $< -o $@;
 
 %.o: ../../../SecurityModel/%.c
+	${CC} ${CFLAGS} -c $< -o $@;
+
+%.o: ../../../lib/%.c
 	${CC} ${CFLAGS} -c $< -o $@;
 
 

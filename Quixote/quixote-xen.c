@@ -553,6 +553,7 @@ static _Bool process_event(CO(XENduct, duct))
 	SecurityEvent exchange = NULL;
 
 	static const char *export      = "export ",
+			  *log	       = "log ",
 			  *discipline  = "DISCIPLINE ",
 			  *release     = "RELEASE ";
 
@@ -561,37 +562,38 @@ static _Bool process_event(CO(XENduct, duct))
 		fprintf(Debug, "%u: Processing event: '%s'\n", getpid(), \
 			Event->get_event(Event));
 
-	INIT(HurdLib, String, update, ERR(goto done));
-	Event->reset(Event);
-
 
 	/* Dispatch the event. */
-	event = Event->extract_export(Event);
+	Event->reset(Event);
+	if ( (event = Event->extract_export(Event)) == TSEM_EVENT_UNKNOWN )
+		ERR(goto done);
+
+	INIT(HurdLib, String, update, ERR(goto done));
 
 	switch ( event ) {
-		case TSEM_EVENT_AGGREGATE:
-			retn = add_aggregate(duct, update);
-			goto done;
-
 		case TSEM_EVENT_EVENT:
 		case TSEM_EVENT_ASYNC_EVENT:
-			if ( !Event->extract_event(Event) )
+			if ( !update->add(update, export) )
 				ERR(goto done);
-
-			update->add(update, export);
-			if ( !Event->encode_event(Event, update) )
+			if ( !update->add(update, Event->get_event(Event)) )
 				ERR(goto done);
 			break;
 
+		case TSEM_EVENT_AGGREGATE:
+			retn = add_aggregate(duct, update);
+			goto done;
+			break;
+
 		case TSEM_EVENT_LOG:
-			if ( !Event->encode_log(Event, update) )
+			if ( !update->add(update, log) )
+				ERR(goto done);
+			if ( !update->add(update, Event->get_event(Event)) )
 				ERR(goto done);
 			break;
 
 		default:
-			fprintf(stderr, "Unknown event: %s\n", \
-				Event->get_event(Event));
 			break;
+
 	}
 
 
