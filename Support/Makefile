@@ -25,6 +25,12 @@ LIBCAP_FILE    = libcap-${LIBCAP_VERSION}.tar.gz
 LIBCAP_URL     = https://mirrors.edge.kernel.org/pub/linux/libs/security/linux-privs/libcap2/${LIBCAP_FILE}
 LIBCAP_TAR     = Build/${LIBCAP_FILE}
 
+# Definitions for building mosquitto.
+MOSQUITTO_VERSION = 2.0.18
+MOSQUITTO_FILE    = mosquitto-${MOSQUITTO_VERSION}.tar.gz
+MOSQUITTO_URL     = https://mosquitto.org/files/source/${MOSQUITTO_FILE}
+MOSQUITTO_TAR     = Build/${MOSQUITTO_FILE}
+
 ifeq ("${KERNEL_VERSION}","5.4")
 LIBCAP_PATCH = Build/libcap-2.66_cap_38.patch
 endif
@@ -56,7 +62,7 @@ NORDIC_URL  = ${BUILD_NORDIC_URL}/${NORDIC_FILE}
 #
 .PHONY: all
 
-all: libcap.stamp mbedtls.stamp nordic.stamp
+all: libcap.stamp mosquitto.stamp mbedtls.stamp nordic.stamp
 
 
 #
@@ -75,6 +81,24 @@ libcap: ${LIBCAP_TAR}
 
 ${LIBCAP_TAR}:
 	wget -O $@ ${LIBCAP_URL};
+
+
+#
+# mosquitto build.
+#
+mosquitto.stamp: mosquitto/lib/libmosquitto.a
+	touch $@;
+
+mosquitto/lib/libmosquitto.a: mosquitto
+	make -C mosquitto CC=${CC} WITH_CJSON=no WITH_STATIC_LIBRARIES=yes \
+		LDFLAGS="`pkg-config ssl --libs-only-L` -lssl -lcrypto";
+
+mosquitto: ${MOSQUITTO_TAR}
+	tar xf $<;
+	mv mosquitto-${MOSQUITTO_VERSION} mosquitto;
+
+${MOSQUITTO_TAR}:
+	wget -O $@ ${MOSQUITTO_URL};
 
 
 #
@@ -117,9 +141,11 @@ install-bin:
 #
 clean:
 	[ -d libcap ] && make -C libcap clean || true;
+	[ -d mosquitto ] && make -C mosquitto clean || true;
 
 distclean: clean
 	[ -d libcap ] && rm -rf libcap || true;
+	[ -d mosquitto ] && rm -rf mosquitto || true;
 	[ -d mbedtls ] && rm -rf mbedtls || true;
 	[ -d nRF5_SDK ] && rm -rf nRF5_SDK || true;
 	rm -f *.stamp;
