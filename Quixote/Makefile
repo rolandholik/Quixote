@@ -77,6 +77,9 @@ NAAAIMLIB      = -L ../lib -lNAAAIM
 SEDE_LIBRARY = ../libSRDEruntime.a
 SEDELIB	     = -L ${SGXDIR} -lSRDEruntime
 
+MOSQUITTO_LIB = -L ../Support/mosquitto/lib -l mosquitto -lssl \
+	${BUILD_LIBCRYPTO}
+
 # libcap library
 LIBCAP = -L ../support/libcap -lcap
 
@@ -137,7 +140,7 @@ quixote-xen.o: quixote-xen.c
 	${CC} ${CFLAGS} ${XENCFLAGS} -c $< -o $@;
 
 quixote-export: quixote-export.o ${LIBDEPS} ${MODELDEPS}
-	${CC} ${LDFLAGS} -o $@ $< ${MODELDEPS} ${LIBS};
+	${CC} ${LDFLAGS} -o $@ $< ${MODELDEPS} ${LIBS} ${MOSQUITTO_LIB};
 
 quixote-cat: quixote-cat.o ${LIBDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${LIBS};

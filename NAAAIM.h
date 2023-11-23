@@ -109,3 +109,4 @@
 #define NAAAIM_EventParser_OBJID	69
 #define NAAAIM_TSEMparser_OBJID		70
 #define NAAAIM_TSEMevent_OBJID		71
+#define NAAAIM_MQTTduct_OBJID		72

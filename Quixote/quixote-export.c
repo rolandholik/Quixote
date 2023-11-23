@@ -67,6 +67,7 @@
 #include "NAAAIM.h"
 #include "TTYduct.h"
 #include "LocalDuct.h"
+#include "MQTTduct.h"
 #include "SHA256.h"
 
 #include "SecurityPoint.h"
@@ -124,6 +125,7 @@ static const char *Runc_name = NULL;
  * The objects used to write the output.
  */
 static File Output_File	    = NULL;
+static MQTTduct MQTT	    = NULL;
 static String Output_String = NULL;
 
 
@@ -306,13 +308,21 @@ static _Bool output_event()
 	_Bool retn = false;
 
 	Output_String->reset(Output_String);
-	if ( !Output_String->add_sprintf(Output_String, "%s\n", \
-					 Event->get_event(Event)) )
-
+	if ( !Output_String->add(Output_String, Event->get_event(Event)) )
 		ERR(goto done);
 
-	if ( !Output_File->write_String(Output_File, Output_String) )
-		ERR(goto done);
+	if ( MQTT != NULL ) {
+		if ( !MQTT->send_String(MQTT, Output_String) )
+			ERR(goto done);
+	}
+
+	if ( Output_File != NULL ) {
+		if ( !Output_String->add(Output_String, "\n") )
+			ERR(goto done);
+		if ( !Output_File->write_String(Output_File, Output_String) )
+			ERR(goto done);
+	}
+
 	retn = true;
 
 
@@ -793,10 +803,14 @@ static _Bool fire_cartridge(CO(char *, cartridge))
 extern int main(int argc, char *argv[])
 
 {
-	char *debug	    = NULL,
+	char *pwd,
+	     *debug	    = NULL,
+	     *broker	    = NULL,
+	     *topic	    = NULL,
 	     *outfile	    = NULL,
 	     *cartridge	    = NULL,
-	     *magazine_size = NULL;
+	     *magazine_size = NULL,
+	     *user	    = "tsem";
 
 	int opt,
 	    retn = 1;
@@ -804,7 +818,7 @@ extern int main(int argc, char *argv[])
 	struct sigaction signal_action;
 
 
-	while ( (opt = getopt(argc, argv, "CPSuc:d:h:n:o:p:")) != EOF )
+	while ( (opt = getopt(argc, argv, "CPSuU:b:c:d:h:n:o:p:t:")) != EOF )
 		switch ( opt ) {
 			case 'C':
 				Mode = cartridge_mode;
@@ -820,6 +834,13 @@ extern int main(int argc, char *argv[])
 				Current_Namespace = true;
 				break;
 
+			case 'U':
+				user = optarg;
+				break;
+
+			case 'b':
+				broker = optarg;
+				break;
 			case 'c':
 				cartridge = optarg;
 				break;
@@ -835,12 +856,15 @@ extern int main(int argc, char *argv[])
 			case 'o':
 				outfile = optarg;
 				break;
+			case 't':
+				topic = optarg;
+				break;
 		}
 
 
 	/* We need an output file. */
-	if ( outfile == NULL ) {
-		fputs("No output file specified.\n", stderr);
+	if ( (outfile == NULL) && (broker == NULL) ) {
+		fputs("No output method specified.\n", stderr);
 		goto done;
 	}
 
@@ -902,12 +926,23 @@ extern int main(int argc, char *argv[])
 	INIT(NAAAIM, TSEMevent, Event, ERR(goto done));
 	INIT(NAAAIM, TSEMcontrol, Control, ERR(goto done));
 
-	/* Open the output file. */
-	truncate(outfile, 0);
+	/* Handle output to a file. */
+	if ( outfile != NULL ) {
+		truncate(outfile, 0);
 
-	INIT(HurdLib, File, Output_File, ERR(goto done));
-	if ( !Output_File->open_rw(Output_File, outfile) )
-		ERR(goto done);
+		INIT(HurdLib, File, Output_File, ERR(goto done));
+		if ( !Output_File->open_rw(Output_File, outfile) )
+			ERR(goto done);
+	}
+
+	if ( broker != NULL ) {
+		pwd = getenv("TSEM_PASSWORD");
+
+		INIT(NAAAIM, MQTTduct, MQTT, ERR(goto done));
+		if ( !MQTT->init_publisher(MQTT, broker, 0, topic, user, pwd) )
+			ERR(goto done);
+	}
+
 
 	INIT(HurdLib, String, Output_String, ERR(goto done));
 
@@ -922,6 +957,7 @@ extern int main(int argc, char *argv[])
 
  done:
 	WHACK(Output_String);
+	WHACK(MQTT);
 	WHACK(Output_File);
 
 	WHACK(Control);

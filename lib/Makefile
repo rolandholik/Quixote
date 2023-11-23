@@ -21,17 +21,19 @@ INSTINCLUDE = ../NAAAIM.h AES256_cbc.h Base64.h Curve25519.h Duct.h	\
 	OTEDKS.h PossumPacket.h PossumPipe.h RSAkey.h RandomBuffer.h	\
 	SHA256.h  SHA256_hmac.h SmartCard.h SoftwareStatus.h		\
 	X509cert.h Prompt.h AES128_cmac.h TTYduct.h XENduct.h		\
-	TSEMcontrol.h TSEMevent.h TSEMparser.h
+	TSEMcontrol.h TSEMevent.h TSEMparser.h MQTTduct.h
 
 CSRC = Duct.c OTEDKS.c Curve25519.c IPC.c SoftwareStatus.c Ivy.c IDmgr.c     \
 	RSAkey.c LocalDuct.c HTTP.c Base64.c Duct_mgr.c SHA256.c	     \
 	SHA256_hmac.c RandomBuffer.c AES256_cbc.c IDtoken.c X509cert.c	     \
 	Prompt.c AES128_cmac.c TTYduct.c XENduct.c TSEMcontrol.c TSEMevent.c \
-	TSEMparser.c
+	TSEMparser.c MQTTduct.c
 
 TESTS = Duct_test Curve25519_test IPC_test RSAkey_test			\
 	LocalDuct_test X509cert_test Prompt_test AES128_cmac_test	\
-	TTYduct_test test-parser #SmartCard_test
+	TTYduct_test MQTTduct_test test-parser #SmartCard_test
+
+MOSQUITTO_LIB = -L ${TOPDIR}/Support/mosquitto/lib -l mosquitto -lssl
 
 LIBNAME = NAAAIM
 LIBRARY = lib${LIBNAME}.a
@@ -59,7 +61,8 @@ LDFLAGS = -g -L ../HurdLib
 #
 COBJS = ${CSRC:.c=.o}
 
-CINCLUDE := -I .. -I ../HurdLib -I /usr/local/Quixote/include
+CINCLUDE := -I .. -I ../HurdLib -I /usr/local/Quixote/include \
+	-I ../Support/mosquitto/include
 
 CFLAGS := ${CFLAGS} ${CINCLUDE}
 
@@ -112,6 +115,10 @@ TTYduct_test: TTYduct_test.o TTYduct.o
 SmartCard_test: SmartCard_test.o SmartCard.o
 	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib \
 		-L/usr/local/lib -lpcsclite
+
+MQTTduct_test: MQTTduct_test.o MQTTduct.o
+	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${MOSQUITTO_LIB} \
+		${BUILD_LIBCRYPTO}
 
 test-parser: test-parser.o TSEMparser.o
 	${CC} ${LDFLAGS} -o $@ $^ -L ../HurdLib -lHurdLib
@@ -166,3 +173,4 @@ AES128_cmac.o : AES128_cmac.h ../NAAAIM.h
 TTYduct.o: TTYduct.h ../NAAAIM.h
 XENduct.o: XENduct.h ../NAAAIM.h
 TSEMcontrol.o: TSEMcontrol.h ../NAAAIM.h
+MQTTduct.o: MQTTduct.h ../NAAAIM.h
