@@ -22,6 +22,8 @@
 #define READ_SIDE  0
 #define WRITE_SIDE 1
 
+#define TSEM_ROOT_EXPORT "/sys/kernel/security/tsem/ExternalTMA/0"
+
 #define _GNU_SOURCE
 
 #define GWHACK(type, var) {			\
@@ -149,6 +151,7 @@ struct {
  */
  enum {
 	 show_mode,
+	 root_mode,
 	 process_mode,
 	 cartridge_mode,
 } Mode = cartridge_mode;
@@ -796,6 +799,211 @@ static _Bool fire_cartridge(CO(char *, cartridge))
 }
 
 
+/**
+ * Private helper function.
+ *
+ * This function is a helper function for the export_root function.  This
+ * function reads a single event description and loads it into the
+ * supplied TSEMevent object.
+ *
+ * \param fd	The file descriptor of the pseudo-file from which the
+ *		event description is to be read.
+ *
+ * \param str	The object that the event description is to be read
+ *		into.
+ *
+ * \return	A boolean value is returned to reflect the status of
+ *		the read.  A false value indicates an error was
+ *		encountered while a true value indicates the output
+ *		structure was populated with an event.  The end of
+ *		the current event list is signaled by the str
+ *		object having a zero size upon return from the
+ *		function.
+ */
+
+static _Bool _get_event(const int fd, CO(String, str), _Bool *nodata)
+
+{
+	_Bool retn = false;
+
+	char bufr[PAGE_SIZE + 1];
+
+	int rc;
+
+
+	memset(bufr, '\0', sizeof(bufr));
+
+	rc = read(fd, bufr, sizeof(bufr));
+	if ( Signals.stop || (rc == 0) ) {
+		retn = true;
+		goto done;
+	}
+
+	if ( rc > 0 ) {
+		if ( !str->add(str, bufr) )
+			ERR(goto done);
+		if ( lseek(fd, 0, SEEK_SET) < 0 )
+			ERR(goto done);
+		retn = true;
+	} else {
+		if ( errno == ENODATA ) {
+			*nodata = true;
+			retn = true;
+		}
+		else
+			ERR(goto done);
+	}
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function is responsible for driving the export of events from
+ * the root security modeling namespace.
+ *
+ * \param follow	A boolean value used to indicate whether or
+ *			not the the security events should be tracked
+ *			after the current queue is read.
+ *
+ * \param queue_size	A pointer to a null-terminated buffer containing
+ *			the string representation of the size of the
+ *			queue of events to be implemented for output.
+ *
+ * \return	A boolean value is returned to reflect the status of
+ *		the export.  A false value indicates an error was
+ *		encountered while a true value indicates the export
+ *		of events was successfully completed.
+ */
+
+static _Bool export_root(const _Bool follow, CO(char *, queue_size))
+
+{
+	_Bool nodata = false,
+	      retn = false;
+
+	int rc,
+	    fd;
+
+	unsigned int cycle = 0;
+
+	long int queue_cnt    = 0,
+		 queue_length = 0;
+
+
+	struct pollfd poll_data[1];
+
+	String str = NULL;
+
+
+
+	/* Open the root export file. */
+	if ( (fd = open(TSEM_ROOT_EXPORT, O_RDONLY)) < 0 )
+		ERR(goto done);
+
+	/* Establish the queue size. */
+	queue_length = strtol(queue_size, NULL, 0);
+	if ( errno == ERANGE )
+		goto done;
+
+	/* Process queued entries. */
+	INIT(HurdLib, String, str, ERR(goto done));
+
+	while ( true ) {
+		if ( !_get_event(fd, str, &nodata) )
+			ERR(goto done);
+
+		if ( nodata )
+			break;
+
+		if ( ++queue_cnt > queue_length ) {
+			Event->reset(Event);
+			if ( !Event->set_event(Event, str) )
+				ERR(goto done);
+			if ( !output_event() )
+				ERR(goto done);
+			queue_cnt = 0;
+			str->reset(str);
+		}
+	}
+
+	/* Flush any queued entries before returning or following. */
+	if ( queue_cnt > queue_length ) {
+		Event->reset(Event);
+		if ( !Event->set_event(Event, str) )
+			ERR(goto done);
+		if ( !output_event() )
+			ERR(goto done);
+		queue_cnt = 0;
+		str->reset(str);
+	}
+
+	if ( !follow ) {
+		retn = true;
+		goto done;
+	}
+
+	/* Loop and output events as they are generated.. */
+	if ( Debug )
+		fprintf(Debug, "%d: Running root event loop.\n", getpid());
+
+	poll_data[0].fd	    = fd;
+	poll_data[0].events = POLLIN;
+
+	while ( 1 ) {
+		if ( Debug )
+			fprintf(Debug, "\n%d: Poll cycle: %d\n", getpid(), \
+				++cycle);
+
+		rc = poll(poll_data, 1, -1);
+		if ( rc < 0 ) {
+			if ( Signals.stop ) {
+				if ( Debug )
+					fputs("Quixote terminated.\n", Debug);
+				retn = true;
+				goto done;
+			}
+			ERR(goto done);
+		}
+
+		if ( Debug )
+			fprintf(Debug, "Poll retn=%d, Data poll=%0x\n", \
+				rc, poll_data[0].revents);
+
+		if ( poll_data[0].revents & POLLIN ) {
+			if ( !_get_event(fd, str, &nodata) )
+				ERR(goto done);
+			if ( ++queue_cnt > queue_length ) {
+				if ( !Event->set_event(Event, str) )
+					ERR(goto done);
+				if ( !output_event() )
+					ERR(goto done);
+				queue_cnt = 0;
+				str->reset(str);
+			}
+		}
+
+	}
+
+
+ done:
+	if ( queue_cnt > 0 ) {
+		if ( !Event->set_event(Event, str) )
+			ERR(goto done);
+		if ( !output_event() )
+			ERR(goto done);
+	}
+
+	WHACK(str);
+
+	return retn;
+}
+
+
 /*
  * Program entry point begins here.
  */
@@ -803,14 +1011,17 @@ static _Bool fire_cartridge(CO(char *, cartridge))
 extern int main(int argc, char *argv[])
 
 {
+	_Bool follow = false;
+
 	char *pwd,
 	     *debug	    = NULL,
 	     *broker	    = NULL,
 	     *topic	    = NULL,
-	     *outfile	    = NULL,
 	     *cartridge	    = NULL,
 	     *magazine_size = NULL,
-	     *user	    = "tsem";
+	     *queue_size    = "100",
+	     *user	    = "tsem",
+	     *outfile	    = "/dev/stdout";
 
 	int opt,
 	    retn = 1;
@@ -818,7 +1029,8 @@ extern int main(int argc, char *argv[])
 	struct sigaction signal_action;
 
 
-	while ( (opt = getopt(argc, argv, "CPSuU:b:c:d:h:n:o:p:t:")) != EOF )
+	while ( (opt = getopt(argc, argv, "CPRSfuU:b:c:d:h:n:o:p:q:t:")) != \
+		EOF )
 		switch ( opt ) {
 			case 'C':
 				Mode = cartridge_mode;
@@ -826,10 +1038,16 @@ extern int main(int argc, char *argv[])
 			case 'P':
 				Mode = process_mode;
 				break;
+			case 'R':
+				Mode = root_mode;
+				break;
 			case 'S':
 				Mode = show_mode;
 				break;
 
+			case 'f':
+				follow = true;
+				break;
 			case 'u':
 				Current_Namespace = true;
 				break;
@@ -855,6 +1073,9 @@ extern int main(int argc, char *argv[])
 				break;
 			case 'o':
 				outfile = optarg;
+				break;
+			case 'q':
+				queue_size = optarg;
 				break;
 			case 't':
 				topic = optarg;
@@ -909,8 +1130,6 @@ extern int main(int argc, char *argv[])
 		goto done;
 	if ( sigaction(SIGQUIT, &signal_action, NULL) == -1 )
 		goto done;
-	if ( sigaction(SIGSEGV, &signal_action, NULL) == -1 )
-		goto done;
 	if ( sigaction(SIGFPE, &signal_action, NULL) == -1 )
 		goto done;
 	if ( sigaction(SIGILL, &signal_action, NULL) == -1 )
@@ -928,7 +1147,8 @@ extern int main(int argc, char *argv[])
 
 	/* Handle output to a file. */
 	if ( outfile != NULL ) {
-		truncate(outfile, 0);
+		if ( strcmp(outfile, "/dev/stdout") != 0 )
+			truncate(outfile, 0);
 
 		INIT(HurdLib, File, Output_File, ERR(goto done));
 		if ( !Output_File->open_rw(Output_File, outfile) )
@@ -938,6 +1158,11 @@ extern int main(int argc, char *argv[])
 	if ( broker != NULL ) {
 		pwd = getenv("TSEM_PASSWORD");
 
+		if ( topic == NULL ) {
+			fputs("No broker topic specified.\n", stderr);
+			goto done;
+		}
+
 		INIT(NAAAIM, MQTTduct, MQTT, ERR(goto done));
 		if ( !MQTT->init_publisher(MQTT, broker, 0, topic, user, pwd) )
 			ERR(goto done);
@@ -945,6 +1170,13 @@ extern int main(int argc, char *argv[])
 
 
 	INIT(HurdLib, String, Output_String, ERR(goto done));
+
+	/* Export the root security modeling domain. */
+	if ( Mode == root_mode ) {
+		if ( export_root(follow, queue_size) )
+			retn = 0;
+		goto done;
+	}
 
 	/* Fire the workload cartridge. */
 	if ( Debug )
