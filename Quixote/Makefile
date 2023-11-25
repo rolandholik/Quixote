@@ -29,16 +29,16 @@ SANCHODIR = ../Sancho
 SANCHOSGX = ${SANCHODIR}/SGX
 
 CSRC = quixote.c quixote-mcu.c quixote-sgx.c quixote-sgx-u.c		\
-	quixote-console.c quixote-xen.c quixote-export.c quixote-cat	\
-	test-sancho.c test-sancho-xen.c
+	quixote-console.c quixote-xen.c quixote-export.c test-sancho.c	\
+	test-sancho-xen.c
 
 TOOLS = quixote quixote-mcu quixote-us quixote-sgx quixote-sgx-u quixote-xen \
-	quixote-console quixote-export quixote-cat test-sancho test-thread   \
+	quixote-console quixote-export test-sancho test-thread		     \
 	test-sancho-xen test-domain-creation
 
 INSTALLBIN  = quixote-console
 INSTALLSBIN = quixote quixote-mcu quixote-us quixote-sgx quixote-sgx-u \
-	quixote-xen quixote-export quixote-cat
+	quixote-xen quixote-export
 INSTALLSCRIPTS = setup-quixote-xen
 
 ifeq ("${KERNEL_VERSION}","5.4")
@@ -141,9 +141,6 @@ quixote-xen.o: quixote-xen.c
 
 quixote-export: quixote-export.o ${LIBDEPS} ${MODELDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${MODELDEPS} ${LIBS} ${MOSQUITTO_LIB};
-
-quixote-cat: quixote-cat.o ${LIBDEPS}
-	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
 
 quixote-console: quixote-console.o ${LIBDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
