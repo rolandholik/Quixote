@@ -310,6 +310,7 @@ static _Bool output_event()
 {
 	_Bool retn = false;
 
+
 	Output_String->reset(Output_String);
 	if ( !Output_String->add(Output_String, Event->get_event(Event)) )
 		ERR(goto done);
@@ -320,8 +321,6 @@ static _Bool output_event()
 	}
 
 	if ( Output_File != NULL ) {
-		if ( !Output_String->add(Output_String, "\n") )
-			ERR(goto done);
 		if ( !Output_File->write_String(Output_File, Output_String) )
 			ERR(goto done);
 	}
