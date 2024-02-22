@@ -75,15 +75,16 @@ static _Bool do_path(CO(String, path))
 
 	uint32_t length = path->size(path);
 
-	Buffer b,
-	       bufr = NULL;
+	Buffer bufr = NULL;
 
 	Sha256 pseudonym = NULL;
 
 
-	/* Hash the name of the string. */
+	/* Add the length of the path and the path itself. */
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	if ( !bufr->add(bufr, (void *) path->get(path), path->size(path)) )
+	if ( !bufr->add(bufr, (void *) &length, sizeof(length)) )
+		ERR(goto done);
+	if ( !bufr->add(bufr, (void *) path->get(path), length) )
 		ERR(goto done);
 
 	INIT(NAAAIM, Sha256, pseudonym, ERR(goto done));
@@ -91,29 +92,9 @@ static _Bool do_path(CO(String, path))
 		ERR(goto done);
 	if ( !pseudonym->compute(pseudonym) )
 		ERR(goto done);
-	b = pseudonym->get_Buffer(pseudonym);
 
-
-	/* Collect the pseudonym components. */
-	bufr->reset(bufr);
-	if ( !bufr->add(bufr, (void *) &length, sizeof(length)) )
-		ERR(goto done);
-	if ( !bufr->add_Buffer(bufr, b) )
-		ERR(goto done);
-
-
-	/* Hash the pseudonym components. */
-	pseudonym->reset(pseudonym);
-	if ( !pseudonym->add(pseudonym, bufr) )
-		ERR(goto done);
-	if ( !pseudonym->compute(pseudonym) )
-		ERR(goto done);
-
-	bufr->reset(bufr);
-	if ( !bufr->add_Buffer(bufr, b) )
-		ERR(goto done);
 	fputs("pseudonym ", stdout);
-	bufr->print(bufr);
+	pseudonym->print(pseudonym);
 
 	retn = true;
 
