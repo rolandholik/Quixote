@@ -147,6 +147,10 @@ static const char *TSEM_name[] = {
 	"bpf",
 	"bpf_map",
 	"bpf_prog",
+	"ptrace_access_check",
+	"capable",
+	"capget",
+	"capset",
 	NULL
 };
 

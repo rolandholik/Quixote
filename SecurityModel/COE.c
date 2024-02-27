@@ -469,7 +469,7 @@ static _Bool format(CO(COE, this), CO(String, event))
 				  "\"euid\": \"%lu\", \"suid\": \"%lu\", "  \
 				  "\"gid\": \"%lu\", \"egid\": \"%lu\",  "  \
 				  "\"sgid\": \"%lu\", \"fsuid\": \"%lu\", " \
-				  "\"fsgidb\": \"%lu\", \"capeff\": "	    \
+				  "\"fsgid\": \"%lu\", \"capeff\": "	    \
 				  "\"0x%llx\"}",			    \
 		       (unsigned long int) S->character.uid,		    \
 		       (unsigned long int) S->character.euid,		    \
