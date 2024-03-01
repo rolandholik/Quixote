@@ -467,7 +467,7 @@ static _Bool format(CO(COE, this), CO(String, event))
 	/* Generate the COE string and add it. */
 	retn = event->add_sprintf(event, "\"COE\": {\"uid\": \"%lu\", "	    \
 				  "\"euid\": \"%lu\", \"suid\": \"%lu\", "  \
-				  "\"gid\": \"%lu\", \"egid\": \"%lu\",  "  \
+				  "\"gid\": \"%lu\", \"egid\": \"%lu\", "   \
 				  "\"sgid\": \"%lu\", \"fsuid\": \"%lu\", " \
 				  "\"fsgid\": \"%lu\", \"capeff\": "	    \
 				  "\"0x%llx\"}",			    \
