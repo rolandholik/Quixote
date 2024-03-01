@@ -68,21 +68,30 @@ const char zero_message[NAAAIM_IDSIZE] = {
 };
 
 
-/* File characteristics. */
-struct file_parameters {
-	uint32_t flags;
-
+/* Definition for an inode. */
+struct inode {
 	uint32_t uid;
 	uint32_t gid;
 	uint16_t mode;
 
-	String name;
-
 	uint32_t s_magic;
 	char s_id[32];
 	uint8_t s_uuid[16];
+};
 
+struct path {
+	uint32_t major;
+	uint32_t minor;
+	String pathname;
+};
+
+/* File characteristics. */
+struct file_parameters {
+	uint32_t flags;
 	char digest[NAAAIM_IDSIZE];
+
+	struct inode inode;
+	struct path path;
 };
 
 /* File mmap parameters. */
@@ -199,9 +208,10 @@ static void _init_state(CO(Cell_State, S))
 
 	memset(&S->file, '\0', sizeof(struct file_parameters));
 
-	S->measured = false;
-	S->event    = NULL;
-	S->identity = NULL;
+	S->measured	      = false;
+	S->event	      = NULL;
+	S->identity	      = NULL;
+	S->file.path.pathname = NULL;
 
 	return;
 }
@@ -373,12 +383,8 @@ static _Bool _get_text(CO(TSEMparser, parser), CO(char *, field), \
  * \param S	The state information for the Cell that the file information
  *		is being parsed into.
  *
- * \param entry	The object containing the definition of the event that
+ * \param event	The object containing the definition of the event that
  *		is to be parsed.
- *
- * \param key	A pointer to the character buffer containing a
- *		null-terminated string describing the key that is
- *		to be used to retrieve the file information.
  *
  * \return	A boolean value is used to indicate the success or
  *		failure of the parsing.  A false value indicates the
@@ -387,7 +393,7 @@ static _Bool _get_text(CO(TSEMparser, parser), CO(char *, field), \
  *		populated.
  */
 
-static _Bool _parse_file(CO(Cell_State, S), CO(String, entry), CO(char *, key))
+static _Bool parse_file_open(CO(Cell_State, S), CO(String, event))
 
 {
 	_Bool retn = false;
@@ -397,45 +403,69 @@ static _Bool _parse_file(CO(Cell_State, S), CO(String, entry), CO(char *, key))
 	TSEMparser parser = NULL;
 
 
-	/* Extract the file field. */
+	/* Extract the file_open and then the file field. */
 	INIT(NAAAIM, TSEMparser, parser, ERR(goto done));
-	if ( !parser->extract_field(parser, entry, key) )
+	if ( !parser->extract_field(parser, event, "file_open") )
 		ERR(goto done);
 
-	/* Parse field entries. */
+	event->reset(event);
+	if ( !parser->get_field(parser, event) )
+		ERR(goto done);
+
+
+	/* Parse the key values from the file{} structure.. */
 	if ( !_get_field(parser, "flags", &value) )
 		ERR(goto done);
 	S->file.flags = value;
 
+	if ( !_get_digest(parser, "digest", (uint8_t *) S->file.digest, \
+			  NAAAIM_IDSIZE) )
+		ERR(goto done);
+
+
+	/* Parse the inode structure. */
+	if ( !parser->extract_field(parser, event, "inode") )
+		ERR(goto done);
+
 	if ( !_get_field(parser, "uid", &value) )
 		ERR(goto done);
-	S->file.uid = value;
+	S->file.inode.uid = value;
 
 	if ( !_get_field(parser, "gid", &value) )
 		ERR(goto done);
-	S->file.gid = value;
+	S->file.inode.gid = value;
 
 	if ( !_get_field(parser, "mode", &value) )
 		ERR(goto done);
-	S->file.mode = value;
-
-	if ( !parser->get_text(parser, "path", S->file.name) )
-		ERR(goto done);
+	S->file.inode.mode = value;
 
 	if ( !_get_field(parser, "s_magic", &value) )
 		ERR(goto done);
-	S->file.s_magic = value;
+	S->file.inode.s_magic = value;
 
-	if ( !_get_text(parser, "s_id", (uint8_t *) S->file.s_id, \
-			sizeof(S->file.s_id)) )
+	if ( !_get_text(parser, "s_id", (uint8_t *) S->file.inode.s_id, \
+			sizeof(S->file.inode.s_id)) )
 		ERR(goto done);
 
-	if ( !_get_digest(parser, "s_uuid", S->file.s_uuid, \
-			  sizeof(S->file.s_uuid)) )
+	if ( !_get_digest(parser, "s_uuid", S->file.inode.s_uuid, \
+			  sizeof(S->file.inode.s_uuid)) )
 		ERR(goto done);
 
-	if ( !_get_digest(parser, "digest", (uint8_t *) S->file.digest, \
-			  NAAAIM_IDSIZE) )
+
+	/* Parse the path description and extract pathname. */
+	if ( !parser->extract_field(parser, event, "path") )
+		ERR(goto done);
+
+	if ( !parser->get_text(parser, "pathname", S->file.path.pathname) )
+		ERR(goto done);
+
+
+	/* Extract the device information. */
+	if ( !parser->extract_field(parser, event, "dev") )
+		ERR(goto done);
+	if ( !_get_field(parser, "major", &S->file.path.major) )
+		ERR(goto done);
+	if ( !_get_field(parser, "minor", &S->file.path.minor) )
 		ERR(goto done);
 
 	retn = true;
@@ -483,9 +513,6 @@ static _Bool _parse_mmap_file(CO(Cell_State, S), CO(String, entry))
 
 	/* Parse field entries. */
 	if ( !_get_field(parser, "type", &S->mmap_file.anonymous) )
-		ERR(goto done);
-
-	if ( !_get_field(parser, "reqprot", &S->mmap_file.reqprot) )
 		ERR(goto done);
 
 	if ( !_get_field(parser, "prot", &S->mmap_file.prot) )
@@ -928,7 +955,7 @@ static _Bool parse(CO(Cell, this), CO(String, entry), \
 
 	switch ( S->type ) {
 		case TSEM_FILE_OPEN:
-			if ( !_parse_file(S, entry, "file_open") )
+			if ( !parse_file_open(S, entry) )
 				ERR(goto done);
 			break;
 
@@ -936,7 +963,7 @@ static _Bool parse(CO(Cell, this), CO(String, entry), \
 			if ( !_parse_mmap_file(S, entry) )
 				ERR(goto done);
 			if ( !S->mmap_file.anonymous ) {
-				if ( !_parse_file(S, entry, "file") )
+				if ( !parse_file_open(S, entry) )
 					ERR(goto done);
 			}
 			break;
@@ -1000,42 +1027,50 @@ static _Bool _measure_file(CO(Cell_State, S))
 
 	uint32_t name_length;
 
-	Buffer b,
-	       bufr = NULL;
+	struct inode *i;
+
+	Buffer bufr = NULL;
+
+	String s;
 
 	Sha256 sha256 = NULL;
 
 
-	/* Compute digest of filename */
-	name_length = S->file.name->size(S->file.name);
-
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	if ( !bufr->add(bufr, (void *) S->file.name->get(S->file.name), \
-			name_length) )
+	if ( !bufr->add(bufr, (void *) &S->file.flags, sizeof(S->file.flags)) )
 		ERR(goto done);
 
-	INIT(NAAAIM, Sha256, sha256, ERR(goto done));
-	sha256->add(sha256, bufr);
-	if ( !sha256->compute(sha256) )
-		ERR(goto done);
-	b = sha256->get_Buffer(sha256);
+	/* Add inode information .*/
+	i = &S->file.inode;
+	bufr->add(bufr, (void *) &i->uid, sizeof(i->uid));
+	bufr->add(bufr, (void *) &i->gid, sizeof(i->gid));
+	bufr->add(bufr, (void *) &i->mode, sizeof(i->mode));
+	bufr->add(bufr, (void *) &i->s_magic, sizeof(i->s_magic));
+	bufr->add(bufr, (void *) &i->s_id, sizeof(i->s_id));
+	bufr->add(bufr, (void *) &i->s_uuid, sizeof(i->s_uuid));
 
-	/* Add the file characteristics. */
-	bufr->reset(bufr);
-	bufr->add(bufr, (void *) &S->file.flags, sizeof(S->file.flags));
-	bufr->add(bufr, (void *) &S->file.uid, sizeof(S->file.uid));
-	bufr->add(bufr, (void *) &S->file.gid, sizeof(S->file.gid));
-	bufr->add(bufr, (void *) &S->file.mode, sizeof(S->file.mode));
-	bufr->add(bufr, (void *) &name_length, sizeof(name_length));
-	bufr->add(bufr, (void *) b->get(b), b->size(b));
-	bufr->add(bufr, (void *) &S->file.s_magic, sizeof(S->file.s_magic));
-	bufr->add(bufr, (void *) S->file.s_id, sizeof(S->file.s_id));
-	bufr->add(bufr, (void *) S->file.s_uuid, sizeof(S->file.s_uuid));
+	/* Add path information .*/
+	s = S->file.path.pathname;
+
+	name_length = s->size(s);
+	if ( !bufr->add(bufr, (void *) &name_length, sizeof(name_length)) )
+		ERR(goto done);
+
+	if ( !bufr->add(bufr, (void *) s->get(s), s->size(s)) )
+		ERR(goto done);
+
+	/* Add the digest value of the file. */
 	if ( !bufr->add(bufr, (void *) S->file.digest, \
 			sizeof(S->file.digest)) )
 		ERR(goto done);
 
-	if ( !S->identity->add(S->identity, bufr) )
+	/* Compute identity of the event. */
+	INIT(NAAAIM, Sha256, sha256, ERR(goto done));
+	sha256->add(sha256, bufr);
+	if ( !sha256->compute(sha256) )
+		ERR(goto done);
+
+	if ( !S->identity->add(S->identity, sha256->get_Buffer(sha256)) )
 		ERR(goto done);
 	retn = true;
 
@@ -1576,11 +1611,9 @@ static _Bool get_pseudonym(CO(Cell, this), CO(Buffer, bufr))
 
 	_Bool retn = false;
 
-	char *np;
-
 	uint32_t size;
 
-	Buffer b;
+	String pathname = S->file.path.pathname;
 
 	Sha256 pseudonym = NULL;
 
@@ -1590,42 +1623,27 @@ static _Bool get_pseudonym(CO(Cell, this), CO(Buffer, bufr))
 		ERR(goto done);
 	if ( bufr->poisoned(bufr) )
 		ERR(goto done);
-	if ( (np = S->file.name->get(S->file.name)) == NULL )
+	if ( pathname->get(pathname) == NULL )
 		return true;
 
+
 	/* Hash the filename. */
-	INIT(NAAAIM, Sha256, pseudonym, ERR(goto done));
-
-	size = S->file.name->size(S->file.name);
-
 	bufr->reset(bufr);
-	if ( !bufr->add(bufr, (void *) np, size) )
-		ERR(goto done);
-
-	if ( !pseudonym->add(pseudonym, bufr) )
-		ERR(goto done);
-	if ( !pseudonym->compute(pseudonym) )
-		ERR(goto done);
-	b = pseudonym->get_Buffer(pseudonym);
-
-	/* Hash the pseudonym components. */
-	bufr->reset(bufr);
-
+	size = pathname->size(pathname);
 	if ( !bufr->add(bufr, (void *) &size, sizeof(size)) )
 		ERR(goto done);
 
-	if ( !bufr->add_Buffer(bufr, b) )
+	if ( !bufr->add(bufr, (void *) pathname->get(pathname), size) )
 		ERR(goto done);
 
-	pseudonym->reset(pseudonym);
+	INIT(NAAAIM, Sha256, pseudonym, ERR(goto done));
 	if ( !pseudonym->add(pseudonym, bufr) )
 		ERR(goto done);
 	if ( !pseudonym->compute(pseudonym) )
 		ERR(goto done);
-	b = pseudonym->get_Buffer(pseudonym);
 
 	bufr->reset(bufr);
-	if ( !bufr->add_Buffer(bufr, b) )
+	if ( !bufr->add_Buffer(bufr, pseudonym->get_Buffer(pseudonym)) )
 		ERR(goto done);
 
 	retn = true;
@@ -1714,47 +1732,52 @@ static _Bool _format_file(CO(Cell_State, S), CO(String, str))
 
 	unsigned int lp;
 
+	struct inode *inode = &S->file.inode;
+
 
 	/* Write the formatted string to the String object. */
-	name = S->file.name->get(S->file.name);
-	if ( !str->add_sprintf(str, "\"file_open\": {\"flags\": \"%lu\", " \
-			       "\"uid\": \"%lu\", \"gid\": \"%lu\", "	   \
-			       "\"mode\": \"0%lo\", \"path\": \"%s\"",	   \
-			       (unsigned long int) S->file.flags,	   \
-			       (unsigned long int) S->file.uid,		   \
-			       (unsigned long int) S->file.gid,		   \
-			       (unsigned long int) S->file.mode,	   \
-			       (unsigned long int) name) )
+	name = S->file.path.pathname->get(S->file.path.pathname);
+	if ( !str->add(str, "\"file_open\": {\"file\": {") )
+		ERR(goto done);
+	if ( !str->add_sprintf(str, "\"flags\": \"%lu\", ", S->file.flags) )
+		ERR(goto done);
+	if ( !str->add_sprintf(str, "\"inode\": {\"uid\": \"%lu\", "	   \
+			       "\"gid\": \"%lu\", \"mode\": \"0%lo\", "	   \
+			       "\"s_magic\": \"0x%x\", \"s_id\": \"%s\", " \
+			       "\"s_uuid\": \"",
+			       (unsigned long int) inode->uid,
+			       (unsigned long int) inode->gid,
+			       (unsigned long int) inode->mode,
+			       inode->s_magic, inode->s_id) )
 		ERR(goto done);
 
 
-	/* , s_magic=%0x, s_id=%s, s_uuid=%*phN */
-	if ( !str->add_sprintf(str, ", \"s_magic\": \"0x%0x\", \"s_id\": " \
-			       "\"%s\", \"s_uuid\": \"", \
-			       S->file.s_magic, S->file.s_id) )
-		ERR(goto done);
-
-	for (lp= 0; lp < sizeof(S->file.s_uuid); ++lp) {
+	for (lp= 0; lp < sizeof(inode->s_uuid); ++lp) {
 		if ( !str->add_sprintf(str, "%02x", \
-				       (unsigned char) S->file.s_uuid[lp]) )
+				       (unsigned char) inode->s_uuid[lp]) )
 		     ERR(goto done);
 	}
 
-	/* , digest=%*phN */
-	if ( !str->add_sprintf(str, "\", \"%s\": \"", "digest") )
+	/* Path description. */
+	if ( !str->add_sprintf(str, "\"}, \"path\": {\"dev\": {"	 \
+			       "\"major\": \"%u\", \"minor\": \"%u\"}, " \
+			       "\"pathname\": \"%s\"}, \"digest\": \"",	 \
+			       S->file.path.major, S->file.path.minor,
+			       name) )
 		ERR(goto done);
 
+	/* File digest. */
 	for (lp= 0; lp < sizeof(S->file.digest); ++lp) {
 		if ( !str->add_sprintf(str, "%02x",
 				       (unsigned char) S->file.digest[lp]) )
 		     ERR(goto done);
 	}
 
-	/* } */
-	if ( !str->add_sprintf(str, "\"}") )
+	/* Ending squiggles. */
+	if ( !str->add_sprintf(str, "\"}}") )
 		ERR(goto done);
-
 	retn = true;
+
 
  done:
 	if ( !retn )
@@ -2146,7 +2169,7 @@ static void reset(CO(Cell, this))
 	S->poisoned = false;
 	S->measured = false;
 
-	S->file.name->reset(S->file.name);
+	S->file.path.pathname->reset(S->file.path.pathname);
 
 	S->event->reset(S->event);
 	S->identity->reset(S->identity);
@@ -2167,6 +2190,10 @@ static void reset(CO(Cell, this))
 void _dump_file(CO(Cell_State, S))
 
 {
+	struct inode *ip = &S->file.inode;
+
+	struct path *pp = &S->file.path;
+
 	Buffer bufr = NULL;
 
 
@@ -2174,16 +2201,16 @@ void _dump_file(CO(Cell_State, S))
 
 	fprintf(stdout, "flags: %u\n", S->file.flags);
 
-	fprintf(stdout, "uid:   %lu\n", (unsigned long int) S->file.uid);
-	fprintf(stdout, "gid:   %lu\n", (unsigned long int) S->file.gid);
-	fprintf(stdout, "mode:  0%lo\n",(unsigned long int) S->file.mode);
-	fprintf(stdout, "name:  %s\n", S->file.name->get(S->file.name));
+	fprintf(stdout, "uid:   %lu\n", (unsigned long int) ip->uid);
+	fprintf(stdout, "gid:   %lu\n", (unsigned long int) ip->gid);
+	fprintf(stdout, "mode:  0%lo\n",(unsigned long int) ip->mode);
+	fprintf(stdout, "name:  %s\n", pp->pathname->get(pp->pathname));
 
-	fprintf(stdout, "s_magic: 0x%x\n", S->file.s_magic);
-	fprintf(stdout, "s_id:    %s\n", S->file.s_id);
+	fprintf(stdout, "s_magic: 0x%x\n", ip->s_magic);
+	fprintf(stdout, "s_id:    %s\n", ip->s_id);
 
-	if ( !bufr->add(bufr, (unsigned char *) S->file.s_uuid,
-			sizeof(S->file.s_uuid)) )
+	if ( !bufr->add(bufr, (unsigned char *) ip->s_uuid, \
+			sizeof(ip->s_uuid)) )
 		ERR(goto done);
 	fputs("s_uuid:  ", stdout);
 	bufr->print(bufr);
@@ -2485,7 +2512,7 @@ static void whack(CO(Cell, this))
 	STATE(S);
 
 
-	WHACK(S->file.name);
+	WHACK(S->file.path.pathname);
 	WHACK(S->event);
 	WHACK(S->identity);
 
@@ -2529,7 +2556,7 @@ extern Cell NAAAIM_Cell_Init(void)
 	_init_state(this->state);
 
 	/* Initialize aggregate objects. */
-	INIT(HurdLib, String, this->state->file.name, ERR(goto fail));
+	INIT(HurdLib, String, this->state->file.path.pathname, ERR(goto fail));
 	INIT(HurdLib, String, this->state->event, ERR(goto fail));
 	INIT(NAAAIM, Sha256, this->state->identity, ERR(goto fail));
 
@@ -2551,7 +2578,7 @@ extern Cell NAAAIM_Cell_Init(void)
 	return this;
 
 fail:
-	WHACK(this->state->file.name);
+	WHACK(this->state->file.path.pathname);
 	WHACK(this->state->event);
 	WHACK(this->state->identity);
 
