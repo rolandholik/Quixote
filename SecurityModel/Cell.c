@@ -96,8 +96,7 @@ struct file_parameters {
 
 /* File mmap parameters. */
 struct mmap_file_parameters {
-	uint32_t anonymous;
-	uint32_t reqprot;
+	bool have_file;
 	uint32_t prot;
 	uint32_t flags;
 };
@@ -214,6 +213,50 @@ static void _init_state(CO(Cell_State, S))
 	S->file.path.pathname = NULL;
 
 	return;
+}
+
+
+/**
+ * Internal private function.
+ *
+ * This method extracts a 16 bit unsigned integer from a JSON field.
+ *
+ * \param parser	The parser object used to extract the field
+ *			description.
+ *
+ * \param field		The description of the integer field to extract.
+ *
+ * \param value		A pointer to the variable which will be loaded
+ *			with the parsed value.
+ *
+ * \return	A boolean value is used to indicate the success or
+ *		failure of extraction of the value.  A false value is
+ *		used to indicate a failure occurred during the
+ *		extraction.  A true value indicates the value has
+ *		been successfully extracted and contains a legitimate
+ *		value.
+ */
+
+static _Bool _get_u16(CO(TSEMparser, parser), CO(char *, field), \
+		      uint16_t *value)
+
+{
+	_Bool retn = false;
+
+	long long int vl;
+
+
+	if ( !parser->get_integer(parser, field, &vl) )
+		ERR(goto done);
+	if ( (unsigned long long int) vl > UINT16_MAX )
+		ERR(goto done);
+
+	*value = (uint16_t) vl;
+	retn = true;
+
+
+ done:
+	return retn;
 }
 
 
@@ -375,6 +418,98 @@ static _Bool _get_text(CO(TSEMparser, parser), CO(char *, field), \
 
 
 /**
+ * Internal helper function.
+ *
+ * This function implements the parsing of a JSON file structure into
+ * it the file_parameters structure.
+ *
+ * \param parser	The parser object used to parse the event
+ *			description.
+ *
+ * \param event		The structure containing the JSON description
+ *			that is holding a JSON file structure description.
+ *
+ * \param fp		A pointer to the file_parameters structure that
+ *			file description parameters will be parsed into.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not the parsing succeeded.  A false value
+ *			indicates a parsing error while a true value
+ *			indicates the structure pointed to by the fp
+ *			argument was properly populated.
+ */
+
+static _Bool _parse_file(CO(TSEMparser, parser), CO(String, event), \
+			 struct file_parameters *fp)
+
+{
+	_Bool retn = false;
+
+
+	/* Extract the file field. */
+	if ( !parser->extract_field(parser, event, "file") )
+		ERR(goto done);
+
+	event->reset(event);
+	if ( !parser->get_field(parser, event) )
+		ERR(goto done);
+
+	/* Parse the native keys from the file{} structure.. */
+	if ( !_get_field(parser, "flags", &fp->flags) )
+		ERR(goto done);
+
+	if ( !_get_digest(parser, "digest", (uint8_t *) fp->digest,
+			  NAAAIM_IDSIZE) )
+		ERR(goto done);
+
+	/* Parse the inode structure. */
+	if ( !parser->extract_field(parser, event, "inode") )
+		ERR(goto done);
+
+	if ( !_get_field(parser, "uid", &fp->inode.uid) )
+		ERR(goto done);
+
+	if ( !_get_field(parser, "gid", &fp->inode.gid) )
+		ERR(goto done);
+
+	if ( !_get_u16(parser, "mode", &fp->inode.mode) )
+		ERR(goto done);
+
+	if ( !_get_field(parser, "s_magic", &fp->inode.s_magic) )
+		ERR(goto done);
+
+	if ( !_get_text(parser, "s_id", (uint8_t *) fp->inode.s_id, \
+			sizeof(fp->inode.s_id)) )
+		ERR(goto done);
+
+	if ( !_get_digest(parser, "s_uuid", fp->inode.s_uuid, \
+			  sizeof(fp->inode.s_uuid)) )
+		ERR(goto done);
+
+	/* Parse the path description and extract pathname. */
+	if ( !parser->extract_field(parser, event, "path") )
+		ERR(goto done);
+
+	if ( !parser->get_text(parser, "pathname", fp->path.pathname) )
+		ERR(goto done);
+
+	/* Extract the device information. */
+	if ( !parser->extract_field(parser, event, "dev") )
+		ERR(goto done);
+	if ( !_get_field(parser, "major", &fp->path.major) )
+		ERR(goto done);
+	if ( !_get_field(parser, "minor", &fp->path.minor) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
  * Internal public method.
  *
  * This method implements parsing the characteristics of a file definition
@@ -398,8 +533,6 @@ static _Bool parse_file_open(CO(Cell_State, S), CO(String, event))
 {
 	_Bool retn = false;
 
-	uint32_t value;
-
 	TSEMparser parser = NULL;
 
 
@@ -408,64 +541,8 @@ static _Bool parse_file_open(CO(Cell_State, S), CO(String, event))
 	if ( !parser->extract_field(parser, event, "file_open") )
 		ERR(goto done);
 
-	event->reset(event);
-	if ( !parser->get_field(parser, event) )
-		ERR(goto done);
-
-
-	/* Parse the key values from the file{} structure.. */
-	if ( !_get_field(parser, "flags", &value) )
-		ERR(goto done);
-	S->file.flags = value;
-
-	if ( !_get_digest(parser, "digest", (uint8_t *) S->file.digest, \
-			  NAAAIM_IDSIZE) )
-		ERR(goto done);
-
-
-	/* Parse the inode structure. */
-	if ( !parser->extract_field(parser, event, "inode") )
-		ERR(goto done);
-
-	if ( !_get_field(parser, "uid", &value) )
-		ERR(goto done);
-	S->file.inode.uid = value;
-
-	if ( !_get_field(parser, "gid", &value) )
-		ERR(goto done);
-	S->file.inode.gid = value;
-
-	if ( !_get_field(parser, "mode", &value) )
-		ERR(goto done);
-	S->file.inode.mode = value;
-
-	if ( !_get_field(parser, "s_magic", &value) )
-		ERR(goto done);
-	S->file.inode.s_magic = value;
-
-	if ( !_get_text(parser, "s_id", (uint8_t *) S->file.inode.s_id, \
-			sizeof(S->file.inode.s_id)) )
-		ERR(goto done);
-
-	if ( !_get_digest(parser, "s_uuid", S->file.inode.s_uuid, \
-			  sizeof(S->file.inode.s_uuid)) )
-		ERR(goto done);
-
-
-	/* Parse the path description and extract pathname. */
-	if ( !parser->extract_field(parser, event, "path") )
-		ERR(goto done);
-
-	if ( !parser->get_text(parser, "pathname", S->file.path.pathname) )
-		ERR(goto done);
-
-
-	/* Extract the device information. */
-	if ( !parser->extract_field(parser, event, "dev") )
-		ERR(goto done);
-	if ( !_get_field(parser, "major", &S->file.path.major) )
-		ERR(goto done);
-	if ( !_get_field(parser, "minor", &S->file.path.minor) )
+	/* Parse the file{} structure. */
+	if ( !_parse_file(parser, event, &S->file) )
 		ERR(goto done);
 
 	retn = true;
@@ -497,7 +574,7 @@ static _Bool parse_file_open(CO(Cell_State, S), CO(String, event))
  *		populated.
  */
 
-static _Bool _parse_mmap_file(CO(Cell_State, S), CO(String, entry))
+static _Bool parse_mmap_file(CO(Cell_State, S), CO(String, entry))
 
 {
 	_Bool retn = false;
@@ -510,17 +587,22 @@ static _Bool _parse_mmap_file(CO(Cell_State, S), CO(String, entry))
 	if ( !parser->extract_field(parser, entry, "mmap_file") )
 		ERR(goto done);
 
-
-	/* Parse field entries. */
-	if ( !_get_field(parser, "type", &S->mmap_file.anonymous) )
-		ERR(goto done);
-
+	/* Parse mmap arguments. */
 	if ( !_get_field(parser, "prot", &S->mmap_file.prot) )
 		ERR(goto done);
 
 	if ( !_get_field(parser, "flags", &S->mmap_file.flags) )
 		ERR(goto done);
 
+	/* Parse the file definition if this is a file based mapping. */
+	S->mmap_file.have_file = parser->has_key(parser, "file");
+	if ( !S->mmap_file.have_file ) {
+		retn = true;
+		goto done;
+	}
+
+	if ( !_parse_file(parser, entry, &S->file) )
+		ERR(goto done);
 	retn = true;
 
 
@@ -960,12 +1042,8 @@ static _Bool parse(CO(Cell, this), CO(String, entry), \
 			break;
 
 		case TSEM_MMAP_FILE:
-			if ( !_parse_mmap_file(S, entry) )
+			if ( !parse_mmap_file(S, entry) )
 				ERR(goto done);
-			if ( !S->mmap_file.anonymous ) {
-				if ( !parse_file_open(S, entry) )
-					ERR(goto done);
-			}
 			break;
 
 		case TSEM_SOCKET_CREATE:
@@ -1111,10 +1189,6 @@ static _Bool _measure_mmap_file(CO(Cell_State, S))
 
 
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
-	p = (unsigned char *) &S->mmap_file.reqprot;
-	size = sizeof(S->mmap_file.reqprot);
-	bufr->add(bufr, p, size);
-
 	p = (unsigned char *) &S->mmap_file.prot;
 	size = sizeof(S->mmap_file.prot);
 	bufr->add(bufr, p, size);
@@ -1483,8 +1557,6 @@ static _Bool measure(CO(Cell, this))
 
 		case TSEM_MMAP_FILE:
 			retn = _measure_mmap_file(S);
-			if ( !S->mmap_file.anonymous )
-				retn = _measure_file(S);
 			break;
 
 		case TSEM_SOCKET_CREATE:
@@ -1709,13 +1781,12 @@ static _Bool set_digest(CO(Cell, this), CO(Buffer, bufr))
 /**
  * Internal public method.
  *
- * This method implements the output of the characteristics of a cell
- * that has a file definition.
+ * This method implements the JSON formatting of a file structure definition.
  *
- * \param S	A pointer to the state of the object being output.
+ * \param fp	A pointer to the file description that is to be
+ *		formatted.
  *
- * \parm str	The object into which the formatted output is to
- *		be placed.
+ * \param str	The object the file description will be added to.
  *
  * \return	A boolean value is used to indicate whether or not
  *		the output was properly formatted.  A true value
@@ -1723,7 +1794,7 @@ static _Bool set_digest(CO(Cell, this), CO(Buffer, bufr))
  *		value indicates an error occurred.
  */
 
-static _Bool _format_file(CO(Cell_State, S), CO(String, str))
+static _Bool _format_file(struct file_parameters *fp, CO(String, str))
 
 {
 	_Bool retn = false;
@@ -1732,14 +1803,14 @@ static _Bool _format_file(CO(Cell_State, S), CO(String, str))
 
 	unsigned int lp;
 
-	struct inode *inode = &S->file.inode;
+	struct inode *inode = &fp->inode;
 
 
 	/* Write the formatted string to the String object. */
-	name = S->file.path.pathname->get(S->file.path.pathname);
-	if ( !str->add(str, "\"file_open\": {\"file\": {") )
+	name = fp->path.pathname->get(fp->path.pathname);
+	if ( !str->add(str, "\"file\": {") )
 		ERR(goto done);
-	if ( !str->add_sprintf(str, "\"flags\": \"%lu\", ", S->file.flags) )
+	if ( !str->add_sprintf(str, "\"flags\": \"%lu\", ", fp->flags) )
 		ERR(goto done);
 	if ( !str->add_sprintf(str, "\"inode\": {\"uid\": \"%lu\", "	   \
 			       "\"gid\": \"%lu\", \"mode\": \"0%lo\", "	   \
@@ -1762,20 +1833,61 @@ static _Bool _format_file(CO(Cell_State, S), CO(String, str))
 	if ( !str->add_sprintf(str, "\"}, \"path\": {\"dev\": {"	 \
 			       "\"major\": \"%u\", \"minor\": \"%u\"}, " \
 			       "\"pathname\": \"%s\"}, \"digest\": \"",	 \
-			       S->file.path.major, S->file.path.minor,
+			       fp->path.major, fp->path.minor,
 			       name) )
 		ERR(goto done);
 
 	/* File digest. */
-	for (lp= 0; lp < sizeof(S->file.digest); ++lp) {
+	for (lp= 0; lp < sizeof(fp->digest); ++lp) {
 		if ( !str->add_sprintf(str, "%02x",
-				       (unsigned char) S->file.digest[lp]) )
+				       (unsigned char) fp->digest[lp]) )
 		     ERR(goto done);
 	}
 
 	/* Ending squiggles. */
-	if ( !str->add_sprintf(str, "\"}}") )
+	if ( !str->add_sprintf(str, "\"}") )
 		ERR(goto done);
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * Internal public method.
+ *
+ * This method implements the output of the description of a
+ * file_open event.
+ *
+ * \param S	A pointer to the state of the object being output.
+ *
+ * \parm str	The object into which the formatted output is to
+ *		be placed.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the output was properly formatted.  A true value
+ *		indicates formatting was successful while a false
+ *		value indicates an error occurred.
+ */
+
+static _Bool _format_file_open(CO(Cell_State, S), CO(String, str))
+
+{
+	_Bool retn = false;
+
+
+	/* Write the formatted string to the String object. */
+	if ( !str->add(str, "\"file_open\": {") )
+		ERR(goto done);
+
+	if ( !_format_file(&S->file, str) )
+		ERR(goto done);
+
+	if ( !str->add(str, "}") )
+		ERR(goto done);
+
 	retn = true;
 
 
@@ -1810,12 +1922,21 @@ static _Bool _format_mmap_file(CO(Cell_State, S), CO(String, str))
 	_Bool retn = false;
 
 
-	if ( !str->add_sprintf(str, "\"mmap_file\": \"type\": \"%u\", "	      \
-			       "\"reqprot\": \"%u\", \"prot\" : \"%u\", "     \
-			       "\"flags\": \"%u\"} ", S->mmap_file.anonymous, \
-			       S->mmap_file.reqprot, S->mmap_file.prot,	      \
+	if ( !str->add(str, "\"mmap_file\": {") )
+		ERR(goto done);
+
+	if ( S->mmap_file.have_file ) {
+		if ( !_format_file(&S->file, str) )
+			ERR(goto done);
+		if ( !str->add(str, ", ") )
+			ERR(goto done);
+	}
+
+	if ( !str->add_sprintf(str, "\"prot\": \"%u\", "		 \
+			       "\"flags\": \"%u\"}}", S->mmap_file.prot, \
 			       S->mmap_file.flags) )
 		ERR(goto done);
+
 	retn = true;
 
 
@@ -2116,13 +2237,11 @@ static _Bool format(CO(Cell, this), CO(String, event))
 
 	switch ( S->type ) {
 		case TSEM_FILE_OPEN:
-			retn = _format_file(S, event);
+			retn = _format_file_open(S, event);
 			break;
 
 		case TSEM_MMAP_FILE:
 			retn = _format_mmap_file(S, event);
-			if ( !S->mmap_file.anonymous )
-				retn = _format_file(S, event);
 			break;
 
 		case TSEM_SOCKET_CREATE:
