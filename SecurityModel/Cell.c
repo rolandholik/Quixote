@@ -1111,8 +1111,6 @@ static _Bool _measure_file(CO(Cell_State, S))
 
 	String s;
 
-	Sha256 sha256 = NULL;
-
 
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 	if ( !bufr->add(bufr, (void *) &S->file.flags, sizeof(S->file.flags)) )
@@ -1142,20 +1140,14 @@ static _Bool _measure_file(CO(Cell_State, S))
 			sizeof(S->file.digest)) )
 		ERR(goto done);
 
-	/* Compute identity of the event. */
-	INIT(NAAAIM, Sha256, sha256, ERR(goto done));
-	sha256->add(sha256, bufr);
-	if ( !sha256->compute(sha256) )
-		ERR(goto done);
-
-	if ( !S->identity->add(S->identity, sha256->get_Buffer(sha256)) )
+	/* Add the parameter stream to the measurement. */
+	if ( !S->identity->add(S->identity, bufr) )
 		ERR(goto done);
 	retn = true;
 
 
  done:
 	WHACK(bufr);
-	WHACK(sha256);
 
 	return retn;
 }
