@@ -221,6 +221,45 @@ static _Bool get_field(CO(TSEMparser, this), CO(String, str))
 /**
  * Internal private method.
  *
+ * This method determines the nesting level of a key value.
+ *
+ * \param start	A pointer to the start of JSON description.
+ *
+ * \param end	A pointer to the start of the key value.
+ *
+ * \return	An unsigned integer is returned that indicates the
+ *		nesting level of the key.  A value of zero implies
+ *		that the key is native the JSON string be assessed.
+ */
+
+static unsigned int _find_level(char *start, char *end)
+
+{
+	int level = 0;
+
+
+	/* Pointer is to first key in the field. */
+	if (++start == end )
+		return level;
+
+	/* Scan forward counting ending and closing squiggles. */
+	while ( start < end ) {
+		if ( *start == '{' )
+			++level;
+		if ( *start == '}' )
+			--level;
+		++start;
+	}
+
+	if ( level < 0 )
+		return 0;
+	return level;
+}
+
+
+/**
+ * Internal private method.
+ *
  * This method locates the starting position of a key in an extracted
  * field.
  *
@@ -237,7 +276,10 @@ static _Bool get_field(CO(TSEMparser, this), CO(String, str))
 static char * _find_key(CO(TSEMparser_State, S), CO(char *, key))
 
 {
+	_Bool not_found = true;
+
 	char *p,
+	     *fp,
 	     *type,
 	     add[2];
 
@@ -248,9 +290,17 @@ static char * _find_key(CO(TSEMparser_State, S), CO(char *, key))
 		return NULL;
 
 	/* Verify that the key is found and terminate it appropriately. */
-	p = strstr(S->field->get(S->field), S->key_value->get(S->key_value));
-	if ( p == NULL )
-		return NULL;
+	fp = S->field->get(S->field);
+
+	while ( not_found ) {
+		p = strstr(fp, S->key_value->get(S->key_value));
+		if ( p == NULL )
+			return NULL;
+		if ( _find_level(S->field->get(S->field), p) == 0 )
+			not_found = false;
+		else
+			fp += S->key_value->size(S->key_value);
+	}
 
 	type = p + S->key_value->size(S->key_value);
 	if ( *type == '\0' )
