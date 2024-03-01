@@ -1180,6 +1180,13 @@ static _Bool _measure_mmap_file(CO(Cell_State, S))
 	Buffer bufr = NULL;
 
 
+	/* Add file measurement if this is a non-anonymous mapping. */
+	if ( S->mmap_file.have_file ) {
+		if ( !_measure_file(S) )
+			ERR(goto done);
+	}
+
+	/* Add the mapping protections and flags. */
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 	p = (unsigned char *) &S->mmap_file.prot;
 	size = sizeof(S->mmap_file.prot);
