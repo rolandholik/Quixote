@@ -20,7 +20,7 @@
  * Copyright (c) 2020, Enjellic Systems Development, LLC. All rights reserved.
  **************************************************************************/
 
-#define MODEL_DIR	 	"/sys/kernel/security/tsem/InternalTMA/model0/"
+#define MODEL_DIR	 	"/sys/kernel/security/tsem/internal_tma/model0/"
 
 #define MEASUREMENT		MODEL_DIR"measurement"
 #define STATE			MODEL_DIR"state"
