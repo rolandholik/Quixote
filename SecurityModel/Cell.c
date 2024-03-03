@@ -2069,8 +2069,8 @@ static _Bool _format_mmap_file(CO(Cell_State, S), CO(String, str))
 			ERR(goto done);
 	}
 
-	if ( !str->add_sprintf(str, "\"prot\": \"%u\", "		 \
-			       "\"flags\": \"%u\"}}", S->mmap_file.prot, \
+	if ( !str->add_sprintf(str, "\"prot\": \"%u\", "		\
+			       "\"flags\": \"%u\"}", S->mmap_file.prot, \
 			       S->mmap_file.flags) )
 		ERR(goto done);
 
