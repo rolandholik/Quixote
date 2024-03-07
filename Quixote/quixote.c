@@ -1821,7 +1821,7 @@ static _Bool fire_cartridge(CO(LocalDuct, mgmt), CO(char *, cartridge),
 
 	if ( Cartridge_pid == 0 ) {
 		/* Drop the ability to modify the security event model. */
-		if ( cap_drop_bound(CAP_ML) != 0 )
+		if ( cap_drop_bound(CAP_MAC_ADMIN) != 0 )
 			ERR(goto done);
 
 		if ( Mode == cartridge_mode ) {
