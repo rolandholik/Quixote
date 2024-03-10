@@ -505,12 +505,17 @@ static _Bool _parse_file(CO(TSEMparser, parser), CO(String, event), \
 		ERR(goto done);
 
 	/* Extract the device information. */
-	if ( !parser->extract_field(parser, event, "dev") )
-		ERR(goto done);
-	if ( !_get_field(parser, "major", &fp->path.major) )
-		ERR(goto done);
-	if ( !_get_field(parser, "minor", &fp->path.minor) )
-		ERR(goto done);
+	if  ( !parser->has_key(parser, "dev") ) {
+		fp->path.major = 0;
+		fp->path.minor = 0; }
+	else {
+		if ( !parser->extract_field(parser, event, "dev") )
+			ERR(goto done);
+		if ( !_get_field(parser, "major", &fp->path.major) )
+			ERR(goto done);
+		if ( !_get_field(parser, "minor", &fp->path.minor) )
+			ERR(goto done);
+	}
 
 	retn = true;
 
