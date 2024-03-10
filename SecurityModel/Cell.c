@@ -19,6 +19,8 @@
 
 #define UNIX_PATH_MAX 108
 
+#define TMPFS_MAGIC 0x01021994
+
 
 /* Include files. */
 #include <stdint.h>
@@ -1194,6 +1196,8 @@ static _Bool _measure_file(CO(Cell_State, S))
 {
 	_Bool retn = false;
 
+	uint8_t null_uuid[16];
+
 	uint32_t name_length;
 
 	struct inode *i;
@@ -1214,7 +1218,12 @@ static _Bool _measure_file(CO(Cell_State, S))
 	bufr->add(bufr, (void *) &i->mode, sizeof(i->mode));
 	bufr->add(bufr, (void *) &i->s_magic, sizeof(i->s_magic));
 	bufr->add(bufr, (void *) &i->s_id, sizeof(i->s_id));
-	bufr->add(bufr, (void *) &i->s_uuid, sizeof(i->s_uuid));
+
+	if ( i->s_magic == TMPFS_MAGIC ) {
+		memset(null_uuid, '\0', sizeof(null_uuid));
+		bufr->add(bufr, null_uuid, sizeof(null_uuid));
+	} else
+		bufr->add(bufr, i->s_uuid, sizeof(i->s_uuid));
 
 	/* Add path information .*/
 	s = S->file.path.pathname;
