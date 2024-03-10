@@ -786,7 +786,7 @@ extern int main(int argc, char *argv[])
 	char *p,
 	     *pid	 = NULL,
 	     *cartridge	 = NULL,
-	     inbufr[1024];
+	     inbufr[TSEM_READ_BUFFER];
 
 	int opt,
 	    retn = 1;

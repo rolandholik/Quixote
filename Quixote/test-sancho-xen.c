@@ -18,6 +18,7 @@
 #include <HurdLib.h>
 #include <Buffer.h>
 
+#include "quixote.h"
 #include "sancho-cmd.h"
 
 #include "NAAAIM.h"
@@ -333,7 +334,7 @@ extern int main(int argc, char *argv[])
 
 	char *p,
 	     *domid = NULL,
-	     inbufr[1024];
+	     inbufr[TSEM_READ_BUFFER];
 
 	int retn;
 

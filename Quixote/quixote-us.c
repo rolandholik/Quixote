@@ -2011,7 +2011,7 @@ static _Bool fire_cartridge(CO(LocalDuct, mgmt), CO(char *, cartridge), \
 	_Bool retn = false;
 
 	char *bundle = NULL,
-	     bufr[1024];
+	     bufr[2048];
 
 	int rc,
 	    event_pipe[2],

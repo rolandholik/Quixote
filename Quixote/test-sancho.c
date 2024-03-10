@@ -18,6 +18,7 @@
 #include <HurdLib.h>
 #include <Buffer.h>
 
+#include "quixote.h"
 #include "sancho-cmd.h"
 
 #include "NAAAIM.h"
@@ -369,7 +370,7 @@ extern int main(int argc, char *argv[])
 	_Bool timing = false;
 
 	char *p,
-	     inbufr[1024],
+	     inbufr[TSEM_READ_BUFFER],
 	     *device = "/dev/ttyACM0";
 
 	int retn;
