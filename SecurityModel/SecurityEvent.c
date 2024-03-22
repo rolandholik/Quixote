@@ -64,7 +64,7 @@
 /* Names of TSEM events. */
 static const char *TSEM_name[] = {
 	"undefined",
-	"bprm_set_creds",
+	"bprm_committed_creds",
 	"task_kill",
 	"task_setpgid",
 	"task_getpgid",
