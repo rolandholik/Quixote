@@ -845,7 +845,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Handle show mode. */
-	if ( (oneshot == oneshot_none) && (Mode == show_mode) ) {
+	if ( oneshot == oneshot_none ) {
 		fprintf(stdout, "%s:\n", QUIXOTE_CARTRIDGE_MGMT_DIR);
 		show_domains(QUIXOTE_CARTRIDGE_MGMT_DIR);
 		fputs("\n", stdout);
