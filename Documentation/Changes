@@ -176,3 +176,22 @@ Version 1.5:
 	* Handle security events called in atomic context.
 
 	* Improve error handling in trust orchestrators.
+
+Version 1.6:
+	* Supports TSEM version 3 release and event types.
+
+	* Switch to CAP_MAC_ADMIN for administrative privileges.
+
+	* Use JSON encoded security event descriptions natively.
+
+	* Improve JSON parser.
+
+	* Implement support for export only namespaces.
+
+	* Implement MQTT client for transmitting security events.
+
+	* Updated kernel documentation.
+
+	* Surface timestamp and task disambiguator information.
+
+	* Use UUID leveling for TMPFS filesystems.
