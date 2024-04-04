@@ -35,9 +35,6 @@ BUILD_LIBCRYPTO = $(shell pkg-config libcrypto --libs)
 BUILD_SANCHOS     = Nordic SGX Xen # STmcu
 BUILD_XEN_VERSION = 4.15
 
-# Kernel version selection.
-BUILD_KERNEL_VERSION = 6.x
-
 # Installation paths.
 BUILD_INSTPATH = ${DESTDIR}/opt/Quixote
 BUILD_VARPATH  = ${DESTDIR}/var/lib/Quixote

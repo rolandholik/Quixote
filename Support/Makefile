@@ -31,18 +31,6 @@ MOSQUITTO_FILE    = mosquitto-${MOSQUITTO_VERSION}.tar.gz
 MOSQUITTO_URL     = https://mosquitto.org/files/source/${MOSQUITTO_FILE}
 MOSQUITTO_TAR     = Build/${MOSQUITTO_FILE}
 
-ifeq ("${KERNEL_VERSION}","5.4")
-LIBCAP_PATCH = Build/libcap-2.66_cap_38.patch
-endif
-
-ifeq ("${KERNEL_VERSION}","5.15")
-LIBCAP_PATCH = Build/libcap-2.66_cap_41.patch
-endif
-
-ifeq ("${KERNEL_VERSION}","6.x")
-LIBCAP_PATCH = Build/libcap-2.66_cap_41.patch
-endif
-
 
 # Definitions for the mbedtls source package.
 MBEDTLS_VERSION = 2.28.1
@@ -76,7 +64,6 @@ libcap/libcap/libcap.a: libcap
 
 libcap: ${LIBCAP_TAR}
 	tar xf $<;
-	patch -p0 < ${LIBCAP_PATCH};
 	mv libcap-${LIBCAP_VERSION} libcap;
 
 ${LIBCAP_TAR}:
