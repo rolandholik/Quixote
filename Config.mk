@@ -13,7 +13,7 @@
 
 # Release version and name.
 RELEASE = 1
-VERSION = 5
+VERSION = 6
 NAME	= Quixote-${RELEASE}.${VERSION}
 
 # Compiler selection.
