@@ -50,7 +50,7 @@ NORDIC_URL  = ${BUILD_NORDIC_URL}/${NORDIC_FILE}
 #
 .PHONY: all
 
-all: libcap.stamp mosquitto.stamp mbedtls.stamp nordic.stamp
+all: libcap.stamp mosquitto.stamp mbedtls.stamp # nordic.stamp
 
 
 #
