@@ -105,7 +105,8 @@ CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib
 .PHONY: all tools ${SUBDIRS}
 
 # Targets
-all: generate-array ${COBJS} ${AOBJS} ${LIBRARY} tools ${SUBDIRS}
+all: Signing-key.pem generate-array ${COBJS} ${AOBJS} ${LIBRARY} tools \
+	${SUBDIRS}
 
 ${LIBRARY}: ${COBJS} ${AOBJS}
 	ar r ${LIBRARY} $^;
@@ -215,6 +216,10 @@ LE.h: generate-array
 TE.h: generate-array
 	./generate-array -i TE.h -n TE_image > $@ || rm $@;
 
+Signing-key.pem:
+	openssl genrsa -3 -out $@ 3072;
+
+
 #
 # Subdirectory targets.
 #
@@ -253,7 +258,7 @@ clean:
 	rm -f generate-array sdk-compute-size ${TOOLS};
 
 distclean: clean;
-	rm -f TAGS sigstruct.h LE_whitelist.h LE.h TE.h;
+	rm -f TAGS sigstruct.h LE_whitelist.h LE.h TE.h Signing-key.pem;
 	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i distclean; done
 
 
