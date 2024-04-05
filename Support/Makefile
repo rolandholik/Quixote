@@ -78,7 +78,7 @@ mosquitto.stamp: mosquitto/lib/libmosquitto.a
 
 mosquitto/lib/libmosquitto.a: mosquitto
 	make -C mosquitto CC=${CC} WITH_CJSON=no WITH_STATIC_LIBRARIES=yes \
-		LDFLAGS="`pkg-config ssl --libs-only-L` -lssl -lcrypto";
+		LDFLAGS="`pkg-config libssl libcrypto --libs` -lrt";
 
 mosquitto: ${MOSQUITTO_TAR}
 	tar xf $<;
