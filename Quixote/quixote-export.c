@@ -56,6 +56,7 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <sys/socket.h>
+#include <sys/user.h>
 #include <linux/un.h>
 
 #include <HurdLib.h>
