@@ -16,8 +16,13 @@ HURDINC = HurdLib/Buffer.h HurdLib/Config.h HurdLib/Fibsequence.h \
 	HurdLib/Origin.h HurdLib/String.h
 HURDLIB = HurdLib/libHurdLib.a
 
-SUBDIRS	    = Support SRDE Sancho SecurityModel Quixote
-DEV_SUBDIRS = lib SRDE
+SUBDIRS	    = Support Sancho SecurityModel Quixote
+DEV_SUBDIRS = lib
+
+ifeq ($(findstring SGX,${BUILD_SANCHOS}),SGX)
+SUBDIRS	    := ${SUBDIRS} SRDE
+DEV_SUBDIRS := ${DEV_SUBDIRS} SRDE
+endif
 
 
 #

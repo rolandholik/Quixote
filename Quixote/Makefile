@@ -28,13 +28,20 @@ include ${SGXDIR}/Make.enclave
 SANCHODIR = ../Sancho
 SANCHOSGX = ${SANCHODIR}/SGX
 
-CSRC = quixote.c quixote-mcu.c quixote-sgx.c quixote-sgx-u.c		\
-	quixote-console.c quixote-xen.c quixote-export.c test-sancho.c	\
-	test-sancho-xen.c
+CSRC = quixote.c quixote-mcu.c quixote-console.c quixote-xen.c \
+	quixote-export.c test-sancho.c test-sancho-xen.c
 
-TOOLS = quixote quixote-mcu quixote-us quixote-sgx quixote-sgx-u quixote-xen \
-	quixote-console quixote-export test-sancho test-thread		     \
-	test-sancho-xen test-domain-creation
+ifeq ($(findstring SGX,${BUILD_SANCHOS}),SGX)
+CSRC := ${CSRC} quixote-sgx.c quixote-sgx-u.c
+endif
+
+TOOLS = quixote quixote-mcu quixote-us quixote-xen quixote-export \
+	quixote-console test-sancho test-thread test-sancho-xen	  \
+	test-domain-creation
+
+ifeq ($(findstring SGX,${BUILD_SANCHOS}),SGX)
+TOOLS := ${TOOLS} quixote-sgx quixote-sgx-u
+endif
 
 INSTALLBIN  = quixote-console
 INSTALLSBIN = quixote quixote-mcu quixote-us quixote-sgx quixote-sgx-u \
