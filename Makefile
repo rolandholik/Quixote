@@ -16,7 +16,7 @@ HURDINC = HurdLib/Buffer.h HurdLib/Config.h HurdLib/Fibsequence.h \
 	HurdLib/Origin.h HurdLib/String.h
 HURDLIB = HurdLib/libHurdLib.a
 
-SUBDIRS	    = Support Sancho SecurityModel Quixote
+SUBDIRS	    = Sancho SecurityModel Quixote
 DEV_SUBDIRS = lib
 
 ifeq ($(findstring SGX,${BUILD_SANCHOS}),SGX)
@@ -28,11 +28,11 @@ endif
 #
 # Target directives.
 #
-.PHONY: lib ${SUBDIRS}
+.PHONY: lib Support ${SUBDIRS}
 
 
 # Targets
-all: HurdLib/libHurdLib.a lib ${SUBDIRS}
+all: HurdLib/libHurdLib.a Support lib ${SUBDIRS}
 
 HurdLib/libHurdLib.a:
 	cd HurdLib && CC=${CC} CFLAGS="${BUILD_CFLAGS}" ./configure;
@@ -125,11 +125,13 @@ tar:
 clean:
 	${MAKE} -C HurdLib clean;
 	${MAKE} -C lib clean;
+	${MAKE} -C Support clean;
 	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i clean; done;
 
 distclean: clean
 	${MAKE} -C lib distclean;
 	${MAKE} -C HurdLib distclean;
+	${MAKE} -C Support distclean
 	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i distclean; done;
 	rm -f Build.mk;
 
