@@ -44,9 +44,7 @@ Xen:
 # Installation targets.
 #
 install-bin:
-	${MAKE} -C SGX install-bin;
-	${MAKE} -C Xen install-bin;
-	${MAKE} -C Nordic install-bin;
+	set -e; for i in ${SUBDIRS}; do ${MAKE} -C $$i install-bin; done;
 
 
 #

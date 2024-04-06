@@ -49,9 +49,15 @@ CSRC := ${CSRC} quixote-xen test-sancho-xen
 endif
 
 INSTALLBIN  = quixote-console
-INSTALLSBIN = quixote quixote-mcu quixote-us quixote-sgx quixote-sgx-u \
-	quixote-xen quixote-export
+INSTALLSBIN = quixote quixote-mcu quixote-us quixote-export
+
+ifeq ($(findstring SGX,${BUILD_SANCHOS}),SGX)
+INSTALLSBIN := ${INSTALLSBIN} quixote-sgx quixote-sgx-u
+endif
+ifeq ($(findstring Xen, ${BUILD_SANCHOS}),Xen)
+INSTALLSBIN := ${INSTALLSBIN} quixote-xen
 INSTALLSCRIPTS = setup-quixote-xen
+endif
 
 ifeq ("${KERNEL_VERSION}","5.4")
 DEFINES = -DCAP_ML=38
@@ -181,7 +187,8 @@ test-domain-creation: test-domain-creation.o ${LIBDEPS}
 install-bin:
 	install -s ${INSTALLBIN} ${INSTPATH}/bin;
 	install -s ${INSTALLSBIN} ${INSTPATH}/sbin;
-	install ${INSTALLSCRIPTS} ${INSTPATH}/sbin;
+	[ -n "${INSTALLSCRIPTS}" ] && \
+		install ${INSTALLSCRIPTS} ${INSTPATH}/sbin || true;
 
 clean:
 	rm -f *.o *~ sancho-enclave.h;
