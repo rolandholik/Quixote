@@ -99,6 +99,7 @@ newlib: ${NEWLIB_TAR}
 	tar xvf $<;
 	patch -p0 < Build/newlib.patch;
 	mv newlib-${NEWLIB_VERSION} newlib;
+	touch $@;
 
 ${NEWLIB_TAR}:
 	wget -O $@ ${NEWLIB_URL};
@@ -120,6 +121,7 @@ ${NEWLIB}/lib/libz.a: zlib mini-os.stamp
 zlib: ${ZLIB_TAR}
 	tar xvf $<;
 	mv zlib-${ZLIB_VERSION} zlib;
+	touch $@;
 
 ${ZLIB_TAR}:
 	wget -O $@ ${ZLIB_URL};
@@ -145,6 +147,7 @@ pciutils: ${PCI_TAR}
 	tar xvf $<;
 	patch -p0 < Build/pciutils.patch;
 	mv pciutils-${PCI_VERSION} pciutils;
+	touch $@;
 
 ${PCI_TAR}:
 	wget -O $@ ${PCI_URL};
