@@ -33,10 +33,10 @@ MOSQUITTO_TAR     = Build/${MOSQUITTO_FILE}
 
 
 # Definitions for the mbedtls source package.
-MBEDTLS_VERSION = 2.28.1
-MBEDTLS_FILE    = v${MBEDTLS_VERSION}.tar.gz
+MBEDTLS_VERSION = 2.28.8
+MBEDTLS_FILE    = mbedtls-${MBEDTLS_VERSION}.tar.gz
 MBEDTLS_TAR     = Build/${MBEDTLS_FILE}
-MBEDTLS_URL     = ${BUILD_MBEDURL}/${MBEDTLS_FILE}
+MBEDTLS_URL     = ${BUILD_MBEDURL}/v${MBEDTLS_VERSION}.tar.gz
 
 
 # Definitions for the Nordic Software Development kit.
@@ -97,6 +97,7 @@ mbedtls.stamp: mbedtls
 mbedtls: ${MBEDTLS_TAR}
 	tar xf $<;
 	mv mbedtls-${MBEDTLS_VERSION} mbedtls;
+	touch mbedtls;
 
 ${MBEDTLS_TAR}:
 	wget -O $@ ${MBEDTLS_URL};
