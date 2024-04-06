@@ -32,7 +32,7 @@ BUILD_ELFLIB = $(shell pkg-config libelf --libs)
 BUILD_LIBCRYPTO = $(shell pkg-config libcrypto --libs)
 
 # Trusted Modeling Agent implentations.
-BUILD_SANCHOS     = Xen # SGX Nordic STmcu
+BUILD_SANCHOS     = # Xen SGX Nordic STmcu
 BUILD_XEN_VERSION = 4.15
 
 # Installation paths.

@@ -28,19 +28,24 @@ include ${SGXDIR}/Make.enclave
 SANCHODIR = ../Sancho
 SANCHOSGX = ${SANCHODIR}/SGX
 
-CSRC = quixote.c quixote-mcu.c quixote-console.c quixote-xen.c \
-	quixote-export.c test-sancho.c test-sancho-xen.c
+CSRC = quixote.c quixote-mcu.c quixote-console.c quixote-export.c \
+	test-sancho.c
 
 ifeq ($(findstring SGX,${BUILD_SANCHOS}),SGX)
 CSRC := ${CSRC} quixote-sgx.c quixote-sgx-u.c
 endif
+ifeq ($(findstring Xen, ${BUILD_SANCHOS}),Xen)
+CSRC := ${CSRC} quixote-xen.c test-sancho-xen.c
+endif
 
-TOOLS = quixote quixote-mcu quixote-us quixote-xen quixote-export \
-	quixote-console test-sancho test-thread test-sancho-xen	  \
-	test-domain-creation
+TOOLS = quixote quixote-mcu quixote-us quixote-export quixote-console \
+	test-sancho test-thread test-domain-creation
 
 ifeq ($(findstring SGX,${BUILD_SANCHOS}),SGX)
 TOOLS := ${TOOLS} quixote-sgx quixote-sgx-u
+endif
+ifeq ($(findstring Xen, ${BUILD_SANCHOS}),Xen)
+CSRC := ${CSRC} quixote-xen test-sancho-xen
 endif
 
 INSTALLBIN  = quixote-console
@@ -92,11 +97,14 @@ LIBCAP = -L ../support/libcap -lcap
 
 LIBS	= ${NAAAIMLIB} ${HURDLIB} ${LIBCAP} ${BUILD_LIBCRYPTO}
 LIBDEPS = ${HURD_LIBRARY} ${NAAAIM_LIBRARY}
+
+ifeq ($(findstring Xen, ${BUILD_SANCHOS}), Xen)
 XENLIBS = ${shell pkg-config --libs xenstore}  \
 	${shell pkg-config --libs xengnttab}   \
 	${shell pkg-config --libs xentoolcore} \
 	${shell pkg-config --libs xentoollog}  \
 	${shell pkg-config --libs xenevtchn} -lpthread
+endif
 
 MODELDEPS = ../SecurityModel/COE.o ../SecurityModel/Cell.o		  \
 	../SecurityModel/SecurityPoint.o ../SecurityModel/SecurityEvent.o \
@@ -106,7 +114,9 @@ MODELDEPS = ../SecurityModel/COE.o ../SecurityModel/Cell.o		  \
 CFLAGS := ${CFLAGS} -I .. -I ../SecurityModel -I ../lib -I ../HurdLib \
 	-I ${SGXDIR} -I ${SANCHOSGX} ${TYPE}
 
+ifeq ($(findstring Xen, ${BUILD_SANCHOS}), Xen)
 XENCFLAGS = ${shell pkg-config --cflags xenstore}
+endif
 
 
 #
