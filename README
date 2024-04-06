@@ -9,12 +9,6 @@ orchestrators, Trusted Modeling Agents (TMA's) and support utilities
 that enable use of the Linux Trusted Security Event Modeling (TSEM)
 Linux Security Module (LSM).
 
-This document is still very cursory, given the need to have the
-userspace implementation released in combination with the submission
-of the TSEM kernel implementation for review for inclusion in the
-mainstream Linux kernel.  Subsequent releases of the software will
-include more detailed instructions.
-
 The following documentation file is a copy of the documentation for
 the TSEM LSM that is part of the LSM documentation for the Linux
 kernel:
@@ -29,10 +23,9 @@ modeling and trust orchestration.
 The beginning of this document also contains a QuickStart summary for
 the basic use of the Quixote trust orchestrators.
 
-The following URL is the download site for the Quixote Trust
-Orchestration System:
+The following URL is the project for the Quixote System:
 
-ftp://ftp.enjellic.com/pub/Quixote
+https://github.com/Quixote-Project
 
 Users who may want to experiment with trust orchestration, without
 moving forward with a full compilation, will find packages that
@@ -40,17 +33,16 @@ contain pre-compiled binaries.  These binaries are statically compiled
 and linked against the MUSL C library and should run on any x86_64
 platform with a TSEM enabled kernel.
 
-The FTP site will also be updated with patches for the long term
-stable kernels.
+The project site also has GIT repositories for TSEM enabled kernels.
 
 
 Trust Orchestrators:
 ====================
 
 Trust orchestrators are utilities that run a process in a subordinate
-security modeling domain coupled with a Trusted Modeling Agent (TMA).
-The root of trust for a modeling domain is determined by where the TMA
-is implemented.
+security modeling namespace coupled with a Trusted Modeling Agent
+(TMA).  The root of trust for a modeling namespace is determined by
+where the TMA is implemented.
 
 The following trust orchestrators are currently implemented:
 
@@ -69,21 +61,22 @@ Process
 
 Container
 
-In process mode a shell process is spawned in a subordinate modeling
-domain.  This process, and all subordinate processes, will be modeled
-by the selected trust orchestrator and modeling agent.
+In process mode, a shell process is spawned in a subordinate security
+modeling namespace.  This process, and all subordinate processes, will
+be modeled by the trust orchestrator and modeling agent that have been
+defined for the namespace.
 
 Process mode is selected by specifying the -P command-line argument to
 the trust orchestrator.
 
 In process mode the -c command-line argument can be used to specify
-the name of the modeling domain.  If this argument is not specified
-the trust orchestrator will use the PID of the lead process as the
-name of the modeling domain.
+the name of the modeling namespace.  If this argument is not specified
+the trust orchestrator will use the PID of the orchestrator as the
+name of the modeling namespace.
 
 In container mode an OCI runc process is spawned in a subordinate
-modeling domain.  The runc process and all subordinate process
-activity will be captured by the selected trust orchestrator and
+modeling namespace.  The runc process and all subordinate security
+events will be captured by the selected trust orchestrator and
 modeling agent.
 
 Container mode is specified by supplying the -c command-line argument
@@ -91,7 +84,7 @@ to the trust orchestrator.   The argument to the -c command-line
 option will be the name of the runc 'bundle' directory that runc will
 use to setup the container environment.
 
-The bundle directories are root in the following directory location:
+The bundle directories are rooted in the following directory location:
 
 /var/lib/Quixote/Magazine
 
@@ -105,15 +98,15 @@ The bundle directory also needs to contain a directory named rootfs.
 This directory needs to be populated with whatever filesystem
 hierarchy that the modeled process will use as its root filesystem.
 
-The -S command-line argument is used to request the generation of a
-list of trust orchestrated contains.  The option generates a listing
-of the contents of the /var/lib/Quixote/Magazine directory.
+The -S command-line argument to the orchestrators are used to request
+a listing of available container environments.  This option generates
+a listing of the contents of the /var/lib/Quixote/Magazine directory.
 
 The -o command-line argument is used to specify that the trust
 orchestrator is to output a security model description after the
-modeling domain executes.  This model description can be used to
+modeling namespace executes.  This model description can be used to
 define the security behavior that a trust orchestrator is to enforce
-for subsequent invocations of the modeling domain.
+for subsequent invocations of the modeling namespace.
 
 The argument to the -o command-line option is the name of the file
 that the security model is to be written to.
@@ -123,7 +116,7 @@ option.  If specified, it will cause the trust orchestrator to output
 the security event description trajectory rather than a security
 model.  This trajectory can be modified in a development work-flow to
 generate subsequent security maps based on, for example, modifications
-to binaries that are being executed in the domain.
+to binaries that are being executed in the namespace.
 
 The -m command-line argument is used to specify a security behavior
 model that is to be enforced by a trust orchestrator.  Any variations
@@ -132,8 +125,8 @@ model.
 
 The -e command-line argument can be used in combination with the -m
 argument to instruct the trust orchestrator to enforce the specified
-security model.  Any forensic events that are generated will cause the
-permission to conduct the event to be denied.
+security model.  Any forensic events that are generated will cause a
+permission denial to be returned as the status of the event.
 
 The strategy for security modeling is to develop an initial security
 map that is modeling in non-enforcing method.  Forensic events that
@@ -161,7 +154,7 @@ number of the Xen stubdomain implementation that is running the TMA.
 In order to use the SanchoXen implementation an additional
 configuration step is required which configures the SanchoMCU
 implementation to be accessed by the virtual machine that is running
-modeled domains.
+modeled namespaces.
 
 After starting the SanchoXen stubdomain implementation and the domU
 instance the following command should be run:
@@ -243,7 +236,7 @@ can be used to to generate a launch token, with the following command:
 
 srde-gen-token -e ENCLAVE -t TOKEN
 
-Where ENCLAVE and TOKEN are replaced with the above pathnames.
+Where ENCLAVE and TOKEN are replaced with the above path names.
 
 The quixote-sgx and quixote-sgx-u implementation are functionally
 identical.  The quixote-sgx-u binary is a 'unified' implementation
@@ -251,23 +244,78 @@ that embeds the enclave in the binary itself for a simpler deployment
 option.
 
 
+Export only modeling:
+=====================
+
+In addition to the trust orchestrators the following utility is also
+built by default:
+
+quixote-export
+
+This utility is used for export only modeling of security namespaces,
+including the root namespace.  Export only modeling can be used for
+implementing host intrusion surveillance or driving machine learning
+models.  The advantage of export only namespaces is that no delays are
+imposed in security event processing caused by the need for a TMA to
+generate the response for a security event.
+
+In export only modeling the kernel asynchronously exports security
+event descriptions to the event orchestrator.  The event orchestrator
+then writes the security event descriptions either to an output file
+or through an MQTT client implementation to an MQTT broker.
+
+The default output is stdout.  This is problematic if an interactive
+shell is being used so the -o command-line option can be used to
+specify an alternate output file.
+
+The -b argument is used to specify a hostname that the MQTT client
+will connect to for the export of events.  The -U command-line
+argument is used to specify the username that the client is to use to
+authenticated to the broker.  The TSEM_PASSWORD environment variable
+is used to specify the password that the client implementation is to
+use with the username.
+
+The -R command-line argument is used to specify that the event
+orchestrator should attach to the root modeling namespace as the
+source for the security events.
+
+In the case of root namespace export the kernel will buffer all of the
+security event descriptions until the event orchestrator accesses the
+output control plane file for the namespace.  There is currently no
+event limit so a failure to access the control plane file and drain
+the kernel event lists can result in kernel memory depletion.
+
+By default the event orchestrator runs in one shot mode where all of
+the security events will be read until the end of the event list is
+reached.  The -f command line argument overrides one shot mode and
+will continue to wait for events until the event orchestrator is
+terminated.
+
+The -q command line argument is used to specify the number of security
+event descriptions that are held until the output queue is emptied to
+the output device.  In the case of root event modeling this can be
+used to diminish the security event artifacts that are generated by
+the fact that the event orchestrator itself is generating events that
+will be captured and output.
+
+
 Building:
 =========
 
 The build of the Quixote TOS is currently validated against the Ubuntu
-22.04.1 LTS (Jammy Jellyfish) release.
+22.04.x LTS release.
 
 At a minimum, the following packages need to be available:
 
 openssl development libraries
 elfutils development libraries
-GCC-ARM Cortex R/M development environment
 
-The build process will automatically fetch the additional packages:
+The build process will automatically fetch the following additional
+packages for a base build.
 
 libcap-2.66
-mbedtls-2.28.1
-nRF5_SDK_v17.x.x Software Development kit.
+mbedtls-2.28.8
+mosquitto-2.0.18
 
 There should always be concerns about the pedigree of software that is
 automatically pulled into a build.  Concerned users should manually
@@ -285,6 +333,12 @@ contain the build configuration:
 
 Config.mk
 
+The default configuration builds the following trust orchestrators:
+
+quixote
+quixote-us
+quixote-export
+
 The following command can be issued to generate the local build
 configuration file:
 
@@ -292,9 +346,6 @@ make Build.mk
 
 If this step is not executed, the invocation of make will build a
 default build configuration file.
-
-Site specific modifications are designed to be placed in the .config
-at the top of the source tree.
 
 Modifications to the values defined by the Config.mk should be placed
 in the .config file.  Any changes to the .config file will be
@@ -309,8 +360,8 @@ build:
 
 make
 
-This will build the Quixote trust orchestrators and their associated
-TMA's.
+This will build the configured Quixote trust orchestrators and TMA
+implementations.
 
 The following command will install the basic Quixote implementation:
 
@@ -318,11 +369,6 @@ make install
 
 This command respects the DESTDIR variable to define an alternate
 installation hierarchy.
-
-As a convenience, the Quixote FTP site contains both RPM and .deb
-packages for the Quixote SGX development and runtime environment.
-This package must be installed in order to build and run the SanchoSGX
-implementation.
 
 For the Nordic SanchoMCU implementation two firmware images are built
 for the following hardware variants:
@@ -390,12 +436,12 @@ environment:
 quixote-console
 
 Running the utility with no arguments will cause the output of the
-currently active modeling domains.
+currently active security modeling namespaces.
 
 By default the utility will connect to a container based model
 specified by the -c argument.
 
-Connection to a process based domain is specified by the -p
+Connection to a process based namespace is specified by the -p
 command-line argument.  The argument to this option is the PID number
 displayed by a naked invocation of the quixote-console utility.
 
@@ -413,7 +459,7 @@ line arguments to specify the output of model values:
 -E:	Security event denials.
 -F:	The model forensics trajectory.
 -M:	The current security model definition.
--P:	The current set of security event state points.
+-P:	The current set of security state coefficients.
 -S:	The current state value of the model.
 -T:	The current execution trajectory.
 
@@ -426,9 +472,8 @@ Conclusion:
 
 The Quixote TOS is currently under active development.  The objective
 with the current release is to provide a functional demonstration of
-the various orchestrators and trust roots that can be implemented.
-
-Significant focus will be expended on the userspace implementation in
-subsequent releases.
+the basic trust orchestrators and their TMA implementations that pair
+with the TSEM releases that are being targeted for the mainline Linux
+kernel.
 
 The Quixote Team
