@@ -28,8 +28,7 @@ include ${SGXDIR}/Make.enclave
 SANCHODIR = ../Sancho
 SANCHOSGX = ${SANCHODIR}/SGX
 
-CSRC = quixote.c quixote-mcu.c quixote-console.c quixote-export.c \
-	test-sancho.c
+CSRC = quixote.c quixote-us.c quixote-console.c quixote-export.c test-sancho.c
 
 ifeq ($(findstring SGX,${BUILD_SANCHOS}),SGX)
 CSRC := ${CSRC} quixote-sgx.c quixote-sgx-u.c
@@ -37,8 +36,11 @@ endif
 ifeq ($(findstring Xen, ${BUILD_SANCHOS}),Xen)
 CSRC := ${CSRC} quixote-xen.c test-sancho-xen.c
 endif
+ifeq ($(findstring Nordic, ${BUILD_SANCHOS}),Nordic)
+CSRC := ${CSRC} quixote-mcu.c
+endif
 
-TOOLS = quixote quixote-mcu quixote-us quixote-export quixote-console \
+TOOLS = quixote quixote-us quixote-export quixote-console \
 	test-sancho test-thread test-domain-creation
 
 ifeq ($(findstring SGX,${BUILD_SANCHOS}),SGX)
@@ -47,9 +49,12 @@ endif
 ifeq ($(findstring Xen, ${BUILD_SANCHOS}),Xen)
 CSRC := ${CSRC} quixote-xen test-sancho-xen
 endif
+ifeq ($(findstring Nordic, ${BUILD_SANCHOS}),Nordic)
+CSRC := ${CSRC} quixote-mcu
+endif
 
 INSTALLBIN  = quixote-console
-INSTALLSBIN = quixote quixote-mcu quixote-us quixote-export
+INSTALLSBIN = quixote quixote-us quixote-export
 
 ifeq ($(findstring SGX,${BUILD_SANCHOS}),SGX)
 INSTALLSBIN := ${INSTALLSBIN} quixote-sgx quixote-sgx-u
@@ -57,6 +62,9 @@ endif
 ifeq ($(findstring Xen, ${BUILD_SANCHOS}),Xen)
 INSTALLSBIN := ${INSTALLSBIN} quixote-xen
 INSTALLSCRIPTS = setup-quixote-xen
+endif
+ifeq ($(findstring Nordic, ${BUILD_SANCHOS}),Nordic)
+INSTALLSBIN := ${INSTALLSBIN} quixote-mcu
 endif
 
 ifeq ("${KERNEL_VERSION}","5.4")
