@@ -50,7 +50,7 @@ NORDIC_URL  = ${BUILD_NORDIC_URL}/${NORDIC_FILE}
 #
 .PHONY: all
 
-all: libcap.stamp mosquitto.stamp mbedtls.stamp # nordic.stamp
+all: Build libcap.stamp mosquitto.stamp mbedtls.stamp # nordic.stamp
 
 
 #
@@ -118,6 +118,13 @@ ${NORDIC_ZIP}:
 
 
 #
+# Target for Build directory.
+#
+Build:
+	[ ! -d Build ] && mkdir Build || true;
+
+
+#
 # Installation target.
 #
 install-bin:
@@ -141,3 +148,4 @@ distclean: clean
 purge: distclean
 	rm -f Build/*.tar.gz;
 	rm -f Build/${NORDIC_FILE};
+	rmdir Build;
