@@ -1,0 +1,24 @@
+# **************************************************************************
+# * Copyright (c) Enjellic Systems Development, LLC. All rights reserved.
+# *
+# * Please refer to the file named Documentation/COPYRIGHT in the top of
+# * the source tree for copyright and licensing information.
+# **************************************************************************/
+
+#
+# Consolidate SGX definitions here in order to avoid replication
+# throughout all of the subordinate directories that build enclave.
+#
+
+# The directory where the Intel SDK is located.
+SGX_SDK	    = /opt/Quixote/share/intel/sgxsdk
+
+
+# The location of the default signing key and tool.
+SGXKEY ?= ${SGXDIR}/Signing-key.pem
+SGX_SIGNER = ${SGX_SDK}/bin/sgx_sign
+
+SRDE_SIGN = ${SGXDIR}/srde-sign
+ifdef SRDE_PRODUCTION
+SRDE_SIGN += -P
+endif

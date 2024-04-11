@@ -1,0 +1,197 @@
+Version 0.8:
+	* Transition to new hardware based GPG signing key.
+
+	* Upgrade to Intel SDK 2.4 and SGX OpenSSL 1.1.0j.
+
+	* Implement uniform copyright standard.
+
+	* Convert to version 3 of IAS API.
+
+	* Improve enclave PossumPipe and Duct error handling.
+
+	* Improvements to identity verifier generation and provisioning.
+
+	* Update SGX capability tester to output launch registers.
+
+	* Support compilation under GCC.
+
+	* Support library usage in C++ based projects.
+
+	* Implement sample application code.
+
+	* Implement installation targets for runtime and development
+	  systems.
+
+Version 0.9:
+	* Implement RSAkey object in trusted space.
+
+	* Transition to version 2.5.5 of Intel development libraries.
+
+	* Transition to version 2.6 of Intel pre-built enclaves.
+
+	* Implement basic time handling in SRDEFusion.
+
+	* Implement dynamic OCALL table generation.
+
+	* Implement object based key management and data sealing.
+
+	* Implement object for verifying X.509 certificates.
+
+	* Implement object for OpenSSL passphrase prompting.
+
+	* Add signature support for RSAkey object.
+
+	* Update to standard and trusted OpenSSL 1.1.1d.
+
+	* Implement support for enclave de-initialization and atexit().
+
+	* Implement mode 2 authentication support for PossumPipe.
+
+	* Support APIkey based development and production reports.
+
+	* Implement OpenSSL based AES128-CMAC object.
+
+	* Implement Report object to generate local attestation reports.
+
+	* Implement SRDEpipe object for enclave to enclave communications.
+
+	* Initial implementation of enclave File object.
+
+	* Implement remote attestation service provider infrastructure.
+
+	* Implement standardized enclave endpoint verification.
+
+Version 1.0:
+	* Update to version 2.7.1 of Intel libraries and enclave.
+
+Version 1.1:
+	* Implement Quixote Trust Orchestration System.
+
+	* Implement Sancho Trusted Modeling Agents.
+
+		- Kernel based.
+
+		- Process based.
+
+		- MCU based.
+
+		- SGX based.
+
+	* Support Linux kernel 5.4.
+
+Version 1.2:
+	* Code cleanups and renaming including dropping of unused code.
+
+	* Convert to TSEM nomenclature for security model code.
+
+	* Updated HurdLib implementation.
+
+	* Implement TSEM arrays with Gaggle object.
+
+	* Implement event modeling architecture.
+
+	* Implement pseudonyms with event modeling architecture.
+
+	* Implemented loading of security models.
+
+	* Implement signed security models.
+
+	* Convert SanchoMCU to use mbedtls for cryptographic primitives.
+
+	* Implement NAAAIM library for SanchoMCU.
+
+	* Implement pseudonym generation utility.
+
+	* Implement model signing utility.
+
+	* Validated functionality in Ubuntu 20.
+
+Version 1.3:
+	* Nordic 52840-DK based TMA/SanchoMCU.
+
+	* Nordic 52840-DONGLE based TMA/SanchoMCU implementation.
+
+	* STM32l562 SanchoMCU implementation.
+
+	* Xen stub domain TMA/SanchoXen implementation.
+
+	* Optimize SecurityModel regex implementation.
+
+	* Kernel driver naming convention changes.
+
+Version 1.4:
+	* Supports initial open-source release of TSEM.
+
+	* Expand number of modeled security events.
+
+	* Replace system call interface with pseudo-filesystem interface.
+
+	* Updated functional definition of security state points.
+
+	* Implement generic event modeling.
+
+	* Support explicit naming of control sockets for process based
+	  domains.
+
+	* Implement model/trajectory output on domain completion.
+
+	* Move all functional to independent filesystem implementation
+	  in /sys/fs/tsem
+
+	* Implement build of custom libcap to support CAP_TRUST.
+
+	* Initial implementation of custom build configuration.
+
+	* Validate build against Ubuntu 22.04.
+
+	* Drop regular expression based event parsing.
+
+	* Drop saving of event descriptions for SanchoMCU implementations.
+
+	* Update SRDE to work with enclaves built against version 2.18
+	  of Intel SGX PSW/SDK.
+
+	* Convert SRDE build to use elf-utils rather than libelf.
+
+	* Automatically download mbedtls source.
+
+	* Automatically download Nordic SDK sources.
+
+	* Use BSD 2-clause plus patent license.
+
+	* Add a README file to explain basic use and functionality.
+
+Version 1.5:
+	* Support new TSEM control plane layout.
+
+	* Accept JSON encoded security event descriptions.
+
+	* Implement TOS<->process authentication.
+
+	* Implement namespace configuration for the hash function, DAC
+	  namespace reference and cache sizes.
+
+	* Optimize reads from the security event export file.
+
+	* Handle security events called in atomic context.
+
+	* Improve error handling in trust orchestrators.
+
+Version 1.6:
+	* Supports TSEM version 3 release and event types.
+
+	* Switch to CAP_MAC_ADMIN for administrative privileges.
+
+	* Use JSON encoded security event descriptions natively.
+
+	* Improve JSON parser.
+
+	* Implement support for export only namespaces.
+
+	* Implement MQTT client for transmitting security events.
+
+	* Updated kernel documentation.
+
+	* Surface timestamp and task disambiguator information.
+
+	* Use UUID leveling for TMPFS filesystems.

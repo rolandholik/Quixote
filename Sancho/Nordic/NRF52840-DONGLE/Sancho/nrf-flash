@@ -1,0 +1,44 @@
+#! /bin/bash
+
+#
+# Wrapper script for running the nrfutil utility to conduct a
+# firmware upgrade on the NRF52840-DONGLE.
+#
+# Two arguments need to be passed to this script.
+#
+#	$1: The path that will execute the python based nrfutil
+#	    utility.
+#
+#	$2: The name of the file containing the hex-encoded
+#	    firmware image to be flashed.
+#
+
+
+declare Hex_File Flash_File;
+
+declare -r Nrfutil="$1";
+declare -r Firmware="$2";
+
+
+# Setup input files.
+if [ -z "$Firmware" ]; then
+	echo "No firmware image specified.";
+	exit 1;
+fi;
+
+Hex_File="$Firmware";
+Flash_File="$Hex_File.zip";
+
+
+# Generate DFU package.
+$Nrfutil pkg generate --hw-version 52 --sd-req 0x00 --debug-mode \
+	--application $Hex_File $Flash_File;
+
+
+# Load the firmware.
+$Nrfutil dfu usb-serial -pkg $Flash_File -p /dev/ttyACM0 -b 115200;
+rm $Flash_File;
+
+
+# All done.
+exit 0;

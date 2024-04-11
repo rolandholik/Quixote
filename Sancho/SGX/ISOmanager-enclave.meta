@@ -1,0 +1,8 @@
+ProdID 0
+ISVSVN 0
+StackMaxSize 0x40000
+HeapMaxSize 0x100000
+TCSNum 1
+TCSPolicy 1
+MiscSelect 0
+MiscMask 0xFFFFFFFF

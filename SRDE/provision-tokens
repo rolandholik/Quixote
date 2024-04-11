@@ -1,0 +1,65 @@
+#! /bin/bash
+
+#
+# This file contains the implementation of a utility that generates
+# launch tokens for all SRDE installed enclaves.
+#
+
+# **************************************************************************
+# * Copyright (c) Enjellic Systems Development, LLC. All rights reserved.
+# *
+# * Please refer to the file named Documentation/COPYRIGHT in the top of
+# * the source tree for copyright and licensing information.
+# **************************************************************************/
+
+
+# Enclave installation directory.
+declare -r Enclave_Dir="/opt/ESD/lib/enclaves";
+declare -r Intel_Dir="/opt/intel/sgxpsw";
+
+# Intel supplied binary enclaves.
+declare -r Ipath="/opt/intel/sgxpsw/aesm";
+declare -r Intel_Enclaves="$Ipath/libsgx_qe.signed.so \
+    $Ipath/libsgx_pce.signed.so $Ipath/libsgx_pve.signed.so";
+
+# Token installation directory.
+declare -r Token_Dir="/var/lib/ESD/tokens";
+
+# Working variables.
+declare Token Enclave_Path Enclave;
+
+
+#
+# Loop through the Intel production enclaves.
+#
+for Enclave_Path in $Intel_Enclaves;
+do
+	Enclave=`basename "$Enclave_Path" .signed.so`;
+	Token="$Token_Dir/$Enclave.token";
+	srde-gen-token -p -e "$Enclave_Path" -o $Token;
+	echo "Generated: $Token";
+done
+
+
+#
+# Loop through the SRDE enclaves and generate tokens.
+#
+for Enclave_Path in $Enclave_Dir/*
+do
+	Enclave=`basename "$Enclave_Path" .signed.so`;
+	Token="$Token_Dir/$Enclave.token";
+	if [ "$Enclave" = "Attestation" -o \
+	     "$Enclave" = "Provisioner" -o \
+	     "$Enclave" = "LocalTarget" ]; then
+		srde-gen-token -p -e "$Enclave_Path" -o $Token;
+	else
+		srde-gen-token -e "$Enclave_Path" -o $Token;
+	fi;
+	echo "Generated: $Token";
+done;
+
+
+#
+# Exit.
+#
+exit 0;

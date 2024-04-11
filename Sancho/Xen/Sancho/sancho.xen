@@ -1,0 +1,16 @@
+#
+# Sample configuration file to execute the SanchoXen Trusted Modeling
+# Agent.
+#
+# After executing both the SanchoXen implementation and the domU
+# instance that will use the implementation the following command
+# should be run:
+#
+# setup-quixote-xen sancho DOMU
+#
+# Where DOMU is replaced with the name of the domU instance.
+#
+
+name = "sancho"
+kernel = "/opt/Quixote/share/sancho-xen.elf"
+memory = 8

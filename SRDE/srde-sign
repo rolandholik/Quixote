@@ -1,0 +1,114 @@
+#! /bin/bash
+
+#
+# This file contains the implementation of a wrapper for what will
+# ultimately be native implementation of an SRDE enclave signing tool.
+# The role of the wrapper is to allow standardization around the
+# simple file based metadata format that will be used by the SRDE
+# signing tool.
+#
+
+# **************************************************************************
+# * Copyright (c) Enjellic Systems Development, LLC. All rights reserved.
+# *
+# * Please refer to the file named Documentation/COPYRIGHT in the top of
+# * the source tree for copyright and licensing information.
+# **************************************************************************/
+
+
+# Utility name.
+declare -r Pgm="srde-sign";
+
+# Working variable for option processing.
+declare Arg;
+
+# Temporary XML file.
+declare XMLfile;
+
+# Binary to use for enclave signing.
+declare -r Signer="$SGX_SIGNER"
+
+# Debug status for the enclave.
+declare Disable_Debug="0";
+
+# Name of enclave file to be signed.
+declare Enclave;
+
+# Name of key file to be used.
+declare Key;
+
+# Name of file containing metadata information.
+declare Metadata;
+
+# Name of output file.
+declare Output;
+
+
+#
+# Option processing.
+#
+while getopts "Pe:k:m:o:" Arg;
+do
+        case $Arg in
+		P)	Disable_Debug="1";;
+
+		e)	Enclave="$OPTARG";;
+		k)	Key="$OPTARG";;
+		m)	Metadata="$OPTARG";;
+		o)	Output="$OPTARG";;
+        esac;
+done;
+
+
+# Verify arguements.
+if [ -z "$Enclave" ]; then
+	echo "$Pgm: No enclave specified.";
+	exit 1;
+fi;
+
+if [ -z "$Key" ]; then
+	echo "$Pgm: No signing key specified.";
+	exit 1;
+fi;
+
+if [ -z "$Metadata" ]; then
+	echo "$Pgm: No enclave metadata specified.";
+	exit 1;
+fi;
+
+if [ -z "$Output" ]; then
+	echo "$Pgm: No output file specified.";
+	exit 1;
+fi;
+
+
+#
+# Generate XML based metadata for signing tool.
+#
+XMLfile="`basename $Metadata .meta`.xml";
+
+sed -r -e '1 i\
+<!-- Automatically generated enclave metadata. -->\
+<EnclaveConfiguration>' \
+	-e 's/(^.*[^ ]) (.*)/  <\1>\2\<\/\1>/' \
+	-e "$ a\\
+  <DisableDebug>$Disable_Debug</DisableDebug>\\
+</EnclaveConfiguration>\\
+" $Metadata >$XMLfile;
+if [ $? -ne 0 ]; then
+	echo "$Pgm: Unable to generate metadata.";
+	rm -f $XMLfile;
+	exit 1;
+fi;
+
+
+# Sign the enclave using the temporary XML configuration.
+/opt/Quixote/share/intel/sgxsdk/bin/sgx_sign sign -key $Key -enclave $Enclave \
+	-out $Output -config $XMLfile;
+
+
+#
+# Exit.
+#
+rm -f $XMLfile;
+exit 0;

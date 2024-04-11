@@ -1,0 +1,3 @@
+[submodule "HurdLib"]
+	path = HurdLib
+	url = git@github.com:Quixote-Project/HurdLib.git
