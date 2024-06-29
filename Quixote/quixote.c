@@ -144,6 +144,11 @@ static char *Digest = NULL;
 static unsigned long Magazine_Size = 0;
 
 /**
+ * The alternate TSEM model that is to be used.
+ */
+static char *TSEM_model = NULL;
+
+/**
  * The following variable holds booleans which describe signals
  * which were received.
  */
@@ -1297,8 +1302,8 @@ static _Bool setup_namespace(_Bool enforce)
 	if ( Current_Namespace )
 		ns = TSEMcontrol_CURRENT_NS;
 
-	if ( !Control->create_ns(Control, TSEMcontrol_TYPE_INTERNAL, Digest,
-				 ns, Magazine_Size) )
+	if ( !Control->create_ns(Control, TSEMcontrol_TYPE_INTERNAL, \
+				 TSEM_model, Digest, ns, Magazine_Size) )
 		ERR(goto done);
 
 	if ( enforce ) {
@@ -2045,7 +2050,7 @@ extern int main(int argc, char *argv[])
 	     infile = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "CPSetuc:d:h:m:n:o:")) != EOF )
+	while ( (opt = getopt(argc, argv, "CPSetuM:c:d:h:m:n:o:")) != EOF )
 		switch ( opt ) {
 			case 'C':
 				Mode = cartridge_mode;
@@ -2064,6 +2069,10 @@ extern int main(int argc, char *argv[])
 				break;
 			case 'u':
 				Current_Namespace = true;
+				break;
+
+			case 'M':
+				TSEM_model = optarg;
 				break;
 
 			case 'c':

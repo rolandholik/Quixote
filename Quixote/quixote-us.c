@@ -175,6 +175,11 @@ static const char *Runc_name = NULL;
 static _Bool Enforce = false;
 
 /**
+ * The alternate TSEM model that is to be used.
+ */
+static char *TSEM_model = NULL;
+
+/**
  * The following variable holds booleans which describe signals
  * which were received.
  */
@@ -1691,8 +1696,8 @@ static _Bool setup_namespace(int *fdptr, _Bool enforce)
 	if ( Current_Namespace )
 		ns = TSEMcontrol_CURRENT_NS;
 
-	if ( !Control->create_ns(Control, TSEMcontrol_TYPE_EXTERNAL, Digest, \
-				 ns, Magazine_Size) )
+	if ( !Control->create_ns(Control, TSEMcontrol_TYPE_EXTERNAL, \
+				 TSEM_model, Digest, ns, Magazine_Size) )
 		ERR(goto done);
 	if ( !Control->id(Control, &id) )
 		ERR(goto done);
@@ -2215,7 +2220,7 @@ extern int main(int argc, char *argv[])
 	LocalDuct mgmt = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "CPSetuc:d:h:m:n:o:p:")) != EOF )
+	while ( (opt = getopt(argc, argv, "CPSetuM:c:d:h:m:n:o:p:")) != EOF )
 		switch ( opt ) {
 			case 'C':
 				Mode = cartridge_mode;
@@ -2235,6 +2240,10 @@ extern int main(int argc, char *argv[])
 				break;
 			case 'u':
 				Current_Namespace = true;
+				break;
+
+			case 'M':
+				TSEM_model = optarg;
 				break;
 
 			case 'c':

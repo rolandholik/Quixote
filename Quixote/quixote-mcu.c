@@ -168,6 +168,11 @@ static const char *Runc_name = NULL;
 static _Bool Enforce = false;
 
 /**
+ * The alternate TSEM model that is to be used.
+ */
+static char *TSEM_model = NULL;
+
+/**
  * The following variable holds booleans which describe signals
  * which were received.
  */
@@ -1911,7 +1916,7 @@ extern int main(int argc, char *argv[])
 	LocalDuct mgmt = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "CPSetuc:d:h:m:n:o:p:s:")) != EOF )
+	while ( (opt = getopt(argc, argv, "CPSetuM:c:d:h:m:n:o:p:s:")) != EOF )
 		switch ( opt ) {
 			case 'C':
 				Mode = cartridge_mode;
@@ -1931,6 +1936,10 @@ extern int main(int argc, char *argv[])
 				break;
 			case 'u':
 				Current_Namespace = true;
+				break;
+
+			case 'M':
+				TSEM_model = optarg;
 				break;
 
 			case 'c':

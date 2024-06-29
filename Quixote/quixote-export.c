@@ -125,6 +125,11 @@ static TSEMevent Event = NULL;
 static const char *Runc_name = NULL;
 
 /**
+ * The alternate TSEM model that is to be used.
+ */
+static char *TSEM_model = NULL;
+
+/**
  * The objects used to write the output.
  */
 static File Output_File	    = NULL;
@@ -437,8 +442,8 @@ static _Bool setup_namespace(int *fdptr)
 	if ( Current_Namespace )
 		ns = TSEMcontrol_CURRENT_NS;
 
-	if ( !Control->create_ns(Control, TSEMcontrol_TYPE_EXPORT, Digest, \
-				 ns, Magazine_Size) )
+	if ( !Control->create_ns(Control, TSEMcontrol_TYPE_EXPORT, \
+				 TSEM_model, Digest, ns, Magazine_Size) )
 		ERR(goto done);
 	if ( !Control->id(Control, &id) )
 		ERR(goto done);
@@ -1044,6 +1049,7 @@ static _Bool export_root(const _Bool follow, CO(char *, queue_size))
 		if ( poll_data[0].revents & POLLIN ) {
 			if ( !_get_event(fd, str, &nodata) )
 				ERR(goto done);
+			fprintf(stderr, "follow: >%s<\n", str->get(str));
 			if ( ++queue_cnt > queue_length ) {
 				if ( !Event->set_event(Event, str) )
 					ERR(goto done);
@@ -1096,7 +1102,7 @@ extern int main(int argc, char *argv[])
 	struct sigaction signal_action;
 
 
-	while ( (opt = getopt(argc, argv, "CPRSfuU:b:c:d:h:n:o:p:q:t:")) != \
+	while ( (opt = getopt(argc, argv, "CPRSfuM:U:b:c:d:h:n:o:p:q:t:")) != \
 		EOF )
 		switch ( opt ) {
 			case 'C':
@@ -1119,6 +1125,9 @@ extern int main(int argc, char *argv[])
 				Current_Namespace = true;
 				break;
 
+			case 'M':
+				TSEM_model = optarg;
+				break;
 			case 'U':
 				user = optarg;
 				break;
@@ -1231,7 +1240,7 @@ extern int main(int argc, char *argv[])
 		}
 
 		INIT(NAAAIM, MQTTduct, MQTT, ERR(goto done));
-		if ( !MQTT->init_publisher(MQTT, broker, 0, topic, user, pwd) )
+		if ( !MQTT->init_publisher(MQTT, broker, 10902, topic, user, pwd) )
 			ERR(goto done);
 	}
 

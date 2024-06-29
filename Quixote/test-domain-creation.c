@@ -35,6 +35,8 @@
 int main(int argc, char *argv[])
 
 {
+	char *model = "integrity";
+
 	pid_t pid;
 
 	uint64_t id;
@@ -54,8 +56,10 @@ int main(int argc, char *argv[])
 
 	/* Child process. */
 	if ( pid == 0 ) {
+		fprintf(stdout, "Creating ns with model: '%s'\n", model);
+
 		if ( !Control->create_ns(Control, TSEMcontrol_TYPE_EXTERNAL,
-					 NULL, TSEMcontrol_INIT_NS, 0) )
+					 model, NULL, TSEMcontrol_INIT_NS, 0) )
 			ERR(goto done);
 		fputs("Created namespace.\n", stderr);
 		if ( !Control->id(Control, &id) )
