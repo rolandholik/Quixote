@@ -26,15 +26,6 @@
 
 #define _GNU_SOURCE
 
-#define GWHACK(type, var) {			\
-	size_t i=var->size(var) / sizeof(type);	\
-	type *o=(type *) var->get(var);		\
-	while ( i-- ) {				\
-		(*o)->whack((*o));		\
-		o+=1;				\
-	}					\
-}
-
 
 /* Include files. */
 #include <stdio.h>
@@ -63,6 +54,7 @@
 #include <Buffer.h>
 #include <String.h>
 #include <File.h>
+#include <Gaggle.h>
 
 #include "quixote.h"
 #include "sancho-cmd.h"
@@ -128,6 +120,11 @@ static const char *Runc_name = NULL;
  * The alternate TSEM model that is to be used.
  */
 static char *TSEM_model = NULL;
+
+/**
+ * The number of event descriptions that are queued.
+ */
+static size_t Queued = 0;
 
 /**
  * The objects used to write the output.
@@ -331,40 +328,6 @@ static _Bool output_event_description()
 
 
   done:
-	return retn;
-}
-
-
-/**
- * Private function.
- *
- * This function is responsible for outputting a series of queued
- * events.
- *
- * \return		A boolean value is returned to indicate whether
- *			or not processing of the event was successful.  A
- *			false value indicates a failure in event
- *			processing while a true value indicates that
- *			event processing has succeeded.
- */
-
-static _Bool output_queued()
-
-{
-	_Bool retn = false;
-
-
-	Output_String->reset(Output_String);
-	if ( !Output_String->add(Output_String, Event->get_event(Event)) )
-		ERR(goto done);
-
-	if ( !output_event_description() )
-		ERR(goto done);
-
-	retn = true;
-
-
- done:
 	return retn;
 }
 
@@ -878,22 +841,23 @@ static _Bool fire_cartridge(CO(char *, cartridge))
  * function reads a single event description and loads it into the
  * supplied TSEMevent object.
  *
- * \param fd	The file descriptor of the pseudo-file from which the
- *		event description is to be read.
+ * \param fd		The file descriptor of the pseudo-file from which
+ *			the event description is to be read.
  *
- * \param str	The object that the event description is to be read
- *		into.
+ * \param output	The object that is used to queue the event
+ *			descriptions that are to be output.
+ *
+ * \param nodata	A pointer to a boolean variable that will be
+ *			used to indicate whether or not the end of the
+ *			current events had been reached.
  *
  * \return	A boolean value is returned to reflect the status of
  *		the read.  A false value indicates an error was
  *		encountered while a true value indicates the output
- *		structure was populated with an event.  The end of
- *		the current event list is signaled by the str
- *		object having a zero size upon return from the
- *		function.
+ *		structure was populated with an event.
  */
 
-static _Bool _get_event(const int fd, CO(String, str), _Bool *nodata)
+static _Bool _get_event(const int fd, CO(Gaggle, output), _Bool *nodata)
 
 {
 	_Bool retn = false;
@@ -901,6 +865,8 @@ static _Bool _get_event(const int fd, CO(String, str), _Bool *nodata)
 	char bufr[PAGE_SIZE + 1];
 
 	int rc;
+
+	String str;
 
 
 	memset(bufr, '\0', sizeof(bufr));
@@ -912,8 +878,11 @@ static _Bool _get_event(const int fd, CO(String, str), _Bool *nodata)
 	}
 
 	if ( rc > 0 ) {
+		str = GGET(output, str);
+		str->reset(str);
 		if ( !str->add(str, bufr) )
 			ERR(goto done);
+
 		if ( lseek(fd, 0, SEEK_SET) < 0 )
 			ERR(goto done);
 		retn = true;
@@ -922,8 +891,113 @@ static _Bool _get_event(const int fd, CO(String, str), _Bool *nodata)
 			*nodata = true;
 			retn = true;
 		}
-		else
+	}
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * Private helper function.
+ *
+ * This function traverses the output object and sends each description
+ * to the designated output.
+ *
+ * \param output	The object containing the set of events to
+ *			be output.
+ *
+ * \return	A boolean value is used indicate whether or not the
+ *		output succeeded.  A false value indicates an error
+ *		occurred while a true value indicates that all of the
+ *		events were sent.
+ */
+
+static _Bool _output_events(CO(Gaggle, output))
+
+{
+	_Bool retn = false;
+
+	size_t lp;
+
+	String str;
+
+
+	output->rewind_cursor(output);
+
+	if ( MQTT != NULL ) {
+		Output_String->reset(Output_String);
+		for (lp= 0; lp < Queued; ++lp) {
+			str = GGET(output, str);
+			if ( !Output_String->add(Output_String, \
+						 str->get(str)) )
+				ERR(goto done);
+		}
+		if ( !MQTT->send_String(MQTT, Output_String) )
 			ERR(goto done);
+	}
+
+	if ( Output_File != NULL ) {
+		for (lp= 0; lp < Queued; ++lp) {
+			str = GGET(output, str);
+			if ( !Output_File->write_String(Output_File, str) )
+				ERR(goto done);
+		}
+	}
+
+	retn = true;
+	output->rewind_cursor(output);
+
+
+  done:
+	return retn;
+}
+
+
+/**
+ * Private helper function.
+ *
+ * This function is a helper function for the export_root function.  This
+ * function reads and outputs all of the oustanding events that are
+ * available.
+ *
+ * \param fd		The file descriptor of the pseudo-file from which
+ *			the event descriptions are to be read.
+ *
+ * \param output	The object that is used to hold the event
+ *			entries.
+ *
+ * \return	A boolean value is returned to reflect the status of
+ *		the exports.  A false value indicates an error was
+ *		encountered while a true value indicates the currently
+ *		available events have been exported.
+ */
+
+static _Bool _export_events(const int fd, CO(Gaggle, output))
+
+{
+	_Bool retn   = false,
+	      nodata = false;
+
+
+	/* Output events until the end of the event list is met. */
+	output->rewind_cursor(output);
+
+	while ( true ) {
+		if ( !_get_event(fd, output, &nodata) )
+			ERR(goto done);
+
+		if ( nodata ) {
+			retn = true;
+			break;
+		}
+
+		if ( ++Queued == output->size(output) ) {
+			if ( !_output_events(output) )
+				ERR(goto done);
+			Queued = 0;
+		}
 	}
 
 
@@ -955,22 +1029,22 @@ static _Bool _get_event(const int fd, CO(String, str), _Bool *nodata)
 static _Bool export_root(const _Bool follow, CO(char *, queue_size))
 
 {
-	_Bool nodata = false,
-	      retn = false;
+	_Bool retn = false;
 
 	int rc,
 	    fd;
 
+	unsigned int lp;
+
+	long int queue_length;
+
 	unsigned int cycle = 0;
-
-	long int queue_cnt    = 0,
-		 queue_length = 0;
-
 
 	struct pollfd poll_data[1];
 
-	String str = NULL;
+	String str;
 
+	Gaggle output = NULL;
 
 
 	/* Open the root export file. */
@@ -982,44 +1056,26 @@ static _Bool export_root(const _Bool follow, CO(char *, queue_size))
 	if ( errno == ERANGE )
 		goto done;
 
-	/* Process queued entries. */
-	INIT(HurdLib, String, str, ERR(goto done));
-
-	while ( true ) {
-		if ( !_get_event(fd, str, &nodata) )
+	/* Initialize output queue. */
+	INIT(HurdLib, Gaggle, output, ERR(goto done));
+	for (lp= 0; lp < queue_length; ++lp) {
+		INIT(HurdLib, String, str, ERR(goto done));
+		if ( !GADD(output, str) )
 			ERR(goto done);
-
-		if ( nodata )
-			break;
-
-		if ( ++queue_cnt > queue_length ) {
-			Event->reset(Event);
-			if ( !Event->set_event(Event, str) )
-				ERR(goto done);
-			if ( !output_queued() )
-				ERR(goto done);
-			queue_cnt = 0;
-			str->reset(str);
-		}
 	}
 
-	/* Flush any queued entries before returning or following. */
-	if ( queue_cnt > queue_length ) {
-		Event->reset(Event);
-		if ( !Event->set_event(Event, str) )
-			ERR(goto done);
-		if ( !output_queued() )
-			ERR(goto done);
-		queue_cnt = 0;
-		str->reset(str);
-	}
+	/* Output entries that have been queued. */
+	if ( !_export_events(fd, output) )
+		ERR(goto done);
 
 	if ( !follow ) {
+		if ( !_output_events(output) )
+			ERR(goto done);
 		retn = true;
 		goto done;
 	}
 
-	/* Loop and output events as they are generated.. */
+	/* Output events as they are generated.. */
 	if ( Debug )
 		fprintf(Debug, "%d: Running root event loop.\n", getpid());
 
@@ -1047,31 +1103,15 @@ static _Bool export_root(const _Bool follow, CO(char *, queue_size))
 				rc, poll_data[0].revents);
 
 		if ( poll_data[0].revents & POLLIN ) {
-			if ( !_get_event(fd, str, &nodata) )
+			if ( !_export_events(fd, output) )
 				ERR(goto done);
-			fprintf(stderr, "follow: >%s<\n", str->get(str));
-			if ( ++queue_cnt > queue_length ) {
-				if ( !Event->set_event(Event, str) )
-					ERR(goto done);
-				if ( !output_queued() )
-					ERR(goto done);
-				queue_cnt = 0;
-				str->reset(str);
-			}
 		}
-
 	}
 
 
  done:
-	if ( queue_cnt > 0 ) {
-		if ( !Event->set_event(Event, str) )
-			ERR(goto done);
-		if ( !output_queued() )
-			ERR(goto done);
-	}
-
-	WHACK(str);
+	GWHACK(output, String);
+	WHACK(output);
 
 	return retn;
 }
