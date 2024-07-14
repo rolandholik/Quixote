@@ -298,43 +298,6 @@ static void kill_cartridge(_Bool wait)
 /**
  * Private function.
  *
- * This function is responsible for outputting the security event
- * description or descriptions that have been encoded in the
- * Output_String object.
- *
- * \return	A boolean value is returned to indicate whether or not
- *		processing of the event was successful.  A false value
- *		indicates a failure in event processing while a true
- *		value indicates that event processing has succeeded.
- */
-
-static _Bool output_event_description()
-
-{
-	_Bool retn = false;
-
-
-	if ( MQTT != NULL ) {
-		if ( !MQTT->send_String(MQTT, Output_String) )
-			ERR(goto done);
-	}
-
-	if ( Output_File != NULL ) {
-		if ( !Output_File->write_String(Output_File, Output_String) )
-			ERR(goto done);
-	}
-
-	retn = true;
-
-
-  done:
-	return retn;
-}
-
-
-/**
- * Private function.
- *
  * This function is responsible for outputting a single event description.
  *
  * \return		A boolean value is returned to indicate whether
@@ -352,14 +315,18 @@ static _Bool output_event()
 	Output_String->reset(Output_String);
 	if ( !Output_String->add(Output_String, Event->get_event(Event)) )
 		ERR(goto done);
+	if ( !Output_String->add(Output_String, "\n") )
+			ERR(goto done);
 
-	if ( Output_File != NULL ) {
-		if ( !Output_String->add(Output_String, "\n") )
+	if ( MQTT != NULL ) {
+		if ( !MQTT->send_String(MQTT, Output_String) )
 			ERR(goto done);
 	}
 
-	if ( !output_event_description() )
-		ERR(goto done);
+	if ( Output_File != NULL ) {
+		if ( !Output_File->write_String(Output_File, Output_String) )
+			ERR(goto done);
+	}
 
 	retn = true;
 
