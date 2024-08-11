@@ -849,9 +849,6 @@ static _Bool _get_event(const int fd, CO(Gaggle, output), _Bool *nodata)
 		str->reset(str);
 		if ( !str->add(str, bufr) )
 			ERR(goto done);
-
-		if ( lseek(fd, 0, SEEK_SET) < 0 )
-			ERR(goto done);
 		retn = true;
 	} else {
 		if ( errno == ENODATA ) {
@@ -859,6 +856,9 @@ static _Bool _get_event(const int fd, CO(Gaggle, output), _Bool *nodata)
 			retn = true;
 		}
 	}
+
+	if ( lseek(fd, 0, SEEK_SET) < 0 )
+		ERR(goto done);
 
 
  done:
@@ -1078,7 +1078,6 @@ static _Bool export_root(const _Bool follow, CO(char *, queue_size))
 
  done:
 	GWHACK(output, String);
-	WHACK(output);
 
 	return retn;
 }
