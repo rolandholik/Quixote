@@ -10,10 +10,14 @@
  * the source tree for copyright and licensing information.
  **************************************************************************/
 
+/* Local defines. */
+#define PWFILE "/opt/Quixote/etc/mqtt.pwd"
+
 /* Include files. */
 #include <stdint.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
@@ -28,6 +32,7 @@
 #include <HurdLib.h>
 #include <Buffer.h>
 #include <String.h>
+#include <File.h>
 
 #include "NAAAIM.h"
 #include "MQTTduct.h"
@@ -71,9 +76,10 @@ struct NAAAIM_MQTTduct_State
 	String topic;
 	unsigned int count;
 
-	/* Broker port and hostname .*/
+	/* Broker port, hostname and password.*/
 	String port;
 	String broker;
+	String password;
 };
 
 
@@ -105,12 +111,83 @@ static void _init_state(CO(MQTTduct_State, S)) {
 	S->topic = NULL;
 	S->count = 0;
 
-	S->port	  = NULL;
-	S->broker = NULL;
+	S->port	    = NULL;
+	S->broker   = NULL;
+	S->password = NULL;
 
 	mosquitto_lib_init();
 
 	return;
+}
+
+
+/**
+ * Internal private method.
+ *
+ * This method implements setting of the password that will be used for
+ * the client.  This function can be called to either set the password
+ * through the TSEM_PASSWORD environment variable or by reading the
+ * password from the following file:
+ *
+ * /opt/Quixote/etc/mqtt.pwd
+ *
+ * The TSEM_PASSWORD variable overrides the use of a file as the source
+ * of the password information.
+ *
+ * If opening of the file files the setting of the password fails.
+ *
+ * \param this		A pointer to the state information for the
+ *			client whose password is being set.
+ *
+ * \parm pwd_file	A null-termianted character buffer containing
+ *			an alternate filename to be used for looking
+ *			up a file based password.
+ *
+ *
+ * \return	A boolean return value is used to indicate success or
+ *		failure of password initialization.  A true value is used
+ *		to indicate success while a false value indicates the
+ *		password was not successfully set.
+ */
+
+static _Bool set_password(CO(MQTTduct, this), CO(char *, pwfile))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	char *pwd;
+
+	const char *pwd_locn = pwfile == NULL ? PWFILE : pwfile;
+
+	File pwd_file = NULL;
+
+
+	INIT(HurdLib, String, S->password, ERR(goto done));
+
+	/* Check for an environment variable override. */
+	if ( (pwd = getenv("TSEM_PASSWORD")) != NULL ) {
+		if ( !S->password->add(S->password, pwd) )
+			ERR(goto done);
+		retn = true;
+		goto done;
+	}
+
+
+	/* Look for a file based password. */
+	INIT(HurdLib, File, pwd_file, ERR(goto done));
+	if ( !pwd_file->open_ro(pwd_file, pwd_locn) )
+		ERR(goto done);
+	if ( !pwd_file->read_String(pwd_file, S->password) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	WHACK(pwd_file);
+
+	return retn;
 }
 
 
@@ -217,6 +294,17 @@ static _Bool init_publisher(CO(MQTTduct, this), CO(char *, broker), int port, \
 
 	_Bool retn = false;
 
+	const char *use_pwd;
+
+
+	/* Select the password to be used. */
+	if ( (pwd == NULL) && (S->password == NULL) )
+		ERR(goto done);
+
+	if ( pwd != NULL )
+		use_pwd = pwd;
+	else
+		use_pwd = S->password->get(S->password);
 
 	/* Save the topic. */
 	if ( !S->topic->add(S->topic, topic) )
@@ -226,8 +314,8 @@ static _Bool init_publisher(CO(MQTTduct, this), CO(char *, broker), int port, \
 	if ( (S->ctx = mosquitto_new(NULL, true, S)) == NULL )
 		ERR(goto done);
 
-	if ( (user != NULL) && (pwd != NULL) ) {
-		S->error = mosquitto_username_pw_set(S->ctx, user, pwd);
+	if ( (user != NULL) && (use_pwd != NULL) ) {
+		S->error = mosquitto_username_pw_set(S->ctx, user, use_pwd);
 		if ( S->error != MOSQ_ERR_SUCCESS )
 			ERR(goto done);
 	}
@@ -360,6 +448,7 @@ static void whack(CO(MQTTduct, this))
 
 	/* Destroy internal resources. */
 	S->topic->whack(S->topic);
+	S->password->whack(S->password);
 
 	/* Destroy the object. */
 	S->root->whack(S->root, this, S);
@@ -405,6 +494,7 @@ extern MQTTduct NAAAIM_MQTTduct_Init(void)
 	INIT(HurdLib, String, this->state->topic, goto fail);
 
 	/* Method initialization. */
+	this->set_password   = set_password;
 	this->init_publisher = init_publisher;
 
 	this->send_String = send_String;

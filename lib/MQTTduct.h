@@ -26,6 +26,7 @@ typedef struct NAAAIM_MQTTduct_State * MQTTduct_State;
 struct NAAAIM_MQTTduct
 {
 	/* External methods. */
+	_Bool (*set_password)(const MQTTduct, const char *);
 	_Bool (*init_publisher)(const MQTTduct, const char *, int port, \
 				const char *, const char *, const char *);
 
