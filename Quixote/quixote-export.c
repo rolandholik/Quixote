@@ -1129,8 +1129,7 @@ extern int main(int argc, char *argv[])
 {
 	_Bool follow = false;
 
-	char *pwd,
-	     *debug	    = NULL,
+	char *debug	    = NULL,
 	     *broker	    = NULL,
 	     *topic	    = NULL,
 	     *cartridge	    = NULL,
@@ -1278,16 +1277,16 @@ extern int main(int argc, char *argv[])
 	}
 
 	if ( broker != NULL ) {
-		pwd = getenv("TSEM_PASSWORD");
-
 		if ( topic == NULL ) {
 			fputs("No broker topic specified.\n", stderr);
 			goto done;
 		}
 
 		INIT(NAAAIM, MQTTduct, MQTT, ERR(goto done));
+		if ( !MQTT->set_password(MQTT, NULL) )
+			ERR(goto done);
 		if ( !MQTT->init_publisher(MQTT, broker, 10902, topic, user, \
-					   pwd) )
+					   NULL) )
 			ERR(goto done);
 	}
 
