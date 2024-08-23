@@ -24,6 +24,10 @@ SUBDIRS	    := ${SUBDIRS} SRDE
 DEV_SUBDIRS := ${DEV_SUBDIRS} SRDE
 endif
 
+ifdef BUILD_KERNEL_SOURCE
+SUBDIRS += TSEM
+endif
+
 
 #
 # Target directives.
@@ -50,6 +54,9 @@ lib:
 
 utils:
 	${MAKE} -C $@;
+
+TSEM:
+	${MAKE} -C $@ build;
 
 SRDE:
 	${MAKE} -C $@;
