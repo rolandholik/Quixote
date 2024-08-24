@@ -65,6 +65,7 @@
 #include <Buffer.h>
 #include <String.h>
 #include <File.h>
+#include <Process.h>
 
 #include "quixote.h"
 #include "sancho-cmd.h"
@@ -149,6 +150,11 @@ static unsigned long Magazine_Size = 0;
 static char *TSEM_model = NULL;
 
 /**
+ * Object used to manage invocation of a specific command in execute mode.
+ */
+static Process Execute = NULL;
+
+/**
  * The following variable holds booleans which describe signals
  * which were received.
  */
@@ -170,6 +176,7 @@ struct {
 	 show_mode,
 	 process_mode,
 	 cartridge_mode,
+	 execute_mode
 } Mode = cartridge_mode;
 
 /** The numerical definitions for the security model load commands. */
@@ -317,6 +324,7 @@ static _Bool setup_management(CO(LocalDuct, mgmt), const char *cartridge)
 			break;
 
 		case process_mode:
+		case execute_mode:
 			sockpath->add_sprintf(sockpath, "%s/pid-", \
 					      QUIXOTE_PROCESS_MGMT_DIR);
 			if ( cartridge != NULL ) {
@@ -1745,14 +1753,23 @@ static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int model_fd)
  *			security domain should be placed in enforcement
  *			mode.
  *
+ * \param argc		The number of command-line arguments specified
+ *			for the execution of the security namespace.
+ *
+ * \param argv		A pointer to the array of strings describing
+ *			the command-line arguements.  This variable and
+ *			the argc value are used if the export utility
+ *			has been running in execute mode.
+ *
  * \return	A boolean value is returned to reflect the status of
  *		the launch.  A false value indicates an error was
  *		encountered while a true value indicates the cartridge
  *		was successfully launched.
  */
 
-static _Bool fire_cartridge(CO(LocalDuct, mgmt), CO(char *, cartridge),
-			    CO(File, map), int *map_fd, _Bool enforce)
+static _Bool fire_cartridge(CO(LocalDuct, mgmt), CO(char *, cartridge),	\
+			    CO(File, map), int *map_fd, _Bool enforce,	\
+			    int argc, char *argv[])
 
 {
 	_Bool retn = false;
@@ -1851,6 +1868,28 @@ static _Bool fire_cartridge(CO(LocalDuct, mgmt), CO(char *, cartridge),
 				fputs("Executing cartridge process.\n", Debug);
 			execlp("bash", "bash", "-i", NULL);
 			fputs("Cartridge process execution failed.\n", stderr);
+			exit(1);
+		}
+
+		if ( Mode == execute_mode ) {
+			if ( geteuid() != getuid() ) {
+				if ( Debug )
+					fprintf(Debug, "Changing to " \
+						"real id: \%u\n",     \
+						getuid());
+				if ( setuid(getuid()) != 0 ) {
+					fputs("Cannot change uid.\n", \
+					      stderr);
+					exit(1);
+				}
+			}
+
+			if ( Debug )
+				fputs("Executing command line.\n", \
+				      Debug);
+			Execute->run_command_line(Execute, argc, argv);
+			fputs("Command line execution failed.\n", \
+			      stderr);
 			exit(1);
 		}
 	}
@@ -2050,7 +2089,7 @@ extern int main(int argc, char *argv[])
 	     infile = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "CPSetuM:c:d:h:m:n:o:")) != EOF )
+	while ( (opt = getopt(argc, argv, "CPSXetuM:c:d:h:m:n:o:")) != EOF )
 		switch ( opt ) {
 			case 'C':
 				Mode = cartridge_mode;
@@ -2069,6 +2108,9 @@ extern int main(int argc, char *argv[])
 				break;
 			case 'u':
 				Current_Namespace = true;
+				break;
+			case 'X':
+				Mode = execute_mode;
 				break;
 
 			case 'M':
@@ -2170,11 +2212,16 @@ extern int main(int argc, char *argv[])
 	if ( !setup_management(mgmt, cartridge) )
 		ERR(goto done);
 
+	/* Initialize the process object if in execute mode. */
+	if ( Mode == execute_mode )
+		INIT(HurdLib, Process, Execute, ERR(goto done));
+
 	/* Launch the software cartridge. */
 	if ( Debug )
 		fprintf(Debug, "Launch process: %d\n", getpid());
 
-	if ( !fire_cartridge(mgmt, cartridge, state, &mapfd, enforce) )
+	if ( !fire_cartridge(mgmt, cartridge, state, &mapfd, enforce, \
+			     argc, argv) )
 		ERR(goto done);
 
 	/* Read the PID of the workload process. */
@@ -2232,6 +2279,7 @@ extern int main(int argc, char *argv[])
 	WHACK(mapout);
 	WHACK(state);
 	WHACK(infile);
+	WHACK(Execute);
 
 	if ( mapfd > 0 )
 		close(mapfd);
