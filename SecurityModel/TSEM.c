@@ -1079,18 +1079,11 @@ static int _state_sort(const void *a1, const void *a2)
 {
 	int retn = 0;
 
+	const unsigned char *p1 = a1,
+			    *p2 = a2;
+
 	uint8_t lp;
 
-	SecurityPoint cp1 = *(SecurityPoint *) a1,
-		      cp2 = *(SecurityPoint *) a2;
-
-	unsigned char *p1 = cp1->get(cp1),
-		      *p2 = cp2->get(cp2);
-
-	Buffer bufr = NULL;
-
-
-	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 
 	for (lp= 0; lp < NAAAIM_IDSIZE; ++lp) {
 		if ( *p1 == *p2 ) {
@@ -1102,12 +1095,9 @@ static int _state_sort(const void *a1, const void *a2)
 			retn = -1;
 		else
 			retn = 1;
-		goto done;
+		break;
 	}
 
-
- done:
-	WHACK(bufr);
 
 	return retn;
 }
@@ -1138,43 +1128,40 @@ static _Bool get_state(CO(TSEM, this), CO(Buffer, out))
 
 	_Bool retn = false;
 
-	unsigned char state[NAAAIM_IDSIZE];
+	unsigned char *p,
+		      state[NAAAIM_IDSIZE];
 
 	size_t cnt;
 
-	void *p;
-
 	Buffer points = NULL;
 
-	SecurityPoint *ep,
-		      event;
+	SecurityPoint ep;
 
 
-	/* Clone the list of security state points. */
+	/* Clone the list of security coefficients. */
 	INIT(HurdLib, Buffer, points, ERR(goto done));
 
 	cnt = S->points->size(S->points);
 	S->points->rewind_cursor(S->points);
 
 	while ( cnt-- ) {
-		p = S->points->get(S->points);
-		if ( !points->add(points, p, sizeof(void *)) )
+		ep = GGET(S->points, ep);
+		if ( !points->add(points, ep->get(ep), NAAAIM_IDSIZE) )
 			ERR(goto done);
 	}
 
-
 	/* Sort the points. */
 	cnt = S->points->size(S->points);
-	qsort(points->get(points), cnt, sizeof(SecurityPoint), _state_sort);
+	qsort(points->get(points), cnt, NAAAIM_IDSIZE, _state_sort);
 
-	ep = (SecurityPoint *) points->get(points);
+	/* Generate the state measurement. */
+	p = points->get(points);
 	memcpy(state, S->aggregate->get(S->aggregate), sizeof(state));
 
 	while ( cnt-- ) {
-		event = *ep;
-		if ( !_extend_measurement(S, event->get(event), state) )
+		if ( !_extend_measurement(S, p, state) )
 			ERR(goto done);
-		++ep;
+		p += NAAAIM_IDSIZE;
 	}
 
 	if ( !out->add(out, state, sizeof(state)) )
