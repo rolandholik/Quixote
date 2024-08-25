@@ -40,6 +40,7 @@
 #include <limits.h>
 #include <sched.h>
 #include <glob.h>
+#include <pwd.h>
 #include <sys/capability.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -608,6 +609,51 @@ static _Bool child_monitor(CO(char *, cartridge), int fd)
 
 
 /**
+ * Private helper function.
+ *
+ * This function is a helper function for the fire_cartridge() function.
+ * The purpose of this function is to set the process permissions to, by
+ * default, to the 'nobody' value, ie. with no privileges.
+ *
+ * \param user	A character pointer to the name of the uid that the
+ *		process will be changed to.  Passing a NULL value to this
+ *		function will cause the 'nobody' user to be attempted.
+ *
+ * \return	A boolean value is returned to reflect the status of
+ *		the permissions change.  A false value indicates an error
+ *		was encountered while a true value indicates the permissions
+ *		were successfully changed.
+ */
+
+static _Bool _set_user(CO(char *, user))
+
+{
+	_Bool retn = false;
+
+	const char *u = user == NULL ? "nobody" : user;
+
+	struct passwd *pw;
+
+
+	if ( (pw = getpwnam(u)) == NULL )
+		ERR(goto done);
+	if ( Debug )
+		fprintf(Debug, "%d: Setting credentials to %s\n", getpid(), \
+			pw->pw_name);
+
+	if ( setgid(pw->pw_gid) != 0 )
+		ERR(goto done);
+	if ( setuid(pw->pw_uid) != 0 )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
  * Private function.
  *
  * This function is responsible for launching a software cartridge
@@ -633,7 +679,8 @@ static _Bool child_monitor(CO(char *, cartridge), int fd)
  *		was successfully launched.
  */
 
-static _Bool fire_cartridge(CO(char *, cartridge), int argc, char *argv[])
+static _Bool fire_cartridge(CO(char *, cartridge), int argc, char *argv[],
+			    CO(char *, user))
 
 {
 	_Bool retn = false;
@@ -677,9 +724,12 @@ static _Bool fire_cartridge(CO(char *, cartridge), int argc, char *argv[])
 		if ( Debug )
 			fprintf(Debug, "Monitor process: %d\n", Monitor_pid);
 
+		if ( !_set_user(user) )
+			ERR(goto done);
 		close(event_pipe[WRITE_SIDE]);
+
 		if ( !child_monitor(cartridge, event_pipe[READ_SIDE]) )
-				ERR(goto done);
+			ERR(goto done);
 		retn = true;
 		goto done;
 	}
@@ -702,7 +752,7 @@ static _Bool fire_cartridge(CO(char *, cartridge), int argc, char *argv[])
 			exit(1);
 
 		/* Child process - run the cartridge. */
-	if ( cartridge_pid == 0 ) {
+		if ( cartridge_pid == 0 ) {
 			if ( Debug )
 				fprintf(Debug, "Workload process: %d\n",
 					getpid());
@@ -764,6 +814,9 @@ static _Bool fire_cartridge(CO(char *, cartridge), int argc, char *argv[])
 		}
 
 		/* Parent process - monitor for events. */
+		if ( !_set_user(user) )
+			ERR(goto done);
+
 		poll_data[0].fd	    = event_fd;
 		poll_data[0].events = POLLIN;
 
@@ -1132,10 +1185,11 @@ extern int main(int argc, char *argv[])
 	char *debug	    = NULL,
 	     *broker	    = NULL,
 	     *topic	    = NULL,
+	     *user	    = NULL,
 	     *cartridge	    = NULL,
 	     *magazine_size = NULL,
 	     *queue_size    = "100",
-	     *user	    = "tsem",
+	     *tsem_user	    = "tsem",
 	     *outfile	    = "/dev/stdout";
 
 	int opt,
@@ -1144,7 +1198,7 @@ extern int main(int argc, char *argv[])
 	struct sigaction signal_action;
 
 
-	while ( (opt = getopt(argc, argv, "CPRSXfuM:U:b:c:d:h:n:o:p:q:t:")) \
+	while ( (opt = getopt(argc, argv, "CPRSXfuM:U:b:c:d:h:n:o:p:q:s:t:")) \
 		!= EOF )
 		switch ( opt ) {
 			case 'C':
@@ -1197,6 +1251,9 @@ extern int main(int argc, char *argv[])
 				break;
 			case 'q':
 				queue_size = optarg;
+				break;
+			case 's':
+				user = optarg;
 				break;
 			case 't':
 				topic = optarg;
@@ -1285,8 +1342,8 @@ extern int main(int argc, char *argv[])
 		INIT(NAAAIM, MQTTduct, MQTT, ERR(goto done));
 		if ( !MQTT->set_password(MQTT, NULL) )
 			ERR(goto done);
-		if ( !MQTT->init_publisher(MQTT, broker, 10902, topic, user, \
-					   NULL) )
+		if ( !MQTT->init_publisher(MQTT, broker, 10902, topic, \
+					   tsem_user, NULL) )
 			ERR(goto done);
 	}
 
@@ -1307,7 +1364,7 @@ extern int main(int argc, char *argv[])
 	/* Fire the workload cartridge. */
 	if ( Debug )
 		fprintf(Debug, "Launch process: %d\n", getpid());
-	if ( !fire_cartridge(cartridge, argc, argv) )
+	if ( !fire_cartridge(cartridge, argc, argv, user) )
 		ERR(goto done);
 
 	waitpid(Monitor_pid, NULL, 0);
