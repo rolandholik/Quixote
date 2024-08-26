@@ -195,3 +195,24 @@ Version 1.6:
 	* Surface timestamp and task disambiguator information.
 
 	* Use UUID leveling for TMPFS filesystems.
+
+Version 1.7
+	* Supports TSEM version 4 release.
+
+	* Update HurdLib implementation used.
+
+	* Update signing key.
+
+	* Implement support for specifying alternate event processing models.
+
+	* Implement sample kernel loadable module for customized event
+	  processing.
+
+	* Implement execute mode for quixote, quixote-us and quixote-export
+	  utilities.
+
+	* Allow MQTT passwords to be read from a privileged access file.
+
+	* Use consistent linefeed termination for exported events.
+
+	* Drop privileges in quixote-export utility.
