@@ -86,11 +86,6 @@ static FILE *Debug = NULL;
 static pid_t Monitor_pid;
 
 /**
- * The control object for the model.
- */
-static TSEMcontrol Control = NULL;
-
-/**
  * This variable is used to control whether the security event
  * descriptions are to reference the initial user namespace or
  * the current user namespace that the process is running in.
@@ -375,15 +370,19 @@ static _Bool setup_namespace(int *fdptr)
 
 	enum TSEMcontrol_ns_config ns = 0;
 
+	TSEMcontrol control = NULL;
+
+
+	INIT(NAAAIM, TSEMcontrol, control, ERR(goto done));
 
 	/* Create and configure a security model namespace. */
 	if ( Current_Namespace )
 		ns = TSEMcontrol_CURRENT_NS;
 
-	if ( !Control->create_ns(Control, TSEMcontrol_TYPE_EXPORT, \
+	if ( !control->create_ns(control, TSEMcontrol_TYPE_EXPORT, \
 				 TSEM_model, Digest, ns, Magazine_Size) )
 		ERR(goto done);
-	if ( !Control->id(Control, &id) )
+	if ( !control->id(control, &id) )
 		ERR(goto done);
 
 
@@ -403,6 +402,9 @@ static _Bool setup_namespace(int *fdptr)
  done:
 	if ( retn )
 		*fdptr = fd;
+
+	WHACK(control);
+
 	return retn;
 }
 
@@ -1321,7 +1323,6 @@ extern int main(int argc, char *argv[])
 
 	/* Initialize the security model and its controller. */
 	INIT(NAAAIM, TSEMevent, Event, ERR(goto done));
-	INIT(NAAAIM, TSEMcontrol, Control, ERR(goto done));
 
 	/* Handle output to a file. */
 	if ( (outfile != NULL) && (broker == NULL) ) {
@@ -1375,7 +1376,6 @@ extern int main(int argc, char *argv[])
 	WHACK(MQTT);
 	WHACK(Output_File);
 
-	WHACK(Control);
 	WHACK(Event);
 	WHACK(Execute);
 
