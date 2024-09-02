@@ -394,7 +394,7 @@ static _Bool setup_namespace(int *fdptr)
 	if ( Debug )
 		fprintf(Debug, "Update file: %s\n", fname);
 
-	if ( (fd = open(fname, O_RDONLY)) < 0 )
+	if ( (fd = open(fname, O_RDONLY | O_CLOEXEC)) < 0 )
 		ERR(goto done);
 	retn = true;
 
@@ -725,10 +725,10 @@ static _Bool fire_cartridge(CO(char *, cartridge), int argc, char *argv[],
 	if ( Monitor_pid > 0 ) {
 		if ( Debug )
 			fprintf(Debug, "Monitor process: %d\n", Monitor_pid);
+		close(event_pipe[WRITE_SIDE]);
 
 		if ( !_set_user(user) )
 			ERR(goto done);
-		close(event_pipe[WRITE_SIDE]);
 
 		if ( !child_monitor(cartridge, event_pipe[READ_SIDE]) )
 			ERR(goto done);
@@ -739,6 +739,9 @@ static _Bool fire_cartridge(CO(char *, cartridge), int argc, char *argv[],
 	/* Child process - create an independent namespace for this process. */
 	if ( Monitor_pid == 0 ) {
 		close(event_pipe[READ_SIDE]);
+		if ( Output_File != NULL )
+			WHACK(Output_File);
+
 		if ( Debug )
 			fprintf(Debug, "%s: Setting up namespace.\n", \
 				__func__);
@@ -755,9 +758,12 @@ static _Bool fire_cartridge(CO(char *, cartridge), int argc, char *argv[],
 
 		/* Child process - run the cartridge. */
 		if ( cartridge_pid == 0 ) {
-			if ( Debug )
+			if ( Debug ) {
 				fprintf(Debug, "Workload process: %d\n",
 					getpid());
+				fclose(Debug);
+			}
+			close(event_pipe[WRITE_SIDE]);
 
 			/* Drop the ability to modify the trust state. */
 			if ( cap_drop_bound(CAP_MAC_ADMIN) != 0 )
