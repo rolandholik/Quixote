@@ -945,6 +945,108 @@ static _Bool fire_cartridge(CO(char *, cartridge), int argc, char *argv[],
 
 
 /**
+ * Private function.
+ *
+ * This function is responsible for launching a workload in an
+ * independent security modeling namespace that has the events exported
+ * by that namespace through an MQTT broker.  The functionality of this
+ * function is identical to the fire_cartridge() function with the
+ * exception that this function initializes the MQTT client in the
+ * context of the monitor process.
+ *
+ * \param cartridge	A pointer to the name of the runc based
+ *			container to execute.
+ *
+ * \param argc		The number of command-line arguments specified
+ *			for the execution of the security namespace.
+ *
+ * \param argv		A pointer to the array of strings describing
+ *			the command-line arguements.  This variable and
+ *			the argc value are used if the export utility
+ *			has been running in execute mode.
+ *
+ * \return	A boolean value is returned to reflect the status of
+ *		the launch.  A false value indicates an error was
+ *		encountered while a true value indicates the cartridge
+ *		was successfully launched.
+ */
+
+static _Bool run_broker_workload(CO(char *, cartridge), int argc,	\
+				 char *argv[], CO(char *, user),	\
+				 CO(char *, broker), CO(char *, port),	\
+				 CO(char *, tsem_user), CO(char *, topic))
+
+{
+	_Bool retn = false;
+
+	char *bundle = NULL;
+
+	int port_num,
+	    event_pipe[2];
+
+	String cartridge_dir = NULL;
+
+
+	/* Create the name of the bundle directory if in cartridge mode . */
+	if ( Mode == cartridge_mode ) {
+		INIT(HurdLib, String, cartridge_dir, ERR(goto done));
+		cartridge_dir->add(cartridge_dir, QUIXOTE_MAGAZINE);
+		cartridge_dir->add(cartridge_dir, "/");
+		if ( !cartridge_dir->add(cartridge_dir, cartridge) )
+			ERR(goto done);
+		bundle = cartridge_dir->get(cartridge_dir);
+		Runc_name = cartridge;
+	}
+
+
+	/* Create the subordinate cartridge process. */
+	if ( pipe(event_pipe) == -1 )
+		ERR(goto done);
+
+	Monitor_pid = fork();
+	if ( Monitor_pid == -1 )
+		ERR(goto done);
+
+	/* Monitor parent process. */
+	if ( Monitor_pid > 0 ) {
+		if ( Debug )
+			fprintf(Debug, "Monitor process: %d\n", Monitor_pid);
+		close(event_pipe[WRITE_SIDE]);
+
+		port_num = strtol(port == NULL ? "1883" : port , NULL, 0);
+		if ( errno == ERANGE )
+			goto done;
+
+		INIT(NAAAIM, MQTTduct, MQTT, ERR(goto done));
+		if ( !MQTT->set_password(MQTT, NULL) )
+			ERR(goto done);
+		if ( !MQTT->init_publisher(MQTT, broker, port_num, topic, \
+					   tsem_user, NULL) )
+			ERR(goto done);
+
+		if ( !_set_user(user) )
+			ERR(goto done);
+
+		if ( !child_monitor(cartridge, event_pipe[READ_SIDE]) )
+			ERR(goto done);
+		retn = true;
+		goto done;
+	}
+
+	/* Child process - run the workload and export events. */
+	if ( !_run_workload(user, event_pipe, bundle, cartridge, argc, argv) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	WHACK(cartridge_dir);
+
+	return retn;
+}
+
+
+/**
  * Private helper function.
  *
  * This function is a helper function for the export_root function.  This
@@ -1239,6 +1341,7 @@ extern int main(int argc, char *argv[])
 	     *broker	    = NULL,
 	     *topic	    = NULL,
 	     *user	    = NULL,
+	     *port	    = NULL,
 	     *cartridge	    = NULL,
 	     *magazine_size = NULL,
 	     *queue_size    = "100",
@@ -1304,6 +1407,9 @@ extern int main(int argc, char *argv[])
 				break;
 			case 'q':
 				queue_size = optarg;
+				break;
+			case 'p':
+				port = optarg;
 				break;
 			case 's':
 				user = optarg;
@@ -1385,20 +1491,6 @@ extern int main(int argc, char *argv[])
 			ERR(goto done);
 	}
 
-	if ( broker != NULL ) {
-		if ( topic == NULL ) {
-			fputs("No broker topic specified.\n", stderr);
-			goto done;
-		}
-
-		INIT(NAAAIM, MQTTduct, MQTT, ERR(goto done));
-		if ( !MQTT->set_password(MQTT, NULL) )
-			ERR(goto done);
-		if ( !MQTT->init_publisher(MQTT, broker, 10902, topic, \
-					   tsem_user, NULL) )
-			ERR(goto done);
-	}
-
 
 	INIT(HurdLib, String, Output_String, ERR(goto done));
 
@@ -1413,11 +1505,25 @@ extern int main(int argc, char *argv[])
 	if ( Mode == execute_mode )
 		INIT(HurdLib, Process, Execute, ERR(goto done));
 
-	/* Fire the workload cartridge. */
 	if ( Debug )
 		fprintf(Debug, "Launch process: %d\n", getpid());
-	if ( !fire_cartridge(cartridge, argc, argv, user) )
-		ERR(goto done);
+
+	if ( broker != NULL ) {
+		/* Run a broker based workload. */
+		if ( topic == NULL ) {
+			fputs("No broker topic specified.\n", stderr);
+			goto done;
+		}
+
+		if ( !run_broker_workload(cartridge, argc, argv, user, \
+					  broker, port, tsem_user, topic) )
+			ERR(goto done);
+
+	} else {
+		/* Run a file based workload. */
+		if ( !fire_cartridge(cartridge, argc, argv, user) )
+			ERR(goto done);
+	}
 
 	waitpid(Monitor_pid, NULL, 0);
 
