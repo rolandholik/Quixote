@@ -656,6 +656,208 @@ static _Bool _set_user(CO(char *, user))
 
 
 /**
+ * Private helper function.
+ *
+ * This function is a helper function for the fire_cartridge() and
+ * fire_broker_cartridge functions.  The purpose of this function is
+ * to run the workload in a security modeling namespace and to export
+ * the security event descriptions that characterize the namespace to
+ * the monitor process for export to the appropriate venue.
+ *
+ * \param user		A character pointer to the name of the uid that
+ *			the process will be changed to.  Passing a NULL
+ *			value to this function will cause the 'nobody'
+ *			user to be attempted.
+ *
+ * \param pipe_fd	A pointer to a two dimensional array containing
+ *			the file descriptors for the event pipe between
+ *			the monitor process and the namespace process.
+ *
+ * \param bundle	A pointer to a null-terminated buffer containing
+ *			the name of the runc, if any, bundle that is to
+ *			be executed.
+ *
+ * \param cartridge	A pointer to a null-terminated character buffer
+ *			containing the name of the runc instance to
+ *			create.
+ *
+ * \param argc		For execute node the number of command-line
+ *			arguments.
+ *
+ * \param argv		For execute mode a pointer to an array of
+ *			character pointers, null terminated, that
+ *			are to be used for the arguments to the command
+ *			to be run.
+ *
+ * \return	A boolean value is returned to reflect the status of
+ *		the workload.  A false value indicates that invocation
+ *		of the workload had failed while a true value indicates
+ *		the workload was successfully executed.
+ */
+
+static _Bool _run_workload(CO(char *, user), CO(const int *, pipe_fd), \
+			   CO(char *, bundle), CO(char *, cartridge),  \
+			   int argc, char *argv[])
+
+{
+	_Bool retn = false;
+
+	char bufr[TSEM_READ_BUFFER];
+
+	int rc,
+	    event_fd = 0;
+
+	pid_t cartridge_pid;
+
+	struct pollfd poll_data[1];
+
+
+	close(pipe_fd[READ_SIDE]);
+	if ( Output_File != NULL )
+		WHACK(Output_File);
+
+	if ( Debug )
+		fprintf(Debug, "%s: Setting up namespace.\n", __func__);
+	if ( !setup_namespace(&event_fd) )
+		_exit(1);
+	if ( Debug )
+		fprintf(Debug, "%s: Have namespace.\n", __func__);
+
+	/* Fork again to run the cartridge. */
+	cartridge_pid = fork();
+	if ( cartridge_pid == -1 )
+		exit(1);
+
+	/* Child process - run the cartridge. */
+	if ( cartridge_pid == 0 ) {
+		if ( Debug ) {
+			fprintf(Debug, "Workload process: %d\n", getpid());
+			fclose(Debug);
+		}
+		close(pipe_fd[WRITE_SIDE]);
+
+		/* Drop the ability to modify the trust state. */
+		if ( cap_drop_bound(CAP_MAC_ADMIN) != 0 )
+			ERR(goto done);
+
+		if ( Mode == cartridge_mode ) {
+			execlp("runc", "runc", "run", "-b", bundle, \
+			       cartridge, NULL);
+			fputs("Cartridge execution failed.\n", stderr);
+			exit(1);
+		}
+
+		if ( Mode == process_mode ) {
+			if ( geteuid() != getuid() ) {
+				if ( Debug )
+					fprintf(Debug, "Changing to real " \
+						"id: %u\n", getuid());
+				if ( setuid(getuid()) != 0 ) {
+					fputs("Cannot change uid.\n", stderr);
+					exit(1);
+				}
+			}
+
+			if ( Debug )
+				fputs("Executing cartridge process.\n", Debug);
+			execlp("bash", "bash", "-i", NULL);
+			fputs("Cartridge process execution failed.\n",\
+			      stderr);
+			exit(1);
+		}
+
+		if ( Mode == execute_mode ) {
+			if ( geteuid() != getuid() ) {
+				if ( Debug )
+					fprintf(Debug, "Changing to real " \
+						"id: \%u\n",  getuid());
+				if ( setuid(getuid()) != 0 ) {
+					fputs("Cannot change uid.\n", stderr);
+					exit(1);
+				}
+			}
+
+			if ( Debug )
+				fputs("Executing command line.\n", Debug);
+			Execute->run_command_line(Execute, argc, argv);
+			fputs("Command line execution failed.\n", stderr);
+			exit(1);
+		}
+	}
+
+	/* Parent process - monitor for events. */
+	if ( !_set_user(user) )
+		ERR(goto done);
+
+	poll_data[0].fd	    = event_fd;
+	poll_data[0].events = POLLIN;
+
+	while ( true ) {
+		if ( Signals.stop ) {
+			if ( Debug )
+				fputs("Monitor process stopped\n", Debug);
+			retn = true;
+			goto done;
+		}
+
+		if ( Signals.sigterm ) {
+			if ( Debug )
+			fputs("Monitor process terminated.\n", Debug);
+			kill_cartridge(false);
+		}
+
+		if ( Signals.sigchild ) {
+			if ( child_exited(cartridge_pid) ) {
+				close(event_fd);
+				close(pipe_fd[WRITE_SIDE]);
+				_exit(0);
+			}
+		}
+
+		memset(bufr, '\0', sizeof(bufr));
+
+		rc = poll(poll_data, 1, -1);
+		if ( rc < 0 ) {
+			if ( errno == -EINTR ) {
+				fputs("poll interrupted.\n", stderr);
+				continue;
+			}
+		}
+
+		if ( (poll_data[0].revents & POLLIN) == 0 )
+			continue;
+
+		while ( true ) {
+			rc = read(event_fd, bufr, sizeof(bufr));
+			if ( rc == 0 )
+				break;
+			if ( rc < 0 ) {
+				if ( errno != ENODATA ) {
+					fputs("Fatal event read.\n", stderr);
+					exit(1);
+				}
+				break;
+			}
+			if ( rc > 0 ) {
+				write(pipe_fd[WRITE_SIDE], bufr, \
+				      rc);
+				lseek(event_fd, 0, SEEK_SET);
+			}
+		}
+
+		if ( lseek(event_fd, 0, SEEK_SET) < 0 ) {
+			fputs("Seek error.\n", stderr);
+			break;
+		}
+	}
+
+
+ done:
+	return retn;
+}
+
+
+/**
  * Private function.
  *
  * This function is responsible for launching a software cartridge
@@ -687,16 +889,9 @@ static _Bool fire_cartridge(CO(char *, cartridge), int argc, char *argv[],
 {
 	_Bool retn = false;
 
-	char *bundle = NULL,
-	     bufr[TSEM_READ_BUFFER];
+	char *bundle = NULL;
 
-	int rc,
-	    event_pipe[2],
-	    event_fd = 0;
-
-	pid_t cartridge_pid;
-
-	struct pollfd poll_data[1];
+	int event_pipe[2];
 
 	String cartridge_dir = NULL;
 
@@ -736,160 +931,10 @@ static _Bool fire_cartridge(CO(char *, cartridge), int argc, char *argv[],
 		goto done;
 	}
 
-	/* Child process - create an independent namespace for this process. */
-	if ( Monitor_pid == 0 ) {
-		close(event_pipe[READ_SIDE]);
-		if ( Output_File != NULL )
-			WHACK(Output_File);
-
-		if ( Debug )
-			fprintf(Debug, "%s: Setting up namespace.\n", \
-				__func__);
-		if ( !setup_namespace(&event_fd) )
-			_exit(1);
-		if ( Debug )
-			fprintf(Debug, "%s: Have namespace.\n", \
-				__func__);
-
-		/* Fork again to run the cartridge. */
-		cartridge_pid = fork();
-		if ( cartridge_pid == -1 )
-			exit(1);
-
-		/* Child process - run the cartridge. */
-		if ( cartridge_pid == 0 ) {
-			if ( Debug ) {
-				fprintf(Debug, "Workload process: %d\n",
-					getpid());
-				fclose(Debug);
-			}
-			close(event_pipe[WRITE_SIDE]);
-
-			/* Drop the ability to modify the trust state. */
-			if ( cap_drop_bound(CAP_MAC_ADMIN) != 0 )
-				ERR(goto done);
-
-			if ( Mode == cartridge_mode ) {
-				execlp("runc", "runc", "run", "-b", bundle, \
-				       cartridge, NULL);
-				fputs("Cartridge execution failed.\n", stderr);
-				exit(1);
-			}
-
-			if ( Mode == process_mode ) {
-				if ( geteuid() != getuid() ) {
-					if ( Debug )
-						fprintf(Debug, "Changing to " \
-							"real id: \%u\n",     \
-							getuid());
-					if ( setuid(getuid()) != 0 ) {
-						fputs("Cannot change uid.\n", \
-						      stderr);
-						exit(1);
-					}
-				}
-
-				if ( Debug )
-					fputs("Executing cartridge " \
-					      "process.\n", Debug);
-				execlp("bash", "bash", "-i", NULL);
-				fputs("Cartridge process execution failed.\n",\
-				      stderr);
-				exit(1);
-			}
-
-			if ( Mode == execute_mode ) {
-				if ( geteuid() != getuid() ) {
-					if ( Debug )
-						fprintf(Debug, "Changing to " \
-							"real id: \%u\n",     \
-							getuid());
-					if ( setuid(getuid()) != 0 ) {
-						fputs("Cannot change uid.\n", \
-						      stderr);
-						exit(1);
-					}
-				}
-
-				if ( Debug )
-					fputs("Executing command line.\n", \
-					      Debug);
-				Execute->run_command_line(Execute, argc, argv);
-				fputs("Command line execution failed.\n", \
-				      stderr);
-				exit(1);
-			}
-		}
-
-		/* Parent process - monitor for events. */
-		if ( !_set_user(user) )
-			ERR(goto done);
-
-		poll_data[0].fd	    = event_fd;
-		poll_data[0].events = POLLIN;
-
-		while ( true ) {
-			if ( Signals.stop ) {
-				if ( Debug )
-					fputs("Monitor process stopped\n", \
-					      Debug);
-				retn = true;
-				goto done;
-			}
-
-			if ( Signals.sigterm ) {
-				if ( Debug )
-					fputs("Monitor process terminated.\n",\
-					      Debug);
-				kill_cartridge(false);
-			}
-
-			if ( Signals.sigchild ) {
-				if ( child_exited(cartridge_pid) ) {
-					close(event_fd);
-					close(event_pipe[WRITE_SIDE]);
-					_exit(0);
-				}
-			}
-
-			memset(bufr, '\0', sizeof(bufr));
-
-			rc = poll(poll_data, 1, -1);
-			if ( rc < 0 ) {
-				if ( errno == -EINTR ) {
-					fputs("poll interrupted.\n", stderr);
-					continue;
-				}
-			}
-
-			if ( (poll_data[0].revents & POLLIN) == 0 )
-				continue;
-
-			while ( true ) {
-				rc = read(event_fd, bufr, sizeof(bufr));
-				if ( rc == 0 )
-					break;
-				if ( rc < 0 ) {
-					if ( errno != ENODATA ) {
-						fputs("Fatal event read.\n", \
-						      stderr);
-						exit(1);
-					}
-					break;
-				}
-				if ( rc > 0 ) {
-					write(event_pipe[WRITE_SIDE], bufr, \
-					      rc);
-					lseek(event_fd, 0, SEEK_SET);
-				}
-			}
-
-			if ( lseek(event_fd, 0, SEEK_SET) < 0 ) {
-				fputs("Seek error.\n", stderr);
-				break;
-			}
-		}
-	}
+	/* Child process - run the workload and export events. */
+	if ( !_run_workload(user, event_pipe, bundle, cartridge, argc, argv) )
+		ERR(goto done);
+	retn = true;
 
 
  done:
