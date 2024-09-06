@@ -533,7 +533,7 @@ static _Bool child_monitor(CO(char *, cartridge), int fd)
 			fprintf(Debug, "\n%d: Poll cycle: %d\n", getpid(), \
 				++cycle);
 
-		rc = poll(poll_data, 2, -1);
+		rc = poll(poll_data, 1, -1);
 		if ( rc < 0 ) {
 			if ( Signals.stop ) {
 				if ( Debug )
