@@ -110,3 +110,4 @@
 #define NAAAIM_TSEMparser_OBJID		70
 #define NAAAIM_TSEMevent_OBJID		71
 #define NAAAIM_MQTTduct_OBJID		72
+#define NAAAIM_TSEMworkload_OBJID	73

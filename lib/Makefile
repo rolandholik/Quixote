@@ -21,13 +21,13 @@ INSTINCLUDE = ../NAAAIM.h AES256_cbc.h Base64.h Curve25519.h Duct.h	\
 	OTEDKS.h PossumPacket.h PossumPipe.h RSAkey.h RandomBuffer.h	\
 	SHA256.h  SHA256_hmac.h SmartCard.h SoftwareStatus.h		\
 	X509cert.h Prompt.h AES128_cmac.h TTYduct.h XENduct.h		\
-	TSEMcontrol.h TSEMevent.h TSEMparser.h MQTTduct.h
+	TSEMcontrol.h TSEMevent.h TSEMparser.h MQTTduct.h TSEMworkload.h
 
 CSRC = Duct.c OTEDKS.c Curve25519.c IPC.c SoftwareStatus.c Ivy.c IDmgr.c     \
 	RSAkey.c LocalDuct.c HTTP.c Base64.c Duct_mgr.c SHA256.c	     \
 	SHA256_hmac.c RandomBuffer.c AES256_cbc.c IDtoken.c X509cert.c	     \
 	Prompt.c AES128_cmac.c TTYduct.c XENduct.c TSEMcontrol.c TSEMevent.c \
-	TSEMparser.c MQTTduct.c
+	TSEMparser.c MQTTduct.c TSEMworkload.c
 
 TESTS = Duct_test Curve25519_test IPC_test RSAkey_test			\
 	LocalDuct_test X509cert_test Prompt_test AES128_cmac_test	\
@@ -173,4 +173,5 @@ AES128_cmac.o : AES128_cmac.h ../NAAAIM.h
 TTYduct.o: TTYduct.h ../NAAAIM.h
 XENduct.o: XENduct.h ../NAAAIM.h
 TSEMcontrol.o: TSEMcontrol.h ../NAAAIM.h
+TSEMworkload.o: TSEMworkload.h TSEMcontrol.h ../NAAAIM.h
 MQTTduct.o: MQTTduct.h ../NAAAIM.h
