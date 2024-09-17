@@ -862,11 +862,12 @@ static _Bool run_workload(CO(TSEMworkload, this))
 			ERR(goto done);
 
 		if ( S->mode == CONTAINER_MODE ) {
-			if ( Debug )
+			if ( Debug ) {
 				fprintf(Debug, "Workload: container=%s, "  \
 					"bundle=%s\n", S->container,	   \
 					S->bundle->get(S->bundle));
-			fclose(Debug);
+				fclose(Debug);
+			}
 
 			execlp("runc", "runc", "run", "-b", \
 			       S->bundle->get(S->bundle), S->container, NULL);
@@ -885,9 +886,10 @@ static _Bool run_workload(CO(TSEMworkload, this))
 				}
 			}
 
-			if ( Debug )
+			if ( Debug ) {
 				fputs("Executing workload shell.\n", Debug);
-			fclose(Debug);
+				fclose(Debug);
+			}
 
 			execlp("bash", "bash", "-i", NULL);
 			fputs("Cartridge process execution failed.\n",\
@@ -907,9 +909,10 @@ static _Bool run_workload(CO(TSEMworkload, this))
 				}
 			}
 
-			if ( Debug )
+			if ( Debug ) {
 				fputs("Executing workload command.\n", Debug);
-			fclose(Debug);
+				fclose(Debug);
+			}
 
 			execute->run_command_line(execute, S->argc, S->argv);
 			fputs("Command line execution failed.\n", stderr);
