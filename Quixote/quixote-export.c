@@ -275,6 +275,92 @@ static void show_magazine(CO(char *, root))
 }
 
 
+/** Private function.
+ *
+ * This function is responsible for opening an output file which the
+ * security events will be written to.  The file is truncated so each
+ * invocation of the utility results in a collection of events for
+ * only that execution of the utility.
+ *
+ * \param outfile	A null-terminated buffer containing the name of
+ *			the output file.
+ *
+ * \return	A boolean value is used to indicate whether or not the
+ *		opening of the file succeeded.  A false value indicates
+ *		a failure while a true value indicates the open
+ *		succeeded.
+ */
+
+static _Bool open_file(CO(char *, outfile))
+
+{
+	_Bool retn = false;
+
+	if ( strcmp(outfile, "/dev/stdout") != 0 )
+		truncate(outfile, 0);
+
+	INIT(HurdLib, File, Output_File, ERR(goto done));
+	if ( Output_File->open_rw(Output_File, outfile) )
+		retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/** Private function.
+ *
+ * This function is responsible for opening a connection to an MQTT
+ * broker that the security events will be forwarded to.
+ *
+ * \param broker	A null-terminated buffer containing the hostname
+ *			of the broker.
+ *
+ * \param port		A null-terminated buffer containing the ASCII
+ *			representation of the numeric port value that
+ *			is to be used for the connection.
+ *
+ * \param user		A null-terminated buffer containing the name of
+ *			the user to be used for authenticating to the
+ *			broker.
+ *
+ * \param topic		A null-terminated buffer containing the name of
+ *			topic that the connection is to be subscribed to.
+ *
+ * \return	A boolean value is used to indicate whether or establishing
+ *		of the connection succeeded.  A false value indicates a
+ *		failure while a true value indicates the connection has
+ *		been established and is operational.
+ */
+
+static _Bool open_broker(CO(char *, broker), CO(char *, port), \
+			 CO(char *, user), CO(char *, topic))
+
+{
+	_Bool retn = false;
+
+	int port_num;
+
+
+	port_num = strtol(port == NULL ? "1883" : port , NULL, 0);
+	if ( errno == ERANGE )
+		goto done;
+
+	INIT(NAAAIM, MQTTduct, MQTT, ERR(goto done));
+	if ( !MQTT->set_password(MQTT, NULL) )
+		ERR(goto done);
+	if ( !MQTT->init_publisher(MQTT, broker, port_num, topic, user, \
+				   NULL) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
 /**
  * Private function.
  *
@@ -312,11 +398,7 @@ static _Bool run_workload(CO(TSEMworkload, workload), CO(char *, outfile))
 
 	/* Parent process - Security Monitor. */
 	if ( workload_pid > 0 ) {
-		if ( strcmp(outfile, "/dev/stdout") != 0 )
-			truncate(outfile, 0);
-
-		INIT(HurdLib, File, Output_File, ERR(goto done));
-		if ( !Output_File->open_rw(Output_File, outfile) )
+		if ( !open_file(outfile) )
 			ERR(goto done);
 
 		if ( !workload->run_monitor(workload, workload_pid, NULL, \
@@ -373,8 +455,6 @@ static _Bool run_broker_workload(CO(TSEMworkload, workload),		\
 {
 	_Bool retn = false;
 
-	int port_num;
-
 	pid_t workload_pid;
 
 
@@ -387,15 +467,7 @@ static _Bool run_broker_workload(CO(TSEMworkload, workload),		\
 		if ( Debug )
 			fprintf(Debug, "SM process: %d\n", getpid());
 
-		port_num = strtol(port == NULL ? "1883" : port , NULL, 0);
-		if ( errno == ERANGE )
-			goto done;
-
-		INIT(NAAAIM, MQTTduct, MQTT, ERR(goto done));
-		if ( !MQTT->set_password(MQTT, NULL) )
-			ERR(goto done);
-		if ( !MQTT->init_publisher(MQTT, broker, port_num, topic, \
-					   tsem_user, NULL) )
+		if ( !open_broker(broker, port, tsem_user, topic) )
 			ERR(goto done);
 
 		if ( !workload->run_monitor(workload, workload_pid, NULL, \
@@ -603,13 +675,34 @@ static _Bool _export_events(const int fd, CO(Gaggle, output))
  *			the string representation of the size of the
  *			queue of events to be implemented for output.
  *
+ * \param outfile	A pointer to a null-terminated character buffer
+ *			containing the name of the output file if file
+ *			based output is requested.
+ *
+ * \param broker	A null-terminated buffer containing the hostname
+ *			of the broker.
+ *
+ * \param port		A null-terminated buffer containing the ASCII
+ *			representation of the numeric port value that
+ *			is to be used for the connection.
+ *
+ * \param user		A null-terminated buffer containing the name of
+ *			the user to be used for authenticating to the
+ *			broker.
+ *
+ * \param topic		A null-terminated buffer containing the name of
+ *			topic that the connection is to be subscribed to.
+ *
  * \return	A boolean value is returned to reflect the status of
- *		the export.  A false value indicates an error was
- *		encountered while a true value indicates the export
- *		of events was successfully completed.
+ *		the the configuration and export of the root security
+ *		modeling namespace.  A false value indicates it failed
+ *		while a true value indicates that the export had
+ *		concluded successfully.
  */
 
-static _Bool export_root(const _Bool follow, CO(char *, queue_size))
+static _Bool export_root(const _Bool follow, CO(char *, queue_size),	\
+			 CO(char *, outfile), CO(char *, broker),	\
+			 CO(char *, port), CO(char *, user), CO(char*, topic))
 
 {
 	_Bool retn = false;
@@ -629,6 +722,22 @@ static _Bool export_root(const _Bool follow, CO(char *, queue_size))
 
 	Gaggle output = NULL;
 
+
+	/* Open the output file if file based output is requested. */
+	if ( outfile != NULL ) {
+		if ( Debug )
+			fprintf(Debug, "Root export to file: %s\n", outfile);
+		if ( !open_file(outfile) )
+			ERR(goto done);
+	}
+
+	/* Open the broker if MQTT output is requested. */
+	if ( broker != NULL ) {
+		if ( Debug )
+			fprintf(Debug, "Root export to broker: %s\n", broker);
+		if ( !open_broker(broker, port, user, topic) )
+			ERR(goto done);
+	}
 
 	/* Open the root export file. */
 	if ( (fd = open(TSEM_ROOT_EXPORT, O_RDONLY)) < 0 )
@@ -714,9 +823,9 @@ extern int main(int argc, char *argv[])
 	     *port	    = NULL,
 	     *cartridge	    = NULL,
 	     *magazine_size = NULL,
+	     *outfile	    = NULL,
 	     *queue_size    = "100",
-	     *tsem_user	    = "tsem",
-	     *outfile	    = "/dev/stdout";
+	     *tsem_user	    = "tsem";
 
 	int opt,
 	    retn = 1;
@@ -821,6 +930,7 @@ extern int main(int argc, char *argv[])
 
 	/* Initialize the TSEM workload manager object. */
 	INIT(NAAAIM, TSEMworkload, workload, ERR(goto done));
+	INIT(HurdLib, String, Output_String, ERR(goto done));
 
 	workload->set_debug(workload, Debug);
 	if ( !workload->configure_export(workload, TSEM_model, Digest, \
@@ -840,7 +950,8 @@ extern int main(int argc, char *argv[])
 			break;
 
 		case root_mode:
-			if ( export_root(follow, queue_size) )
+			if ( export_root(follow, queue_size, outfile, \
+					 broker, port, tsem_user, topic) )
 				retn = 0;
 			goto done;
 			break;
@@ -850,9 +961,10 @@ extern int main(int argc, char *argv[])
 	}
 
 	/* Initialize the process object if in execute mode. */
-	INIT(HurdLib, String, Output_String, ERR(goto done));
-
 	if ( broker != NULL ) {
+		if ( Debug )
+			fprintf(Debug, "Broker output: host=%s, topic=%s\n", \
+				broker, topic);
 		/* Run a broker based workload. */
 		if ( topic == NULL ) {
 			fputs("No broker topic specified.\n", stderr);
