@@ -537,6 +537,11 @@ static _Bool _get_event(const int fd, CO(Gaggle, output), _Bool *nodata)
 		str->reset(str);
 		if ( !str->add(str, bufr) )
 			ERR(goto done);
+
+		if ( Debug )
+			fprintf(Debug, "Queuing %lu/%lu.\n", Queued, \
+				output->size(output));
+		++Queued;
 		retn = true;
 	} else {
 		if ( errno == ENODATA ) {
@@ -580,6 +585,8 @@ static _Bool _output_events(CO(Gaggle, output))
 
 
 	output->rewind_cursor(output);
+	if ( Debug )
+		fputs("Flushing output queue.\n", Debug);
 
 	if ( MQTT != NULL ) {
 		Output_String->reset(Output_String);
@@ -601,6 +608,7 @@ static _Bool _output_events(CO(Gaggle, output))
 		}
 	}
 
+	Queued = 0;
 	retn = true;
 	output->rewind_cursor(output);
 
@@ -637,8 +645,6 @@ static _Bool _export_events(const int fd, CO(Gaggle, output))
 
 
 	/* Output events until the end of the event list is met. */
-	output->rewind_cursor(output);
-
 	while ( true ) {
 		if ( !_get_event(fd, output, &nodata) )
 			ERR(goto done);
@@ -648,10 +654,9 @@ static _Bool _export_events(const int fd, CO(Gaggle, output))
 			break;
 		}
 
-		if ( ++Queued == output->size(output) ) {
+		if ( Queued == output->size(output) ) {
 			if ( !_output_events(output) )
 				ERR(goto done);
-			Queued = 0;
 		}
 	}
 
@@ -760,9 +765,10 @@ static _Bool export_root(const _Bool follow, CO(char *, queue_size),	\
 	if ( !_export_events(fd, output) )
 		ERR(goto done);
 
+	if ( !_output_events(output) )
+		ERR(goto done);
+
 	if ( !follow ) {
-		if ( !_output_events(output) )
-			ERR(goto done);
 		retn = true;
 		goto done;
 	}
