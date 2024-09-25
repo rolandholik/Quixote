@@ -550,11 +550,11 @@ static _Bool _get_event(const int fd, CO(Gaggle, output), _Bool *nodata)
 		}
 	}
 
+
+ done:
 	if ( lseek(fd, 0, SEEK_SET) < 0 )
 		ERR(goto done);
 
-
- done:
 	return retn;
 }
 
