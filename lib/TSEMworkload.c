@@ -726,8 +726,8 @@ static _Bool _setup_namespace(CO(TSEMworkload_State, S))
 	INIT(NAAAIM, TSEMcontrol, control, ERR(goto done));
 
 	/* Create and configure a security model namespace. */
-	if ( !control->create_ns(control, TSEMcontrol_TYPE_EXPORT, model, \
-				 digest, S->ns, S->cache_size) )
+	if ( !control->create_ns(control, S->type, model, digest, S->ns, \
+				 S->cache_size) )
 		ERR(goto done);
 	if ( !control->id(control, &S->id) )
 		ERR(goto done);
