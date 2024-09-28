@@ -70,7 +70,6 @@
 #include "SecurityPoint.h"
 #include "SecurityEvent.h"
 #include "TSEM.h"
-#include "TSEMcontrol.h"
 #include "TSEMevent.h"
 #include "TSEMworkload.h"
 
@@ -105,11 +104,6 @@ static char *Digest = NULL;
 static unsigned long Magazine_Size = 0;
 
 /**
- * The object that will be used for parsing the TSEM events.
- */
-static TSEMevent Event = NULL;
-
-/**
  * The alternate TSEM model that is to be used.
  */
 static char *TSEM_model = NULL;
@@ -125,11 +119,6 @@ static size_t Queued = 0;
 static File Output_File	    = NULL;
 static MQTTduct MQTT	    = NULL;
 static String Output_String = NULL;
-
-/**
- * Object used to manage invocation of a specific command in execute mode.
- */
-static Process Execute = NULL;
 
 
 /**
@@ -402,7 +391,7 @@ static _Bool run_workload(CO(TSEMworkload, workload), CO(char *, outfile))
 			ERR(goto done);
 
 		if ( !workload->run_monitor(workload, workload_pid, NULL, \
-					    output_event) )
+					    output_event, NULL) )
 			ERR(goto done);
 		retn = true;
 		goto done;
@@ -471,7 +460,7 @@ static _Bool run_broker_workload(CO(TSEMworkload, workload),		\
 			ERR(goto done);
 
 		if ( !workload->run_monitor(workload, workload_pid, NULL, \
-					    output_event) )
+					    output_event, NULL) )
 			ERR(goto done);
 
 		retn = true;
@@ -932,8 +921,6 @@ extern int main(int argc, char *argv[])
 		}
 	}
 
-	/* Handle output to a file. */
-
 	/* Initialize the TSEM workload manager object. */
 	INIT(NAAAIM, TSEMworkload, workload, ERR(goto done));
 	INIT(HurdLib, String, Output_String, ERR(goto done));
@@ -994,9 +981,6 @@ extern int main(int argc, char *argv[])
 	WHACK(Output_String);
 	WHACK(MQTT);
 	WHACK(Output_File);
-
-	WHACK(Event);
-	WHACK(Execute);
 
 	WHACK(workload);
 
