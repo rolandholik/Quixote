@@ -41,15 +41,6 @@
 
 #define _GNU_SOURCE
 
-#define GWHACK(type, var) {			\
-	size_t i=var->size(var) / sizeof(type);	\
-	type *o=(type *) var->get(var);		\
-	while ( i-- ) {				\
-		(*o)->whack((*o));		\
-		o+=1;				\
-	}					\
-}
-
 
 /* Include files. */
 #include <stdio.h>
