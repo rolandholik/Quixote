@@ -92,6 +92,7 @@
 #include "TSEM.h"
 #include "TSEMcontrol.h"
 #include "TSEMevent.h"
+#include "TSEMworkload.h"
 
 
 /**
@@ -106,14 +107,14 @@ static FILE *Debug = NULL;
 static pid_t Monitor_pid;
 
 /**
+ * The object representing the workload under management.
+ */
+static TSEMworkload Workload = NULL;
+
+/**
  * The modeling object for the canister.
  */
 static TSEM Model = NULL;
-
-/**
- * The control object for the model.
- */
-static TSEMcontrol Control = NULL;
 
 /**
  * This variable is used to signal that a modeling error has occurred
@@ -160,16 +161,6 @@ static char *Digest = NULL;
 static unsigned long Magazine_Size = 0;
 
 /**
- * The object that will be used for parsing the TSEM events.
- */
-static TSEMevent Event = NULL;
-
-/**
- * The name of the runc workload.
- */
-static const char *Runc_name = NULL;
-
-/**
  * A flag to indicate whether or not the security model is to
  * be enforced.
  */
@@ -179,11 +170,6 @@ static _Bool Enforce = false;
  * The alternate TSEM model that is to be used.
  */
 static char *TSEM_model = NULL;
-
-/**
- * Object used to manage invocation of a specific command in execute mode.
- */
-static Process Execute = NULL;
 
 /**
  * The following variable holds booleans which describe signals
@@ -206,144 +192,10 @@ struct {
  enum {
 	 show_mode,
 	 process_mode,
-	 cartridge_mode,
+	 container_mode,
 	 execute_mode
-} Mode = cartridge_mode;
+} Mode = container_mode;
 
-
-/**
- * Private function.
- *
- * This function implements the signal handler for the utility.  It
- * sets the signal type in the Signals structure.
- *
- * \param signal	The number of the signal which caused the
- *			handler to execute.
- */
-
-void signal_handler(int signal, siginfo_t *siginfo, void *private)
-
-{
-	if ( Debug )
-		fprintf(Debug, "%s(%d): signal = %d\n", __func__, getpid(), \
-			signal);
-
-	switch ( signal ) {
-		case SIGINT:
-			Signals.stop = true;
-			return;
-		case SIGTERM:
-			Signals.sigterm = true;
-			return;
-		case SIGHUP:
-			Signals.stop = true;
-			return;
-		case SIGQUIT:
-			Signals.stop = true;
-			return;
-		case SIGCHLD:
-			Signals.sigchild = true;
-			return;
-	}
-
-	return;
-}
-
-
-/**
- * Private function.
- *
- * This function implements checking for whether or not the cartridge
- * process has terminated.
- *
- * \param cartridge_pid	The pid of the cartridge.
- *
- *
- * \return		A boolean value is used to indicate whether
- *			or not the designed process has exited.  A
- *			false value indicates it has not while a
- *			true value indicates it has.
- */
-
-static _Bool child_exited(const pid_t cartridge)
-
-{
-	int status;
-
-
-	if ( waitpid(cartridge, &status, WNOHANG) != cartridge )
-		return false;
-
-	return true;
-}
-
-
-/**
- * Private function.
- *
- * This function is responsible for shutting down the workload.
- *
- * \param wait		A boolean flag used to indicate whether or
- *			not a runc based workload should wait for the
- *			termination of the run process.
- *
- * \return	No return value is defined.
- */
-
-static void kill_cartridge(_Bool wait)
-
-{
-	int status;
-
-	static pid_t kill_process = 0;
-
-
-	/* Signal the monitor process to shutdown the cartridge process. */
-	if ( Mode == process_mode ) {
-		if ( Debug )
-			fprintf(Debug, "%u sending SIGHUP to %u.\n", \
-				getpid(), Monitor_pid);
-		kill(Monitor_pid, SIGTERM);
-		return;
-	}
-
-
-	/* Check to see if runc kill has finished. */
-	if ( kill_process ) {
-		waitpid(kill_process, &status, WNOHANG);
-		if ( !WIFEXITED(status) )
-			return;
-
-		if ( Debug )
-			fprintf(Debug, "Cartridge kill status: %d\n", \
-				WEXITSTATUS(status));
-		if ( WEXITSTATUS(status) == 0 ) {
-			kill_process = 0;
-			return;
-		}
-	}
-
-
-	/* Fork a process to use runc to send the termination signal. */
-	kill_process = fork();
-	if ( kill_process == -1 )
-		return;
-
-	/* Child process - execute runc in kill mode. */
-	if ( kill_process == 0 ) {
-		if ( Debug )
-			fputs("Killing runc cartridge.\n", Debug);
-		execlp("runc", "runc", "kill", Runc_name, "SIGKILL", \
-		       NULL);
-		exit(1);
-	}
-
-	/* Parent process - wait for the kill process to complete. */
-	if ( wait )
-		waitpid(kill_process, &status, 0);
-
-	return;
-}
 
 /**
  * Private function.
@@ -402,7 +254,7 @@ static _Bool setup_management(CO(LocalDuct, mgmt), const char *cartridge)
 			}
 			break;
 
-		case cartridge_mode:
+		case container_mode:
 			sockpath->add(sockpath, QUIXOTE_CARTRIDGE_MGMT_DIR);
 			sockpath->add(sockpath, "/");
 			if ( !sockpath->add(sockpath, cartridge) )
@@ -481,7 +333,7 @@ static _Bool add_event(CO(String, update))
 
 		if ( !event->get_pid(event, &pid) )
 			ERR(goto done);
-		if ( !Control->release(Control, pid) ) {
+		if ( !Workload->release(Workload, pid) ) {
 			fprintf(stderr, "Bad actor release error: "  \
 				"%d:%s\n", errno, strerror(errno));
 		}
@@ -507,7 +359,7 @@ static _Bool add_event(CO(String, update))
 	if ( !sealed ) {
 		if ( Debug )
 			fprintf(Debug, "Unsealed, releasing pid %d.\n", pid);
-		if ( !Control->release(Control, pid) )
+		if ( !Workload->release(Workload, pid) )
 			fprintf(stderr, "[%s]: Release actor status: %d:%s\n",
 				__func__, errno, strerror(errno));
 	}
@@ -522,7 +374,7 @@ static _Bool add_event(CO(String, update))
 		if ( discipline ) {
 			if ( Debug )
 				fputs("Sealed, releasing bad actor.\n", Debug);
-			if ( !Control->discipline(Control, pid) ) {
+			if ( !Workload->discipline(Workload, pid) ) {
 				fprintf(stderr, "Bad actor release error: "  \
 					"%d:%s\n", errno, strerror(errno));
 					retn = false;
@@ -531,7 +383,7 @@ static _Bool add_event(CO(String, update))
 		} else {
 			if ( Debug )
 				fputs("Sealed, releasing actor.\n", Debug);
-			if ( !Control->release(Control,pid) ) {
+			if ( !Workload->release(Workload, pid) ) {
 				fprintf(stderr, "Good actor release error: "  \
 					"%d:%s\n", errno, strerror(errno));
 					retn = false;
@@ -601,7 +453,7 @@ static _Bool add_async_event(CO(String, update))
 	Model->discipline_pid(Model, &pid);
 
 	if ( Debug )
-		fprintf(Debug, "Model update: status=%d, violation=%d\n",
+		fprintf(Debug, "Async model update: status=%d, violation=%d\n",
 			status, violation);
 
 
@@ -612,7 +464,9 @@ static _Bool add_async_event(CO(String, update))
 		if ( violation && Enforce ) {
 			fputs("Security violation in atomic context, "
 			      "shutting down workload.\n", stderr);
+#if 0
 			kill_cartridge(true);
+#endif
 		}
 	}
 
@@ -632,9 +486,9 @@ static _Bool add_async_event(CO(String, update))
  *
  * This function carries out the addition of the hardware aggregate
  * measurement to the current security state model.
-v *
- * \param str	The object that will be used to extract the string
- *		value from the event.
+ *
+ * \param str	The object containing the description of the aggregate
+ *		value.
  *
  * \return	A boolean value is returned to indicate whether or
  *		addition of the aggregate value succeeded.  A false
@@ -642,15 +496,11 @@ v *
  *		value indicates the addition succeeded.
  */
 
-static _Bool add_aggregate(String str)
+static _Bool add_aggregate(CO(String, str))
 
 {
 	_Bool retn = false;
 
-
-	str->reset(str);
-	if ( !Event->get_text(Event, "value", str) )
-		ERR(goto done);
 
 	if ( Debug )
 		fprintf(Debug, "aggregate %s\n", str->get(str));
@@ -658,7 +508,7 @@ static _Bool add_aggregate(String str)
 	if ( Aggregate == NULL ) {
 		INIT(HurdLib, Buffer, Aggregate, ERR(goto done));
 		if ( !Aggregate->add_hexstring(Aggregate, str->get(str)) )
-		ERR(goto done);
+			ERR(goto done);
 	}
 
 	if ( !Model->set_aggregate(Model, Aggregate) )
@@ -710,8 +560,8 @@ static _Bool add_log(CO(String, event))
  * This function is responsible for the processing of Turing security
  * state events generated by the kernel.
  *
- * \param bufr		A pointer to the character buffer containing
- *			the ASCII encoded event.
+ * \param event		The object that contains the exported event that
+ *			is to be processed.
  *
  * \return		A boolean value is returned to indicate whether
  *			or not processing of the event was successful.  A
@@ -720,7 +570,7 @@ static _Bool add_log(CO(String, event))
  *			event processing has succeeded.
  */
 
-static _Bool process_event()
+static _Bool process_event(CO(TSEMevent, event))
 
 {
 	_Bool retn = false;
@@ -732,20 +582,25 @@ static _Bool process_event()
 
 	if ( Debug )
 		fprintf(Debug, "Processing event: '%s'\n", \
-			Event->get_event(Event));
+			event->get_event(event));
 
 
 	/* Dispatch the event. */
-	Event->reset(Event);
-	if ( (type = Event->extract_export(Event)) == TSEM_EVENT_UNKNOWN )
+	if ( Debug )
+		fputs("Resetting event.\n", Debug);
+	event->reset(event);
+	if ( (type = event->extract_export(event)) == TSEM_EVENT_UNKNOWN )
 		ERR(goto done);
 
 	INIT(HurdLib, String, str, ERR(goto done));
-	if ( !str->add(str, Event->get_event(Event)) )
+	if ( !str->add(str, event->get_event(event)) )
 		ERR(goto done);
 
 	switch ( type ) {
 		case TSEM_EVENT_AGGREGATE:
+			str->reset(str);
+			if ( !event->get_text(event, "value", str) )
+				ERR(goto done);
 			retn = add_aggregate(str);
 			break;
 
@@ -1667,80 +1522,6 @@ static _Bool output_model(CO(char *, fname))
 /**
  * Private function.
  *
- * This function creates an independent security event domain that
- * is modeled by a userspace Trusted Modeling Agent implementation.
- *
- * \param fdptr		A pointer to the variable that will hold the
- *			file descriptor of the pseudo-file that will
- *			emit model events for the domain.
- *
- * \param enforce	A flag variable used to indicate whether or not
- *			the security model should be placed in
- *			enforcement mode.
- *
- * \return		A boolean value is returned to indicate whether
- *			or not the the creation of the domain was
- *			successful.  A false value indicates setup of
- *			the domain was unsuccessful while a true
- *			value indicates the domains is setup and
- *			ready to be modeled.
- */
-
-static _Bool setup_namespace(int *fdptr, _Bool enforce)
-
-{
-	_Bool retn = false;
-
-	char fname[PATH_MAX];
-
-	int fd;
-
-	uint64_t id;
-
-	enum TSEMcontrol_ns_config ns = 0;
-
-
-	/* Create and configure a security model namespace. */
-	if ( Current_Namespace )
-		ns = TSEMcontrol_CURRENT_NS;
-
-	if ( !Control->create_ns(Control, TSEMcontrol_TYPE_EXTERNAL, \
-				 TSEM_model, Digest, ns, Magazine_Size) )
-		ERR(goto done);
-	if ( !Control->id(Control, &id) )
-		ERR(goto done);
-	if ( enforce ) {
-		if ( !Control->enforce(Control) )
-			ERR(goto done);
-	}
-	if ( Sealed ) {
-		if ( !Control->seal(Control) )
-			ERR(goto done);
-	}
-
-	/* Create the pathname to the event update file. */
-	memset(fname, '\0', sizeof(fname));
-	if ( snprintf(fname, sizeof(fname), TSEM_UPDATE_FILE, \
-		      (long long int) id) >= sizeof(fname) )
-		ERR(goto done);
-	if ( Debug )
-		fprintf(Debug, "Update file: %s\n", fname);
-
-	if ( (fd = open(fname, O_RDONLY)) < 0 )
-		ERR(goto done);
-	retn = true;
-
-
- done:
-	if ( retn )
-		*fdptr = fd;
-	return retn;
-}
-
-
-/**
- * Private function.
- *
  * This function implements Quixote show mode.  This mode displays the
  * set of software security cartridges that are currently deployed
  * on the host.
@@ -1813,266 +1594,53 @@ static void show_magazine(CO(char *, root))
 /**
  * Private function.
  *
- * This function is responsible for monitoring the child process that
- * is running the modeled workload.  The event loop monitors for a
- * a child exit and process management requests.
- *
- * \param mgmt		The object that will be used to receive management
- *			requests.
- *
- * \param cartridge	A pointer to a null terminated buffer containing
- *			the name of the cartridge being run.
- *
- * \param fd		The file descriptor from which security domain
- *			updates will be read from.
- *
- * \return		A boolean value is used to indicate the status
- *			of the child monitor.  A true value indicates
- *			that management was successfully completed while
- *			a false value indicates an error occurred.
- */
-
-static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int fd)
-
-{
-	_Bool event,
-	      retn = false,
-	      connected = false;
-
-	int rc;
-
-	unsigned int cycle = 0;
-
-	struct pollfd poll_data[2];
-
-	Buffer cmdbufr = NULL;
-
-
-	INIT(HurdLib, Buffer, cmdbufr, ERR(goto done));
-
-	poll_data[0].fd	    = fd;
-	poll_data[0].events = POLLIN;
-
-	if ( !mgmt->get_socket(mgmt, &poll_data[1].fd) ) {
-		fputs("Error setting up polling data.\n", stderr);
-		goto done;
-	}
-	poll_data[1].events = POLLIN;
-
-
-	/* Dispatch loop. */
-	if ( Debug ) {
-		fprintf(Debug, "%d: Calling event loop\n", getpid());
-		fprintf(Debug, "descriptor 1: %d, descriptor 2: %d\n", \
-			poll_data[0].fd, poll_data[1].fd);
-	}
-
-	while ( 1 ) {
-		if ( Debug )
-			fprintf(Debug, "\n%d: Poll cycle: %d\n", getpid(), \
-				++cycle);
-
-		rc = poll(poll_data, 2, -1);
-		if ( rc < 0 ) {
-			if ( Signals.stop ) {
-				if ( Debug )
-					fputs("Quixote terminated.\n", Debug);
-				kill_cartridge(true);
-				retn = true;
-				goto done;
-			}
-			if ( Signals.sigchild ) {
-				if ( !child_exited(Monitor_pid) )
-					continue;
-				retn = true;
-				goto done;
-			}
-
-			fputs("Poll error.\n", stderr);
-			kill_cartridge(true);
-			retn = true;
-			goto done;
-		}
-		if ( rc == 0 ) {
-			if ( Debug )
-				fputs("Poll timeout.\n", Debug);
-			continue;
-		}
-
-		if ( Debug )
-			fprintf(Debug, "Poll retn=%d, Data poll=%0x, "	     \
-				"Mgmt poll=%0x\n", rc, poll_data[0].revents, \
-				poll_data[1].revents);
-
-		if ( poll_data[0].revents & POLLHUP ) {
-			if ( Signals.stop ) {
-				retn = true;
-				goto done;
-			}
-			if ( Signals.sigchild ) {
-				if ( !child_exited(Monitor_pid) )
-					continue;
-				retn = true;
-				goto done;
-			}
-		}
-
-		if ( poll_data[0].revents & POLLIN ) {
-			if ( !Event->read_event(Event, fd) ) {
-				kill_cartridge(false);
-				break;
-			}
-
-			event = true;
-			while ( event ) {
-				if ( !Event->fetch_event(Event, &event) ) {
-					kill_cartridge(false);
-					break;
-				}
-				if ( !process_event() ) {
-					if ( Debug )
-						fprintf(Debug, "Event "	     \
-							"processing error, " \
-							"%u killing %u\n",   \
-							getpid(), Monitor_pid);
-					Model_Error = true;
-					break;
-				}
-			}
-			if ( Model_Error ) {
-				kill_cartridge(false);
-				break;
-			}
-		}
-
-		if ( poll_data[1].revents & POLLIN ) {
-			if ( !connected ) {
-				if ( Debug )
-					fputs("Have socket connection.\n", \
-					      Debug);
-
-				if ( !mgmt->accept_connection(mgmt) )
-					ERR(goto done);
-				if ( !mgmt->get_fd(mgmt, &poll_data[1].fd) )
-					ERR(goto done);
-				connected = true;
-				continue;
-			}
-			if ( !mgmt->receive_Buffer(mgmt, cmdbufr) ) {
-				fputs("Orchestrator manager error.\n", stderr);
-				Model_Error = true;
-				kill_cartridge(false);
-			}
-			if ( mgmt->eof(mgmt) ) {
-				if ( Debug )
-					fputs("Terminating management.\n", \
-					      Debug);
-				mgmt->reset(mgmt);
-				if ( !mgmt->get_socket(mgmt, \
-						       &poll_data[1].fd) )
-					ERR(goto done);
-				connected = false;
-				continue;
-			}
-
-			if ( !process_command(mgmt, cmdbufr) ) {
-				Model_Error = true;
-				kill_cartridge(false);
-			}
-			cmdbufr->reset(cmdbufr);
-		}
-	}
-
-
- done:
-	WHACK(cmdbufr);
-
-	return retn;
-}
-
-
-/**
- * Private function.
- *
  * This function is responsible for launching a software cartridge
  * in an independent measurement domain.  A pipe is established
  * between the parent process and the child that is used to return
  * the namespace specific events for injection into the security
  * co-processor.
  *
- * \param root		A pointer to the buffer containing the root
- *			directory to be used to display the cartridges.
+ * \param workload	The object that is managing the workload.
  *
- * \param enforce	A flag used to indicate whether or not the
- *			security domain should be placed in enforcement
- *			mode.
+ * \param container	A pointer to a null-terminated character buffer
+ *			containing the name of the container that is
+ *			being executed.
  *
  * \param outfile	A pointer to a null-terminated array
  *			containing the name of the output file that
  *			is to be generated.
  *
- * \param argc		The number of command-line arguments specified for
- *			the execution of the security namespace.
- *                         
- * \param argv		A pointer to the array of strings describing
- *			the command-line arguements.  This variable and
- *			the argc value are used if the export utility
- *			has been running in execute mode.
- *
  * \return	A boolean value is returned to reflect the status of
- *		the launch.  A false value indicates an error was
- *		encountered while a true value indicates the cartridge
- *		was successfully launched.
+ *		the workload.  A false value indicates an error was
+ *		encountered while a true value indicates the workload
+ *		was successfuly executed.
  */
 
-static _Bool fire_cartridge(CO(LocalDuct, mgmt), CO(char *, cartridge), \
-			    _Bool enforce, char *outfile, int argc,	\
-			    char *argv[])
+static _Bool run_workload(CO(TSEMworkload, workload), CO(char *, container), \
+			  CO(char *, outfile), const _Bool enforce)
 
 {
 	_Bool retn = false;
 
-	char *bundle = NULL,
-	     bufr[2048];
+	pid_t workload_pid;
 
-	int rc,
-	    event_pipe[2],
-	    event_fd = 0;
-
-	pid_t cartridge_pid;
-
-	struct pollfd poll_data[1];
-
-	String cartridge_dir = NULL;
+	LocalDuct mgmt = NULL;
 
 
-	/* Create the name of the bundle directory if in cartridge mode . */
-	if ( Mode == cartridge_mode ) {
-		INIT(HurdLib, String, cartridge_dir, ERR(goto done));
-		cartridge_dir->add(cartridge_dir, QUIXOTE_MAGAZINE);
-		cartridge_dir->add(cartridge_dir, "/");
-		if ( !cartridge_dir->add(cartridge_dir, cartridge) )
+	/* Create the namespace management process. */
+	workload_pid = fork();
+	if ( workload_pid == -1 )
+		ERR(goto done);
+
+	/* Parent process - Security Monitor. */
+	if ( workload_pid > 0 ) {
+		/* Setup the management socket. */
+		INIT(NAAAIM, LocalDuct, mgmt, ERR(goto done));
+		if ( !setup_management(mgmt, container) )
 			ERR(goto done);
-		bundle = cartridge_dir->get(cartridge_dir);
-		Runc_name = cartridge;
-	}
 
-
-	/* Create the subordinate cartridge process. */
-	if ( pipe(event_pipe) == -1 )
-		ERR(goto done);
-
-	Monitor_pid = fork();
-	if ( Monitor_pid == -1 )
-		ERR(goto done);
-
-	/* Monitor parent process. */
-	if ( Monitor_pid > 0 ) {
-		if ( Debug )
-			fprintf(Debug, "Monitor process: %d\n", Monitor_pid);
-
-		close(event_pipe[WRITE_SIDE]);
-		if ( !child_monitor(mgmt, cartridge, event_pipe[READ_SIDE]) )
+		if ( !workload->run_monitor(workload, workload_pid, mgmt, \
+					    process_event, process_command) )
 			ERR(goto done);
 
 		if ( outfile != NULL ) {
@@ -2084,153 +1652,18 @@ static _Bool fire_cartridge(CO(LocalDuct, mgmt), CO(char *, cartridge), \
 		}
 		else
 			retn = true;
+
+		WHACK(mgmt);
 		goto done;
 	}
 
-	/* Child process - create an independent namespace for this process. */
-	if ( Monitor_pid == 0 ) {
-		close(event_pipe[READ_SIDE]);
-		if ( !setup_namespace(&event_fd, enforce) )
-			_exit(1);
-
-		/* Fork again to run the cartridge. */
-		cartridge_pid = fork();
-		if ( cartridge_pid == -1 )
-			exit(1);
-
-		/* Child process - run the cartridge. */
-		if ( cartridge_pid == 0 ) {
-			if ( Debug )
-				fprintf(Debug, "Workload process: %d\n",
-					getpid());
-
-			/* Drop the ability to modify the trust state. */
-			if ( cap_drop_bound(CAP_MAC_ADMIN) != 0 )
-				ERR(goto done);
-
-			if ( Mode == cartridge_mode ) {
-				execlp("runc", "runc", "run", "-b", bundle, \
-				       cartridge, NULL);
-				fputs("Cartridge execution failed.\n", stderr);
-				exit(1);
-			}
-
-			if ( Mode == process_mode ) {
-				if ( geteuid() != getuid() ) {
-					if ( Debug )
-						fprintf(Debug, "Changing to " \
-							"real id: \%u\n",     \
-							getuid());
-					if ( setuid(getuid()) != 0 ) {
-						fputs("Cannot change uid.\n", \
-						      stderr);
-						exit(1);
-					}
-				}
-
-				if ( Debug )
-					fputs("Executing cartridge " \
-					      "process.\n", Debug);
-				execlp("bash", "bash", "-i", NULL);
-				fputs("Cartridge process execution failed.\n",\
-				      stderr);
-				exit(1);
-			}
-
-			if ( Mode == execute_mode ) {
-				if ( geteuid() != getuid() ) {
-					if ( Debug )
-						fprintf(Debug, "Changing to " \
-							"real id: \%u\n",     \
-							getuid());
-					if ( setuid(getuid()) != 0 ) {
-						fputs("Cannot change uid.\n", \
-						      stderr);
-						exit(1);
-					}
-				}
-
-				if ( Debug )
-					fputs("Executing command line.\n", \
-					      Debug);
-				Execute->run_command_line(Execute, argc, argv);
-				fputs("Command line execution failed.\n", \
-				      stderr);
-				exit(1);
-			}
-		}
-			
-		/* Parent process - monitor for events. */
-		poll_data[0].fd	    = event_fd;
-		poll_data[0].events = POLLIN;
-
-		while ( true ) {
-			if ( Signals.stop ) {
-				if ( Debug )
-					fputs("Monitor process stopped\n", \
-					      Debug);
-				retn = true;
-				goto done;
-			}
-
-			if ( Signals.sigterm ) {
-				if ( Debug )
-					fputs("Monitor process terminated.\n",\
-					      Debug);
-				kill_cartridge(false);
-			}
-
-			if ( Signals.sigchild ) {
-				if ( child_exited(cartridge_pid) ) {
-					close(event_fd);
-					close(event_pipe[WRITE_SIDE]);
-					_exit(0);
-				}
-			}
-
-			memset(bufr, '\0', sizeof(bufr));
-
-			rc = poll(poll_data, 1, -1);
-			if ( rc < 0 ) {
-				if ( errno == -EINTR ) {
-					fputs("poll interrupted.\n", stderr);
-					continue;
-				}
-			}
-
-			if ( (poll_data[0].revents & POLLIN) == 0 )
-				continue;
-
-			while ( true ) {
-				rc = read(event_fd, bufr, sizeof(bufr));
-				if ( rc == 0 )
-					break;
-				if ( rc < 0 ) {
-					if ( errno != ENODATA ) {
-						fputs("Fatal event read.\n", \
-						      stderr);
-						exit(1);
-					}
-					break;
-				}
-				if ( rc > 0 ) {
-					write(event_pipe[WRITE_SIDE], bufr, \
-					      rc);
-					lseek(event_fd, 0, SEEK_SET);
-				}
-			}
-
-			if ( lseek(event_fd, 0, SEEK_SET) < 0 ) {
-				fputs("Seek error.\n", stderr);
-				break;
-			}
-		}
-	}
+	/* Child process - run the workload and model events. */
+	if ( !workload->run_workload(workload) )
+		ERR(goto done);
+	retn = true;
 
 
  done:
-	WHACK(cartridge_dir);
-
 	return retn;
 }
 
@@ -2247,22 +1680,18 @@ extern int main(int argc, char *argv[])
 	char *debug	    = NULL,
 	     *model	    = NULL,
 	     *outfile	    = NULL,
-	     *cartridge	    = NULL,
+	     *container	    = NULL,
 	     *magazine_size = NULL;
 
 	int opt,
 	    fd	 = 0,
 	    retn = 1;
 
-	struct sigaction signal_action;
-
-	LocalDuct mgmt = NULL;
-
 
 	while ( (opt = getopt(argc, argv, "CPSXetuM:c:d:h:m:n:o:p:")) != EOF )
 		switch ( opt ) {
 			case 'C':
-				Mode = cartridge_mode;
+				Mode = container_mode;
 				break;
 			case 'P':
 				Mode = process_mode;
@@ -2289,7 +1718,7 @@ extern int main(int argc, char *argv[])
 				break;
 
 			case 'c':
-				cartridge = optarg;
+				container = optarg;
 				break;
 			case 'd':
 				debug = optarg;
@@ -2312,8 +1741,8 @@ extern int main(int argc, char *argv[])
 	if ( Mode == show_mode )
 		show_magazine(QUIXOTE_MAGAZINE);
 
-	if ( (Mode == cartridge_mode) && (cartridge == NULL) ) {
-		fputs("No software cartridge specified.\n", stderr);
+	if ( (Mode == container_mode) && (container == NULL) ) {
+		fputs("No software container specified.\n", stderr);
 		goto done;
 	}
 
@@ -2335,42 +1764,6 @@ extern int main(int argc, char *argv[])
 		}
 	}
 
-	/* Setup signal handlers. */
-	if ( sigemptyset(&signal_action.sa_mask) == -1 )
-		ERR(goto done);
-
-	signal_action.sa_flags = SA_SIGINFO | SA_NODEFER | SA_RESTART;
-	signal_action.sa_sigaction = signal_handler;
-	if ( sigaction(SIGINT, &signal_action, NULL) == -1 )
-		goto done;
-	if ( sigaction(SIGTERM, &signal_action, NULL) == -1 )
-		goto done;
-	if ( sigaction(SIGHUP, &signal_action, NULL) == -1 )
-		goto done;
-	if ( sigaction(SIGQUIT, &signal_action, NULL) == -1 )
-		goto done;
-	if ( sigaction(SIGSEGV, &signal_action, NULL) == -1 )
-		goto done;
-	if ( sigaction(SIGFPE, &signal_action, NULL) == -1 )
-		goto done;
-	if ( sigaction(SIGILL, &signal_action, NULL) == -1 )
-		goto done;
-	if ( sigaction(SIGBUS, &signal_action, NULL) == -1 )
-		goto done;
-	if ( sigaction(SIGTRAP, &signal_action, NULL) == -1 )
-		goto done;
-	if ( sigaction(SIGCHLD, &signal_action, NULL) == -1 )
-		goto done;
-
-
-	/* Initialize the security model and its controller. */
-	INIT(NAAAIM, TSEM, Model, ERR(goto done));
-	INIT(NAAAIM, TSEMevent, Event, ERR(goto done));
-
-	INIT(NAAAIM, TSEMcontrol, Control, ERR(goto done));
-	if ( !Control->generate_key(Control) )
-		ERR(goto done);
-
 
 	/* Load and seal a security model if specified. */
 	if ( model != NULL ) {
@@ -2384,19 +1777,34 @@ extern int main(int argc, char *argv[])
 	}
 
 
-	/* Setup the management socket. */
-	INIT(NAAAIM, LocalDuct, mgmt, ERR(goto done));
-	if ( !setup_management(mgmt, cartridge) )
+	/* Initialize and configure the workload. */
+	INIT(NAAAIM, TSEM, Model, ERR(goto done));
+	INIT(NAAAIM, TSEMworkload, Workload, ERR(goto done));
+
+	Workload->set_debug(Workload, Debug);
+	if ( !Workload->configure_external(Workload, TSEM_model, Digest, \
+					   magazine_size, Current_Namespace) )
 		ERR(goto done);
 
-	/* Initialize the process object if in execute mode. */
-	if ( Mode == execute_mode )
-		INIT(HurdLib, Process, Execute, ERR(goto done));
+	switch ( Mode ) {
+		case container_mode:
+			if ( !Workload->set_container_mode(Workload, 	     \
+							   QUIXOTE_MAGAZINE, \
+							   container) )
+				ERR(goto done);
+			break;
 
-	/* Fire the workload cartridge. */
+		case execute_mode:
+			Workload->set_execute_mode(Workload, argc, argv);
+			break;
+
+		default:
+			break;
+	}
+
 	if ( Debug )
 		fprintf(Debug, "Launch process: %d\n", getpid());
-	if ( !fire_cartridge(mgmt, cartridge, enforce, outfile, argc, argv) )
+	if ( !run_workload(Workload, container, outfile, enforce) )
 		ERR(goto done);
 
 	waitpid(Monitor_pid, NULL, 0);
@@ -2411,13 +1819,9 @@ extern int main(int argc, char *argv[])
 
 
  done:
-	WHACK(mgmt);
-
 	WHACK(Aggregate);
 	WHACK(Model);
-	WHACK(Control);
-	WHACK(Event);
-	WHACK(Execute);
+	WHACK(Workload);
 
 	if ( fd > 0 )
 		close(fd);
