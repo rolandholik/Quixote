@@ -136,6 +136,9 @@ struct NAAAIM_TSEMworkload_State
 	/* Communication pipe for state events. */
 	int event_pipe[2];
 
+	/* Namespace control object. */
+	TSEMcontrol control;
+
 	/* Event processing object. */
 	TSEMevent event;
 };
@@ -168,6 +171,7 @@ static void _init_state(CO(TSEMworkload_State, S))
 	S->cache_size = 0;
 	S->model = NULL;
 	S->digest = NULL;
+	S->control = NULL;
 
 	S->mode = PROCESS_MODE;
 	S->argc = 0;
@@ -323,6 +327,40 @@ static _Bool configure_export(CO(TSEMworkload, this), CO(char *, model),  \
 
 	retn	= true;
 	S->type = TSEMcontrol_TYPE_EXPORT;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements the creation of a security modeling workload
+ * that externally models the events.
+ *
+ * \param this	A pointer to the object describing the workload.
+ */
+
+static _Bool configure_external(CO(TSEMworkload, this), CO(char *, model),  \
+				CO(char *, digest), CO(char *, cache_size), \
+				const _Bool initial_ns)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	if ( !_init_ns_config(S, model, digest, initial_ns, cache_size) )
+		ERR(goto done);
+
+	S->type = TSEMcontrol_TYPE_EXTERNAL;
+	if ( !S->control->generate_key(S->control) )
+		ERR(goto done);
+
+	retn = true;
 
 
  done:
@@ -561,15 +599,17 @@ static void kill_workload(CO(TSEMworkload_State, S), _Bool wait)
  *		successfully configured.
  */
 
-static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid, \
-			 CO(LocalDuct, mgmt),		     \
-			 _Bool (*event_handler)(TSEMevent))
+static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
+			 CO(LocalDuct, mgmt),				\
+			 _Bool (*event_handler)(TSEMevent),		\
+			 _Bool (*command_handler)(LocalDuct, Buffer))
 
 {
 	STATE(S);
 
 	_Bool event,
-	      retn = false;
+	      retn	= false,
+	      connected = false;
 
 	int rc,
 	    fd	  = S->event_pipe[READ_SIDE],
@@ -579,11 +619,15 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid, \
 
 	struct pollfd poll_data[2];
 
+	Buffer cmdbufr = NULL;
+
 
 	if ( Debug )
 		fprintf(Debug, "Security Monitor (SM) pid: %d\n", getpid());
-	S->workload_pid = workload_pid;
 
+	INIT(HurdLib, Buffer, cmdbufr, ERR(goto done));
+
+	S->workload_pid = workload_pid;
 	close(S->event_pipe[WRITE_SIDE]);
 
 	poll_data[0].fd	    = fd;
@@ -681,10 +725,46 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid, \
 				}
 			}
 		}
+
+		if ( poll_data[1].revents & POLLIN ) {
+			if ( !connected ) {
+				if ( Debug )
+					fputs("Have socket connection.\n", \
+					      Debug);
+
+				if ( !mgmt->accept_connection(mgmt) )
+					ERR(goto done);
+				if ( !mgmt->get_fd(mgmt, &poll_data[1].fd) )
+					ERR(goto done);
+				connected = true;
+				continue;
+			}
+			if ( !mgmt->receive_Buffer(mgmt, cmdbufr) ) {
+				fputs("Orchestrator manager error.\n", stderr);
+				kill_workload(S, false);
+			}
+			if ( mgmt->eof(mgmt) ) {
+				if ( Debug )
+					fputs("Terminating management.\n", \
+					      Debug);
+				mgmt->reset(mgmt);
+				if ( !mgmt->get_socket(mgmt, \
+						       &poll_data[1].fd) )
+					ERR(goto done);
+				connected = false;
+				continue;
+			}
+
+			if ( !command_handler(mgmt, cmdbufr) )
+				kill_workload(S, false);
+			cmdbufr->reset(cmdbufr);
+		}
 	}
 
 
  done:
+	WHACK(cmdbufr);
+
 	return retn;
 }
 
@@ -720,16 +800,12 @@ static _Bool _setup_namespace(CO(TSEMworkload_State, S))
 	     *digest = S->digest == NULL ? NULL : S->digest->get(S->digest),
 	     fname[PATH_MAX];
 
-	TSEMcontrol control = NULL;
-
-
-	INIT(NAAAIM, TSEMcontrol, control, ERR(goto done));
 
 	/* Create and configure a security model namespace. */
-	if ( !control->create_ns(control, S->type, model, digest, S->ns, \
-				 S->cache_size) )
+	if ( !S->control->create_ns(S->control, S->type, model, digest, \
+				    S->ns, S->cache_size) )
 		ERR(goto done);
-	if ( !control->id(control, &S->id) )
+	if ( !S->control->id(S->control, &S->id) )
 		ERR(goto done);
 
 
@@ -741,14 +817,12 @@ static _Bool _setup_namespace(CO(TSEMworkload_State, S))
 	if ( Debug )
 		fprintf(Debug, "Update file: %s\n", fname);
 
-	if ( (S->fd = open(fname, O_RDONLY | O_CLOEXEC)) < 0 )
+	if ( (S->fd = open(fname, O_RDONLY)) < 0 )
 		ERR(goto done);
 	retn = true;
 
 
  done:
-	WHACK(control);
-
 	return retn;
 
 }
@@ -855,7 +929,9 @@ static _Bool run_workload(CO(TSEMworkload, this))
 		if ( Debug ) {
 			fprintf(Debug, "Workload process: %d\n", getpid());
 		}
+		close(S->fd);
 		close(S->event_pipe[WRITE_SIDE]);
+		WHACK(S->control);
 
 		/* Drop the ability to modify the trust state. */
 		if ( cap_drop_bound(CAP_MAC_ADMIN) != 0 )
@@ -921,13 +997,19 @@ static _Bool run_workload(CO(TSEMworkload, this))
 	}
 
 	/* Parent process - Namespace Monitor. */
-	if ( Debug )
+	if ( Debug ) {
 		fprintf(Debug, "Namespace Monitor (NM) pid: %d\n", getpid());
-	if ( !_set_user(NULL) )
-		ERR(goto done);
+		fprintf(Debug, "%d: Calling event loop\n", getpid());
+		fprintf(Debug, "%d: fd descriptor: %d\n", getpid(), S->fd);
+	}
 
 	poll_data[0].fd	    = S->fd;
 	poll_data[0].events = POLLIN;
+
+	if ( S->type == TSEMcontrol_TYPE_EXPORT ) {
+		if ( !_set_user(NULL) )
+			ERR(goto done);
+	}
 
 	while ( true ) {
 		if ( Signals.stop ) {
@@ -997,6 +1079,62 @@ static _Bool run_workload(CO(TSEMworkload, this))
 /**
  * External public method.
  *
+ * This method releases a process to run as a trusted process.  It serves
+ * as an inheritance wrapper around a the TSEMcontrol->release method.
+ *
+ * \param this	The object describing the workload whose process is to
+ *		be released.
+ *
+ * \param pid	The process identifier of the process to be released.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not the workload was successfully released.
+ *			A false value indicates that a failure had
+ *			occurred int he process release.  A true value
+ *			indicates the process was successfully released.
+ */
+
+static _Bool release(CO(TSEMworkload, this), const pid_t pid)
+
+{
+	STATE(S);
+
+	return S->control->release(S->control, pid);
+}
+
+
+/**
+ * External public method.
+ *
+ * This method releases a process to run as an untrusted process.  It
+ * serves as an inheritance wrapper around a the TSEMcontrol->release
+ * method.
+ *
+ * \param this	The object describing the workload whose process is to
+ *		be released.
+ *
+ * \param pid	The process identifier of the process to be released
+ *		as untrusted.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not the workload was successfully released.
+ *			A false value indicates that a failure had
+ *			occurred int he process release.  A true value
+ *			indicates the process was successfully released.
+ */
+
+static _Bool discipline(CO(TSEMworkload, this), const pid_t pid)
+
+{
+	STATE(S);
+
+	return S->control->discipline(S->control, pid);
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a destructor for a TSEMworkload object.
  *
  * \param this	A pointer to the object which is to be destroyed.
@@ -1014,6 +1152,7 @@ static void whack(CO(TSEMworkload, this))
 	WHACK(S->bundle);
 
 	WHACK(S->event);
+	WHACK(S->control);
 
 	S->root->whack(S->root, this, S);
 	return;
@@ -1119,9 +1258,11 @@ extern TSEMworkload NAAAIM_TSEMworkload_Init(void)
 
 	/* Initialize aggregate objects. */
 	INIT(NAAAIM, TSEMevent, this->state->event, goto fail);
+	INIT(NAAAIM, TSEMcontrol, this->state->control, goto fail);
 
 	/* Method initialization. */
-	this->configure_export = configure_export;
+	this->configure_export	 = configure_export;
+	this->configure_external = configure_external;
 
 	this->set_debug		 = set_debug;
 	this->set_execute_mode	 = set_execute_mode;
@@ -1129,6 +1270,9 @@ extern TSEMworkload NAAAIM_TSEMworkload_Init(void)
 
 	this->run_monitor  = run_monitor;
 	this->run_workload = run_workload;
+
+	this->release	 = release;
+	this->discipline = discipline;
 
 	this->whack = whack;
 
