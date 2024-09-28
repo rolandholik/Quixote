@@ -261,6 +261,8 @@ static _Bool create_ns(CO(TSEMcontrol, this),
 
 	if ( !_write_cmd(S) )
 		ERR(goto done);
+
+	WHACK(S->file);
 	retn = true;
 
 
