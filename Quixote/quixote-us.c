@@ -134,13 +134,6 @@ static _Bool Sealed = false;
 static _Bool Trajectory = false;
 
 /**
- * This variable is used to control whether the security event
- * descriptions are to reference the initial user namespace or
- * the current user namespace that the process is running in.
- */
-static _Bool Current_Namespace = false;
-
-/**
  * The name of the hash function to be used for the namespace.
  */
 static char *Digest = NULL;
@@ -1666,7 +1659,8 @@ static _Bool run_workload(CO(TSEMworkload, workload), CO(char *, container), \
 extern int main(int argc, char *argv[])
 
 {
-	_Bool enforce = false;
+	_Bool enforce		= false,
+	      current_namespace = false;
 
 	char *debug	    = NULL,
 	     *model	    = NULL,
@@ -1701,7 +1695,7 @@ extern int main(int argc, char *argv[])
 				Trajectory = true;
 				break;
 			case 'u':
-				Current_Namespace = true;
+				current_namespace = true;
 				break;
 
 			case 'M':
@@ -1774,7 +1768,7 @@ extern int main(int argc, char *argv[])
 
 	Workload->set_debug(Workload, Debug);
 	if ( !Workload->configure_external(Workload, TSEM_model, Digest, \
-					   magazine_size, Current_Namespace) )
+					   magazine_size, current_namespace) )
 		ERR(goto done);
 
 	switch ( Mode ) {
