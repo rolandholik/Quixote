@@ -85,6 +85,9 @@ struct path {
 	uint32_t major;
 	uint32_t minor;
 	String pathname;
+
+	uint64_t instance;
+	char owner[NAAAIM_IDSIZE];
 };
 
 /* File characteristics. */
@@ -265,6 +268,50 @@ static _Bool _get_u16(CO(TSEMparser, parser), CO(char *, field), \
 		ERR(goto done);
 
 	*value = (uint16_t) vl;
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * Internal private function.
+ *
+ * This method extracts a 64 bit unsigned integer from a JSON field.
+ *
+ * \param parser	The parser object used to extract the field
+ *			description.
+ *
+ * \param field		The description of the integer field to extract.
+ *
+ * \param value		A pointer to the variable which will be loaded
+ *			with the parsed value.
+ *
+ * \return	A boolean value is used to indicate the success or
+ *		failure of extraction of the value.  A false value is
+ *		used to indicate a failure occurred during the
+ *		extraction.  A true value indicates the value has
+ *		been successfully extracted and contains a legitimate
+ *		value.
+ */
+
+static _Bool _get_u64(CO(TSEMparser, parser), CO(char *, field), \
+		      uint64_t *value)
+
+{
+	_Bool retn = false;
+
+	long long int vl;
+
+
+	if ( !parser->get_integer(parser, field, &vl) )
+		ERR(goto done);
+	if ( (unsigned long long int) vl > UINT64_MAX )
+		ERR(goto done);
+
+	*value = (uint64_t) vl;
 	retn = true;
 
 
@@ -499,12 +546,22 @@ static _Bool _parse_file(CO(TSEMparser, parser), CO(String, event), \
 			  sizeof(fp->inode.s_uuid)) )
 		ERR(goto done);
 
-	/* Parse the path description and extract pathname. */
+	/* Parse the path description and extract pathname and instance. */
 	if ( !parser->extract_field(parser, event, "path") )
 		ERR(goto done);
 
 	if ( !parser->get_text(parser, "pathname", fp->path.pathname) )
 		ERR(goto done);
+
+	if ( !parser->has_key(parser, "instance") )
+		fp->path.instance = 0;
+	else {
+		if ( !_get_u64(parser, "instance", &fp->path.instance) )
+			ERR(goto done);
+		if ( !_get_digest(parser, "owner", (uint8_t *) fp->path.owner,
+				  NAAAIM_IDSIZE) )
+			ERR(goto done);
+	}
 
 	/* Extract the device information. */
 	if  ( !parser->has_key(parser, "dev") ) {
@@ -1178,6 +1235,104 @@ static _Bool parse(CO(Cell, this), CO(String, entry), \
 
 
 /**
+ * Internal helper function.
+ *
+ * This function adds the contents of a String object the input to a
+ * measurement value.
+ *
+ * \param bufr	A pointer to the object that contains the contents of
+ *		the measurement that will be generated.
+ *
+ * \param str	A pointer to the object whose string representation is
+ *		to be added to the bufr object.
+ *
+ * \return	A boolean value is returned to indicate the status of
+ *		adding the String object to the measurement.  A false
+ *		value indicates the addition added while a true value
+ *		indicates the contents was successfully added.
+ */
+
+static _Bool _add_String(CO(Buffer, bufr), CO(String, str))
+
+{
+	_Bool retn = false;
+
+	uint32_t length = str->size(str);
+
+
+	if ( !bufr->add(bufr, (void *) &length, sizeof(length)) )
+		ERR(goto done);
+
+	if ( !bufr->add(bufr, (void *) str->get(str), length) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * Internal helper function.
+ *
+ * This method implements adding the path components for a temporary file
+ * into the measurement.
+ *
+ * \param bufr	The object that will be extended with the measurement of
+ *		the temporary file.
+ *
+ * \param pp	A pointer to the structure containing the information about
+ *		the path to the temporary file.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the extension with the path information had succeeded or
+ *		failed.  A false value indicates a failure while a true
+ *		value indicates the object was successfully extended.
+ */
+
+static _Bool _add_temp_path(CO(Buffer, bufr), CO(struct path *, pp))
+
+{
+	_Bool retn = false;
+
+	char *p, ch = '\0';
+
+	uint32_t length;
+
+
+	p = strrchr(pp->pathname->get(pp->pathname), '/');
+	if ( p == NULL )
+		ERR(goto done);
+	++p;
+	ch = *p;
+	if (ch)
+		*p = '\0';
+	length = strlen(pp->pathname->get(pp->pathname));
+	if (ch)
+		*p = ch;
+
+	if ( !bufr->add(bufr, (void *) &length, sizeof(length)) )
+		ERR(goto done);
+	if ( !bufr->add(bufr, (void *) pp->pathname->get(pp->pathname), \
+		     length) )
+		ERR(goto done);
+
+	if ( !bufr->add(bufr, (void *) &pp->instance, sizeof(pp->instance)) )
+		ERR(goto done);
+
+	if ( !bufr->add(bufr, (void *) pp->owner, sizeof(pp->owner)) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
  * Internal private method.
  *
  * This method implements computing of the measurement of a cell that
@@ -1198,13 +1353,9 @@ static _Bool _measure_file(CO(Cell_State, S))
 
 	uint8_t null_uuid[16];
 
-	uint32_t name_length;
-
 	struct inode *i;
 
 	Buffer bufr = NULL;
-
-	String s;
 
 
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
@@ -1226,14 +1377,13 @@ static _Bool _measure_file(CO(Cell_State, S))
 		bufr->add(bufr, i->s_uuid, sizeof(i->s_uuid));
 
 	/* Add path information .*/
-	s = S->file.path.pathname;
-
-	name_length = s->size(s);
-	if ( !bufr->add(bufr, (void *) &name_length, sizeof(name_length)) )
-		ERR(goto done);
-
-	if ( !bufr->add(bufr, (void *) s->get(s), s->size(s)) )
-		ERR(goto done);
+	if ( S->file.path.instance > 0 ) {
+		if ( !_add_temp_path(bufr, &S->file.path) )
+			ERR(goto done);
+	} else {
+		if ( !_add_String(bufr, S->file.path.pathname) )
+			ERR(goto done);
+	}
 
 	/* Add the digest value of the file. */
 	if ( !bufr->add(bufr, (void *) S->file.digest, \
@@ -1982,9 +2132,26 @@ static _Bool _format_file(struct file_parameters *fp, CO(String, str))
 
 	/* Path description. */
 	if ( !str->add_sprintf(str, "\"}, \"path\": {\"dev\": {"	 \
-			       "\"major\": \"%u\", \"minor\": \"%u\"}, " \
-			       "\"pathname\": \"%s\"}, \"digest\": \"",	 \
-			       fp->path.major, fp->path.minor,
+			       "\"major\": \"%u\", \"minor\": \"%u\"}, ",
+			       fp->path.major, fp->path.minor) )
+		ERR(goto done);
+
+	if ( fp->path.instance > 0 ) {
+		if ( !str->add(str, "\"owner\": \"") )
+			ERR(goto done);
+		for (lp= 0; lp < sizeof(fp->path.owner); ++lp) {
+			if ( !str->add_sprintf(str, "%02x",
+				       (unsigned char) fp->path.owner[lp]) )
+				ERR(goto done);
+		}
+		if ( !str->add(str, "\", ") )
+			ERR(goto done);
+		if ( !str->add_sprintf(str, "\"instance\": \"%lu\", ", \
+				       fp->path.instance) )
+			ERR(goto done);
+	}
+
+	if ( !str->add_sprintf(str, "\"pathname\": \"%s\"}, \"digest\": \"", \
 			       name) )
 		ERR(goto done);
 
@@ -2569,16 +2736,24 @@ void _dump_file(CO(Cell_State, S))
 	fprintf(stdout, "gid:   %lu\n", (unsigned long int) ip->gid);
 	fprintf(stdout, "mode:  0%lo\n",(unsigned long int) ip->mode);
 	fprintf(stdout, "name:  %s\n", pp->pathname->get(pp->pathname));
-
 	fprintf(stdout, "s_magic: 0x%x\n", ip->s_magic);
 	fprintf(stdout, "s_id:    %s\n", ip->s_id);
-
 	if ( !bufr->add(bufr, (unsigned char *) ip->s_uuid, \
 			sizeof(ip->s_uuid)) )
 		ERR(goto done);
 	fputs("s_uuid:  ", stdout);
 	bufr->print(bufr);
 	bufr->reset(bufr);
+
+	if ( pp->instance > 0 ) {
+		fprintf(stdout, "instance: %lu\n", pp->instance);
+
+		if ( !bufr->add(bufr, (void *) pp->owner, sizeof(pp->owner)) )
+			ERR(goto done);
+		fputs("owner:    ", stdout);
+		bufr->print(bufr);
+		bufr->reset(bufr);
+	}
 
 	if ( !bufr->add(bufr, (unsigned char *) S->file.digest,
 			sizeof(S->file.digest)) )
