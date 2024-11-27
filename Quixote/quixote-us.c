@@ -1792,8 +1792,6 @@ extern int main(int argc, char *argv[])
 	if ( !run_workload(Workload, container, outfile, enforce) )
 		ERR(goto done);
 
-	waitpid(Monitor_pid, NULL, 0);
-
 	if ( outfile != NULL ) {
 		if ( Trajectory )
 			fputs("Wrote execution trajectory to: ", stdout);
