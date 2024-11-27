@@ -1080,10 +1080,10 @@ static _Bool _parse_task_kill(CO(Cell_State, S), CO(String, entry))
 		ERR(goto done);
 
 	/* Parse task_kill parameters. */
-	if ( !_get_field(parser, "cross", &S->task_kill.cross_model) )
+	if ( !_get_field(parser, "cross_ns", &S->task_kill.cross_model) )
 		ERR(goto done);
 
-	if ( !_get_field(parser, "signal", &S->task_kill.signal) )
+	if ( !_get_field(parser, "sig", &S->task_kill.signal) )
 		ERR(goto done);
 
 	if ( !_get_digest(parser, "target", S->task_kill.task_id, \
@@ -2599,9 +2599,7 @@ static _Bool _format_task_kill(CO(Cell_State, S), CO(String, str))
 	_Bool retn = false;
 
 
-	if ( !str->add_sprintf(str, "\"task_kill\": {\"cross\": \"%u\", " \
-			       "\"signal\": \"%u\", \"task_id\": ",	  \
-			       S->task_kill.cross_model, S->task_kill.signal) )
+	if ( !str->add(str, "\"task_kill\": {\"target\": \"") )
 		ERR(goto done);
 
 	p    = S->task_kill.task_id;
@@ -2612,7 +2610,9 @@ static _Bool _format_task_kill(CO(Cell_State, S), CO(String, str))
 		++p;
 	}
 
-	if ( !str->add(str, "}") )
+	if ( !str->add_sprintf(str, "\", \"sig\": \"%u\", \"cross_ns\": " \
+			       "\"%u\"}", S->task_kill.cross_model,	  \
+			       S->task_kill.signal) )
 		ERR(goto done);
 	retn = true;
 
@@ -2970,7 +2970,7 @@ void _dump_task_kill(CO(Cell_State, S))
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 
 	fprintf(stdout, "cross model: %u\n", S->task_kill.cross_model);
-	fprintf(stdout, "signal:      %u\n", S->task_kill.signal);
+	fprintf(stdout, "sig:         %u\n", S->task_kill.signal);
 
 	if ( !bufr->add(bufr, S->task_kill.task_id, \
 			sizeof(S->task_kill.task_id)) )
