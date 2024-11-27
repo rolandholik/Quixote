@@ -21,9 +21,12 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("The Quixote Project");
 MODULE_DESCRIPTION("Sample TSEM integrity model.");
 
-static bool bypasses[TSEM_EVENT_CNT];
+static bool event_handlers[TSEM_EVENT_CNT] = {
+	[TSEM_FILE_OPEN] = true,
+	[TSEM_MMAP_FILE] = true
+};
 
-static int integrity_event_init(struct tsem_event *ep)
+static int cell_init(struct tsem_event *ep)
 {
 	int retn;
 
@@ -53,7 +56,7 @@ static int integrity_event_init(struct tsem_event *ep)
 	return retn;
 }
 
-static int integrity_map_event(struct tsem_event *ep)
+static int map_event(struct tsem_event *ep)
 {
 	u8 *p;
 
@@ -75,21 +78,13 @@ static int integrity_map_event(struct tsem_event *ep)
 
 const struct tsem_context_ops integrity_ops = {
 	.name = KBUILD_MODNAME,
-	.bypasses = bypasses,
-	.init = integrity_event_init,
-	.map = integrity_map_event
+	.events = event_handlers,
+	.cell_init = cell_init,
+	.map = map_event
 };
 
 static int __init integrity_init(void)
 {
-	unsigned int lp;
-
-	for (lp= 0; lp < TSEM_EVENT_CNT; ++lp)
-		bypasses[lp] = true;
-
-	bypasses[TSEM_FILE_OPEN] = false;
-	bypasses[TSEM_MMAP_FILE] = false;
-
 	return tsem_nsmgr_register(&integrity_ops, THIS_MODULE);
 }
 module_init(integrity_init);
