@@ -1,0 +1,172 @@
+#! /bin/bash
+
+#
+# This script automates the comparison of two separate execution
+# trajectories.
+#
+# Three modes are available via the following command-line switches:
+#	-A:	Automates the capture of two execution trajectories.
+#	-C:	Compares the state of two execution trajectories.
+#	-G:	Captures the state of an execution trajectory.
+#
+# The security model execution environment is selected with the following
+# command-line switches:
+#	-c [NAME]:	Selects a container namespace named by [NAME].
+#	-p [NAME]:	Selects a process namespaced named by [NAME].
+#	-v [NUMBER]:	Version number of a test.
+#
+# The -G mode requires the specification of a version identifier that
+# the name space information is to be written to.  The comparison mode
+# of this utility assumes this number will be either 1 or 2.
+#
+
+#
+# Copyright (c) Enjellic Systems Development, LLC. All rights reserved.
+#
+# Please refer to the file named Documentation/COPYRIGHT in the top of
+# the source tree for copyright and licensing information.
+#
+
+
+# The variable that will be used for getopt processing.
+declare Arg;
+
+# The mode the utility is running in, either process or container.
+declare Mode="none";
+
+# The name of the container or process environment.
+declare Namespace;
+
+# The mode argument for the quixote-console utility.
+declare Mode_switch;
+
+# The command that will be used to interrogate the namespace.
+declare Qc="quixote-console";
+
+# The command to be executed.
+declare Cmd="none";
+
+# The version number of the namespace information.
+declare Version;
+
+
+#
+# This function interrogates a security modeling namespace for the
+# state of the namespace, its trajectory and security coefficients.
+#
+# A single argument is expected:
+#
+#	$1:->	A numeric suffix of 1 or 2 specifying whether this is
+#		the first or second invocation of the namespace.
+#
+# Return:
+#	No return value is specified.
+#
+
+function Grab() {
+
+	$Qc -S >| state.$1;
+	$Qc -T >| t.$1;
+	$Qc -P >| p.$1;
+	
+	return;
+}
+
+
+#
+# This function compares two invocations of a security modeling
+# namespace and determines if they have different security states.
+#
+# No arguments are expected.
+#
+# Return:
+#	No return value is specified.
+#
+
+function Check() {
+
+	if [ ! -e "state.1" ]; then
+		echo "First state file not found."
+		exit 1;
+	fi;
+	if [ ! -e "state.2" ]; then
+		echo "Second state file not found."
+		exit 1;
+	fi;
+
+	if [ "`cat state.1`" = "`cat state.2`" ]; then
+		echo "States are identical.";
+		return 0;
+	fi;
+
+	sort p.1 >| p.1.s;
+	sort p.2 >| p.2.s;
+	line=`diff -u p.1.s p.2.s | sed -n -e '/^-[0-9a-f]/ s/^.//p'`;
+	paste p.1 t.1 | grep "$line";
+
+	echo;
+	line=`diff -u p.1.s p.2.s | sed -n -e '/^+[0-9a-f]/ s/^.//p'`;
+	paste p.2 t.2 | grep "$line";
+
+	return;
+}
+
+
+#
+# Parse arguments.
+#
+while getopts "ACGc:p:v:" Arg;
+do
+	case $Arg in
+		A)	Mode="auto";;
+	    	C)	Mode="check";;
+		G)	Mode="grab";;
+
+		c)	Mode_switch="-c";
+			Namespace="$OPTARG";;
+	    	p)	Mode_switch="-p";
+			Namespace="$OPTARG";;
+		v)	Version="$OPTARG";;
+	esac;
+done;
+
+if [ "$Mode" = "none" ]; then
+	echo "Unknown mode, expected: [-A | -C | -G]";
+	exit 1;
+fi;
+
+if [ "$Mode" != "check" -a -z "$Namespace" ]; then
+	echo "No namespace specified.";
+	exit 1;
+fi;
+
+if [ "$Mode" = "grab" -a -z "$Version" ]; then
+	echo "No version number for data grab.";
+	exit 1;
+fi;
+
+Qc="$Qc $Mode_switch $Namespace";
+
+
+#
+# Vector execution according to terminal command on the command-line
+#
+case $Mode in
+	auto)	read -p "Run test 1: cr>";
+		Grab 1;
+		read -p "Run test 2: cr>";
+		Grab 2;
+		read -p "Compare states: cr>";
+		Check;;
+
+    	check)
+		Check;;
+
+	grab)	Grab $Version;;
+esac;
+
+
+#
+# All done.
+#
+exit 0;
