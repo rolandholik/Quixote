@@ -84,6 +84,7 @@ struct inode {
 struct path {
 	uint32_t major;
 	uint32_t minor;
+	String type;
 	String pathname;
 
 	uint64_t instance;
@@ -548,6 +549,9 @@ static _Bool _parse_file(CO(TSEMparser, parser), CO(String, event), \
 
 	/* Parse the path description and extract pathname and instance. */
 	if ( !parser->extract_field(parser, event, "path") )
+		ERR(goto done);
+
+	if ( !parser->get_text(parser, "type", fp->path.type) )
 		ERR(goto done);
 
 	if ( !parser->get_text(parser, "pathname", fp->path.pathname) )
@@ -1377,6 +1381,9 @@ static _Bool _measure_file(CO(Cell_State, S))
 		bufr->add(bufr, i->s_uuid, sizeof(i->s_uuid));
 
 	/* Add path information .*/
+	if ( !_add_String(bufr, S->file.path.type) )
+		ERR(goto done);
+
 	if ( S->file.path.instance > 0 ) {
 		if ( !_add_temp_path(bufr, &S->file.path) )
 			ERR(goto done);
@@ -2151,6 +2158,10 @@ static _Bool _format_file(struct file_parameters *fp, CO(String, str))
 			ERR(goto done);
 	}
 
+	if ( !str->add_sprintf(str, "\"type\": \"%s\", ",
+			       fp->path.type->get(fp->path.type)) )
+		ERR(goto done);
+
 	if ( !str->add_sprintf(str, "\"pathname\": \"%s\"}, \"digest\": \"", \
 			       name) )
 		ERR(goto done);
@@ -2735,6 +2746,7 @@ void _dump_file(CO(Cell_State, S))
 	fprintf(stdout, "uid:   %lu\n", (unsigned long int) ip->uid);
 	fprintf(stdout, "gid:   %lu\n", (unsigned long int) ip->gid);
 	fprintf(stdout, "mode:  0%lo\n",(unsigned long int) ip->mode);
+	fprintf(stdout, "type:  %s\n", pp->pathname->get(pp->type));
 	fprintf(stdout, "name:  %s\n", pp->pathname->get(pp->pathname));
 	fprintf(stdout, "s_magic: 0x%x\n", ip->s_magic);
 	fprintf(stdout, "s_id:    %s\n", ip->s_id);
@@ -3053,6 +3065,7 @@ static void whack(CO(Cell, this))
 	STATE(S);
 
 
+	WHACK(S->file.path.type);
 	WHACK(S->file.path.pathname);
 	WHACK(S->event);
 	WHACK(S->identity);
@@ -3097,6 +3110,7 @@ extern Cell NAAAIM_Cell_Init(void)
 	_init_state(this->state);
 
 	/* Initialize aggregate objects. */
+	INIT(HurdLib, String, this->state->file.path.type, ERR(goto fail));
 	INIT(HurdLib, String, this->state->file.path.pathname, ERR(goto fail));
 	INIT(HurdLib, String, this->state->event, ERR(goto fail));
 	INIT(NAAAIM, Sha256, this->state->identity, ERR(goto fail));
@@ -3119,6 +3133,7 @@ extern Cell NAAAIM_Cell_Init(void)
 	return this;
 
 fail:
+	WHACK(this->state->file.path.type);
 	WHACK(this->state->file.path.pathname);
 	WHACK(this->state->event);
 	WHACK(this->state->identity);
