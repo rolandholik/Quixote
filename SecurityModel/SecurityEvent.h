@@ -32,7 +32,7 @@ struct NAAAIM_SecurityEvent
 
 	_Bool (*get_identity)(const SecurityEvent, const Buffer);
 	_Bool (*get_event)(const SecurityEvent, const String);
-	_Bool (*get_pid)(const SecurityEvent, pid_t *);
+	_Bool (*get_pid)(const SecurityEvent, pid_t *, uint64_t *);
 
 	_Bool (*format)(const SecurityEvent, const String);
 

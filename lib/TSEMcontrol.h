@@ -46,8 +46,8 @@ struct NAAAIM_TSEMcontrol
 	_Bool (*internal)(const TSEMcontrol);
 	_Bool (*seal)(const TSEMcontrol);
 
-	_Bool (*discipline)(const TSEMcontrol, pid_t);
-	_Bool (*release)(const TSEMcontrol, pid_t);
+	_Bool (*discipline)(const TSEMcontrol, pid_t, uint64_t);
+	_Bool (*release)(const TSEMcontrol, pid_t, uint64_t);
 
 	_Bool (*set_base)(const TSEMcontrol, const Buffer);
 	_Bool (*add_state)(const TSEMcontrol, const Buffer);
@@ -55,7 +55,6 @@ struct NAAAIM_TSEMcontrol
 
 	_Bool (*id)(const TSEMcontrol, uint64_t *);
 
-	_Bool (*generate_key)(const TSEMcontrol);
 	void (*whack)(const TSEMcontrol);
 
 	/* Private state. */

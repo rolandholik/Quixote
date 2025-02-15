@@ -296,6 +296,8 @@ static _Bool add_event(CO(String, update))
 	      sealed,
 	      retn = false;
 
+	uint64_t tnum;
+
 	pid_t pid;
 
 	SecurityEvent event = NULL;
@@ -315,9 +317,9 @@ static _Bool add_event(CO(String, update))
 		if ( Debug )
 			fputs("Model error, releasing actor.\n", Debug);
 
-		if ( !event->get_pid(event, &pid) )
+		if ( !event->get_pid(event, &pid, &tnum) )
 			ERR(goto done);
-		if ( !Workload->release(Workload, pid) ) {
+		if ( !Workload->release(Workload, pid, tnum) ) {
 			fprintf(stderr, "Bad actor release error: "  \
 				"%d:%s\n", errno, strerror(errno));
 		}
@@ -332,7 +334,7 @@ static _Bool add_event(CO(String, update))
 	if ( !Model->update(Model, event, &status, &discipline, &sealed) )
 		ERR(goto done);
 
-	Model->discipline_pid(Model, &pid);
+	Model->discipline_pid(Model, &pid, &tnum);
 
 	if ( Debug )
 		fprintf(Debug, "Model update: status=%d, discipline=%d\n",
@@ -342,8 +344,9 @@ static _Bool add_event(CO(String, update))
 	/* Security domain is not being disciplined, release the process. */
 	if ( !sealed ) {
 		if ( Debug )
-			fprintf(Debug, "Unsealed, releasing pid %d.\n", pid);
-		if ( !Workload->release(Workload, pid) )
+			fprintf(Debug, "Unsealed, releasing pid %d/%lu.\n", \
+				pid, tnum);
+		if ( !Workload->release(Workload, pid, tnum) )
 			fprintf(stderr, "[%s]: Release actor status: %d:%s\n",
 				__func__, errno, strerror(errno));
 	}
@@ -358,7 +361,7 @@ static _Bool add_event(CO(String, update))
 		if ( discipline ) {
 			if ( Debug )
 				fputs("Sealed, releasing bad actor.\n", Debug);
-			if ( !Workload->discipline(Workload, pid) ) {
+			if ( !Workload->discipline(Workload, pid, tnum) ) {
 				fprintf(stderr, "Bad actor release error: "  \
 					"%d:%s\n", errno, strerror(errno));
 					retn = false;
@@ -367,7 +370,7 @@ static _Bool add_event(CO(String, update))
 		} else {
 			if ( Debug )
 				fputs("Sealed, releasing actor.\n", Debug);
-			if ( !Workload->release(Workload, pid) ) {
+			if ( !Workload->release(Workload, pid, tnum) ) {
 				fprintf(stderr, "Good actor release error: "  \
 					"%d:%s\n", errno, strerror(errno));
 					retn = false;
@@ -409,6 +412,8 @@ static _Bool add_async_event(CO(String, update))
 	      sealed,
 	      retn = false;
 
+	uint64_t tnum;
+
 	pid_t pid;
 
 	SecurityEvent event = NULL;
@@ -434,7 +439,7 @@ static _Bool add_async_event(CO(String, update))
 	if ( !Model->update(Model, event, &status, &violation, &sealed) )
 		ERR(goto done);
 
-	Model->discipline_pid(Model, &pid);
+	Model->discipline_pid(Model, &pid, &tnum);
 
 	if ( Debug )
 		fprintf(Debug, "Async model update: status=%d, violation=%d\n",

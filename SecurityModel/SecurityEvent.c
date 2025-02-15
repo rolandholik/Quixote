@@ -171,8 +171,9 @@ struct NAAAIM_SecurityEvent_State
 	/* The numeric event type. */
 	uint32_t type;
 
-	/* The process id involved in the event. */
+	/* The process id and number of the event event. */
 	pid_t pid;
+	uint64_t tnum;
 
 	/* Event description .*/
 	String event;
@@ -258,20 +259,26 @@ static _Bool _parse_pid(CO(SecurityEvent_State, S), CO(TSEMparser, parser), \
 	long long int vl;
 
 
-	/* Verify that a pid field is present. */
+	/* Verify and extract the pid field. */
 	if ( !parser->has_key(parser, "pid") ) {
 		retn = true;
 		goto done;
 	}
-
-
-	/* Extract and verify the pid. */
 	if ( !parser->get_integer(parser, "pid", &vl) )
 		ERR(goto done);
 	if ( (unsigned long long int) vl > UINT32_MAX )
 		ERR(goto done);
-
 	S->pid = (uint32_t) vl;
+
+	/* Verify and extract the pid field. */
+	if ( !parser->has_key(parser, "tnum") ) {
+		retn = true;
+		goto done;
+	}
+	if ( !parser->get_integer(parser, "tnum", &vl) )
+		ERR(goto done);
+	S->tnum = vl;
+
 	retn = true;
 
 
@@ -651,15 +658,20 @@ static _Bool get_event(CO(SecurityEvent, this), CO(String, event))
  * \param pid	A pointer to the variable which will be loaded
  *		with the process identifier.
  *
+ * \param tnum	A pointer to the task number of the process generating
+ *		the event.
+ *
  * \return	A boolean value is used to indicate whether or
  *		not the request for a pid was successful.  A
  *		false value indicates the object has been
- *		poisoned and is not able to return a PID,  A
- *		true value indicates the location provided by
- *		the caller contains a valid process identifier.
+ *		poisoned and is not able to return the process
+ *		identifiers.  A true value indicates the locations
+ *		provided by the callener contains valid process
+ *		identifiers.
  */
 
-static _Bool get_pid(CO(SecurityEvent, this), pid_t * const pid)
+static _Bool get_pid(CO(SecurityEvent, this), pid_t * const pid, \
+		     uint64_t * const tnum)
 
 {
 	STATE(S);
@@ -669,6 +681,7 @@ static _Bool get_pid(CO(SecurityEvent, this), pid_t * const pid)
 		return false;
 
 	*pid = S->pid;
+	*tnum = S->tnum;
 	return true;
 }
 
@@ -771,8 +784,10 @@ static void dump(CO(SecurityEvent, this))
 		fputs("*Poisoned.\n", stdout);
 
 	fputs("Event:\n", stdout);
-	if ( S->pid != 0 )
+	if ( S->pid != 0 ) {
 		fprintf(stdout, "pid:\t%u\n", S->pid);
+		fprintf(stdout, "tnum:\t%lu\n", S->tnum);
+	}
 	fprintf(stdout, "type:\t%d / %s\n", S->type, TSEM_name[S->type]);
 	fprintf(stdout, "taskid:\t%s\n\n", S->task_id->get(S->task_id));
 

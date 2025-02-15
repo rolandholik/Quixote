@@ -111,8 +111,9 @@ struct NAAAIM_TSEM_State
 	/* Flag to indicate security event descriptions are logged. */
 	_Bool logging;
 
-	/* Process identifier to be disciplined. */
+	/* Identifiers of process to be disciplined. */
 	pid_t discipline_pid;
+	uint64_t tnum;
 
 	/* Model base point. */
 	unsigned char base[NAAAIM_IDSIZE];
@@ -168,6 +169,7 @@ static void _init_state(CO(TSEM_State, S))
 	S->logging	  = true;
 
 	S->discipline_pid = 0;
+	S->tnum = 0;
 
 	memset(S->base, '\0', sizeof(S->base));
 	memset(S->measurement, '\0', sizeof(S->measurement));
@@ -390,7 +392,7 @@ static _Bool update(CO(TSEM, this), CO(SecurityEvent, event), _Bool *status, \
 		ERR(goto done);
 	if ( !event->get_identity(event, point) )
 		ERR(goto done);
-	if ( !event->get_pid(event, &S->discipline_pid) )
+	if ( !event->get_pid(event, &S->discipline_pid, &S->tnum) )
 		ERR(goto done);
 
 	INIT(NAAAIM, SecurityPoint, cp, ERR(goto done));
@@ -419,7 +421,7 @@ static _Bool update(CO(TSEM, this), CO(SecurityEvent, event), _Bool *status, \
 	if ( S->sealed ) {
 		cp->set_invalid(cp);
 		list = S->forensics;
-		if ( !event->get_pid(event, &S->discipline_pid) )
+		if ( !event->get_pid(event, &S->discipline_pid, &S->tnum) )
 			ERR(goto done);
 	}
 	else
@@ -1187,7 +1189,10 @@ static _Bool get_state(CO(TSEM, this), CO(Buffer, out))
  * \param this	A pointer to the canister whose pid is to be returned.
  *
  * \param pid	A pointer to the location where the pid is to be
- *		storaged.
+ *		stored.
+ *
+ * \param tnum	A pointer to the location where the task number is to
+ *		be stored.
  *
  * \return	A boolean value is used to indicate whether or not
  *		a valid pid was returned.  A false value
@@ -1196,7 +1201,8 @@ static _Bool get_state(CO(TSEM, this), CO(Buffer, out))
  *		process ID.
  */
 
-static _Bool discipline_pid(CO(TSEM, this), pid_t * const pid)
+static _Bool discipline_pid(CO(TSEM, this), pid_t * const pid,
+			    uint64_t * const tnum)
 
 {
 	STATE(S);
@@ -1210,6 +1216,7 @@ static _Bool discipline_pid(CO(TSEM, this), pid_t * const pid)
 
 
 	*pid = S->discipline_pid;
+	*tnum = S->tnum;
 	retn = true;
 
  done:

@@ -40,8 +40,8 @@ struct NAAAIM_TSEMworkload
 			     _Bool (*command_handler)(LocalDuct, Buffer));
 	_Bool (*run_workload)(const TSEMworkload);
 
-	_Bool (*release)(const TSEMworkload, pid_t);
-	_Bool (*discipline)(const TSEMworkload, pid_t);
+	_Bool (*release)(const TSEMworkload, pid_t, uint64_t);
+	_Bool (*discipline)(const TSEMworkload, pid_t, uint64_t);
 
 	void (*whack)(const TSEMworkload);
 

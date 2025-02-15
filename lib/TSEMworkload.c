@@ -357,9 +357,6 @@ static _Bool configure_external(CO(TSEMworkload, this), CO(char *, model),  \
 		ERR(goto done);
 
 	S->type = TSEMcontrol_TYPE_EXTERNAL;
-	if ( !S->control->generate_key(S->control) )
-		ERR(goto done);
-
 	retn = true;
 
 
@@ -916,6 +913,8 @@ static _Bool run_workload(CO(TSEMworkload, this))
 		fprintf(Debug, "%s: Setting up namespace.\n", __func__);
 	if ( !_setup_namespace(S) )
 		_exit(1);
+	if ( Debug )
+		fprintf(Debug, "%s: Setting up namespace.\n", __func__);
 
 	/* Fork again to run the cartridge. */
 	close(S->event_pipe[READ_SIDE]);
@@ -1087,6 +1086,8 @@ static _Bool run_workload(CO(TSEMworkload, this))
  *
  * \param pid	The process identifier of the process to be released.
  *
+ * \param tnum	The task number of the process to be released.
+ *
  * \return		A boolean value is returned to indicate whether
  *			or not the workload was successfully released.
  *			A false value indicates that a failure had
@@ -1094,12 +1095,13 @@ static _Bool run_workload(CO(TSEMworkload, this))
  *			indicates the process was successfully released.
  */
 
-static _Bool release(CO(TSEMworkload, this), const pid_t pid)
+static _Bool release(CO(TSEMworkload, this), const pid_t pid, \
+		     const uint64_t tnum)
 
 {
 	STATE(S);
 
-	return S->control->release(S->control, pid);
+	return S->control->release(S->control, pid, tnum);
 }
 
 
@@ -1116,6 +1118,9 @@ static _Bool release(CO(TSEMworkload, this), const pid_t pid)
  * \param pid	The process identifier of the process to be released
  *		as untrusted.
  *
+ * \parm tnum	The task number of the process to be released as
+ *		untrusted.
+ *
  * \return		A boolean value is returned to indicate whether
  *			or not the workload was successfully released.
  *			A false value indicates that a failure had
@@ -1123,12 +1128,13 @@ static _Bool release(CO(TSEMworkload, this), const pid_t pid)
  *			indicates the process was successfully released.
  */
 
-static _Bool discipline(CO(TSEMworkload, this), const pid_t pid)
+static _Bool discipline(CO(TSEMworkload, this), const pid_t pid, \
+			const uint64_t tnum)
 
 {
 	STATE(S);
 
-	return S->control->discipline(S->control, pid);
+	return S->control->discipline(S->control, pid, tnum);
 }
 
 

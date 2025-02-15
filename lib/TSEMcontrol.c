@@ -70,8 +70,6 @@ struct NAAAIM_TSEMcontrol_State
 	/* String object used to compose the command. */
 	String cmdstr;
 
-	/* String object used to hold the TMA authentication key. */
-	String key;
 
 	/* File object that implements I/O to the control file. */
 	File file;
@@ -94,8 +92,6 @@ static void _init_state(CO(TSEMcontrol_State, S)) {
 	S->objid = NAAAIM_TSEMcontrol_OBJID;
 
 	S->poisoned = false;
-
-	S->key = NULL;
 
 	return;
 }
@@ -221,9 +217,6 @@ static _Bool create_ns(CO(TSEMcontrol, this),
 	      external = (type == TSEMcontrol_TYPE_EXTERNAL);
 
 
-	if ( external && (S->key == NULL) )
-		ERR(goto done);
-
 	if ( external )
 		S->cmdstr->add(S->cmdstr, "external");
 	else if ( type == TSEMcontrol_TYPE_INTERNAL )
@@ -251,10 +244,6 @@ static _Bool create_ns(CO(TSEMcontrol, this),
 
 	if ( cache_size != 0 )
 		S->cmdstr->add_sprintf(S->cmdstr, " cache=%u", cache_size);
-
-	if ( external )
-		S->cmdstr->add_sprintf(S->cmdstr, " key=%s", \
-				       S->key->get(S->key));
 
 	if ( !S->cmdstr->add(S->cmdstr, "\n") )
 		ERR(goto done);
@@ -317,6 +306,9 @@ static _Bool seal(CO(TSEMcontrol, this))
  * \param pid	The process ID whose security event status is to
  *		be set
  *
+ * \param tnum	Thet number of the tasdk whose security event status is
+ *		to be set.
+ *
  * \return	A boolean value is used to indicate the status of
  *		setting the process security event status.  A false
  *		value indicates a failure to set the status while
@@ -324,7 +316,7 @@ static _Bool seal(CO(TSEMcontrol, this))
  *		was set.
  */
 
-static _Bool discipline(CO(TSEMcontrol, this), pid_t pid)
+static _Bool discipline(CO(TSEMcontrol, this), pid_t pid, uint64_t tnum)
 
 {
 	STATE(S);
@@ -332,11 +324,8 @@ static _Bool discipline(CO(TSEMcontrol, this), pid_t pid)
 	_Bool retn = false;
 
 
-	if ( S->key == NULL )
-		ERR(goto done);
-
-	if ( !S->cmdstr->add_sprintf(S->cmdstr, "untrusted pid=%d key=%s\n", \
-				     pid, S->key->get(S->key)) )
+	if ( !S->cmdstr->add_sprintf(S->cmdstr, "untrusted pid=%d tnum=%s\n", \
+				     pid, tnum) )
 		ERR(goto done);
 
 	if ( !_write_cmd(S) )
@@ -358,7 +347,10 @@ static _Bool discipline(CO(TSEMcontrol, this), pid_t pid)
  * \param this	The object that will be implementing the command.
  *
  * \param pid	The process ID whose security event status is to
- *		be set
+ *		be set.
+ *
+ * \param tnum	The task number whose security event status is to
+ *		be set.
  *
  * \return	A boolean value is used to indicate the status of
  *		setting the process security event status.  A false
@@ -367,7 +359,7 @@ static _Bool discipline(CO(TSEMcontrol, this), pid_t pid)
  *		was set.
  */
 
-static _Bool release(CO(TSEMcontrol, this), pid_t pid)
+static _Bool release(CO(TSEMcontrol, this), pid_t pid, uint64_t tnum)
 
 {
 	STATE(S);
@@ -375,11 +367,8 @@ static _Bool release(CO(TSEMcontrol, this), pid_t pid)
 	_Bool retn = false;
 
 
-	if ( S->key == NULL )
-		ERR(goto done);
-
-	if ( !S->cmdstr->add_sprintf(S->cmdstr, "trusted pid=%d key=%s\n", \
-				     pid, S->key->get(S->key)) )
+	if ( !S->cmdstr->add_sprintf(S->cmdstr, "trusted pid=%d tnum=%lu\n", \
+				     pid, tnum) )
 		ERR(goto done);
 
 	if ( !_write_cmd(S) )
@@ -562,62 +551,6 @@ static _Bool pseudonym(CO(TSEMcontrol, this), CO(Buffer, pseudonym))
 /**
  * External public method.
  *
- * This method is used to generate the authentication key that will
- * be used to authenticate trust release commands issued by this
- * object.
- *
- * \param this	The object that is generating the authentication key.
- *
- * \return	A boolean value is used to indicate the status of
- *		the key generation.  A false value indicates an error
- *		occured and the object cannot be trusted to have
- *		a valid key.  A true value indicates the object has
- *		a key.
- */
-
-static _Bool generate_key(CO(TSEMcontrol, this))
-
-{
-	STATE(S);
-
-	_Bool retn = false;
-
-	uint8_t *p;
-
-	size_t lp;
-
-	Buffer bufr;
-
-	RandomBuffer rnd = NULL;
-
-
-	INIT(NAAAIM, RandomBuffer, rnd, ERR(goto done));
-	if ( !rnd->generate(rnd, 256 / 8) )
-		ERR(goto done);
-	bufr = rnd->get_Buffer(rnd);
-
-	/* Convert the key into its ASCII equivalent. */
-	INIT(HurdLib, String, S->key, ERR(goto done));
-
-	p = bufr->get(bufr);
-	for (lp= 0; lp < bufr->size(bufr); ++lp)
-		S->key->add_sprintf(S->key, "%02x", *(p + lp));
-
-	if ( S->key->poisoned(S->key) )
-		ERR(goto done);
-	retn = true;
-
-
- done:
-	WHACK(rnd);
-
-	return retn;
-}
-
-
-/**
- * External public method.
- *
  * This method implements a destructor for a TSEMcontrol object.
  *
  * \param this	A pointer to the object which is to be destroyed.
@@ -631,7 +564,6 @@ static void whack(CO(TSEMcontrol, this))
 
 	WHACK(S->bufr);
 	WHACK(S->cmdstr);
-	WHACK(S->key);
 	WHACK(S->file);
 
 	S->root->whack(S->root, this, S);
@@ -695,7 +627,6 @@ extern TSEMcontrol NAAAIM_TSEMcontrol_Init(void)
 
 	this->id = id;
 
-	this->generate_key = generate_key;
 	this->whack = whack;
 
 	return this;

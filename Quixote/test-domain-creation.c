@@ -45,8 +45,6 @@ int main(int argc, char *argv[])
 
 
 	INIT(NAAAIM, TSEMcontrol, Control, ERR(goto done));
-	if ( !Control->generate_key(Control) )
-		ERR(goto done);
 
 	pid = fork();
 	if (pid < 0) {

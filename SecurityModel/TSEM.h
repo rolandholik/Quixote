@@ -39,7 +39,7 @@ struct NAAAIM_TSEM
 
 	_Bool (*get_measurement)(const TSEM, const Buffer);
 	_Bool (*get_state)(const TSEM, const Buffer);
-	_Bool (*discipline_pid)(const TSEM, pid_t *);
+	_Bool (*discipline_pid)(const TSEM, pid_t *, uint64_t *);
 
 	void (*rewind_event)(const TSEM);
 	_Bool (*get_event)(const TSEM, SecurityEvent *);
