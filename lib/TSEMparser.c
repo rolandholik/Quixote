@@ -337,7 +337,9 @@ static char * _find_key(CO(TSEMparser_State, S), CO(char *, key))
 static _Bool _get_key(CO(TSEMparser_State, S), CO(char *, key))
 
 {
-	_Bool retn = false;
+	_Bool retn  = false,
+	      found = false;
+
 
 	char *start,
 	     *end,
@@ -350,15 +352,27 @@ static _Bool _get_key(CO(TSEMparser_State, S), CO(char *, key))
 	start += S->key_value->size(S->key_value);
 	end    = start;
 
-	if ( (end = strchr(start, '"')) == NULL )
-		ERR(goto done);
+	while ( !found ) {
+		if ( (end = strchr(end, '"')) == NULL )
+			ERR(goto done);
+
+		if ( *(end - 1) != '\\' )
+			found = true;
+		else
+			++end;
+	}
 
 	/* Copy the key value. */
 	S->key_value->reset(S->key_value);
 
 	in[1] = '\0';
 	do {
-		in[0] = *start;
+		if ( *start != '\\' )
+			in[0] = *start;
+		else {
+			++start;
+			in[0] = *start;
+		}
 		S->key_value->add(S->key_value, in);
 	} while ( ++start < end );
 

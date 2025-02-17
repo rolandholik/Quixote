@@ -2085,6 +2085,55 @@ static _Bool set_digest(CO(Cell, this), CO(Buffer, bufr))
 	return retn;
 }
 
+/**
+ * Internal public function.
+ *
+ * This method implements the generation of the escaped form of
+ * a pathname.
+ *
+ * \param path		The object containing the unescaped version
+ *			of the pathname.
+ *
+ * \param escaped	The object that will be loaded with the
+ *			JSON escaped version of the string.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		the escaped version of the pathname was created.  A
+ *		true value indicates the output object has the
+ *		escaped value of the string while a false value
+ *		indicates that an error occurred and the output
+ *		object does not contain a valid string.
+ */
+
+static _Bool _escape_path(CO(String, path), CO(String, escaped))
+
+{
+	char *p,
+	     in[2];
+
+
+	if ( strchr(path->get(path), '"') == NULL ) {
+		if ( !escaped->add(escaped, path->get(path)) )
+			return false;
+		return true;
+	}
+
+	in[1] = '\0';
+	p = path->get(path);
+	while ( *p != '\0' ) {
+		if ( *p != '"' )
+			in[0] = *p;
+		else {
+			escaped->add(escaped, "\\");
+			in[0] = '"';
+		}
+		escaped->add(escaped, in);
+		++p;
+	}
+
+	return true;
+}
+
 
 /**
  * Internal public method.
@@ -2113,9 +2162,15 @@ static _Bool _format_file(struct file_parameters *fp, CO(String, str))
 
 	struct inode *inode = &fp->inode;
 
+	String escaped = NULL;
+
 
 	/* Write the formatted string to the String object. */
-	name = fp->path.pathname->get(fp->path.pathname);
+	INIT(HurdLib, String, escaped, ERR(goto done));
+	if ( !_escape_path(fp->path.pathname, escaped) )
+		ERR(goto done);
+	name = escaped->get(escaped);
+
 	if ( !str->add(str, "\"file\": {") )
 		ERR(goto done);
 	if ( !str->add_sprintf(str, "\"flags\": \"%lu\", ", fp->flags) )
@@ -2180,6 +2235,8 @@ static _Bool _format_file(struct file_parameters *fp, CO(String, str))
 
 
  done:
+	WHACK(escaped);
+
 	return retn;
 }
 
