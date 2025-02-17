@@ -2711,6 +2711,7 @@ static void reset(CO(Cell, this))
 	S->poisoned = false;
 	S->measured = false;
 
+	S->file.path.type->reset(S->file.path.type);
 	S->file.path.pathname->reset(S->file.path.pathname);
 
 	S->event->reset(S->event);
