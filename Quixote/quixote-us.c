@@ -93,11 +93,6 @@
 static FILE *Debug = NULL;
 
 /**
- * The process id of the cartridge monitor process.
- */
-static pid_t Monitor_pid;
-
-/**
  * The object representing the workload under management.
  */
 static TSEMworkload Workload = NULL;
