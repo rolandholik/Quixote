@@ -1751,6 +1751,8 @@ extern int main(int argc, char *argv[])
 
 
 	/* Load and seal a security model if specified. */
+	INIT(NAAAIM, TSEM, Model, ERR(goto done));
+
 	if ( model != NULL ) {
 		if ( Debug )
 			fprintf(Debug, "Loading security model: %s\n", model);
@@ -1763,7 +1765,6 @@ extern int main(int argc, char *argv[])
 
 
 	/* Initialize and configure the workload. */
-	INIT(NAAAIM, TSEM, Model, ERR(goto done));
 	INIT(NAAAIM, TSEMworkload, Workload, ERR(goto done));
 
 	Workload->set_debug(Workload, Debug);
