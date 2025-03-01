@@ -2192,6 +2192,8 @@ extern int main(int argc, char *argv[])
 	if ( sigaction(SIGCHLD, &signal_action, NULL) == -1 )
 		goto done;
 
+	/* Initialize the security model controller. */
+	INIT(NAAAIM, TSEMcontrol, Control, ERR(goto done));
 
 	/* Load and seal a behavior map if specified. */
 	if ( mapfile != NULL ) {
@@ -2202,10 +2204,6 @@ extern int main(int argc, char *argv[])
 		if ( Debug )
 			fprintf(Debug, "Opened state map: %s\n", mapfile);
 	}
-
-
-	/* Initialize the security model controller. */
-	INIT(NAAAIM, TSEMcontrol, Control, ERR(goto done));
 
 	/* Setup the management socket. */
 	INIT(NAAAIM, LocalDuct, mgmt, ERR(goto done));
