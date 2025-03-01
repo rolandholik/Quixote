@@ -323,7 +323,7 @@ static _Bool discipline(CO(TSEMcontrol, this), pid_t pid, uint64_t tnum)
 	_Bool retn = false;
 
 
-	if ( !S->cmdstr->add_sprintf(S->cmdstr, "untrusted pid=%d tnum=%s\n", \
+	if ( !S->cmdstr->add_sprintf(S->cmdstr, "untrusted pid=%d tnum=%lu\n",
 				     pid, tnum) )
 		ERR(goto done);
 
