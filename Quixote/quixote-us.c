@@ -332,9 +332,8 @@ static _Bool add_event(CO(String, update))
 	Model->discipline_pid(Model, &pid, &tnum);
 
 	if ( Debug )
-		fprintf(Debug, "Model update: status=%d, discipline=%d\n",
-			status, discipline);
-
+		fprintf(Debug, "Model update: status=%d, discipline=%d, " \
+			"pid=%d, tnum=%lu\n", status, discipline, pid, tnum);
 
 	/* Security domain is not being disciplined, release the process. */
 	if ( !sealed ) {
@@ -437,14 +436,15 @@ static _Bool add_async_event(CO(String, update))
 	Model->discipline_pid(Model, &pid, &tnum);
 
 	if ( Debug )
-		fprintf(Debug, "Async model update: status=%d, violation=%d\n",
-			status, violation);
+		fprintf(Debug, "Async model update: status=%d, "	\
+			"violation=%d, pid=%d, tnum=%lu\n", status,	\
+			violation, pid, tnum);
 
 
 	/* Handle a sealed model that is in violation. */
 	if ( sealed ) {
 		if ( Debug )
-			fputs("Atomic context security violation.\n", Debug);
+			fputs("Atomic context security violation:\n", Debug);
 		if ( violation && Enforce ) {
 			fputs("Security violation in atomic context, "
 			      "shutting down workload.\n", stderr);
