@@ -502,73 +502,6 @@ static _Bool child_exited(const pid_t child)
 
 
 /**
- * Private method.
- *
- * This function is responsible for shutting down the workload.
- *
- * \param S		The object state information that is to be
- *			acted on.
- *
- * \param wait		A boolean flag used to indicate whether or
- *			not a runc based workload should wait for the
- *			termination of the run process.
- *
- * \return	No return value is defined.
- */
-
-static void kill_workload(CO(TSEMworkload_State, S), _Bool wait)
-
-{
-	int status;
-
-	static pid_t kill_process = 0;
-
-
-	/* Signal the monitor process to shutdown the cartridge process. */
-	if ( S->mode == PROCESS_MODE ) {
-		kill(S->workload_pid, SIGTERM);
-		return;
-	}
-
-
-	/* Check to see if runc kill has finished. */
-	if ( kill_process ) {
-		waitpid(kill_process, &status, WNOHANG);
-		if ( !WIFEXITED(status) )
-			return;
-
-		if ( Debug )
-			fprintf(Debug, "Cartridge kill status: %d\n", \
-				WEXITSTATUS(status));
-		if ( WEXITSTATUS(status) == 0 ) {
-			kill_process = 0;
-			return;
-		}
-	}
-
-
-	/* Fork a process to use runc to send the termination signal. */
-	kill_process = fork();
-	if ( kill_process == -1 )
-		return;
-
-	/* Child process - execute runc in kill mode. */
-	if ( kill_process == 0 ) {
-		if ( Debug )
-			fputs("Killing runc cartridge.\n", Debug);
-		execlp("runc", "runc", "kill", S->container, "SIGKILL", NULL);
-		exit(1);
-	}
-
-	/* Parent process - wait for the kill process to complete. */
-	if ( wait )
-		waitpid(kill_process, &status, 0);
-
-	return;
-}
-
-
-/**
  * External public method.
  *
  * This method implements running the security monitor process.  This
@@ -657,7 +590,7 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
 			if ( Signals.stop ) {
 				if ( Debug )
 					fputs("Quixote terminated.\n", Debug);
-				kill_workload(S, true);
+				this->shutdown(this, true);
 				retn = true;
 				goto done;
 			}
@@ -669,7 +602,7 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
 			}
 
 			fputs("Poll error.\n", stderr);
-			kill_workload(S, true);
+			this->shutdown(this, true);
 			retn = true;
 			goto done;
 		}
@@ -699,7 +632,7 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
 
 		if ( poll_data[0].revents & POLLIN ) {
 			if ( !S->event->read_event(S->event, fd) ) {
-				kill_workload(S, false);
+				this->shutdown(this, false);
 				break;
 			}
 
@@ -707,7 +640,7 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
 			while ( event ) {
 				if ( !S->event->fetch_event(S->event, \
 							    &event) ) {
-					kill_workload(S, false);
+					this->shutdown(this, false);
 					break;
 				}
 
@@ -719,6 +652,13 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
 							getpid(),	     \
 							S->workload_pid);
 					break;
+				}
+				if ( Signals.sigchild ) {
+					if ( child_exited(S->workload_pid) ) {
+						retn = true;
+						goto done;
+					}
+					continue;
 				}
 			}
 		}
@@ -738,7 +678,7 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
 			}
 			if ( !mgmt->receive_Buffer(mgmt, cmdbufr) ) {
 				fputs("Orchestrator manager error.\n", stderr);
-				kill_workload(S, false);
+				this->shutdown(this, false);
 			}
 			if ( mgmt->eof(mgmt) ) {
 				if ( Debug )
@@ -753,7 +693,7 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
 			}
 
 			if ( !command_handler(mgmt, cmdbufr) )
-				kill_workload(S, false);
+				this->shutdown(this, false);
 			cmdbufr->reset(cmdbufr);
 		}
 	}
@@ -967,8 +907,7 @@ static _Bool run_workload(CO(TSEMworkload, this))
 			}
 
 			execlp("bash", "bash", "-i", NULL);
-			fputs("Cartridge process execution failed.\n",\
-			      stderr);
+			fputs("Cartridge process execution failed.\n", stderr);
 			exit(1);
 		}
 
@@ -1021,7 +960,7 @@ static _Bool run_workload(CO(TSEMworkload, this))
 		if ( Signals.sigterm ) {
 			if ( Debug )
 				fputs("Monitor process terminated.\n", Debug);
-			kill_workload(S, false);
+			this->shutdown(this, false);
 		}
 
 		if ( Signals.sigchild ) {
@@ -1135,6 +1074,80 @@ static _Bool discipline(CO(TSEMworkload, this), const pid_t pid, \
 	STATE(S);
 
 	return S->control->discipline(S->control, pid, tnum);
+}
+
+
+/**
+ * External public method.
+ *
+ * This method shuts down the workload being managed by this object.
+ * If the workload is process based a termination signal is issued.  If
+ * the workload is runc based a kill signal is transmitted to the
+ * runc instance that is managing the workload.
+ *
+ * \param wait	A boolean flag used to indicate whether or not a runc
+ *		based workload should wait for the termination of the
+ *		run process.
+ *
+ * \return	A boolean value is returned to indicate whether
+ *		or not the workload was successfully shutdown.
+ *		A false value indicates that a failure during
+ *		the shutdown.  A true value indicated the workload
+ *		was successfully shutdown.
+ */
+
+static void shutdown(CO(TSEMworkload, this), const _Bool wait)
+
+{
+	STATE(S);
+
+	int status;
+
+	static pid_t kill_process = 0;
+
+
+	/* Signal the monitor process to shutdown the cartridge process. */
+	if ( S->mode != CONTAINER_MODE ) {
+		kill(S->workload_pid, SIGHUP);
+		return;
+	}
+
+
+	/* Check to see if runc kill has finished. */
+	if ( kill_process ) {
+		waitpid(kill_process, &status, WNOHANG);
+		if ( !WIFEXITED(status) )
+			return;
+
+		if ( Debug )
+			fprintf(Debug, "Cartridge kill status: %d\n", \
+				WEXITSTATUS(status));
+		if ( WEXITSTATUS(status) == 0 ) {
+			kill_process = 0;
+			return;
+		}
+	}
+
+
+	/* Fork a process to use runc to send the termination signal. */
+	kill_process = fork();
+	if ( kill_process == -1 )
+		return;
+
+	/* Child process - execute runc in kill mode. */
+	if ( kill_process == 0 ) {
+		if ( Debug )
+			fprintf(Debug, "Killing runc container: %s.\n",
+				S->container);
+		execlp("runc", "runc", "kill", S->container, "SIGKILL", NULL);
+		exit(1);
+	}
+
+	/* Parent process - wait for the kill process to complete. */
+	if ( wait )
+		waitpid(kill_process, &status, 0);
+
+	return;
 }
 
 
@@ -1279,6 +1292,7 @@ extern TSEMworkload NAAAIM_TSEMworkload_Init(void)
 
 	this->release	 = release;
 	this->discipline = discipline;
+	this->shutdown	 = shutdown;
 
 	this->whack = whack;
 
