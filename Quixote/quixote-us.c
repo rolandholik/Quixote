@@ -1633,7 +1633,7 @@ static void show_magazine(CO(char *, root))
  */
 
 static _Bool run_workload(CO(TSEMworkload, workload), CO(char *, container), \
-			  CO(char *, outfile), const _Bool enforce)
+			  CO(char *, outfile))
 
 {
 	_Bool retn = false;
@@ -1691,8 +1691,7 @@ static _Bool run_workload(CO(TSEMworkload, workload), CO(char *, container), \
 extern int main(int argc, char *argv[])
 
 {
-	_Bool enforce		= false,
-	      current_namespace = false;
+	_Bool current_namespace = false;
 
 	char *debug	    = NULL,
 	     *model	    = NULL,
@@ -1720,7 +1719,6 @@ extern int main(int argc, char *argv[])
 				Mode = execute_mode;
 				break;
 			case 'e':
-				enforce = true;
 				Enforce = true;
 				break;
 			case 't':
@@ -1800,8 +1798,9 @@ extern int main(int argc, char *argv[])
 	INIT(NAAAIM, TSEMworkload, Workload, ERR(goto done));
 
 	Workload->set_debug(Workload, Debug);
-	if ( !Workload->configure_external(Workload, TSEM_model, Digest, \
-					   magazine_size, current_namespace) )
+	if ( !Workload->configure_external(Workload, TSEM_model, Digest,     \
+					   magazine_size, current_namespace, \
+					   Enforce) )
 		ERR(goto done);
 
 	switch ( Mode ) {
@@ -1822,7 +1821,7 @@ extern int main(int argc, char *argv[])
 
 	if ( Debug )
 		fprintf(Debug, "Launch process: %d\n", getpid());
-	if ( !run_workload(Workload, container, outfile, enforce) )
+	if ( !run_workload(Workload, container, outfile) )
 		ERR(goto done);
 
 	if ( outfile != NULL ) {

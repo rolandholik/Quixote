@@ -123,6 +123,7 @@ struct NAAAIM_TSEMworkload_State
 	enum TSEMcontrol_ns_config type;
 	enum TSEMcontrol_ns_config ns;
 	unsigned int cache_size;
+	_Bool enforce;
 	String model;
 	String digest;
 
@@ -261,6 +262,9 @@ void signal_handler(int signal, siginfo_t *siginfo, void *private)
  *			containing the ASCII expresion of the asynchronous
  *			cache sizes to be used for the modeling namespace.
  *
+ * \param enforce	A boolean value indicating whether or not the
+ *			namespace should be placed in enforcing mode.
+ *
  * \return	A boolean value is used to indicate whether or not the
  *		security model namespace has been initialized.  A false
  *		value indicates the initialization failed while a true
@@ -269,7 +273,7 @@ void signal_handler(int signal, siginfo_t *siginfo, void *private)
 
 static _Bool _init_ns_config(CO(TSEMworkload_State, S), CO(char *, model), \
 			     CO(char *, digest), const _Bool initial_ns,   \
-			     CO(char *, cache_size))
+			     CO(char *, cache_size), const _Bool enforce)
 
 {
 	_Bool retn = false;
@@ -295,6 +299,9 @@ static _Bool _init_ns_config(CO(TSEMworkload_State, S), CO(char *, model), \
 
 	if ( !initial_ns )
 		S->ns = TSEMcontrol_CURRENT_NS;
+
+	S->enforce = enforce;
+
 	retn = true;
 
 
@@ -309,7 +316,29 @@ static _Bool _init_ns_config(CO(TSEMworkload_State, S), CO(char *, model), \
  * This method implements the creation of a security modeling workload
  * that externally exports the events.
  *
- * \param this	A pointer to the object describing the workload.
+ * \param this		A pointer to the object describing the workload.
+ *
+ * \param model		A pointer to a null-terminated character buffer
+ *			containing the name of an alternate security
+ *			model that is to be used for processing security
+ *			events.
+ *
+ * \param digest	A pointer to a null-terminated character buffer
+ *			containing the name of the cryptographic hash
+ *			function that will be used to generate the
+ *			security event coefficients.
+ *
+ * \param cache_size	A pointer to a null-terminated character buffer
+ *			containing an integer expression of the size
+ *			of the event magazines that are to be used
+ *			for the security modeling namespace.
+ *
+ * \param initial_ns	A boolean value that indicates the origin for
+ *			the characteristics of the context of execution.
+ *			A true value indicates that the initial user
+ *			namespace should be used, a false value indicates
+ *			that the user namespace view of the characteristics
+ *			should be used.
  */
 
 static _Bool configure_export(CO(TSEMworkload, this), CO(char *, model),  \
@@ -322,7 +351,8 @@ static _Bool configure_export(CO(TSEMworkload, this), CO(char *, model),  \
 	_Bool retn = false;
 
 
-	if ( !_init_ns_config(S, model, digest, initial_ns, cache_size) )
+	if ( !_init_ns_config(S, model, digest, initial_ns, cache_size, \
+			      false) )
 		ERR(goto done);
 
 	retn	= true;
@@ -341,11 +371,38 @@ static _Bool configure_export(CO(TSEMworkload, this), CO(char *, model),  \
  * that externally models the events.
  *
  * \param this	A pointer to the object describing the workload.
+ *
+ * \param model		A pointer to a null-terminated character buffer
+ *			containing the name of an alternate security
+ *			model that is to be used for processing security
+ *			events.
+ *
+ * \param digest	A pointer to a null-terminated character buffer
+ *			containing the name of the cryptographic hash
+ *			function that will be used to generate the
+ *			security event coefficients.
+ *
+ * \param cache_size	A pointer to a null-terminated character buffer
+ *			containing an integer expression of the size
+ *			of the event magazines that are to be used
+ *			for the security modeling namespace.
+ *
+ * \param initial_ns	A boolean value that indicates the origin for
+ *			the characteristics of the context of execution.
+ *			A true value indicates that the initial user
+ *			namespace should be used, a false value indicates
+ *			that the user namespace view of the characteristics
+ *			should be used.
+ *
+ * \param enforce	A boolean value that indicates whether or not
+ *			the security modeling namespace should be set to
+ *			enforcing mode.  A true value indicates that
+ *			enforcing mode should be selected.
  */
 
 static _Bool configure_external(CO(TSEMworkload, this), CO(char *, model),  \
 				CO(char *, digest), CO(char *, cache_size), \
-				const _Bool initial_ns)
+				const _Bool initial_ns, const _Bool enforce)
 
 {
 	STATE(S);
@@ -353,7 +410,8 @@ static _Bool configure_external(CO(TSEMworkload, this), CO(char *, model),  \
 	_Bool retn = false;
 
 
-	if ( !_init_ns_config(S, model, digest, initial_ns, cache_size) )
+	if ( !_init_ns_config(S, model, digest, initial_ns, cache_size, \
+			      enforce) )
 		ERR(goto done);
 
 	S->type = TSEMcontrol_TYPE_EXTERNAL;
@@ -744,6 +802,10 @@ static _Bool _setup_namespace(CO(TSEMworkload_State, S))
 		ERR(goto done);
 	if ( !S->control->id(S->control, &S->id) )
 		ERR(goto done);
+	if ( S->enforce ) {
+		if ( !S->control->enforce(S->control) )
+			ERR(goto done);
+	}
 
 
 	/* Create the pathname to the event update file. */
