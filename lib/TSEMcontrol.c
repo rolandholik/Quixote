@@ -118,20 +118,13 @@ static _Bool _write_cmd(CO(TSEMcontrol_State, S))
 	_Bool retn = false;
 
 
-	if ( !S->bufr->add(S->bufr,
-			   (unsigned char *) S->cmdstr->get(S->cmdstr), \
-			   S->cmdstr->size(S->cmdstr)) )
-		ERR(goto done);
+	if ( S->file->poisoned(S->file) )
+		S->file->clear(S->file);
 
-	if ( !S->file->write_Buffer(S->file, S->bufr) )
-		ERR(goto done);
+	if ( S->file->write_String(S->file, S->cmdstr) )
+		retn = true;
 
-	S->bufr->reset(S->bufr);
 	S->cmdstr->reset(S->cmdstr);
-	retn = true;
-
-
- done:
 	return retn;
 }
 
@@ -327,9 +320,8 @@ static _Bool discipline(CO(TSEMcontrol, this), pid_t pid, uint64_t tnum)
 				     pid, tnum) )
 		ERR(goto done);
 
-	if ( !_write_cmd(S) )
-		ERR(goto done);
-	retn = true;
+	if ( _write_cmd(S) )
+		retn = true;
 
 
  done:
