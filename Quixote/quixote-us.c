@@ -103,6 +103,14 @@ static TSEMworkload Workload = NULL;
 static TSEM Model = NULL;
 
 /**
+ * This variable is used to indicate that a model violation has occurred
+ * in an event running in atomic context and the workload is being
+ * shutdown.
+ */
+
+static _Bool In_Shutdown = false;
+
+/**
  * This variable is used to signal that a modeling error has occurred
  * and signals the disciplining code to unilaterally release a process
  * rather then model is status in the security domain.
@@ -355,6 +363,11 @@ static _Bool add_event(CO(String, update))
 		if ( discipline ) {
 			if ( Debug )
 				fputs("Sealed, releasing bad actor.\n", Debug);
+			if ( In_Shutdown) {
+				Workload->discipline(Workload, pid, tnum);
+				retn = true;
+				goto done;
+			}
 			if ( !Workload->discipline(Workload, pid, tnum) ) {
 				fprintf(stderr, "Bad actor release error: "  \
 					"%d:%s\n", errno, strerror(errno));
@@ -364,6 +377,11 @@ static _Bool add_event(CO(String, update))
 		} else {
 			if ( Debug )
 				fputs("Sealed, releasing actor.\n", Debug);
+			if ( In_Shutdown) {
+				Workload->release(Workload, pid, tnum);
+				retn = true;
+				goto done;
+			}
 			if ( !Workload->release(Workload, pid, tnum) ) {
 				fprintf(stderr, "Good actor release error: "  \
 					"%d:%s\n", errno, strerror(errno));
@@ -432,7 +450,6 @@ static _Bool add_async_event(CO(String, update))
 	/* Proceed with modeling the event. */
 	if ( !Model->update(Model, event, &status, &violation, &sealed) )
 		ERR(goto done);
-
 	Model->discipline_pid(Model, &pid, &tnum);
 
 	if ( Debug )
@@ -440,18 +457,33 @@ static _Bool add_async_event(CO(String, update))
 			"violation=%d, pid=%d, tnum=%lu\n", status,	\
 			violation, pid, tnum);
 
+	if ( In_Shutdown ) {
+		if ( violation ) {
+			if ( Debug )
+				fputs("In shutdown, disciplining PID.\n", \
+				      Debug);
+			Workload->discipline(Workload, pid, tnum);
+		}
+		else {
+			if ( Debug )
+				fputs("In shutdown, releasing PID.\n", \
+				      Debug);
+			Workload->release(Workload, pid, tnum);
+		}
+		retn = true;
+		goto done;
+	}
+
 
 	/* Handle a sealed model that is in violation. */
-	if ( sealed ) {
+	if ( sealed && violation && Enforce ) {
 		if ( Debug )
 			fputs("Atomic context security violation:\n", Debug);
-		if ( violation && Enforce ) {
-			fputs("Security violation in atomic context, "
-			      "shutting down workload.\n", stderr);
-#if 0
-			kill_cartridge(true);
-#endif
-		}
+		fputs("Security violation in atomic context, "
+		      "shutting down workload.\n", stderr);
+		In_Shutdown = true;
+		Workload->discipline(Workload, pid, tnum);
+		Workload->shutdown(Workload, true);
 	}
 
 	retn = true;
