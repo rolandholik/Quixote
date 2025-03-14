@@ -915,8 +915,6 @@ static _Bool run_workload(CO(TSEMworkload, this))
 		fprintf(Debug, "%s: Setting up namespace.\n", __func__);
 	if ( !_setup_namespace(S) )
 		_exit(1);
-	if ( Debug )
-		fprintf(Debug, "%s: Setting up namespace.\n", __func__);
 
 	/* Fork again to run the cartridge. */
 	close(S->event_pipe[READ_SIDE]);
