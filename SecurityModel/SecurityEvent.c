@@ -80,6 +80,7 @@ static const char *TSEM_name[] = {
 	"file_open",
 	"mmap_file",
 	"file_ioctl",
+	"file_ioctl_compat",
 	"file_lock",
 	"file_fcntl",
 	"file_receive",
