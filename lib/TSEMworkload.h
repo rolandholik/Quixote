@@ -43,7 +43,7 @@ struct NAAAIM_TSEMworkload
 
 	_Bool (*release)(const TSEMworkload, pid_t, uint64_t);
 	_Bool (*discipline)(const TSEMworkload, pid_t, uint64_t);
-	void (*shutdown)(const TSEMworkload, const _Bool);
+	void (*shutdown)(const TSEMworkload, const int, const _Bool);
 
 	void (*whack)(const TSEMworkload);
 

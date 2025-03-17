@@ -483,7 +483,7 @@ static _Bool add_async_event(CO(String, update))
 		      "shutting down workload.\n", stderr);
 		In_Shutdown = true;
 		Workload->discipline(Workload, pid, tnum);
-		Workload->shutdown(Workload, true);
+		Workload->shutdown(Workload, SIGTERM, true);
 	}
 
 	retn = true;

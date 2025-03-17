@@ -648,11 +648,13 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
 			if ( Signals.stop ) {
 				if ( Debug )
 					fputs("Quixote terminated.\n", Debug);
-				this->shutdown(this, true);
 				retn = true;
+				Signals.stop = false;
+				this->shutdown(this, SIGTERM, true);
 				goto done;
 			}
 			if ( Signals.sigchild ) {
+				Signals.sigchild = false;
 				if ( !child_exited(S->workload_pid) )
 					continue;
 				retn = true;
@@ -660,7 +662,7 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
 			}
 
 			fputs("Poll error.\n", stderr);
-			this->shutdown(this, true);
+			this->shutdown(this, SIGTERM, true);
 			retn = true;
 			goto done;
 		}
@@ -678,9 +680,11 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
 		if ( poll_data[0].revents & POLLHUP ) {
 			if ( Signals.stop ) {
 				retn = true;
+				Signals.stop = false;
 				goto done;
 			}
 			if ( Signals.sigchild ) {
+				Signals.sigchild = false;
 				if ( !child_exited(S->workload_pid) )
 					continue;
 				retn = true;
@@ -690,7 +694,7 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
 
 		if ( poll_data[0].revents & POLLIN ) {
 			if ( !S->event->read_event(S->event, fd) ) {
-				this->shutdown(this, false);
+				this->shutdown(this, SIGTERM, false);
 				break;
 			}
 
@@ -698,7 +702,7 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
 			while ( event ) {
 				if ( !S->event->fetch_event(S->event, \
 							    &event) ) {
-					this->shutdown(this, false);
+					this->shutdown(this, SIGTERM, false);
 					break;
 				}
 
@@ -712,6 +716,7 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
 					break;
 				}
 				if ( Signals.sigchild ) {
+					Signals.sigchild = false;
 					if ( child_exited(S->workload_pid) ) {
 						retn = true;
 						goto done;
@@ -736,7 +741,7 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
 			}
 			if ( !mgmt->receive_Buffer(mgmt, cmdbufr) ) {
 				fputs("Orchestrator manager error.\n", stderr);
-				this->shutdown(this, false);
+				this->shutdown(this, SIGTERM, false);
 			}
 			if ( mgmt->eof(mgmt) ) {
 				if ( Debug )
@@ -751,7 +756,7 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
 			}
 
 			if ( !command_handler(mgmt, cmdbufr) )
-				this->shutdown(this, false);
+				this->shutdown(this, SIGTERM, false);
 			cmdbufr->reset(cmdbufr);
 		}
 	}
@@ -904,8 +909,6 @@ static _Bool run_workload(CO(TSEMworkload, this))
 
 	int rc;
 
-	pid_t cartridge_pid;
-
 	struct pollfd poll_data[1];
 
 	Process execute = NULL;
@@ -919,12 +922,12 @@ static _Bool run_workload(CO(TSEMworkload, this))
 	/* Fork again to run the cartridge. */
 	close(S->event_pipe[READ_SIDE]);
 
-	cartridge_pid = fork();
-	if ( cartridge_pid == -1 )
+	S->workload_pid = fork();
+	if ( S->workload_pid == -1 )
 		exit(1);
 
 	/* Child process - Workload. */
-	if ( cartridge_pid == 0 ) {
+	if ( S->workload_pid == 0 ) {
 		if ( Debug ) {
 			fprintf(Debug, "Workload process: %d\n", getpid());
 		}
@@ -1014,21 +1017,24 @@ static _Bool run_workload(CO(TSEMworkload, this))
 			if ( Debug )
 				fputs("Monitor process stopped\n", Debug);
 			retn = true;
+			Signals.stop = false;
 			goto done;
 		}
 
 		if ( Signals.sigterm ) {
 			if ( Debug )
 				fputs("Monitor process terminated.\n", Debug);
-			this->shutdown(this, false);
+			Signals.sigterm = 0;
+			this->shutdown(this, SIGKILL, false);
 		}
 
 		if ( Signals.sigchild ) {
-			if ( child_exited(cartridge_pid) ) {
+			if ( child_exited(S->workload_pid) ) {
 				close(S->fd);
 				close(S->event_pipe[WRITE_SIDE]);
 				_exit(0);
 			}
+			Signals.sigchild = false;
 		}
 
 		memset(bufr, '\0', sizeof(bufr));
@@ -1145,18 +1151,15 @@ static _Bool discipline(CO(TSEMworkload, this), const pid_t pid, \
  * the workload is runc based a kill signal is transmitted to the
  * runc instance that is managing the workload.
  *
- * \param wait	A boolean flag used to indicate whether or not a runc
- *		based workload should wait for the termination of the
- *		run process.
+ * \param signal	The signal that is to sent to the child process.
  *
- * \return	A boolean value is returned to indicate whether
- *		or not the workload was successfully shutdown.
- *		A false value indicates that a failure during
- *		the shutdown.  A true value indicated the workload
- *		was successfully shutdown.
+ * \param wait		A boolean flag used to indicate whether or not
+ *			a runc based workload should wait for the
+ *			termination of the run process.
  */
 
-static void shutdown(CO(TSEMworkload, this), const _Bool wait)
+static void shutdown(CO(TSEMworkload, this), const int signal, \
+		     const _Bool wait)
 
 {
 	STATE(S);
@@ -1168,7 +1171,7 @@ static void shutdown(CO(TSEMworkload, this), const _Bool wait)
 
 	/* Signal the monitor process to shutdown the cartridge process. */
 	if ( S->mode != CONTAINER_MODE ) {
-		kill(S->workload_pid, SIGHUP);
+		kill(S->workload_pid, signal);
 		return;
 	}
 
