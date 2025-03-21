@@ -19,6 +19,7 @@
 #include <string.h>
 #include <errno.h>
 #include <netdb.h>
+#include <poll.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
 #include <sys/un.h>
@@ -353,6 +354,46 @@ static _Bool accept_connection(CO(LocalDuct, this))
 
 
 /**
+ * Internal private function.
+ *
+ * This function is responsible for issueing a poll request to determine
+ * if data can be sent over the UNIX domain socket or if the other end
+ * has terminated the connection.
+ *
+ * \param this	The LocalDuct object over which the Buffer is to be sent.
+ *
+ * \return	An integer value is used to indicate the status of the
+ *		poll.  A negative value indicates that an error in the
+ *		POLL call occurred or an unrecognized event was
+ *		received.  A value of zero is used to indicate that the
+ *		side of the connection has closed the connection.  A
+ *		true value indicates that the connection is ready to
+ *		receive data.
+ */
+
+static int _check_write(const int fd)
+
+{
+	struct pollfd poll_data[1];
+
+
+	poll_data[0].fd	    = fd;
+	poll_data[0].events = POLLHUP | POLLOUT;
+
+
+	if ( poll(poll_data, 1, -1) < 0 )
+		return -1;
+
+	if ( poll_data[0].revents & POLLHUP )
+		return 0;
+	if ( poll_data[0].revents & POLLOUT )
+		return 1;
+
+	return -1;
+}
+
+
+/**
  * External public method.
  *
  * This method implements sending the contents of a specified Buffer object
@@ -372,6 +413,8 @@ static _Bool send_Buffer(CO(LocalDuct, this), CO(Buffer, bf))
 
 	_Bool retn = false;
 
+	int rc;
+
 	struct iovec vector[2];
 
 	uint32_t size = htonl(bf->size(bf));
@@ -385,6 +428,16 @@ static _Bool send_Buffer(CO(LocalDuct, this), CO(Buffer, bf))
 		ERR(goto done);
 	if ( (bf == NULL) || bf->poisoned(bf))
 		ERR(goto done);
+
+	/* Check for write status. */
+	rc = _check_write(S->fd);
+	if ( rc < 0 )
+		ERR(goto done);
+	if ( rc == 0 ) {
+		retn = true;
+		S->eof = true;
+		goto done;
+	}
 
 
 	/* Setup vectors for packet size and payload. */
