@@ -605,7 +605,7 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
 
 	unsigned int cycle = 0;
 
-	struct pollfd poll_data[2];
+	struct pollfd poll_data[3];
 
 	Buffer cmdbufr = NULL;
 
@@ -627,23 +627,33 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
 		if ( !mgmt->get_socket(mgmt, &poll_data[1].fd) )
 			ERR(goto done);
 		++fdcnt;
-		poll_data[1].events = POLLIN;
+		poll_data[1].events = POLLIN | POLLHUP;
 	}
 
 	/* Dispatch loop. */
 	if ( Debug ) {
-		fprintf(Debug, "%d: Calling event loop\n", getpid());
-		fprintf(Debug, "fdcnt: %d, descriptor 1: %d, " \
-			"descriptor 2: %d\n", fdcnt, poll_data[0].fd, \
-			poll_data[1].fd);
+		fprintf(Debug, "%d: Calling monitor loop.\n", getpid());
+		fprintf(Debug, "fdcnt=%d, monitor fd=%d, command fd=%d\n", \
+			fdcnt, poll_data[0].fd, poll_data[1].fd);
 	}
 
 	while ( 1 ) {
 		if ( Debug )
-			fprintf(Debug, "\n%d: Poll cycle: %d\n", getpid(), \
+			fprintf(Debug, "\n%d: Monitor cycle: %d\n", getpid(), \
 				++cycle);
 
 		rc = poll(poll_data, fdcnt, -1);
+		if ( Debug ) {
+			fprintf(Debug, "Poll retn=%d, Data poll=%0x, "	   \
+				"Mgmt poll=%0x", rc, poll_data[0].revents, \
+				poll_data[1].revents);
+			if ( connected )
+				fprintf(Debug, ", Cmd poll=%0x\n", \
+					poll_data[2].revents);
+			else
+				fputs("\n", Debug);
+		}
+
 		if ( rc < 0 ) {
 			if ( Signals.stop ) {
 				if ( Debug )
@@ -658,6 +668,8 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
 				if ( !child_exited(S->workload_pid) )
 					continue;
 				retn = true;
+				if ( Debug )
+					fputs("Workload terminated.\n", Debug);
 				goto done;
 			}
 
@@ -666,16 +678,6 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
 			retn = true;
 			goto done;
 		}
-		if ( rc == 0 ) {
-			if ( Debug )
-				fputs("Poll timeout.\n", Debug);
-			continue;
-		}
-
-		if ( Debug )
-			fprintf(Debug, "Poll retn=%d, Data poll=%0x, "	     \
-				"Mgmt poll=%0x\n", rc, poll_data[0].revents, \
-				poll_data[1].revents);
 
 		if ( poll_data[0].revents & POLLHUP ) {
 			if ( Signals.stop ) {
@@ -728,17 +730,26 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
 
 		if ( poll_data[1].revents & POLLIN ) {
 			if ( !connected ) {
-				if ( Debug )
-					fputs("Have socket connection.\n", \
-					      Debug);
-
 				if ( !mgmt->accept_connection(mgmt) )
 					ERR(goto done);
-				if ( !mgmt->get_fd(mgmt, &poll_data[1].fd) )
+				if ( !mgmt->get_fd(mgmt, &poll_data[2].fd) )
 					ERR(goto done);
+				++fdcnt;
 				connected = true;
+				poll_data[2].events = POLLIN;
+				if ( Debug )
+					fprintf(Debug, "Have management " \
+						"connection, fd=%d\n",	  \
+						poll_data[2].fd);
+
 				continue;
 			}
+		}
+
+		if ( !connected )
+			continue;
+
+		if ( poll_data[2].revents & POLLIN ) {
 			if ( !mgmt->receive_Buffer(mgmt, cmdbufr) ) {
 				fputs("Orchestrator manager error.\n", stderr);
 				this->shutdown(this, SIGTERM, false);
@@ -751,6 +762,10 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
 				if ( !mgmt->get_socket(mgmt, \
 						       &poll_data[1].fd) )
 					ERR(goto done);
+
+				--fdcnt;
+				poll_data[2].fd = 0;
+				poll_data[2].events = 0;
 				connected = false;
 				continue;
 			}
@@ -758,6 +773,16 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
 			if ( !command_handler(mgmt, cmdbufr) )
 				this->shutdown(this, SIGTERM, false);
 			cmdbufr->reset(cmdbufr);
+
+			if ( mgmt->eof(mgmt) ) {
+				if ( Debug )
+					fputs("Terminated command.\n", Debug);
+				--fdcnt;
+				poll_data[2].fd = 0;
+				poll_data[2].events = 0;
+				connected = false;
+				mgmt->reset(mgmt);
+			}
 		}
 	}
 
