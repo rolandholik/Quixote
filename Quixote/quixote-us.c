@@ -707,6 +707,50 @@ static _Bool send_list(CO(TTYduct, duct), CO(LocalDuct, mgmt), \
 
 
 /**
+ * Internal private function.
+ *
+ * This function is responsible for sending a line of command output to
+ * the console.
+ *
+ * \param mgmt		The socket object used to communicate with
+ *			the quixote-console management instance.
+ *
+ * \param bufr		The object containing the command output that
+ *			is to be sent.
+ *
+ * \param retn		A pointer to the boolean variable that will
+ *			be loaded with the error return status that
+ *			will be returned to the caller.
+ *
+ * \return		A boolean value is used to indicate whether or
+ *			not output should be terminated.  A false value
+ *			indicates that this invocation should be the
+ *			last output that is to be set.  A true return
+ *			value indicates that the next cycle of output
+ *			should be attempted.
+ */
+
+static _Bool _send_output(CO(LocalDuct, mgmt), CO(Buffer, bufr), _Bool *retn)
+
+{
+	*retn = false;
+
+	if ( !mgmt->send_Buffer(mgmt, bufr) )
+		ERR(return false);
+
+	if ( mgmt->eof(mgmt) ) {
+		*retn = true;
+		if ( Debug )
+			fprintf(Debug, "%d: Received end of connection.\n", \
+				getpid());
+		return false;
+	}
+
+	return true;
+}
+
+
+/**
  * Private function.
  *
  * This function is responsible for returning the current security event
@@ -747,10 +791,11 @@ static _Bool send_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 	cmdbufr->reset(cmdbufr);
 	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
-	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
-		ERR(goto done);
+	if ( !_send_output(mgmt, cmdbufr, &retn) )
+		goto done;
 	if ( Debug )
-		fprintf(Debug, "Sent trajectory size: %zu\n", cnt);
+		fprintf(Debug, "%d: Sent trajectory size: %zu\n", getpid(), \
+			cnt);
 
 
 	/* Send each trajectory point. */
@@ -769,8 +814,8 @@ static _Bool send_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 		cmdbufr->reset(cmdbufr);
 		cmdbufr->add(cmdbufr, (unsigned char *) es->get(es), \
 			     es->size(es) + 1);
-		if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
-			ERR(goto done);
+		if ( !_send_output(mgmt, cmdbufr, &retn) )
+			goto done;
 		es->reset(es);
 	}
 
@@ -835,8 +880,8 @@ static _Bool send_trajectory_counts(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr), \
 
 	cmdbufr->reset(cmdbufr);
 	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
-	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
-		ERR(goto done);
+	if ( !_send_output(mgmt, cmdbufr, &retn) )
+		goto done;
 	if ( Debug )
 		fprintf(Debug, "Sent coefficient counts size: %zu\n", cnt);
 
@@ -855,14 +900,14 @@ static _Bool send_trajectory_counts(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr), \
 
 		cmdbufr->reset(cmdbufr);
 		cmdbufr->add(cmdbufr, (unsigned char *) bufr, sizeof(bufr));
-		if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
-			ERR(goto done);
+		if ( !_send_output(mgmt, cmdbufr, &retn) )
+			goto done;
 	}
 
 	retn = true;
 
- done:
 
+ done:
 	return retn;
 }
 
@@ -909,8 +954,8 @@ static _Bool send_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 	cmdbufr->reset(cmdbufr);
 	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
-	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
-		ERR(goto done);
+	if ( !_send_output(mgmt, cmdbufr, &retn) )
+		goto done;
 	if ( Debug )
 		fprintf(Debug, "Sent forensics size: %zu\n", cnt);
 
@@ -943,12 +988,13 @@ static _Bool send_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 		cmdbufr->reset(cmdbufr);
 		cmdbufr->add(cmdbufr, (unsigned char *) es->get(es), \
 			     es->size(es) + 1);
-		if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
-			ERR(goto done);
+		if ( !_send_output(mgmt, cmdbufr, &retn) )
+			goto done;
 		es->reset(es);
 	}
 
 	retn = true;
+
 
  done:
 	WHACK(es);
@@ -1014,8 +1060,8 @@ static _Bool send_trajectory_coefficients(CO(LocalDuct, mgmt), \
 
 	cmdbufr->reset(cmdbufr);
 	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
-	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
-		ERR(goto done);
+	if ( !_send_output(mgmt, cmdbufr, &retn) )
+		goto done;
 	if ( Debug )
 		fprintf(Debug, "Sent coefficient size: %zu\n", cnt);
 
@@ -1038,8 +1084,8 @@ static _Bool send_trajectory_coefficients(CO(LocalDuct, mgmt), \
 
 		cmdbufr->reset(cmdbufr);
 		cmdbufr->add(cmdbufr, (unsigned char *) point, sizeof(point));
-		if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
-			ERR(goto done);
+		if ( !_send_output(mgmt, cmdbufr, &retn) )
+			goto done;
 	}
 
 	retn = true;
@@ -1089,8 +1135,8 @@ static _Bool send_events(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 	cmdbufr->reset(cmdbufr);
 	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
-	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
-		ERR(goto done);
+	if ( !_send_output(mgmt, cmdbufr, &retn) )
+		goto done;
 	if ( Debug )
 		fprintf(Debug, "Sent event size: %zu\n", cnt);
 
@@ -1107,8 +1153,8 @@ static _Bool send_events(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 		cmdbufr->reset(cmdbufr);
 		cmdbufr->add(cmdbufr, (unsigned char *) event->get(event), \
 			     event->size(event) + 1);
-		if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
-			ERR(goto done);
+		if ( !_send_output(mgmt, cmdbufr, &retn) )
+			goto done;
 	}
 
 	retn = true;
@@ -1149,9 +1195,8 @@ static _Bool send_map(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	/* Send the domain aggregate. */
 	cmdbufr->reset(cmdbufr);
 	cmdbufr->add_Buffer(cmdbufr, Aggregate);
-	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
-		ERR(goto done);
-
+	if ( !_send_output(mgmt, cmdbufr, &retn) )
+		goto done;
 
 	/* Send each point in the model. */
 	retn = send_trajectory_coefficients(mgmt, cmdbufr, true);
