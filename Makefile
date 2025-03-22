@@ -111,8 +111,8 @@ install-path:
 	[ -d ${INSTPATH}/share ]	  || mkdir ${INSTPATH}/share;
 	[ -d ${INSTPATH}/share/doc ]	  || mkdir ${INSTPATH}/share/doc;
 	[ -d ${VARPATH} ]		  || mkdir -p ${VARPATH};
-	[ -d ${VARPATH}/Magazine]	  || mkdir ${VARPATH}/Magazine;
-	[ -d ${VARPATH}/mgmt		  || mkdir ${VARPATH}/mgmt;
+	[ -d ${VARPATH}/Magazine ]	  || mkdir ${VARPATH}/Magazine;
+	[ -d ${VARPATH}/mgmt ]		  || mkdir ${VARPATH}/mgmt;
 	[ -d ${VARPATH}/mgmt/cartridges ] || mkdir ${VARPATH}/mgmt/cartridges;
 	[ -d ${VARPATH}/mgmt/processes ]  || mkdir ${VARPATH}/mgmt/processes;
 	[ -d ${VARPATH}/tokens ]	  || mkdir ${VARPATH}/tokens;
