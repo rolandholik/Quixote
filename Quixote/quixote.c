@@ -371,6 +371,49 @@ static _Bool setup_management(CO(LocalDuct, mgmt), const char *cartridge)
 	return retn;
 }
 
+/**
+ * Internal private function.
+ *
+ * This function is responsible for sending a line of command output to
+ * the console.
+ *
+ * \param mgmt		The socket object used to communicate with
+ *			the quixote-console management instance.
+ *
+ * \param bufr		The object containing the command output that
+ *			is to be sent.
+ *
+ * \param retn		A pointer to the boolean variable that will
+ *			be loaded with the error return status that
+ *			will be returned to the caller.
+ *
+ * \return		A boolean value is used to indicate whether or
+ *			not output should be terminated.  A false value
+ *			indicates that this invocation should be the
+ *			last output that is to be set.  A true return
+ *			value indicates that the next cycle of output
+ *			should be attempted.
+ */
+
+static _Bool _send_output(CO(LocalDuct, mgmt), CO(Buffer, bufr), _Bool *retn)
+
+{
+	*retn = false;
+
+	if ( !mgmt->send_Buffer(mgmt, bufr) )
+		ERR(return false);
+
+	if ( mgmt->eof(mgmt) ) {
+		*retn = true;
+		if ( Debug )
+			fprintf(Debug, "%d: Received end of connection.\n", \
+				getpid());
+		return false;
+	}
+
+	return true;
+}
+
 
 /**
  * Private function.
@@ -424,8 +467,8 @@ static _Bool send_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 	cmdbufr->reset(cmdbufr);
 	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
-	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
-		ERR(goto done);
+	if ( !_send_output(mgmt, cmdbufr, &retn) )
+		goto done;
 	if ( Debug )
 		fprintf(Debug, "Sent forensics size: %zu\n", cnt);
 
@@ -441,8 +484,8 @@ static _Bool send_forensics(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 		cmdbufr->reset(cmdbufr);
 		cmdbufr->add(cmdbufr, (void *) es->get(es), es->size(es) + 1);
-		if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
-			ERR(goto done);
+		if ( !_send_output(mgmt, cmdbufr, &retn) )
+			goto done;
 	}
 
 	retn = true;
@@ -510,8 +553,8 @@ static _Bool send_coefficients(CO(LocalDuct, mgmt), CO(char *, type), \
 
 	cmdbufr->reset(cmdbufr);
 	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
-	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
-		ERR(goto done);
+	if ( !_send_output(mgmt, cmdbufr, &retn) )
+		goto done;
 	if ( Debug )
 		fprintf(Debug, "Sent points size: %zu\n", cnt);
 
@@ -527,8 +570,8 @@ static _Bool send_coefficients(CO(LocalDuct, mgmt), CO(char *, type), \
 
 		cmdbufr->reset(cmdbufr);
 		cmdbufr->add(cmdbufr, (void *) es->get(es), es->size(es) + 1);
-		if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
-			ERR(goto done);
+		if ( !_send_output(mgmt, cmdbufr, &retn) )
+			goto done;
 	}
 
 	retn = true;
@@ -593,8 +636,8 @@ static _Bool send_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 	cmdbufr->reset(cmdbufr);
 	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
-	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
-		ERR(goto done);
+	if ( !_send_output(mgmt, cmdbufr, &retn) )
+		goto done;
 	if ( Debug )
 		fprintf(Debug, "Sent trajectory size: %zu\n", cnt);
 
@@ -610,8 +653,8 @@ static _Bool send_trajectory(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 		cmdbufr->reset(cmdbufr);
 		cmdbufr->add(cmdbufr, (void *) es->get(es), es->size(es) + 1);
-		if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
-			ERR(goto done);
+		if ( !_send_output(mgmt, cmdbufr, &retn) )
+			goto done;
 		event->reset(event);
 	}
 
@@ -682,8 +725,8 @@ static _Bool send_counts(CO(LocalDuct, mgmt), CO(char *, type), \
 
 	cmdbufr->reset(cmdbufr);
 	cmdbufr->add(cmdbufr, (unsigned char *) &cnt, sizeof(cnt));
-	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
-		ERR(goto done);
+	if ( !_send_output(mgmt, cmdbufr, &retn) )
+		goto done;
 	if ( Debug )
 		fprintf(Debug, "Sent count size: %zu\n", cnt);
 
@@ -699,8 +742,8 @@ static _Bool send_counts(CO(LocalDuct, mgmt), CO(char *, type), \
 
 		cmdbufr->reset(cmdbufr);
 		cmdbufr->add(cmdbufr, (void *) es->get(es), es->size(es) + 1);
-		if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
-			ERR(goto done);
+		if ( !_send_output(mgmt, cmdbufr, &retn) )
+			goto done;
 	}
 
 	retn = true;
@@ -749,8 +792,8 @@ static _Bool seal_domain(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 	/* Send response to caller. */
 	cmdbufr->reset(cmdbufr);
 	cmdbufr->add(cmdbufr, ok, sizeof(ok));
-	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
-		ERR(goto done);
+	if ( _send_output(mgmt, cmdbufr, &retn) )
+		goto done;
 
 	retn = true;
 
@@ -802,8 +845,8 @@ static _Bool send_map(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 	cmdbufr->reset(cmdbufr);
 	cmdbufr->add_hexstring(cmdbufr, (void *) as->get(as));
-	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
-		ERR(goto done);
+	if ( _send_output(mgmt, cmdbufr, &retn) )
+		goto done;
 
 	/* Send each point in the model. */
 	retn = send_coefficients(mgmt, TRAJECTORY_COEFFICIENTS, cmdbufr);
@@ -879,8 +922,8 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 			if ( !cmdbufr->add_hexstring(cmdbufr, \
 						     estr->get(estr)) )
 				ERR(goto done);
-			if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
-				ERR(goto done);
+			if ( !_send_output(mgmt, cmdbufr, &retn) )
+				goto done;
 			retn = true;
 			break;
 
@@ -894,8 +937,8 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 			if ( !cmdbufr->add_hexstring(cmdbufr, \
 						     estr->get(estr)) )
 				ERR(goto done);
-			if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
-				ERR(goto done);
+			if ( !_send_output(mgmt, cmdbufr, &retn) )
+				goto done;
 			retn = true;
 			break;
 
@@ -1618,11 +1661,12 @@ static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int model_fd)
 	_Bool retn	= false,
 	      connected = false;
 
-	int rc;
+	int rc,
+	    fdcnt;
 
 	unsigned int opt;
 
-	struct pollfd poll_data[1];
+	struct pollfd poll_data[2];
 
 	Buffer cmdbufr = NULL;
 
@@ -1641,12 +1685,13 @@ static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int model_fd)
 	}
 
 	opt = 0;
+	fdcnt = 1;
 	while ( true ) {
 		if ( Debug )
 			fprintf(Debug, "\n%d: Poll cycle: %d\n", getpid(), \
 				++opt);
 
-		rc = poll(poll_data, 1, -1);
+		rc = poll(poll_data, fdcnt, -1);
 		if ( rc == -1 ) {
 			if ( errno != EINTR ) {
 				fprintf(stderr, "Orchestrator poll error: "
@@ -1655,9 +1700,15 @@ static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int model_fd)
 			}
 		}
 
-		if ( Debug )
-			fprintf(Debug, "Poll event: %d, Mgmt poll=%0x\n", \
+		if ( Debug ) {
+			fprintf(Debug, "Poll event: %d, Mgmt events=%0x", \
 				rc, poll_data[0].revents);
+			if ( connected )
+				fprintf(Debug, ", Cmd events=%0x\n",
+					poll_data[1].revents);
+			else
+				fputs("\n", Debug);
+		}
 
 		/* Check for signals. */
 		if ( Signals.stop || Signals.sigterm ) {
@@ -1686,27 +1737,40 @@ static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int model_fd)
 
 		if ( poll_data[0].revents & POLLIN ) {
 			if ( !connected ) {
-				if ( Debug )
-					fputs("Have socket connection.\n", \
-					      Debug);
-
 				if ( !mgmt->accept_connection(mgmt) )
 					ERR(goto done);
-				if ( !mgmt->get_fd(mgmt, &poll_data[0].fd) )
+				if ( !mgmt->get_fd(mgmt, &poll_data[1].fd) )
 					ERR(goto done);
+				++fdcnt;
 				connected = true;
+				poll_data[1].events = POLLIN;
+				if ( Debug )
+					fprintf(Debug, "Have management " \
+						"connection, fd=%d\n",	  \
+						poll_data[1].fd);
+
 				continue;
 			}
+		}
+
+		if ( !connected )
+			continue;
+
+		if ( poll_data[1].revents & POLLIN ) {
 			if ( !mgmt->receive_Buffer(mgmt, cmdbufr) )
-				continue;
+				ERR(goto done);
 			if ( mgmt->eof(mgmt) ) {
 				if ( Debug )
 					fputs("Terminating management.\n", \
 					      Debug);
 				mgmt->reset(mgmt);
 				if ( !mgmt->get_socket(mgmt, \
-						       &poll_data[0].fd) )
+						       &poll_data[1].fd) )
 					ERR(goto done);
+
+				--fdcnt;
+				poll_data[1].fd = 0;
+				poll_data[1].events = 0;
 				connected = false;
 				continue;
 			}
@@ -1714,6 +1778,16 @@ static _Bool child_monitor(LocalDuct mgmt, CO(char *, cartridge), int model_fd)
 			if ( !process_command(mgmt, cmdbufr) )
 				ERR(goto done);
 			cmdbufr->reset(cmdbufr);
+
+			if ( mgmt->eof(mgmt) ) {
+				if ( Debug )
+					fputs("Terminated command.\n", Debug);
+				--fdcnt;
+				poll_data[1].fd = 0;
+				poll_data[1].events = 0;
+				connected = false;
+				mgmt->reset(mgmt);
+			}
 		}
 	}
 
