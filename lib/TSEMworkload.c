@@ -671,8 +671,8 @@ static _Bool run_monitor(CO(TSEMworkload, this), CO(LocalDuct, mgmt),	\
 	/* Dispatch loop. */
 	if ( Debug ) {
 		fprintf(Debug, "%d: Calling monitor loop.\n", getpid());
-		fprintf(Debug, "fdcnt=%d, monitor fd=%d, command fd=%d\n", \
-			fdcnt, poll_data[0].fd, poll_data[1].fd);
+		fprintf(Debug, "%d: fdcnt=%d, monitor fd=%d, command fd=%d\n",\
+			getpid(), fdcnt, poll_data[0].fd, poll_data[1].fd);
 	}
 
 	while ( 1 ) {
@@ -682,9 +682,9 @@ static _Bool run_monitor(CO(TSEMworkload, this), CO(LocalDuct, mgmt),	\
 
 		rc = poll(poll_data, fdcnt, -1);
 		if ( Debug ) {
-			fprintf(Debug, "Poll retn=%d, Data poll=%0x, "	   \
-				"Mgmt poll=%0x", rc, poll_data[0].revents, \
-				poll_data[1].revents);
+			fprintf(Debug, "%d: Poll retn=%d, Data poll=%0x, " \
+				"Mgmt poll=%0x", getpid(), rc,		   \
+				poll_data[0].revents, poll_data[1].revents);
 			if ( connected )
 				fprintf(Debug, ", Cmd poll=%0x\n", \
 					poll_data[2].revents);
@@ -695,7 +695,9 @@ static _Bool run_monitor(CO(TSEMworkload, this), CO(LocalDuct, mgmt),	\
 		if ( rc < 0 ) {
 			if ( Signals.stop ) {
 				if ( Debug )
-					fputs("Quixote terminated.\n", Debug);
+					fprintf(Debug,			     \
+						"%d: Quixote terminated.\n", \
+						getpid());
 				retn = true;
 				Signals.stop = false;
 				this->shutdown(this, SIGTERM, true);
@@ -753,9 +755,9 @@ static _Bool run_monitor(CO(TSEMworkload, this), CO(LocalDuct, mgmt),	\
 				connected = true;
 				poll_data[2].events = POLLIN;
 				if ( Debug )
-					fprintf(Debug, "Have management " \
-						"connection, fd=%d\n",	  \
-						poll_data[2].fd);
+					fprintf(Debug, "%d: Have management " \
+						"connection, fd=%d\n",	      \
+						getpid(), poll_data[2].fd);
 
 				continue;
 			}
@@ -771,8 +773,9 @@ static _Bool run_monitor(CO(TSEMworkload, this), CO(LocalDuct, mgmt),	\
 			}
 			if ( mgmt->eof(mgmt) ) {
 				if ( Debug )
-					fputs("Terminating management.\n", \
-					      Debug);
+					fprintf(Debug,			   \
+						"%d:  Closing control.\n", \
+						getpid());
 				mgmt->reset(mgmt);
 				if ( !mgmt->get_socket(mgmt, \
 						       &poll_data[1].fd) )
@@ -791,7 +794,9 @@ static _Bool run_monitor(CO(TSEMworkload, this), CO(LocalDuct, mgmt),	\
 
 			if ( mgmt->eof(mgmt) ) {
 				if ( Debug )
-					fputs("Terminated command.\n", Debug);
+					fprintf(Debug,			     \
+						"%d: Terminated control.\n", \
+						getpid());
 				--fdcnt;
 				poll_data[2].fd = 0;
 				poll_data[2].events = 0;
@@ -1043,7 +1048,7 @@ static _Bool run_workload(CO(TSEMworkload, this))
 
 	if ( S->mode == CONTAINER_MODE ) {
 		if ( Debug ) {
-			fprintf(Debug, "%d: Workload container=%s, ",	\
+			fprintf(Debug, "%d: Workload container=%s, "	\
 				"bundle=%s\n", getpid(), S->container,	\
 				S->bundle->get(S->bundle));
 			fclose(Debug);
