@@ -1030,22 +1030,21 @@ static _Bool run_workload(CO(TSEMworkload, this))
 
 	/* Child process - Workload. */
 	if ( Debug ) {
-		fprintf(Debug, "Workload process: %d\n", getpid());
+		fprintf(Debug, "%d: Workload process.\n", getpid());
 	}
 	if ( !_setup_namespace(S, ns_pipe) )
 		_exit(1);
 
 	/* Drop the ability to modify the trust state. */
 	if ( Debug )
-		fprintf(Debug, "%d: Dropping CAP_MAC_ADMIN\n",
-			getpid());
+		fprintf(Debug, "%d: Dropping CAP_MAC_ADMIN\n", getpid());
 	if ( cap_drop_bound(CAP_MAC_ADMIN) != 0 )
 		ERR(goto done);
 
 	if ( S->mode == CONTAINER_MODE ) {
 		if ( Debug ) {
-			fprintf(Debug, "Workload: container=%s, "  \
-				"bundle=%s\n", S->container,	   \
+			fprintf(Debug, "%d: Workload container=%s, ",	\
+				"bundle=%s\n", getpid(), S->container,	\
 				S->bundle->get(S->bundle));
 			fclose(Debug);
 		}
@@ -1059,8 +1058,8 @@ static _Bool run_workload(CO(TSEMworkload, this))
 	if ( S->mode == PROCESS_MODE ) {
 		if ( geteuid() != getuid() ) {
 			if ( Debug )
-				fprintf(Debug, "Changing to real " \
-					"id: %u\n", getuid());
+				fprintf(Debug, "%d: Changing to real " \
+					"id: %u\n", getpid(), getuid());
 			if ( setuid(getuid()) != 0 ) {
 				fputs("Cannot change uid.\n", stderr);
 				exit(1);
@@ -1068,7 +1067,8 @@ static _Bool run_workload(CO(TSEMworkload, this))
 		}
 
 		if ( Debug ) {
-			fputs("Executing workload shell.\n", Debug);
+			fprintf(Debug, "%d: Executing workload shell.\n", \
+				getpid());
 			fclose(Debug);
 		}
 
@@ -1090,7 +1090,8 @@ static _Bool run_workload(CO(TSEMworkload, this))
 		}
 
 		if ( Debug ) {
-			fputs("Executing workload command.\n", Debug);
+			fprintf(Debug, "%d: Executing workload command.\n", \
+				getpid());
 			fclose(Debug);
 		}
 
