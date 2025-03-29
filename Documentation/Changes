@@ -216,3 +216,35 @@ Version 1.7
 	* Use consistent linefeed termination for exported events.
 
 	* Drop privileges in quixote-export utility.
+
+Version 1.8
+	* Update version of HurdLib module.
+
+	* Correctness fixes in orchestrators.
+
+	* Eliminate leakage of trust orchestrator file descriptors into
+	  subordinate processes.
+
+	* Improvements to MQTT based event export.
+
+	* Standardize workload setup and management with the
+	  TSEMworkload object.
+
+	* Support modeling of files that are created in a modeling namespace.
+
+	* Initial implementation of diff-states utility for comparing
+	  execution trajectories.
+
+	* Implement support for pathname context references in external
+	  models.
+
+	* Implement support for direct process identifcation rather than
+	  authentication.
+
+	* Support pathnames with escaped quotation marks.
+
+	* Properly shutdown externally modeled workloads.
+
+	* Properly implement enforcement for externally modeled workloads.
+
+	* Begin coordinating TSEM and Quixote releases.
