@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
+#include <errno.h>
 
 #include <sys/ioctl.h>
 
@@ -260,6 +261,73 @@ static _Bool fetch_event(CO(TSEMevent, this), _Bool *more)
 
 
  done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implements reading an event description from the
+ * kernel export pseudo-file.
+ *
+ * \param this	A pointer to the object which is to read the event
+ *		description.
+ *
+ * \param fd		The file descriptor that the event is to be read
+ *			from.
+ *
+ * \param have_event	A pointer to a boolean variable used to indicate if
+ *			the end of the event stream has been reeached.
+ *
+ * \return	A boolean value is used to indicate the state of the
+ *		read.  A false value indicates the read failed while
+ *		a true value indicates the object has a valid event
+ *		description.
+ */
+
+static _Bool read_export(CO(TSEMevent, this), const int fd, _Bool *have_event)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	char *p,
+	     bufr[4096];
+
+	int rc;
+
+
+	/* Read up to a page size of the event. */
+	*have_event = true;
+	memset(bufr, '\0', sizeof(bufr));
+
+	rc = read(fd, bufr, sizeof(bufr));
+	if ( rc == 0 )
+		ERR(goto done);
+	if ( rc < 0 ) {
+		if ( errno != ENODATA )
+			ERR(goto done);
+
+		retn = true;
+		*have_event = false;
+		goto done;
+	}
+
+	/* Null-terminate the value and save it in the String object. */
+	if ( (p = strchr(bufr, '\n')) != NULL )
+		*p = '\0';
+
+	S->event->reset(S->event);
+	if ( !S->event->add(S->event, bufr) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	if ( retn )
+		lseek(fd, 0, SEEK_SET);
 	return retn;
 }
 
@@ -950,6 +1018,7 @@ extern TSEMevent NAAAIM_TSEMevent_Init(void)
 	this->set_event	  = set_event;
 	this->read_event  = read_event;
 	this->fetch_event = fetch_event;
+	this->read_export = read_export;
 	this->get_event	  = get_event;
 
 	this->extract_export = extract_export;

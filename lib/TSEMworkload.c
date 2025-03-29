@@ -560,6 +560,53 @@ static _Bool child_exited(const pid_t child)
 
 
 /**
+ * Private helper method.
+ *
+ * This method implements reading and processing of events until there are
+ * no additional events.
+ *
+ * \param this		The object that represents the workload reading
+ *			events.
+ *
+ * \param event_handler	A pointer to the function that will be handling
+ *			processing of the events.
+ *
+ * \return	A boolean value is used to indicate whether or not the
+ *		designed process has exited.  A false value indicates it
+ *		has not while a true value indicates it has.
+ */
+
+static _Bool _process_events(CO(TSEMworkload, this), \
+			     _Bool (*event_handler)(TSEMevent))
+
+{
+	STATE(S);
+
+	_Bool have_event = true;
+
+
+	do {
+		if ( !S->event->read_export(S->event, S->fd, &have_event) ) {
+			if ( Debug )
+				fprintf(Debug, "%d: Event read error.\n", \
+					getpid());
+			return false;
+		}
+		if ( !have_event )
+			break;
+		if ( event_handler(S->event) )
+			continue;
+		if ( Debug )
+			fprintf(Debug, "%d: Event handler error.\n", getpid());
+		return false;
+	} while ( have_event );
+
+
+	return true;
+}
+
+
+/**
  * External public method.
  *
  * This method implements running the security monitor process.  This
@@ -568,9 +615,6 @@ static _Bool child_exited(const pid_t child)
  *
  * \param this		A pointer to the object whose security monitor
  *			process is to be run.
- *
- * \param workload_pid	The process id of the workload that will be
- *			monitored for security events.
  *
  * \param mgmt		If a workload manager is to be used a pointer
  *			to the object.  A NULL value will disable for
@@ -587,20 +631,17 @@ static _Bool child_exited(const pid_t child)
  *		successfully configured.
  */
 
-static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
-			 CO(LocalDuct, mgmt),				\
+static _Bool run_monitor(CO(TSEMworkload, this), CO(LocalDuct, mgmt),	\
 			 _Bool (*event_handler)(TSEMevent),		\
 			 _Bool (*command_handler)(LocalDuct, Buffer))
 
 {
 	STATE(S);
 
-	_Bool event,
-	      retn	= false,
+	_Bool retn	= false,
 	      connected = false;
 
 	int rc,
-	    fd	  = S->event_pipe[READ_SIDE],
 	    fdcnt = 1;
 
 	unsigned int cycle = 0;
@@ -611,14 +652,11 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
 
 
 	if ( Debug )
-		fprintf(Debug, "Security Monitor (SM) pid: %d\n", getpid());
+		fprintf(Debug, "%d: Workload monitor.\n", getpid());
 
 	INIT(HurdLib, Buffer, cmdbufr, ERR(goto done));
 
-	S->workload_pid = workload_pid;
-	close(S->event_pipe[WRITE_SIDE]);
-
-	poll_data[0].fd	    = fd;
+	poll_data[0].fd	    = S->fd;
 	poll_data[0].events = POLLIN;
 
 	if ( mgmt == NULL )
@@ -668,8 +706,6 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
 				if ( !child_exited(S->workload_pid) )
 					continue;
 				retn = true;
-				if ( Debug )
-					fputs("Workload terminated.\n", Debug);
 				goto done;
 			}
 
@@ -695,37 +731,16 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
 		}
 
 		if ( poll_data[0].revents & POLLIN ) {
-			if ( !S->event->read_event(S->event, fd) ) {
+			if ( !_process_events(this, event_handler) )
 				this->shutdown(this, SIGTERM, false);
-				break;
-			}
-
-			event = true;
-			while ( event ) {
-				if ( !S->event->fetch_event(S->event, \
-							    &event) ) {
-					this->shutdown(this, SIGTERM, false);
-					break;
-				}
-
-				if ( !event_handler(S->event) ) {
-					if ( Debug )
-						fprintf(Debug, "Event "	     \
-							"processing error, " \
-							"%u killing %u\n",   \
-							getpid(),	     \
-							S->workload_pid);
-					break;
-				}
-				if ( Signals.sigchild ) {
-					Signals.sigchild = false;
-					if ( child_exited(S->workload_pid) ) {
-						retn = true;
-						goto done;
-					}
-					continue;
+			if ( Signals.sigchild ) {
+				Signals.sigchild = false;
+				if ( child_exited(S->workload_pid) ) {
+					retn = true;
+					goto done;
 				}
 			}
+			continue;
 		}
 
 		if ( poll_data[1].revents & POLLIN ) {
@@ -788,6 +803,9 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
 
 
  done:
+	if ( Debug )
+		fprintf(Debug, "%d: Workload terminated.\n", getpid());
+
 	WHACK(cmdbufr);
 
 	return retn;
@@ -805,6 +823,10 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
  * \param S		A pointer to the structure containing the state
  *			information for the object running the workload.
  *
+ * \param fdp		A pointer to the array containing the pipe
+ *			descriptors that will be used to convey the
+ *			namespace identifier back to the TMA.
+ *
  * \return		A boolean value is used to indicated whether or
  *			not the setup of the namespace has succeeded.  A
  *			false value indicates failure while a true
@@ -816,14 +838,13 @@ static _Bool run_monitor(CO(TSEMworkload, this), pid_t workload_pid,	\
  *			export file.
  */
 
-static _Bool _setup_namespace(CO(TSEMworkload_State, S))
+static _Bool _setup_namespace(CO(TSEMworkload_State, S), const int *fdp)
 
 {
 	_Bool retn = false;
 
 	char *model  = S->model == NULL ? NULL : S->model->get(S->model),
-	     *digest = S->digest == NULL ? NULL : S->digest->get(S->digest),
-	     fname[PATH_MAX];
+	     *digest = S->digest == NULL ? NULL : S->digest->get(S->digest);
 
 
 	/* Create and configure a security model namespace. */
@@ -838,10 +859,68 @@ static _Bool _setup_namespace(CO(TSEMworkload_State, S))
 	}
 
 
-	/* Create the pathname to the event update file. */
+	/* Write the namespace identifier. */
+	if ( Debug )
+		fprintf(Debug, "%d: Sending namespace id: %lu\n", getpid(), \
+			S->id);
+	if ( write(fdp[WRITE_SIDE], &S->id, sizeof(S->id)) != sizeof(S->id) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	close(fdp[READ_SIDE]);
+	close(fdp[WRITE_SIDE]);
+
+	return retn;
+
+}
+
+
+/**
+ * Private helper method
+ *
+ * This function is a helper function for the ->run_workload method.  It
+ * is responsible for reading the namespace identifier from the
+ * workload and opening the file that will receive events from the
+ * namespace.
+ *
+ * \param S		A pointer to the structure containing the state
+ *			information for the object running the workload.
+ *
+ * \param fdp		A pointer to the array containing the pipe
+ *			descriptors that will be used to convey the
+ *			namespace identifier back to the TMA.
+ *
+ * \return		A boolean value is used to indicated whether or
+ *			not the namespace event file was opened.  A
+ *			false value indicates failure while a true
+ *			value indicates the namespace was successfully
+ *			created.
+ */
+
+static _Bool _open_event_file(CO(TSEMworkload_State, S), const int *fdp)
+
+{
+	_Bool retn = false;
+
+	char fname[PATH_MAX];
+
+	int rc;
+
+
+	/* Read the namespace identifier from the workload process. */
+	rc = read(fdp[READ_SIDE], &S->id, sizeof(S->id));
+	close(fdp[WRITE_SIDE]);
+	close(fdp[READ_SIDE]);
+	if ( rc != sizeof(S->id) )
+		ERR(goto done);
+
+
+	/* Open the event export file. */
 	memset(fname, '\0', sizeof(fname));
-	if ( snprintf(fname, sizeof(fname), TSEM_EVENT_FILE, \
-		      S->id) >= sizeof(fname) )
+	if ( snprintf(fname, sizeof(fname), TSEM_EVENT_FILE, S->id) >= \
+	     sizeof(fname) )
 		ERR(goto done);
 	if ( Debug )
 		fprintf(Debug, "Update file: %s\n", fname);
@@ -850,10 +929,8 @@ static _Bool _setup_namespace(CO(TSEMworkload_State, S))
 		ERR(goto done);
 	retn = true;
 
-
  done:
 	return retn;
-
 }
 
 
@@ -930,172 +1007,96 @@ static _Bool run_workload(CO(TSEMworkload, this))
 
 	_Bool retn = false;
 
-	char bufr[TSEM_READ_BUFFER];
-
-	int rc;
-
-	struct pollfd poll_data[1];
+	int ns_pipe[2];
 
 	Process execute = NULL;
 
 
-	if ( Debug )
-		fprintf(Debug, "%s: Setting up namespace.\n", __func__);
-	if ( !_setup_namespace(S) )
-		_exit(1);
+	/* Create pipe to transfer namespace number .*/
+	if ( pipe(ns_pipe) == -1 )
+		ERR(goto done);
 
-	/* Fork again to run the cartridge. */
-	close(S->event_pipe[READ_SIDE]);
-
+	/* Fork to run the workload. */
 	S->workload_pid = fork();
 	if ( S->workload_pid == -1 )
-		exit(1);
+		ERR(goto done);
+
+	/* Parent process - workload monitor. */
+	if ( S->workload_pid > 0 ) {
+		if ( !_open_event_file(S, ns_pipe) )
+			ERR(goto done);
+		return true;
+	}
 
 	/* Child process - Workload. */
-	if ( S->workload_pid == 0 ) {
-		if ( Debug ) {
-			fprintf(Debug, "Workload process: %d\n", getpid());
-		}
-		close(S->fd);
-		close(S->event_pipe[WRITE_SIDE]);
-		WHACK(S->control);
-
-		/* Drop the ability to modify the trust state. */
-		if ( cap_drop_bound(CAP_MAC_ADMIN) != 0 )
-			ERR(goto done);
-
-		if ( S->mode == CONTAINER_MODE ) {
-			if ( Debug ) {
-				fprintf(Debug, "Workload: container=%s, "  \
-					"bundle=%s\n", S->container,	   \
-					S->bundle->get(S->bundle));
-				fclose(Debug);
-			}
-
-			execlp("runc", "runc", "run", "-b", \
-			       S->bundle->get(S->bundle), S->container, NULL);
-			fputs("Workload execution failed.\n", stderr);
-			exit(1);
-		}
-
-		if ( S->mode == PROCESS_MODE ) {
-			if ( geteuid() != getuid() ) {
-				if ( Debug )
-					fprintf(Debug, "Changing to real " \
-						"id: %u\n", getuid());
-				if ( setuid(getuid()) != 0 ) {
-					fputs("Cannot change uid.\n", stderr);
-					exit(1);
-				}
-			}
-
-			if ( Debug ) {
-				fputs("Executing workload shell.\n", Debug);
-				fclose(Debug);
-			}
-
-			execlp("bash", "bash", "-i", NULL);
-			fputs("Cartridge process execution failed.\n", stderr);
-			exit(1);
-		}
-
-		if ( S->mode == EXECUTE_MODE ) {
-			INIT(HurdLib, Process, execute, exit(1));
-			if ( geteuid() != getuid() ) {
-				if ( Debug )
-					fprintf(Debug, "Changing to real " \
-						"id: \%u\n",  getuid());
-				if ( setuid(getuid()) != 0 ) {
-					fputs("Cannot change uid.\n", stderr);
-					exit(1);
-				}
-			}
-
-			if ( Debug ) {
-				fputs("Executing workload command.\n", Debug);
-				fclose(Debug);
-			}
-
-			execute->run_command_line(execute, S->argc, S->argv);
-			fputs("Command line execution failed.\n", stderr);
-			exit(1);
-		}
-	}
-
-	/* Parent process - Namespace Monitor. */
 	if ( Debug ) {
-		fprintf(Debug, "Namespace Monitor (NM) pid: %d\n", getpid());
-		fprintf(Debug, "%d: Calling event loop\n", getpid());
-		fprintf(Debug, "%d: fd descriptor: %d\n", getpid(), S->fd);
+		fprintf(Debug, "Workload process: %d\n", getpid());
+	}
+	if ( !_setup_namespace(S, ns_pipe) )
+		_exit(1);
+
+	/* Drop the ability to modify the trust state. */
+	if ( Debug )
+		fprintf(Debug, "%d: Dropping CAP_MAC_ADMIN\n",
+			getpid());
+	if ( cap_drop_bound(CAP_MAC_ADMIN) != 0 )
+		ERR(goto done);
+
+	if ( S->mode == CONTAINER_MODE ) {
+		if ( Debug ) {
+			fprintf(Debug, "Workload: container=%s, "  \
+				"bundle=%s\n", S->container,	   \
+				S->bundle->get(S->bundle));
+			fclose(Debug);
+		}
+
+		execlp("runc", "runc", "run", "-b", \
+		       S->bundle->get(S->bundle), S->container, NULL);
+		fputs("Workload execution failed.\n", stderr);
+		exit(1);
 	}
 
-	poll_data[0].fd	    = S->fd;
-	poll_data[0].events = POLLIN;
+	if ( S->mode == PROCESS_MODE ) {
+		if ( geteuid() != getuid() ) {
+			if ( Debug )
+				fprintf(Debug, "Changing to real " \
+					"id: %u\n", getuid());
+			if ( setuid(getuid()) != 0 ) {
+				fputs("Cannot change uid.\n", stderr);
+				exit(1);
+			}
+		}
 
-	if ( S->type == TSEMcontrol_TYPE_EXPORT ) {
-		if ( !_set_user(NULL) )
-			ERR(goto done);
+		if ( Debug ) {
+			fputs("Executing workload shell.\n", Debug);
+			fclose(Debug);
+		}
+
+		execlp("bash", "bash", "-i", NULL);
+		fputs("Cartridge process execution failed.\n", stderr);
+		exit(1);
 	}
 
-	while ( true ) {
-		if ( Signals.stop ) {
+	if ( S->mode == EXECUTE_MODE ) {
+		INIT(HurdLib, Process, execute, exit(1));
+		if ( geteuid() != getuid() ) {
 			if ( Debug )
-				fputs("Monitor process stopped\n", Debug);
-			retn = true;
-			Signals.stop = false;
-			goto done;
-		}
-
-		if ( Signals.sigterm ) {
-			if ( Debug )
-				fputs("Monitor process terminated.\n", Debug);
-			Signals.sigterm = 0;
-			this->shutdown(this, SIGKILL, false);
-		}
-
-		if ( Signals.sigchild ) {
-			if ( child_exited(S->workload_pid) ) {
-				close(S->fd);
-				close(S->event_pipe[WRITE_SIDE]);
-				_exit(0);
-			}
-			Signals.sigchild = false;
-		}
-
-		memset(bufr, '\0', sizeof(bufr));
-
-		rc = poll(poll_data, 1, -1);
-		if ( rc < 0 ) {
-			if ( errno == -EINTR ) {
-				fputs("poll interrupted.\n", stderr);
-				continue;
+				fprintf(Debug, "Changing to real " \
+					"id: \%u\n",  getuid());
+			if ( setuid(getuid()) != 0 ) {
+				fputs("Cannot change uid.\n", stderr);
+				exit(1);
 			}
 		}
 
-		if ( (poll_data[0].revents & POLLIN) == 0 )
-			continue;
-
-		while ( true ) {
-			rc = read(S->fd, bufr, sizeof(bufr));
-			if ( rc == 0 )
-				break;
-			if ( rc < 0 ) {
-				if ( errno != ENODATA ) {
-					fputs("Fatal event read.\n", stderr);
-					exit(1);
-				}
-				break;
-			}
-			if ( rc > 0 ) {
-				write(S->event_pipe[WRITE_SIDE], bufr, rc);
-				lseek(S->fd, 0, SEEK_SET);
-			}
+		if ( Debug ) {
+			fputs("Executing workload command.\n", Debug);
+			fclose(Debug);
 		}
 
-		if ( lseek(S->fd, 0, SEEK_SET) < 0 ) {
-			fputs("Seek error.\n", stderr);
-			break;
-		}
+		execute->run_command_line(execute, S->argc, S->argv);
+		fputs("Command line execution failed.\n", stderr);
+		exit(1);
 	}
 
 

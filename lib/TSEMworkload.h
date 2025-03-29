@@ -36,8 +36,8 @@ struct NAAAIM_TSEMworkload
 	_Bool (*set_container_mode)(const TSEMworkload, const char *, \
 				    const char *);
 
-	_Bool (*run_monitor)(const TSEMworkload, pid_t, const LocalDuct, \
-			     _Bool (*event_handler)(TSEMevent),		 \
+	_Bool (*run_monitor)(const TSEMworkload,  const LocalDuct, \
+			     _Bool (*event_handler)(TSEMevent),	   \
 			     _Bool (*command_handler)(LocalDuct, Buffer));
 	_Bool (*run_workload)(const TSEMworkload);
 
