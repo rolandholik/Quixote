@@ -1039,6 +1039,7 @@ static _Bool run_workload(CO(TSEMworkload, this))
 	}
 	if ( !_setup_namespace(S, ns_pipe) )
 		_exit(1);
+	WHACK(S->control);
 
 	/* Drop the ability to modify the trust state. */
 	if ( Debug )
