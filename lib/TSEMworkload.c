@@ -774,7 +774,7 @@ static _Bool run_monitor(CO(TSEMworkload, this), CO(LocalDuct, mgmt),	\
 			if ( mgmt->eof(mgmt) ) {
 				if ( Debug )
 					fprintf(Debug,			   \
-						"%d:  Closing control.\n", \
+						"%d: Closing control.\n", \
 						getpid());
 				mgmt->reset(mgmt);
 				if ( !mgmt->get_socket(mgmt, \
