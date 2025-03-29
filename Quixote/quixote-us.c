@@ -1683,48 +1683,35 @@ static _Bool run_workload(CO(TSEMworkload, workload), CO(char *, container), \
 {
 	_Bool retn = false;
 
-	pid_t workload_pid;
-
 	LocalDuct mgmt = NULL;
 
 
-	/* Create the namespace management process. */
-	workload_pid = fork();
-	if ( workload_pid == -1 )
+	/* Setup the management socket. */
+	INIT(NAAAIM, LocalDuct, mgmt, ERR(goto done));
+	if ( !setup_management(mgmt, container) )
 		ERR(goto done);
 
-	/* Parent process - Security Monitor. */
-	if ( workload_pid > 0 ) {
-		/* Setup the management socket. */
-		INIT(NAAAIM, LocalDuct, mgmt, ERR(goto done));
-		if ( !setup_management(mgmt, container) )
-			ERR(goto done);
-
-		if ( !workload->run_monitor(workload, workload_pid, mgmt, \
-					    process_event, process_command) )
-			ERR(goto done);
-
-		if ( outfile != NULL ) {
-			truncate(outfile, 0);
-			if ( Trajectory )
-				retn = output_trajectory(outfile);
-			else
-				retn = output_model(outfile);
-		}
-		else
-			retn = true;
-
-		WHACK(mgmt);
-		goto done;
-	}
-
-	/* Child process - run the workload and model events. */
 	if ( !workload->run_workload(workload) )
 		ERR(goto done);
+
+	if ( !workload->run_monitor(workload, mgmt, process_event, \
+				    process_command) )
+		ERR(goto done);
+
+	if ( outfile != NULL ) {
+		truncate(outfile, 0);
+		if ( Trajectory )
+			retn = output_trajectory(outfile);
+		else
+			retn = output_model(outfile);
+	}
+
 	retn = true;
 
 
  done:
+	WHACK(mgmt);
+
 	return retn;
 }
 
