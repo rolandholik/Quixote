@@ -13,6 +13,9 @@
 
 /* Local definitions. */
 
+/* Location of the root export file. */
+#define TSEM_ROOT_EXPORT "/sys/kernel/security/tsem/external_tma/0"
+
 /* Defines for which side of the event pipe to access. */
 #define READ_SIDE  0
 #define WRITE_SIDE 1
@@ -502,6 +505,39 @@ static _Bool set_container_mode(CO(TSEMworkload, this), \
 
  done:
 	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method implementations configuring the workload object to handle
+ * exports from the root modeling namespace.
+ *
+ * \param this		A pointer to the object whose workload type is
+ *			being set.
+ *
+ * \param fdp		A pointer to a variable that will be loaded with
+ *			the file descriptior of the root export file.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		configuration of the mode had succeeded.  A false
+ *		value indicates that configuration failed while a true
+ *		value indicates the object execution mode was successfully
+ *		configured.
+ */
+
+static _Bool set_root_mode(CO(TSEMworkload, this), int *fd)
+
+{
+	STATE(S);
+
+
+	if ( (S->fd = open(TSEM_ROOT_EXPORT, O_RDONLY)) < 0 )
+		ERR(return false);
+
+	*fd  = S->fd;
+	return true;
 }
 
 
@@ -1382,6 +1418,7 @@ extern TSEMworkload NAAAIM_TSEMworkload_Init(void)
 	this->set_debug		 = set_debug;
 	this->set_execute_mode	 = set_execute_mode;
 	this->set_container_mode = set_container_mode;
+	this->set_root_mode	 = set_root_mode;
 
 	this->run_monitor  = run_monitor;
 	this->run_workload = run_workload;
