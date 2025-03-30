@@ -19,11 +19,7 @@
  * Copyright (c) 2023, Enjellic Systems Development, LLC. All rights reserved.
  **************************************************************************/
 
-#define READ_SIDE  0
-#define WRITE_SIDE 1
-
 #define TSEM_ROOT_EXPORT "/sys/kernel/security/tsem/external_tma/0"
-
 #define _GNU_SOURCE
 
 
@@ -112,6 +108,14 @@ static char *TSEM_model = NULL;
  * The number of event descriptions that are queued.
  */
 static size_t Queued = 0;
+
+
+/**
+ * The object used to hold events being exported from the root modeling
+ * namespace.
+ */
+static Gaggle Output = NULL;
+
 
 /**
  * The objects used to write the output.
@@ -375,37 +379,19 @@ static _Bool run_workload(CO(TSEMworkload, workload), CO(char *, outfile))
 {
 	_Bool retn = false;
 
-	pid_t workload_pid;
 
-	String cartridge_dir = NULL;
-
-
-	/* Create the workload process process. */
-	workload_pid = fork();
-	if ( workload_pid == -1 )
+	if ( !workload->run_workload(workload) )
 		ERR(goto done);
 
-	/* Parent process - Security Monitor. */
-	if ( workload_pid > 0 ) {
-		if ( !open_file(outfile) )
-			ERR(goto done);
+	if ( !open_file(outfile) )
+		ERR(goto done);
 
-		if ( !workload->run_monitor(workload, workload_pid, NULL, \
-					    output_event, NULL) )
-			ERR(goto done);
-		retn = true;
-		goto done;
-	}
-
-	/* Child process - workload process. */
-	if ( !workload->run_workload(workload) )
+	if ( !workload->run_monitor(workload, NULL, output_event, NULL) )
 		ERR(goto done);
 	retn = true;
 
 
  done:
-	WHACK(cartridge_dir);
-
 	return retn;
 }
 
@@ -444,31 +430,14 @@ static _Bool run_broker_workload(CO(TSEMworkload, workload),		\
 {
 	_Bool retn = false;
 
-	pid_t workload_pid;
 
-
-	workload_pid = fork();
-	if ( workload_pid == -1 )
+	if ( !workload->run_workload(workload) )
 		ERR(goto done);
 
-	/* Security monitor parent process. */
-	if ( workload_pid > 0 ) {
-		if ( Debug )
-			fprintf(Debug, "SM process: %d\n", getpid());
+	if ( !open_broker(broker, port, tsem_user, topic) )
+		ERR(goto done);
 
-		if ( !open_broker(broker, port, tsem_user, topic) )
-			ERR(goto done);
-
-		if ( !workload->run_monitor(workload, workload_pid, NULL, \
-					    output_event, NULL) )
-			ERR(goto done);
-
-		retn = true;
-		goto done;
-	}
-
-	/* Child process - run the workload and export events. */
-	if ( !workload->run_workload(workload) )
+	if ( !workload->run_monitor(workload, NULL, output_event, NULL) )
 		ERR(goto done);
 	retn = true;
 
@@ -481,69 +450,40 @@ static _Bool run_broker_workload(CO(TSEMworkload, workload),		\
 /**
  * Private helper function.
  *
- * This function is a helper function for the export_root function.  This
- * function reads a single event description and loads it into the
- * supplied TSEMevent object.
+ * This function is a helper function for the export_root function.  It
+ * is responsible for queing a single event in the output Gaggle.
  *
- * \param fd		The file descriptor of the pseudo-file from which
- *			the event description is to be read.
- *
- * \param output	The object that is used to queue the event
- *			descriptions that are to be output.
- *
- * \param nodata	A pointer to a boolean variable that will be
- *			used to indicate whether or not the end of the
- *			current events had been reached.
+ * \param event		The object containing the event description.
  *
  * \return	A boolean value is returned to reflect the status of
- *		the read.  A false value indicates an error was
+ *		the queueing.  A false value indicates an error was
  *		encountered while a true value indicates the output
  *		structure was populated with an event.
  */
 
-static _Bool _get_event(const int fd, CO(Gaggle, output), _Bool *nodata)
+_Bool _queue_event(CO(TSEMevent, event))
 
 {
 	_Bool retn = false;
 
-	char bufr[PAGE_SIZE + 1];
-
-	int rc;
-
 	String str;
 
 
-	memset(bufr, '\0', sizeof(bufr));
+	str = GGET(Output, str);
+	str->reset(str);
 
-	rc = read(fd, bufr, sizeof(bufr));
-	if ( Signals.stop || (rc == 0) ) {
-		retn = true;
-		goto done;
-	}
-
-	if ( rc > 0 ) {
-		str = GGET(output, str);
-		str->reset(str);
-		if ( !str->add(str, bufr) )
-			ERR(goto done);
-
-		if ( Debug )
-			fprintf(Debug, "Queuing %lu/%lu.\n", Queued, \
-				output->size(output));
-		++Queued;
-		retn = true;
-	} else {
-		if ( errno == ENODATA ) {
-			*nodata = true;
-			retn = true;
-		}
-	}
-
-
- done:
-	if ( lseek(fd, 0, SEEK_SET) < 0 )
+	if ( !str->add(str, event->get_event(event)) )
+		ERR(goto done);
+	if ( !str->add(str, "\n") )
 		ERR(goto done);
 
+	if ( Debug )
+		fprintf(Debug, "Queuing %lu/%lu.\n", Queued, \
+			Output->size(Output));
+	++Queued;
+	retn = true;
+
+ done:
 	return retn;
 }
 
@@ -554,16 +494,13 @@ static _Bool _get_event(const int fd, CO(Gaggle, output), _Bool *nodata)
  * This function traverses the output object and sends each description
  * to the designated output.
  *
- * \param output	The object containing the set of events to
- *			be output.
- *
  * \return	A boolean value is used indicate whether or not the
  *		output succeeded.  A false value indicates an error
  *		occurred while a true value indicates that all of the
  *		events were sent.
  */
 
-static _Bool _output_events(CO(Gaggle, output))
+static _Bool _output_events(void)
 
 {
 	_Bool retn = false;
@@ -573,14 +510,14 @@ static _Bool _output_events(CO(Gaggle, output))
 	String str;
 
 
-	output->rewind_cursor(output);
+	Output->rewind_cursor(Output);
 	if ( Debug )
 		fputs("Flushing output queue.\n", Debug);
 
 	if ( MQTT != NULL ) {
 		Output_String->reset(Output_String);
 		for (lp= 0; lp < Queued; ++lp) {
-			str = GGET(output, str);
+			str = GGET(Output, str);
 			if ( !Output_String->add(Output_String, \
 						 str->get(str)) )
 				ERR(goto done);
@@ -591,7 +528,7 @@ static _Bool _output_events(CO(Gaggle, output))
 
 	if ( Output_File != NULL ) {
 		for (lp= 0; lp < Queued; ++lp) {
-			str = GGET(output, str);
+			str = GGET(Output, str);
 			if ( !Output_File->write_String(Output_File, str) )
 				ERR(goto done);
 		}
@@ -599,7 +536,7 @@ static _Bool _output_events(CO(Gaggle, output))
 
 	Queued = 0;
 	retn = true;
-	output->rewind_cursor(output);
+	Output->rewind_cursor(Output);
 
 
   done:
@@ -614,7 +551,10 @@ static _Bool _output_events(CO(Gaggle, output))
  * function reads and outputs all of the oustanding events that are
  * available.
  *
- * \param fd		The file descriptor of the pseudo-file from which
+ * \param event		The event processing structure that will be used
+ *			to read the event stream.
+ *
+ * \param fd		The file descriptor of the export file from which
  *			the event descriptions are to be read.
  *
  * \param output	The object that is used to hold the event
@@ -626,28 +566,64 @@ static _Bool _output_events(CO(Gaggle, output))
  *		available events have been exported.
  */
 
-static _Bool _export_events(const int fd, CO(Gaggle, output))
+static _Bool _read_events(CO(TSEMevent, event), const int fd)
 
 {
-	_Bool retn   = false,
-	      nodata = false;
+	_Bool retn	 = false,
+	      have_event = true;
 
 
 	/* Output events until the end of the event list is met. */
-	while ( true ) {
-		if ( !_get_event(fd, output, &nodata) )
+	while ( have_event ) {
+		if ( !event->read_export(event, fd, &have_event) )
 			ERR(goto done);
-
-		if ( nodata ) {
-			retn = true;
-			break;
-		}
-
-		if ( Queued == output->size(output) ) {
-			if ( !_output_events(output) )
+		if ( !have_event )
+			return true;
+		if ( !_queue_event(event) )
+			ERR(goto done);
+		if ( Queued == Output->size(Output) ) {
+			if ( !_output_events() )
 				ERR(goto done);
 		}
 	}
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * Private helper function.
+ *
+ * This function is a helper function for the export_root function.  It
+ * is called by the TSEMworkload->monitor method for each event that
+ * is processed.
+ *
+ * \param event		The event processing structure that will be used
+ *			to read the event stream.
+ *
+ * \return	A boolean value is returned to reflect the status of
+ *		the exports.  A false value indicates an error was
+ *		encountered while a true value indicates the currently
+ *		available events have been exported.
+ */
+
+static _Bool _process_event(CO(TSEMevent, event))
+
+{
+	_Bool retn = false;
+
+
+	/* Output events until the end of the event list is met. */
+	if ( !_queue_event(event) )
+		ERR(goto done);
+
+	if ( Queued == Output->size(Output) ) {
+		if ( !_output_events() )
+			ERR(goto done);
+	}
+	retn = true;
 
 
  done:
@@ -660,6 +636,9 @@ static _Bool _export_events(const int fd, CO(Gaggle, output))
  *
  * This function is responsible for driving the export of events from
  * the root security modeling namespace.
+ *
+ * \param workload	The workload management object that will be
+ *			used to monitor the root modeling namespace.
  *
  * \param follow	A boolean value used to indicate whether or
  *			not the the security events should be tracked
@@ -694,27 +673,23 @@ static _Bool _export_events(const int fd, CO(Gaggle, output))
  *		concluded successfully.
  */
 
-static _Bool export_root(const _Bool follow, CO(char *, queue_size),	\
-			 CO(char *, outfile), CO(char *, broker),	\
-			 CO(char *, port), CO(char *, user), CO(char*, topic))
+static _Bool export_root(CO(TSEMworkload, workload), const _Bool follow, \
+			 CO(char *, queue_size), CO(char *, outfile),	 \
+			 CO(char *, broker), CO(char *, port),		 \
+			 CO(char *, user), CO(char*, topic))
 
 {
 	_Bool retn = false;
 
-	int rc,
-	    fd;
+	int fd;
 
 	unsigned int lp;
 
 	long int queue_length;
 
-	unsigned int cycle = 0;
-
-	struct pollfd poll_data[1];
-
 	String str;
 
-	Gaggle output = NULL;
+	TSEMevent event = NULL;
 
 
 	/* Open the output file if file based output is requested. */
@@ -733,28 +708,30 @@ static _Bool export_root(const _Bool follow, CO(char *, queue_size),	\
 			ERR(goto done);
 	}
 
-	/* Open the root export file. */
-	if ( (fd = open(TSEM_ROOT_EXPORT, O_RDONLY)) < 0 )
-		ERR(goto done);
-
 	/* Establish the queue size. */
 	queue_length = strtol(queue_size, NULL, 0);
 	if ( errno == ERANGE )
 		goto done;
 
 	/* Initialize output queue. */
-	INIT(HurdLib, Gaggle, output, ERR(goto done));
+	INIT(HurdLib, Gaggle, Output, ERR(goto done));
 	for (lp= 0; lp < queue_length; ++lp) {
 		INIT(HurdLib, String, str, ERR(goto done));
-		if ( !GADD(output, str) )
+		if ( !GADD(Output, str) )
 			ERR(goto done);
 	}
 
-	/* Output entries that have been queued. */
-	if ( !_export_events(fd, output) )
+	/* Initialize the workload to manage root exports. */
+	INIT(NAAAIM, TSEMevent, event, ERR(goto done));
+
+	if ( !workload->set_root_mode(workload, &fd) )
 		ERR(goto done);
 
-	if ( !_output_events(output) )
+	/* Output entries that have been queued. */
+	if ( !_read_events(event, fd) )
+		ERR(goto done);
+
+	if ( !_output_events() )
 		ERR(goto done);
 
 	if ( !follow ) {
@@ -766,38 +743,14 @@ static _Bool export_root(const _Bool follow, CO(char *, queue_size),	\
 	if ( Debug )
 		fprintf(Debug, "%d: Running root event loop.\n", getpid());
 
-	poll_data[0].fd	    = fd;
-	poll_data[0].events = POLLIN;
-
-	while ( 1 ) {
-		if ( Debug )
-			fprintf(Debug, "\n%d: Poll cycle: %d\n", getpid(), \
-				++cycle);
-
-		rc = poll(poll_data, 1, -1);
-		if ( rc < 0 ) {
-			if ( Signals.stop ) {
-				if ( Debug )
-					fputs("Quixote terminated.\n", Debug);
-				retn = true;
-				goto done;
-			}
-			ERR(goto done);
-		}
-
-		if ( Debug )
-			fprintf(Debug, "Poll retn=%d, Data poll=%0x\n", \
-				rc, poll_data[0].revents);
-
-		if ( poll_data[0].revents & POLLIN ) {
-			if ( !_export_events(fd, output) )
-				ERR(goto done);
-		}
-	}
+	if ( !workload->run_monitor(workload, NULL, _process_event, NULL) )
+		ERR(goto done);
+	retn = true;
 
 
  done:
-	GWHACK(output, String);
+	WHACK(event);
+	GWHACK(Output, String);
 
 	return retn;
 }
@@ -943,8 +896,9 @@ extern int main(int argc, char *argv[])
 			break;
 
 		case root_mode:
-			if ( export_root(follow, queue_size, outfile, \
-					 broker, port, tsem_user, topic) )
+			if ( export_root(workload, follow, queue_size,	   \
+					 outfile, broker, port, tsem_user, \
+					 topic) )
 				retn = 0;
 			goto done;
 			break;
