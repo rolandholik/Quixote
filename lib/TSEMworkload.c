@@ -429,6 +429,59 @@ static _Bool configure_external(CO(TSEMworkload, this), CO(char *, model),  \
 /**
  * External public method.
  *
+ * This method implements the creation of a an internally modeled workload.
+ *
+ * \param this		A pointer to the object describing the workload.
+ *
+ * \param model		A pointer to a null-terminated character buffer
+ *			containing the name of an alternate security
+ *			model that is to be used for processing security
+ *			events.
+ *
+ * \param digest	A pointer to a null-terminated character buffer
+ *			containing the name of the cryptographic hash
+ *			function that will be used to generate the
+ *			security event coefficients.
+ *
+ * \param cache_size	A pointer to a null-terminated character buffer
+ *			containing an integer expression of the size
+ *			of the event magazines that are to be used
+ *			for the security modeling namespace.
+ *
+ * \param initial_ns	A boolean value that indicates the origin for
+ *			the characteristics of the context of execution.
+ *			A true value indicates that the initial user
+ *			namespace should be used, a false value indicates
+ *			that the user namespace view of the characteristics
+ *			should be used.
+ */
+
+static _Bool configure_internal(CO(TSEMworkload, this), CO(char *, model),  \
+				CO(char *, digest), CO(char *, cache_size), \
+				const _Bool initial_ns, const _Bool enforce)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	if ( !_init_ns_config(S, model, digest, initial_ns, cache_size, \
+			      enforce) )
+		ERR(goto done);
+
+	S->type = TSEMcontrol_TYPE_INTERNAL;
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implementations configuration of execution mode for the
  * workload.  Execution mode involves running a specific command that
  * is provided in the form of an argc count and an array of pointers
@@ -692,12 +745,12 @@ static _Bool run_monitor(CO(TSEMworkload, this), CO(LocalDuct, mgmt),	\
 
 	INIT(HurdLib, Buffer, cmdbufr, ERR(goto done));
 
-	poll_data[0].fd	    = S->fd;
-	poll_data[0].events = POLLIN;
-
-	if ( mgmt == NULL )
-		poll_data[1].fd = 0;
-	else {
+	memset(&poll_data, '\0', sizeof poll_data);
+	if ( S->fd != 0 ) {
+		poll_data[0].fd	    = S->fd;
+		poll_data[0].events = POLLIN;
+	}
+	if ( mgmt != NULL ) {
 		if ( !mgmt->get_socket(mgmt, &poll_data[1].fd) )
 			ERR(goto done);
 		++fdcnt;
@@ -949,6 +1002,10 @@ static _Bool _open_event_file(CO(TSEMworkload_State, S), const int *fdp)
 
 	int rc;
 
+
+	/* No event file if this is an internally modeled workload. */
+	if ( S->type == TSEMcontrol_TYPE_INTERNAL )
+		return true;
 
 	/* Read the namespace identifier from the workload process. */
 	rc = read(fdp[READ_SIDE], &S->id, sizeof(S->id));
@@ -1414,6 +1471,7 @@ extern TSEMworkload NAAAIM_TSEMworkload_Init(void)
 	/* Method initialization. */
 	this->configure_export	 = configure_export;
 	this->configure_external = configure_external;
+	this->configure_internal = configure_internal;
 
 	this->set_debug		 = set_debug;
 	this->set_execute_mode	 = set_execute_mode;
