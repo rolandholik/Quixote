@@ -137,8 +137,8 @@ struct NAAAIM_TSEMworkload_State
 	const char *container;
 	String bundle;
 
-	/* Communication pipe for state events. */
-	int event_pipe[2];
+	/* Communication pipe between monitor and workload. */
+	int fdp[2];
 
 	/* Namespace control object. */
 	TSEMcontrol control;
@@ -730,6 +730,8 @@ static _Bool run_monitor(CO(TSEMworkload, this), CO(LocalDuct, mgmt),	\
 	_Bool retn	= false,
 	      connected = false;
 
+	char out;
+
 	int rc,
 	    fdcnt = 1;
 
@@ -758,6 +760,20 @@ static _Bool run_monitor(CO(TSEMworkload, this), CO(LocalDuct, mgmt),	\
 	}
 
 	/* Dispatch loop. */
+	if ( Debug )
+		fprintf(Debug, "%d: Releasing workload %d.\n", getpid(), \
+			S->workload_pid);
+
+	rc = write(S->fdp[WRITE_SIDE], &out, sizeof(out));
+	close(S->fdp[WRITE_SIDE]);
+	close(S->fdp[READ_SIDE]);
+
+	if ( rc != sizeof(out) ) {
+		kill(S->workload_pid, SIGKILL);
+		fputs("Child start failed.\n", stderr);
+		goto done;
+	}
+
 	if ( Debug ) {
 		fprintf(Debug, "%d: Calling monitor loop.\n", getpid());
 		fprintf(Debug, "%d: fdcnt=%d, monitor fd=%d, command fd=%d\n",\
@@ -917,10 +933,6 @@ static _Bool run_monitor(CO(TSEMworkload, this), CO(LocalDuct, mgmt),	\
  * \param S		A pointer to the structure containing the state
  *			information for the object running the workload.
  *
- * \param fdp		A pointer to the array containing the pipe
- *			descriptors that will be used to convey the
- *			namespace identifier back to the TMA.
- *
  * \return		A boolean value is used to indicated whether or
  *			not the setup of the namespace has succeeded.  A
  *			false value indicates failure while a true
@@ -932,12 +944,13 @@ static _Bool run_monitor(CO(TSEMworkload, this), CO(LocalDuct, mgmt),	\
  *			export file.
  */
 
-static _Bool _setup_namespace(CO(TSEMworkload_State, S), const int *fdp)
+static _Bool _setup_namespace(CO(TSEMworkload_State, S))
 
 {
 	_Bool retn = false;
 
-	char *model  = S->model == NULL ? NULL : S->model->get(S->model),
+	char in,
+	     *model  = S->model == NULL ? NULL : S->model->get(S->model),
 	     *digest = S->digest == NULL ? NULL : S->digest->get(S->digest);
 
 
@@ -952,19 +965,32 @@ static _Bool _setup_namespace(CO(TSEMworkload_State, S), const int *fdp)
 			ERR(goto done);
 	}
 
+	/* Drop privileges after namespace setup. */
+	if ( Debug )
+		fprintf(Debug, "%d: Dropping CAP_MAC_ADMIN\n", getpid());
+	if ( cap_drop_bound(CAP_MAC_ADMIN) != 0 )
+		ERR(goto done);
 
 	/* Write the namespace identifier. */
-	if ( Debug )
-		fprintf(Debug, "%d: Sending namespace id: %lu\n", getpid(), \
-			S->id);
-	if ( write(fdp[WRITE_SIDE], &S->id, sizeof(S->id)) != sizeof(S->id) )
+	if ( write(S->fdp[WRITE_SIDE], &S->id, sizeof(S->id)) != \
+	     sizeof(S->id) )
 		ERR(goto done);
+	if ( Debug )
+		fprintf(Debug, "%d: Sent namespace id: %lu\n", getpid(), \
+			S->id);
+
+	if ( read(S->fdp[READ_SIDE], &in, 1) != 1 )
+		ERR(goto done);
+	if ( Debug )
+		fprintf(Debug, "%d: Released by orchestrator.\n", getpid());
+
 	retn = true;
 
 
  done:
-	close(fdp[READ_SIDE]);
-	close(fdp[WRITE_SIDE]);
+	close(S->fdp[READ_SIDE]);
+	close(S->fdp[WRITE_SIDE]);
+	WHACK(S->control);
 
 	return retn;
 
@@ -982,10 +1008,6 @@ static _Bool _setup_namespace(CO(TSEMworkload_State, S), const int *fdp)
  * \param S		A pointer to the structure containing the state
  *			information for the object running the workload.
  *
- * \param fdp		A pointer to the array containing the pipe
- *			descriptors that will be used to convey the
- *			namespace identifier back to the TMA.
- *
  * \return		A boolean value is used to indicated whether or
  *			not the namespace event file was opened.  A
  *			false value indicates failure while a true
@@ -993,7 +1015,7 @@ static _Bool _setup_namespace(CO(TSEMworkload_State, S), const int *fdp)
  *			created.
  */
 
-static _Bool _open_event_file(CO(TSEMworkload_State, S), const int *fdp)
+static _Bool _open_event_file(CO(TSEMworkload_State, S))
 
 {
 	_Bool retn = false;
@@ -1008,9 +1030,7 @@ static _Bool _open_event_file(CO(TSEMworkload_State, S), const int *fdp)
 		return true;
 
 	/* Read the namespace identifier from the workload process. */
-	rc = read(fdp[READ_SIDE], &S->id, sizeof(S->id));
-	close(fdp[WRITE_SIDE]);
-	close(fdp[READ_SIDE]);
+	rc = read(S->fdp[READ_SIDE], &S->id, sizeof(S->id));
 	if ( rc != sizeof(S->id) )
 		ERR(goto done);
 
@@ -1105,13 +1125,11 @@ static _Bool run_workload(CO(TSEMworkload, this))
 
 	_Bool retn = false;
 
-	int ns_pipe[2];
-
 	Process execute = NULL;
 
 
 	/* Create pipe to transfer namespace number .*/
-	if ( pipe(ns_pipe) == -1 )
+	if ( pipe(S->fdp) == -1 )
 		ERR(goto done);
 
 	/* Fork to run the workload. */
@@ -1121,24 +1139,19 @@ static _Bool run_workload(CO(TSEMworkload, this))
 
 	/* Parent process - workload monitor. */
 	if ( S->workload_pid > 0 ) {
-		if ( !_open_event_file(S, ns_pipe) )
+		if ( !_open_event_file(S) )
 			ERR(goto done);
 		return true;
 	}
 
 	/* Child process - Workload. */
 	if ( Debug ) {
-		fprintf(Debug, "%d: Workload process.\n", getpid());
+		fprintf(Debug, "Workload process: %d\n", getpid());
 	}
-	if ( !_setup_namespace(S, ns_pipe) )
+	if ( !_setup_namespace(S) )
 		_exit(1);
-	WHACK(S->control);
 
 	/* Drop the ability to modify the trust state. */
-	if ( Debug )
-		fprintf(Debug, "%d: Dropping CAP_MAC_ADMIN\n", getpid());
-	if ( cap_drop_bound(CAP_MAC_ADMIN) != 0 )
-		ERR(goto done);
 
 	if ( S->mode == CONTAINER_MODE ) {
 		if ( Debug ) {
@@ -1459,9 +1472,6 @@ extern TSEMworkload NAAAIM_TSEMworkload_Init(void)
 	_init_state(this->state);
 
 	if ( !_init_signals() )
-		goto fail;
-
-	if ( pipe(this->state->event_pipe) == -1 )
 		goto fail;
 
 	/* Initialize aggregate objects. */
