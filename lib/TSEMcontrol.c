@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <sched.h>
 #include <errno.h>
+#include <unistd.h>
 
 #include <Origin.h>
 #include <HurdLib.h>
@@ -397,14 +398,26 @@ static _Bool id(CO(TSEMcontrol, this), uint64_t *idptr)
 
 	_Bool retn = false;
 
+	int erc;
+
 	uint64_t id;
 
 	File file = NULL;
 
 
 	INIT(HurdLib, File, file, ERR(goto done));
-	if ( !file->open_ro(file, ID_FILE) )
-		ERR(goto done);
+
+	do {
+		if ( file->open_ro(file, ID_FILE) )
+			break;
+
+		erc = file->error(file);
+		if ( erc && erc != ENOENT )
+			ERR(goto done);
+
+		file->reset(file);
+		usleep(200);
+	} while ( erc != 0 );
 
 	S->cmdstr->reset(S->cmdstr);
 	if ( !file->read_String(file, S->cmdstr) )
