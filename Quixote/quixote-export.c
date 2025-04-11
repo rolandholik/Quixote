@@ -380,13 +380,11 @@ static _Bool run_workload(CO(TSEMworkload, workload), CO(char *, outfile))
 	_Bool retn = false;
 
 
-	if ( !workload->run_workload(workload) )
-		ERR(goto done);
-
 	if ( !open_file(outfile) )
 		ERR(goto done);
 
-	if ( !workload->run_monitor(workload, NULL, output_event, NULL) )
+	if ( !workload->run_workload(workload, NULL, NULL, output_event, \
+				     NULL) )
 		ERR(goto done);
 	retn = true;
 
@@ -431,13 +429,11 @@ static _Bool run_broker_workload(CO(TSEMworkload, workload),		\
 	_Bool retn = false;
 
 
-	if ( !workload->run_workload(workload) )
-		ERR(goto done);
-
 	if ( !open_broker(broker, port, tsem_user, topic) )
 		ERR(goto done);
 
-	if ( !workload->run_monitor(workload, NULL, output_event, NULL) )
+	if ( !workload->run_workload(workload, NULL, NULL, output_event, \
+				     NULL) )
 		ERR(goto done);
 	retn = true;
 
@@ -743,7 +739,8 @@ static _Bool export_root(CO(TSEMworkload, workload), const _Bool follow, \
 	if ( Debug )
 		fprintf(Debug, "%d: Running root event loop.\n", getpid());
 
-	if ( !workload->run_monitor(workload, NULL, _process_event, NULL) )
+	if ( !workload->run_workload(workload, NULL, NULL, _process_event, \
+				     NULL) )
 		ERR(goto done);
 	retn = true;
 

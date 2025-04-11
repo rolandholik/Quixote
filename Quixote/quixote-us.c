@@ -351,6 +351,8 @@ static _Bool add_event(CO(String, update))
 		if ( !Workload->release(Workload, pid, tnum) )
 			fprintf(stderr, "[%s]: Release actor status: %d:%s\n",
 				__func__, errno, strerror(errno));
+		if ( Debug )
+			fprintf(Debug, "%d: Released task.\n", getpid());
 	}
 
 
@@ -1691,11 +1693,8 @@ static _Bool run_workload(CO(TSEMworkload, workload), CO(char *, container), \
 	if ( !setup_management(mgmt, container) )
 		ERR(goto done);
 
-	if ( !workload->run_workload(workload) )
-		ERR(goto done);
-
-	if ( !workload->run_monitor(workload, mgmt, process_event, \
-				    process_command) )
+	if ( !workload->run_workload(workload, mgmt, NULL, process_event, \
+				     process_command) )
 		ERR(goto done);
 
 	if ( outfile != NULL ) {
@@ -1830,9 +1829,9 @@ extern int main(int argc, char *argv[])
 	INIT(NAAAIM, TSEMworkload, Workload, ERR(goto done));
 
 	Workload->set_debug(Workload, Debug);
-	if ( !Workload->configure_external(Workload, TSEM_model, Digest,     \
-					   magazine_size, current_namespace, \
-					   Enforce) )
+	if ( !Workload->configure_external(Workload, NULL, TSEM_model,	\
+					   Digest, magazine_size,	\
+					   current_namespace, Enforce) )
 		ERR(goto done);
 
 	switch ( Mode ) {

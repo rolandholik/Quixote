@@ -1183,8 +1183,9 @@ static _Bool load(CO(String, entry))
  * This function implements the initialization of a security model from
  * a file.
  *
- * \param model_file	The name of the file that contains the security
- *			model that is to be enforced.
+ * \param model_file	The object that contains the name of a file
+ *			containing a security model that is to be
+ *			enforced.
  *
  * \return		A boolean value is returned to indicate whether
  *			or not the model was loaded.  A false value
@@ -1193,7 +1194,7 @@ static _Bool load(CO(String, entry))
  *			loaded.
  */
 
-static _Bool load_model(const char *model_file)
+static _Bool load_model(CO(String, model_file))
 
 {
 	_Bool retn = false;
@@ -1206,8 +1207,12 @@ static _Bool load_model(const char *model_file)
 	/* Open the security map file. */
 	INIT(HurdLib, String, str, ERR(goto done));
 
+	/* Open the file containing the security model. */
+	INIT(HurdLib, File, model, ERR(goto done));
+	if ( !model->open_ro(model, model_file->get(model_file)) )
+		ERR(goto done);
 
-	/* Loop over the contents of the map.. */
+	/* Loop over the contents of the model file. */
 	while ( model->read_String(model, str) ) {
 		if ( Debug )
 			fprintf(Debug, "Model entry: %s\n", str->get(str));
@@ -1222,6 +1227,7 @@ static _Bool load_model(const char *model_file)
 
  done:
 	WHACK(str);
+	WHACK(model);
 
 	return retn;
 }
@@ -1464,6 +1470,9 @@ static _Bool output_model(CO(char *, filename))
  *
  * \param workload	The object that is managing the workload.
  *
+ * \param map_loader	A pointer to the function that will be used to
+ *			load a security map if one has been specified.
+ *
  * \param container	A pointer to a null-terminated character buffer
  *			containing the name of the container that is
  *			being executed.
@@ -1478,8 +1487,9 @@ static _Bool output_model(CO(char *, filename))
  *		was successfuly executed.
  */
 
-static _Bool run_workload(CO(TSEMworkload, workload), CO(char *, container), \
-			  CO(char *, outfile))
+static _Bool run_workload(CO(TSEMworkload, workload),	     \
+			  _Bool (*map_loader)(const String), \
+			  CO(char *, container), CO(char *, outfile))
 
 {
 	_Bool retn = false;
@@ -1492,10 +1502,8 @@ static _Bool run_workload(CO(TSEMworkload, workload), CO(char *, container), \
 	if ( !setup_management(mgmt, container) )
 		ERR(goto done);
 
-	if ( !workload->run_workload(workload) )
-		ERR(goto done);
-
-	if ( !workload->run_monitor(workload, mgmt, NULL, process_command) )
+	if ( !workload->run_workload(workload, mgmt, map_loader, NULL, \
+				     process_command) )
 		ERR(goto done);
 
 	if ( outfile != NULL ) {
@@ -1612,25 +1620,14 @@ extern int main(int argc, char *argv[])
 		}
 	}
 
-	/* Load and seal a security model if specified. */
-	if ( model != NULL ) {
-		if ( Debug )
-			fprintf(Debug, "Loading security model: %s\n", model);
-
-		if ( !load_model(model) ) {
-			fputs("Cannot initialize security model.\n", stderr);
-			goto done;
-		}
-	}
-
 	/* Initialize the security model controller. */
 	INIT(NAAAIM, TSEMcontrol, Control, ERR(goto done));
 
 	INIT(NAAAIM, TSEMworkload, Workload, ERR(goto done));
 	Workload->set_debug(Workload, Debug);
-	if ( !Workload->configure_internal(Workload, TSEM_model, Digest,     \
-					   magazine_size, current_namespace, \
-					   enforce) )
+	if ( !Workload->configure_internal(Workload, model, TSEM_model, \
+					   Digest, magazine_size,	\
+					   current_namespace, enforce) )
 		ERR(goto done);
 
 	switch ( Mode ) {
@@ -1652,7 +1649,7 @@ extern int main(int argc, char *argv[])
 	/* Run the workload. */
 	if ( Debug )
 		fprintf(Debug, "Launch process: %d\n", getpid());
-	if ( !run_workload(Workload, container, outfile) )
+	if ( !run_workload(Workload, load_model, container, outfile) )
 		ERR(goto done);
 
 	if ( outfile != NULL ) {
