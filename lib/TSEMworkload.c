@@ -13,6 +13,9 @@
 
 /* Local definitions. */
 
+/* Location of management sockets. */
+#define QUIXOTE_WORKLOAD_MGMT_DIR "/var/lib/Quixote/mgmt"
+
 /* Location of the root export file. */
 #define TSEM_ROOT_EXPORT "/sys/kernel/security/tsem/external_tma/0"
 
@@ -127,6 +130,7 @@ struct NAAAIM_TSEMworkload_State
 	enum TSEMcontrol_ns_config ns;
 	unsigned int cache_size;
 	_Bool enforce;
+	String name;
 	String model;
 	String digest;
 	String map;
@@ -135,11 +139,13 @@ struct NAAAIM_TSEMworkload_State
 	enum workload_mode mode;
 	int argc;
 	char **argv;
-	const char *container;
 	String bundle;
 
 	/* Communication pipe between monitor and workload. */
 	int fdp[2];
+
+	/* Workload management object. */
+	LocalDuct mgmt;
 
 	/* Namespace control object. */
 	TSEMcontrol control;
@@ -174,15 +180,16 @@ static void _init_state(CO(TSEMworkload_State, S))
 	S->type = 0;
 	S->ns = TSEMcontrol_INIT_NS;
 	S->cache_size = 0;
+	S->name = NULL;
 	S->model = NULL;
 	S->digest = NULL;
+	S->mgmt = NULL;
 	S->control = NULL;
 	S->map = NULL;
 
 	S->mode = PROCESS_MODE;
 	S->argc = 0;
 	S->argv = NULL;
-	S->container = NULL;
 	S->bundle = NULL;
 
 	return;
@@ -276,13 +283,20 @@ void signal_handler(int signal, siginfo_t *siginfo, void *private)
  *		value indicates the state was successfully initialized.
  */
 
-static _Bool _init_ns_config(CO(TSEMworkload_State, S), CO(char *, model), \
-			     CO(char *, digest), const _Bool initial_ns,   \
-			     CO(char *, cache_size), const _Bool enforce)
+static _Bool _init_ns_config(CO(TSEMworkload_State, S), CO(char *, name),    \
+			     CO(char *, model), CO(char *, digest),	     \
+			     const _Bool initial_ns, CO(char *, cache_size), \
+			     const _Bool enforce)
 
 {
 	_Bool retn = false;
 
+
+	if ( name != NULL ) {
+		INIT(HurdLib, String, S->name, ERR(goto done));
+		if ( !S->name->add(S->name, name) )
+			ERR(goto done);
+	}
 
 	if ( model != NULL ) {
 		INIT(HurdLib, String, S->model, ERR(goto done));
@@ -323,6 +337,9 @@ static _Bool _init_ns_config(CO(TSEMworkload_State, S), CO(char *, model), \
  *
  * \param this		A pointer to the object describing the workload.
  *
+ * \param name		A pointer to a null-terminated character buffer
+ *			containing the name of the workload.
+ *
  * \param model		A pointer to a null-terminated character buffer
  *			containing the name of an alternate security
  *			model that is to be used for processing security
@@ -346,9 +363,9 @@ static _Bool _init_ns_config(CO(TSEMworkload_State, S), CO(char *, model), \
  *			should be used.
  */
 
-static _Bool configure_export(CO(TSEMworkload, this), CO(char *, model),  \
-			      CO(char *, digest), CO(char *, cache_size), \
-			      const _Bool initial_ns)
+static _Bool configure_export(CO(TSEMworkload, this), CO(char *, name),	  \
+			      CO(char *, model), CO(char *, digest),	  \
+			      CO(char *, cache_size), const _Bool initial_ns)
 
 {
 	STATE(S);
@@ -356,7 +373,7 @@ static _Bool configure_export(CO(TSEMworkload, this), CO(char *, model),  \
 	_Bool retn = false;
 
 
-	if ( !_init_ns_config(S, model, digest, initial_ns, cache_size, \
+	if ( !_init_ns_config(S, name, model, digest, initial_ns, cache_size, \
 			      false) )
 		ERR(goto done);
 
@@ -376,6 +393,9 @@ static _Bool configure_export(CO(TSEMworkload, this), CO(char *, model),  \
  * that externally models the events.
  *
  * \param this	A pointer to the object describing the workload.
+ *
+ * \param name		A pointer to a null-terminated character buffer
+ *			containing the name of the workload.
  *
  * \param map		A pointer to a null-terminated character buffer
  *			containing the pathname of security behavior
@@ -410,9 +430,9 @@ static _Bool configure_export(CO(TSEMworkload, this), CO(char *, model),  \
  *			enforcing mode should be selected.
  */
 
-static _Bool configure_external(CO(TSEMworkload, this), CO(char *, map), \
-				CO(char *, model),  CO(char *, digest),	 \
-				CO(char *, cache_size),			 \
+static _Bool configure_external(CO(TSEMworkload, this), CO(char *, name),   \
+				CO(char *, map), CO(char *, model),	    \
+				CO(char *, digest), CO(char *, cache_size), \
 				const _Bool initial_ns, const _Bool enforce)
 
 {
@@ -427,7 +447,7 @@ static _Bool configure_external(CO(TSEMworkload, this), CO(char *, map), \
 			ERR(goto done);
 	}
 
-	if ( !_init_ns_config(S, model, digest, initial_ns, cache_size, \
+	if ( !_init_ns_config(S, name, model, digest, initial_ns, cache_size, \
 			      enforce) )
 		ERR(goto done);
 
@@ -446,6 +466,9 @@ static _Bool configure_external(CO(TSEMworkload, this), CO(char *, map), \
  * This method implements the creation of a an internally modeled workload.
  *
  * \param this		A pointer to the object describing the workload.
+ *
+ * \param name		A pointer to a null-terminated character buffer
+ *			containing the name of the workload.
  *
  * \param map		A pointer to a null-terminated character buffer
  *			containing the pathname of security behavior
@@ -485,10 +508,10 @@ static _Bool configure_external(CO(TSEMworkload, this), CO(char *, map), \
  *			internally modeled namespace.
  */
 
-static _Bool configure_internal(CO(TSEMworkload, this), CO(char *, map),    \
-				CO(char *, model), CO(char *, digest),	    \
-				CO(char *, cache_size),			    \
-				const _Bool initial_ns, const _Bool enforce,\
+static _Bool configure_internal(CO(TSEMworkload, this), CO(char *, name),    \
+				CO(char *, map), CO(char *, model),	     \
+				CO(char *, digest), CO(char *, cache_size),  \
+				const _Bool initial_ns, const _Bool enforce, \
 				TSEMcontrol *control)
 
 {
@@ -503,7 +526,7 @@ static _Bool configure_internal(CO(TSEMworkload, this), CO(char *, map),    \
 			ERR(goto done);
 	}
 
-	if ( !_init_ns_config(S, model, digest, initial_ns, cache_size, \
+	if ( !_init_ns_config(S, name, model, digest, initial_ns, cache_size, \
 			      enforce) )
 		ERR(goto done);
 
@@ -565,9 +588,6 @@ static void set_execute_mode(CO(TSEMworkload, this), int argc, char *argv[])
  *			containing the directory location where the
  *			container instance is located.
  *
- * \param container	A pointer to a null-terminated buffer containing
- *			the name of the runc container to execute.
- *
  * \return	A boolean value is used to indicate whether or not
  *		configuration of the mode has succeesed.  A false
  *		value indicates that configuration failed while a true
@@ -575,8 +595,7 @@ static void set_execute_mode(CO(TSEMworkload, this), int argc, char *argv[])
  *		configured.
  */
 
-static _Bool set_container_mode(CO(TSEMworkload, this), \
-				CO(char *, magazine), CO(char *, container))
+static _Bool set_container_mode(CO(TSEMworkload, this), CO(char *, magazine))
 
 {
 	STATE(S);
@@ -586,12 +605,12 @@ static _Bool set_container_mode(CO(TSEMworkload, this), \
 
 	/* Save the container name and create the bundle name. */
 	INIT(HurdLib, String, S->bundle, ERR(goto done));
-	if ( !S->bundle->add_sprintf(S->bundle, "%s/%s", magazine, container) )
+	if ( !S->bundle->add_sprintf(S->bundle, "%s/%s", magazine, \
+				     S->name->get(S->name)) )
 		ERR(goto done);
 
 	retn	     = true;
 	S->mode	     = CONTAINER_MODE;
-	S->container = container;
 
 
  done:
@@ -726,12 +745,21 @@ static _Bool _create_namespace(CO(TSEMworkload_State, S))
 		ERR(goto done);
 
 	/* Wait for workload release. */
+	if ( Debug )
+		fprintf(Debug, "%d: Waiting for workload release.\n", \
+			getpid());
 	rc = read(S->fdp[READ_SIDE], &cb, sizeof(cb));
 	if ( rc != sizeof(cb) ) {
-
 			fprintf(Debug, "%d: Error on release read.\n", \
 				getpid());
-		ERR(goto done);
+			_exit(1);
+	}
+
+	if ( cb == '\x00' ) {
+		if ( Debug )
+			fprintf(Debug, "%d: Terminated by orchestrator.\n", \
+				getpid());
+		_exit(1);
 	}
 	if ( Debug )
 		fprintf(Debug, "%d: Released by orchestrator.\n", getpid());
@@ -751,6 +779,47 @@ static _Bool _create_namespace(CO(TSEMworkload_State, S))
 
 	return retn;
 
+}
+
+
+/**
+ * Private helper method.
+ *
+ * This helper method is used to signal the workload that it is supposed
+ * to begin execution or terminate before starting execution.
+ *
+ * \param S		A pointer to the state of the workload object
+ *			that a control signal is to be sent through.
+ *
+ * \param start		A boolean value used to indicate whether or not
+ *			the workload should be started or terminated.  A
+ *			false value indicates that the workload is to
+ *			terminate while a true value indicates that the
+ *			workload is to commence execution.
+ *
+ * \return		A boolean value is used to indicated whether or
+ *			not signaling of the workload has succeeded.  A
+ *			false value indicates it has failed.  In the
+ *			event of a failure a SIGKILL will have been sent
+ *			to the process.
+ */
+
+static _Bool _signal_workload(CO(TSEMworkload_State, S), const _Bool start)
+
+{
+	_Bool retn = false;
+
+	char cb = start ? '\x01' : '\x00';
+
+	if ( write(S->fdp[WRITE_SIDE], &cb, sizeof(cb)) == sizeof(cb) )
+		retn = true;
+	else
+		kill(S->workload_pid, SIGKILL);
+
+	if ( !retn && S->type == TSEMcontrol_TYPE_EXTERNAL )
+		kill(S->workload_pid, SIGKILL);
+
+	return retn;
 }
 
 
@@ -780,10 +849,7 @@ static _Bool _configure_namespace(CO(TSEMworkload_State, S), \
 {
 	_Bool retn = false;
 
-	char cb,
-	     fname[PATH_MAX];
-
-	int rc;
+	char fname[PATH_MAX];
 
 
 	/* Wait for release by workload. */
@@ -821,20 +887,71 @@ static _Bool _configure_namespace(CO(TSEMworkload_State, S), \
 	if ( Debug )
 		fprintf(Debug, "%d: Releasing workload %d.\n", getpid(), \
 			S->workload_pid);
-	if ( (rc = write(S->fdp[WRITE_SIDE], &cb, sizeof(cb))) == sizeof(cb) )
-		retn = true;
-	else {
-		kill(S->workload_pid, SIGKILL);
-		fputs("Child start failed.\n", stderr);
-	}
+	if ( !_signal_workload(S, true) )
+		ERR(goto done);
+	retn = true;
 
 
  done:
-	close(S->fdp[WRITE_SIDE]);
-	close(S->fdp[READ_SIDE]);
-
 	return retn;
 
+}
+
+
+/**
+ * Private method.
+ *
+ * This function sets up the UNIX domain management socket.
+ *
+ * \param this		The workload object describing the workload for
+ *			which management is to be setup.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not setup of the management socket was
+ *			successful.  A true value indicates the setup
+ *			was successful while a false value indicates the
+ *			setup failed.
+ */
+
+static _Bool _setup_management(CO(TSEMworkload_State, S))
+
+{
+	_Bool rc,
+	      retn = false;
+
+	mode_t mask;
+
+	String sockpath = NULL;
+
+
+	/* Initialize socket server mode. */
+	INIT(NAAAIM, LocalDuct, S->mgmt, ERR(goto done));
+	if ( !S->mgmt->init_server(S->mgmt) )
+		ERR(goto done);
+
+	/* Create the appropriate path to the socket location. */
+	INIT(HurdLib, String, sockpath, ERR(goto done));
+	sockpath->add_sprintf(sockpath, "%s/%s", QUIXOTE_WORKLOAD_MGMT_DIR,
+			      S->name->get(S->name));
+
+	/* Create socket in designated path. */
+	if ( Debug )
+		fprintf(Debug, "Opening management socket: %s\n", \
+			sockpath->get(sockpath));
+
+	mask = umask(0x2);
+	rc = S->mgmt->init_port(S->mgmt, sockpath->get(sockpath));
+	umask(mask);
+
+	if ( !rc )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	WHACK(sockpath);
+
+	return retn;
 }
 
 
@@ -870,14 +987,13 @@ static _Bool _start_workload(CO(TSEMworkload_State, S))
 
 	if ( S->mode == CONTAINER_MODE ) {
 		if ( Debug ) {
-			fprintf(Debug, "%d: Workload container=%s, "	\
-				"bundle=%s\n", getpid(), S->container,	\
+			fprintf(Debug, "%d: Workload bundle=%s", getpid(),
 				S->bundle->get(S->bundle));
 			fclose(Debug);
 		}
 
 		execlp("runc", "runc", "run", "-b", \
-		       S->bundle->get(S->bundle), S->container, NULL);
+		       S->bundle->get(S->bundle), S->name->get(S->name), NULL);
 		fputs("Workload execution failed.\n", stderr);
 		exit(1);
 	}
@@ -989,10 +1105,6 @@ static _Bool _process_events(CO(TSEMworkload, this), \
  * \param this		A pointer to the object whose security monitor
  *			process is to be run.
  *
- * \param mgmt		If a workload manager is to be used a pointer
- *			to the object.  A NULL value will disable for
- *			polling for management commands.
- *
  * \param map_load	A pointer to the function that will be invoked
  *			to load a security map for the workload.
  *
@@ -1011,7 +1123,7 @@ static _Bool _process_events(CO(TSEMworkload, this), \
  *		successfully configured.
  */
 
-static _Bool run_workload(CO(TSEMworkload, this), CO(LocalDuct, mgmt),	\
+static _Bool run_workload(CO(TSEMworkload, this),			\
 			  _Bool (*map_loader)(String),			\
 			  _Bool (*event_handler)(TSEMevent),		\
 			  _Bool (*command_handler)(LocalDuct, Buffer))
@@ -1028,6 +1140,8 @@ static _Bool run_workload(CO(TSEMworkload, this), CO(LocalDuct, mgmt),	\
 	unsigned int cycle = 0;
 
 	struct pollfd poll_data[3];
+
+	LocalDuct mgmt;
 
 	Buffer cmdbufr = NULL;
 
@@ -1050,9 +1164,19 @@ static _Bool run_workload(CO(TSEMworkload, this), CO(LocalDuct, mgmt),	\
 		return true;
 	}
 
-	/* Parent process - configure and monitor namespace. */
-	if ( !_configure_namespace(S, map_loader) )
+	/* Parent process. */
+	if ( S->type != TSEMcontrol_TYPE_EXPORT ) {
+		if ( !_setup_management(S) ) {
+			_signal_workload(S, false);
+			ERR(goto done);
+		}
+	}
+	mgmt = S->mgmt;
+
+	if ( !_configure_namespace(S, map_loader) ) {
+		_signal_workload(S, false);
 		ERR(goto done);
+	}
 
 	if ( Debug )
 		fprintf(Debug, "%d: Workload monitor.\n", getpid());
@@ -1388,8 +1512,9 @@ static void shutdown(CO(TSEMworkload, this), const int signal, \
 	if ( kill_process == 0 ) {
 		if ( Debug )
 			fprintf(Debug, "Killing runc container: %s.\n",
-				S->container);
-		execlp("runc", "runc", "kill", S->container, "SIGKILL", NULL);
+				S->name->get(S->name));
+		execlp("runc", "runc", "kill", S->name->get(S->name), \
+		       "SIGKILL", NULL);
 		exit(1);
 	}
 
@@ -1415,6 +1540,7 @@ static void whack(CO(TSEMworkload, this))
 	STATE(S);
 
 
+	WHACK(S->name);
 	WHACK(S->model);
 	WHACK(S->digest);
 	WHACK(S->map);
@@ -1423,6 +1549,7 @@ static void whack(CO(TSEMworkload, this))
 
 	WHACK(S->event);
 	WHACK(S->control);
+	WHACK(S->mgmt);
 
 	S->root->whack(S->root, this, S);
 	return;
