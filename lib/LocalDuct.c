@@ -149,8 +149,11 @@ static _Bool _init_server_port(CO(LocalDuct_State, S), CO(char *, path))
 
 	if ( (S->sockt = socket(AF_UNIX, SOCK_STREAM, 0)) == -1 )
 		ERR(goto done);
-	if ( bind(S->sockt, (struct sockaddr *) &sdef, sizeof(sdef)) == -1 )
+	if ( bind(S->sockt, (struct sockaddr *) &sdef, sizeof(sdef)) == -1 ) {
+		if ( errno == EADDRINUSE )
+			WHACK(S->path);
 		ERR(goto done);
+	}
 	if ( listen(S->sockt, 5) == -1 )
 		ERR(goto done);
 
