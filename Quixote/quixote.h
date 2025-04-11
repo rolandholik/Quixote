@@ -15,6 +15,7 @@
 #define TSEM_CONTROL_FILE		"/sys/kernel/security/tsem/control"
 #define TSEM_UPDATE_FILE		"/sys/kernel/security/tsem/external_tma/%llu"
 
+#define QUIXOTE_WORKLOAD_MGMT_DIR	"/var/lib/Quixote/mgmt"
 #define QUIXOTE_PROCESS_MGMT_DIR	"/var/lib/Quixote/mgmt/processes"
 #define QUIXOTE_CARTRIDGE_MGMT_DIR	"/var/lib/Quixote/mgmt/cartridges"
 #define QUIXOTE_MAGAZINE		"/var/lib/Quixote/Magazine"

@@ -1,4 +1,3 @@
-
 /** \file
  *
  * This file implements a utility for managing a quixote co-processor
@@ -101,35 +100,37 @@ static void show_domains(const char *root)
 
 	uint16_t lp;
 
-	glob_t domains;
+	glob_t workloads;
 
 	String str = NULL;
 
 
-	/* Generate the list of cartridges. */
+	/* Generate a wildcard match in the workload directory. */
 	INIT(HurdLib, String, str, ERR(goto done));
-	str->add(str, root);
-	if ( !str->add(str, "/*") )
+	if ( !str->add_sprintf(str, "%s/*", root) )
 		ERR(goto done);
 
-	rc = glob(str->get(str), 0, NULL, &domains);
+	/* Generate the list of cartridges. */
+	rc = glob(str->get(str), 0, NULL, &workloads);
 	if ( rc == GLOB_NOMATCH ) {
-		fputs("\tNo domains found.\n", stderr);
+		fputs("No workloads found.\n", stderr);
 		goto done;
 	}
 
 	if ( rc != 0 ) {
-		fprintf(stderr, "Failed read of domain directory %s, " \
+		fprintf(stderr, "Failed read of worklaod directory %s, " \
 			"code = %d\n", root, rc);
 		goto done;
 	}
 
 
-	/* Iterate through and print the cartridges found .*/
-	for (lp= 0; lp < domains.gl_pathc; ++lp) {
+	/* Iterate through and print the workloads found .*/
+	fputs("Workloads:\n", stdout);
+
+	for (lp= 0; lp < workloads.gl_pathc; ++lp) {
 		str->reset(str);
-		if ( !str->add(str, domains.gl_pathv[lp]) ) {
-			fputs("Error processing domain list\n", stderr);
+		if ( !str->add(str, workloads.gl_pathv[lp]) ) {
+			fputs("Error processing workload list\n", stderr);
 			goto done;
 		}
 
@@ -143,7 +144,7 @@ static void show_domains(const char *root)
 
 
  done:
-	globfree(&domains);
+	globfree(&workloads);
 	WHACK(str);
 
         return;
@@ -158,11 +159,8 @@ static void show_domains(const char *root)
  * \param mgmt		The object that will be used to handle management
  *			requests.
  *
- * \param pidstr	A null terminated string containing the number
- *			of the process id to be managed.
- *
- * \param cartridge	A null terminated string containing the name of
- *			the cartridge process to be managed.
+ * \param name		A null terminated character buffer containing the
+ *			name of the workload to be managed.
  *
  * \return		A boolean value is returned to indicate whether
  *			or not setup of the management socket was
@@ -171,8 +169,7 @@ static void show_domains(const char *root)
  *			setup failed.
  */
 
-static _Bool setup_management(CO(LocalDuct, mgmt), const char *pidstr, \
-			      const char *cartridge)
+static _Bool setup_management(CO(LocalDuct, mgmt), const char *name)
 
 {
 	_Bool retn = false;
@@ -188,26 +185,8 @@ static _Bool setup_management(CO(LocalDuct, mgmt), const char *pidstr, \
 
 	/* Create the appropriate path to the socket location. */
 	INIT(HurdLib, String, sockpath, ERR(goto done));
-
-	switch ( Mode ) {
-		case show_mode:
-			break;
-
-		case process_mode:
-			sockpath->add(sockpath, QUIXOTE_PROCESS_MGMT_DIR);
-			if ( !sockpath->add_sprintf(sockpath, "/pid-%s", \
-						    pidstr) )
-				ERR(goto done);
-			break;
-
-		case cartridge_mode:
-			sockpath->add(sockpath, QUIXOTE_CARTRIDGE_MGMT_DIR);
-			sockpath->add(sockpath, "/");
-			if ( !sockpath->add(sockpath, cartridge) )
-				ERR(goto done);
-			break;
-	}
-
+	sockpath->add_sprintf(sockpath, "%s/%s", QUIXOTE_WORKLOAD_MGMT_DIR, \
+			      name);
 
 	/* Create socket in designated path. */
 	if ( !mgmt->init_port(mgmt, sockpath->get(sockpath)) ) {
@@ -784,8 +763,7 @@ extern int main(int argc, char *argv[])
 	_Bool tty_input = isatty(fileno(stdin));
 
 	char *p,
-	     *pid	 = NULL,
-	     *cartridge	 = NULL,
+	     *name = NULL,
 	     inbufr[TSEM_READ_BUFFER];
 
 	int opt,
@@ -803,7 +781,7 @@ extern int main(int argc, char *argv[])
 	File infile = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "CEFMPSTc:p:")) != EOF )
+	while ( (opt = getopt(argc, argv, "CEFMPSTw:")) != EOF )
 		switch ( opt ) {
 			case 'C':
 				oneshot = oneshot_counts;
@@ -827,14 +805,8 @@ extern int main(int argc, char *argv[])
 				oneshot = oneshot_trajectory;
 				break;
 
-			case 'c':
-				Mode = cartridge_mode;
-				cartridge = optarg;
-				break;
-			case 'p':
-				Mode = process_mode;
-				pid = optarg;
-				break;
+			case 'w':
+				name = optarg;
 		}
 
 
@@ -846,26 +818,22 @@ extern int main(int argc, char *argv[])
 
 	/* Handle show mode. */
 	if ( oneshot == oneshot_none ) {
-		fprintf(stdout, "%s:\n", QUIXOTE_CARTRIDGE_MGMT_DIR);
-		show_domains(QUIXOTE_CARTRIDGE_MGMT_DIR);
-		fputs("\n", stdout);
-		fprintf(stdout, "%s:\n", QUIXOTE_PROCESS_MGMT_DIR);
-		show_domains(QUIXOTE_PROCESS_MGMT_DIR);
+		show_domains(QUIXOTE_WORKLOAD_MGMT_DIR);
 		retn = 0;
 		goto done;
 	}
 
 
 	/* Verify that a socket type has been specified. */
-	if ( (pid == NULL) && (cartridge == NULL) ) {
-		fputs("No domain specified.\n", stderr);
+	if ( name == NULL ) {
+		fputs("No workload name specified.\n", stderr);
 		goto done;
 	}
 
 
 	/* Establish management socket. */
 	INIT(NAAAIM, LocalDuct, mgmt, ERR(goto done));
-	if ( !setup_management(mgmt, pid, cartridge) )
+	if ( !setup_management(mgmt, name) )
 		ERR(goto done);
 
 

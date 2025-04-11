@@ -384,8 +384,7 @@ static _Bool run_workload(CO(TSEMworkload, workload), CO(char *, outfile))
 	if ( !open_file(outfile) )
 		ERR(goto done);
 
-	if ( !workload->run_workload(workload, NULL, NULL, output_event, \
-				     NULL) )
+	if ( !workload->run_workload(workload, NULL, output_event, NULL) )
 		ERR(goto done);
 	retn = true;
 
@@ -433,8 +432,7 @@ static _Bool run_broker_workload(CO(TSEMworkload, workload),		\
 	if ( !open_broker(broker, port, tsem_user, topic) )
 		ERR(goto done);
 
-	if ( !workload->run_workload(workload, NULL, NULL, output_event, \
-				     NULL) )
+	if ( !workload->run_workload(workload, NULL, output_event, NULL) )
 		ERR(goto done);
 	retn = true;
 
@@ -740,8 +738,7 @@ static _Bool export_root(CO(TSEMworkload, workload), const _Bool follow, \
 	if ( Debug )
 		fprintf(Debug, "%d: Running root event loop.\n", getpid());
 
-	if ( !workload->run_workload(workload, NULL, NULL, _process_event, \
-				     NULL) )
+	if ( !workload->run_workload(workload, NULL, _process_event, NULL) )
 		ERR(goto done);
 	retn = true;
 
@@ -767,7 +764,7 @@ extern int main(int argc, char *argv[])
 	     *broker	    = NULL,
 	     *topic	    = NULL,
 	     *port	    = NULL,
-	     *cartridge	    = NULL,
+	     *name	    = NULL,
 	     *magazine_size = NULL,
 	     *outfile	    = NULL,
 	     *queue_size    = "100",
@@ -779,7 +776,7 @@ extern int main(int argc, char *argv[])
 	TSEMworkload workload = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "CPRSXfuM:b:c:d:h:n:o:p:q:s:t:")) \
+	while ( (opt = getopt(argc, argv, "CPRSXfuM:b:d:h:n:o:p:q:s:t:w:")) \
 		!= EOF )
 		switch ( opt ) {
 			case 'C':
@@ -812,9 +809,6 @@ extern int main(int argc, char *argv[])
 			case 'b':
 				broker = optarg;
 				break;
-			case 'c':
-				cartridge = optarg;
-				break;
 			case 'd':
 				debug = optarg;
 				break;
@@ -836,6 +830,9 @@ extern int main(int argc, char *argv[])
 			case 't':
 				topic = optarg;
 				break;
+			case 'w':
+				name = optarg;
+				break;
 		}
 
 
@@ -849,8 +846,8 @@ extern int main(int argc, char *argv[])
 	if ( Mode == show_mode )
 		show_magazine(QUIXOTE_MAGAZINE);
 
-	if ( (Mode == container_mode) && (cartridge == NULL) ) {
-		fputs("No software cartridge specified.\n", stderr);
+	if ( name == NULL ) {
+		fputs("No workload name specified.\n", stderr);
 		goto done;
 	}
 
@@ -877,15 +874,14 @@ extern int main(int argc, char *argv[])
 	INIT(HurdLib, String, Output_String, ERR(goto done));
 
 	workload->set_debug(workload, Debug);
-	if ( !workload->configure_export(workload, TSEM_model, Digest, \
+	if ( !workload->configure_export(workload, name, TSEM_model, Digest, \
 					 magazine_size, Current_Namespace) )
 		ERR(goto done);
 
 	switch ( Mode ) {
 		case container_mode:
 			if ( !workload->set_container_mode(workload, 	     \
-							   QUIXOTE_MAGAZINE, \
-							   cartridge) )
+							   QUIXOTE_MAGAZINE) )
 				ERR(goto done);
 			break;
 

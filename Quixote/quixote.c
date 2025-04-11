@@ -184,97 +184,6 @@ struct security_load_definition Security_cmd_list[] = {
 
 
 /**
- * Private function.
- *
- * This function sets up the UNIX domain management socket.
- *
- * \param mgmt		The object that will be used to handle management
- *			requests.
- *
- * \param cartridge	A null terminated string containing the name of
- *			the cartridge process to be managed.
- *
- * \return		A boolean value is returned to indicate whether
- *			or not setup of the management socket was
- *			successful.  A true value indicates the setup
- *			was successful while a false value indicates the
- *			setup failed.
- */
-
-static _Bool setup_management(CO(LocalDuct, mgmt), const char *cartridge)
-
-{
-	_Bool rc,
-	      retn = false;
-
-	mode_t mask;
-
-	String sockpath = NULL;
-
-
-	/* Initialize socket server mode. */
-	if ( !mgmt->init_server(mgmt) ) {
-		fputs("Cannot set management server mode.\n", stderr);
-		goto done;
-	}
-
-
-	/* Create the appropriate path to the socket location. */
-	INIT(HurdLib, String, sockpath, ERR(goto done));
-
-	switch ( Mode ) {
-		case show_mode:
-			break;
-
-		case process_mode:
-		case execute_mode:
-			sockpath->add_sprintf(sockpath, "%s/pid-", \
-					      QUIXOTE_PROCESS_MGMT_DIR);
-			if ( cartridge != NULL ) {
-				if ( !sockpath->add(sockpath, cartridge) )
-					ERR(goto done);
-			} else {
-				if ( !sockpath->add_sprintf(sockpath, "%u", \
-							    getpid()) )
-					ERR(goto done);
-			}
-			break;
-
-		case container_mode:
-			sockpath->add(sockpath, QUIXOTE_CARTRIDGE_MGMT_DIR);
-			sockpath->add(sockpath, "/");
-			if ( !sockpath->add(sockpath, cartridge) )
-				ERR(goto done);
-			break;
-	}
-
-
-	/* Create socket in desginated path. */
-	if ( Debug )
-		fprintf(Debug, "Opening management socket: %s\n", \
-			sockpath->get(sockpath));
-
-	mask = umask(0x2);
-	rc = mgmt->init_port(mgmt, sockpath->get(sockpath));
-	umask(mask);
-
-	if ( !rc ) {
-
-		fprintf(stderr, "Cannot initialize socket: %s.\n", \
-			sockpath->get(sockpath));
-		goto done;
-	}
-
-	retn = true;
-
-
- done:
-	WHACK(sockpath);
-
-	return retn;
-}
-
-/**
  * Internal private function.
  *
  * This function is responsible for sending a line of command output to
@@ -1494,15 +1403,8 @@ static _Bool run_workload(CO(TSEMworkload, workload),	     \
 {
 	_Bool retn = false;
 
-	LocalDuct mgmt = NULL;
-
-
 	/* Setup the management socket. */
-	INIT(NAAAIM, LocalDuct, mgmt, ERR(goto done));
-	if ( !setup_management(mgmt, container) )
-		ERR(goto done);
-
-	if ( !workload->run_workload(workload, mgmt, map_loader, NULL, \
+	if ( !workload->run_workload(workload, map_loader, NULL, \
 				     process_command) )
 		ERR(goto done);
 
@@ -1518,8 +1420,6 @@ static _Bool run_workload(CO(TSEMworkload, workload),	     \
 
 
  done:
-	WHACK(mgmt);
-
 	return retn;
 }
 
@@ -1537,14 +1437,14 @@ extern int main(int argc, char *argv[])
 	char *debug	    = NULL,
 	     *outfile	    = NULL,
 	     *model	    = NULL,
-	     *container	    = NULL,
+	     *name	    = NULL,
 	     *magazine_size = NULL;
 
 	int opt,
 	    retn = 1;
 
 
-	while ( (opt = getopt(argc, argv, "CPSXetuM:c:d:h:m:n:o:")) != EOF )
+	while ( (opt = getopt(argc, argv, "CPSXetuM:d:h:m:n:o:w:")) != EOF )
 		switch ( opt ) {
 			case 'C':
 				Mode = container_mode;
@@ -1572,9 +1472,6 @@ extern int main(int argc, char *argv[])
 				TSEM_model = optarg;
 				break;
 
-			case 'c':
-				container = optarg;
-				break;
 			case 'd':
 				debug = optarg;
 				break;
@@ -1591,14 +1488,17 @@ extern int main(int argc, char *argv[])
 				Pause   = true;
 				outfile = optarg;
 				break;
+			case 'w':
+				name = optarg;
+				break;
 		}
 
 	/* Execute cartridge display mode. */
 	if ( Mode == show_mode )
 		show_magazine(QUIXOTE_MAGAZINE);
 
-	if ( (Mode == container_mode) && (container == NULL) ) {
-		fputs("No software container specified.\n", stderr);
+	if ( name == NULL ) {
+		fputs("No workload name specified.\n", stderr);
 		goto done;
 	}
 
@@ -1623,17 +1523,16 @@ extern int main(int argc, char *argv[])
 	/* Initialize the security model controller. */
 	INIT(NAAAIM, TSEMworkload, Workload, ERR(goto done));
 	Workload->set_debug(Workload, Debug);
-	if ( !Workload->configure_internal(Workload, model, TSEM_model, \
-					   Digest, magazine_size,	\
-					   current_namespace, enforce,	\
+	if ( !Workload->configure_internal(Workload, name, model,	      \
+					   TSEM_model, Digest, magazine_size, \
+					   current_namespace, enforce,	      \
 					   &Control) )
 		ERR(goto done);
 
 	switch ( Mode ) {
 		case container_mode:
 			if ( !Workload->set_container_mode(Workload, 	     \
-							   QUIXOTE_MAGAZINE, \
-							   container) )
+							   QUIXOTE_MAGAZINE) )
 				ERR(goto done);
 			break;
 
@@ -1648,7 +1547,7 @@ extern int main(int argc, char *argv[])
 	/* Run the workload. */
 	if ( Debug )
 		fprintf(Debug, "Launch process: %d\n", getpid());
-	if ( !run_workload(Workload, load_model, container, outfile) )
+	if ( !run_workload(Workload, load_model, name, outfile) )
 		ERR(goto done);
 
 	if ( outfile != NULL ) {
