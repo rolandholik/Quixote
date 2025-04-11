@@ -1621,13 +1621,12 @@ extern int main(int argc, char *argv[])
 	}
 
 	/* Initialize the security model controller. */
-	INIT(NAAAIM, TSEMcontrol, Control, ERR(goto done));
-
 	INIT(NAAAIM, TSEMworkload, Workload, ERR(goto done));
 	Workload->set_debug(Workload, Debug);
 	if ( !Workload->configure_internal(Workload, model, TSEM_model, \
 					   Digest, magazine_size,	\
-					   current_namespace, enforce) )
+					   current_namespace, enforce,	\
+					   &Control) )
 		ERR(goto done);
 
 	switch ( Mode ) {
@@ -1664,7 +1663,6 @@ extern int main(int argc, char *argv[])
 
 
  done:
-	WHACK(Control);
 	WHACK(Workload);
 
 	return retn;

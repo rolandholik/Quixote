@@ -32,7 +32,7 @@ struct NAAAIM_TSEMworkload
 				    const _Bool, const _Bool);
 	_Bool (*configure_internal)(const TSEMworkload, const char *,	      \
 				    const char *, const char *, const char *, \
-				    const _Bool, const _Bool);
+				    const _Bool, const _Bool, TSEMcontrol *);
 
 	void (*set_debug)(const TSEMworkload, FILE *);
 	void (*set_execute_mode)(const TSEMworkload, int argc, char *argv[]);

@@ -67,6 +67,7 @@
 #include "SecurityEvent.h"
 #include "TSEM.h"
 #include "TSEMevent.h"
+#include "TSEMcontrol.h"
 #include "TSEMworkload.h"
 
 

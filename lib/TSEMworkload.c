@@ -473,12 +473,23 @@ static _Bool configure_external(CO(TSEMworkload, this), CO(char *, map), \
  *			namespace should be used, a false value indicates
  *			that the user namespace view of the characteristics
  *			should be used.
+ *
+ * \param enforce	A boolean value indicating whether or not a security
+ *			model provided for the namespace should be enforced.
+ *
+ * \parm control	A pointer that will be used to save the TSEMcontrol
+ *			object being used for the security namespace.  This
+ *			is needed for internally modeled namespaces to
+ *			avoid having to include inheritance wrappers for
+ *			the control methods that are required for an
+ *			internally modeled namespace.
  */
 
 static _Bool configure_internal(CO(TSEMworkload, this), CO(char *, map),    \
 				CO(char *, model), CO(char *, digest),	    \
 				CO(char *, cache_size),			    \
-				const _Bool initial_ns, const _Bool enforce)
+				const _Bool initial_ns, const _Bool enforce,\
+				TSEMcontrol *control)
 
 {
 	STATE(S);
@@ -496,6 +507,7 @@ static _Bool configure_internal(CO(TSEMworkload, this), CO(char *, map),    \
 			      enforce) )
 		ERR(goto done);
 
+	*control = S->control;
 	S->type = TSEMcontrol_TYPE_INTERNAL;
 	retn = true;
 
