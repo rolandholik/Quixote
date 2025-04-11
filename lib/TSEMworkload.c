@@ -129,6 +129,7 @@ struct NAAAIM_TSEMworkload_State
 	_Bool enforce;
 	String model;
 	String digest;
+	String map;
 
 	/* Execute mode parameters. */
 	enum workload_mode mode;
@@ -176,6 +177,7 @@ static void _init_state(CO(TSEMworkload_State, S))
 	S->model = NULL;
 	S->digest = NULL;
 	S->control = NULL;
+	S->map = NULL;
 
 	S->mode = PROCESS_MODE;
 	S->argc = 0;
@@ -375,6 +377,11 @@ static _Bool configure_export(CO(TSEMworkload, this), CO(char *, model),  \
  *
  * \param this	A pointer to the object describing the workload.
  *
+ * \param map		A pointer to a null-terminated character buffer
+ *			containing the pathname of security behavior
+ *			model that is to be enforced.  Setting this
+ *			value to a NULL pointer disables map loading.
+ *
  * \param model		A pointer to a null-terminated character buffer
  *			containing the name of an alternate security
  *			model that is to be used for processing security
@@ -403,8 +410,9 @@ static _Bool configure_export(CO(TSEMworkload, this), CO(char *, model),  \
  *			enforcing mode should be selected.
  */
 
-static _Bool configure_external(CO(TSEMworkload, this), CO(char *, model),  \
-				CO(char *, digest), CO(char *, cache_size), \
+static _Bool configure_external(CO(TSEMworkload, this), CO(char *, map), \
+				CO(char *, model),  CO(char *, digest),	 \
+				CO(char *, cache_size),			 \
 				const _Bool initial_ns, const _Bool enforce)
 
 {
@@ -412,6 +420,12 @@ static _Bool configure_external(CO(TSEMworkload, this), CO(char *, model),  \
 
 	_Bool retn = false;
 
+
+	if ( map != NULL ) {
+		INIT(HurdLib, String, S->map, ERR(goto done));
+		if ( !S->map->add(S->map, map) )
+			ERR(goto done);
+	}
 
 	if ( !_init_ns_config(S, model, digest, initial_ns, cache_size, \
 			      enforce) )
@@ -432,6 +446,11 @@ static _Bool configure_external(CO(TSEMworkload, this), CO(char *, model),  \
  * This method implements the creation of a an internally modeled workload.
  *
  * \param this		A pointer to the object describing the workload.
+ *
+ * \param map		A pointer to a null-terminated character buffer
+ *			containing the pathname of security behavior
+ *			model that is to be enforced.  Setting this
+ *			value to a NULL pointer disables map loading.
  *
  * \param model		A pointer to a null-terminated character buffer
  *			containing the name of an alternate security
@@ -456,8 +475,9 @@ static _Bool configure_external(CO(TSEMworkload, this), CO(char *, model),  \
  *			should be used.
  */
 
-static _Bool configure_internal(CO(TSEMworkload, this), CO(char *, model),  \
-				CO(char *, digest), CO(char *, cache_size), \
+static _Bool configure_internal(CO(TSEMworkload, this), CO(char *, map),    \
+				CO(char *, model), CO(char *, digest),	    \
+				CO(char *, cache_size),			    \
 				const _Bool initial_ns, const _Bool enforce)
 
 {
@@ -465,6 +485,12 @@ static _Bool configure_internal(CO(TSEMworkload, this), CO(char *, model),  \
 
 	_Bool retn = false;
 
+
+	if ( map != NULL ) {
+		INIT(HurdLib, String, S->map, ERR(goto done));
+		if ( !S->map->add(S->map, map) )
+			ERR(goto done);
+	}
 
 	if ( !_init_ns_config(S, model, digest, initial_ns, cache_size, \
 			      enforce) )
@@ -649,6 +675,252 @@ static _Bool child_exited(const pid_t child)
 
 
 /**
+ * Private helper method
+ *
+ * This function is a helper function for the ->run_workload method.  It
+ * is responsible for creating the security modeling namespace.  After
+ * creating the security modeling namespace the process waits for
+ * a control byte to be written over a pipe that it shares with the
+ * trust orchestrator.  This read is a signal that indicates that
+ * execution of the work can be started.
+ *
+ * \param S		A pointer to the structure containing the state
+ *			information for the object running the workload.
+ *
+ * \return		A boolean value is used to indicated whether or
+ *			not the setup of the namespace has succeeded.  A
+ *			false value indicates failure while a true
+ *			value indicates the namespace was successfully
+ *			created.
+ */
+
+static _Bool _create_namespace(CO(TSEMworkload_State, S))
+
+{
+	_Bool retn = false;
+
+	char cb,
+	     *model  = S->model == NULL ? NULL : S->model->get(S->model),
+	     *digest = S->digest == NULL ? NULL : S->digest->get(S->digest);
+
+	int rc = 0;
+
+
+	/* Create and configure a security model namespace. */
+	if (  Debug )
+		fprintf(Debug, "%d: Creating namespace.\n", getpid());
+	if ( !S->control->create_ns(S->control, S->type, model, digest, \
+				    S->ns, S->cache_size) )
+		ERR(goto done);
+
+	/* Wait for workload release. */
+	rc = read(S->fdp[READ_SIDE], &cb, sizeof(cb));
+	if ( rc != sizeof(cb) ) {
+
+			fprintf(Debug, "%d: Error on release read.\n", \
+				getpid());
+		ERR(goto done);
+	}
+	if ( Debug )
+		fprintf(Debug, "%d: Released by orchestrator.\n", getpid());
+
+	/* Drop privileges after namespace setup. */
+	if ( Debug )
+		fprintf(Debug, "%d: Dropping CAP_MAC_ADMIN\n", getpid());
+	if ( cap_drop_bound(CAP_MAC_ADMIN) != 0 )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	close(S->fdp[READ_SIDE]);
+	close(S->fdp[WRITE_SIDE]);
+	WHACK(S->control);
+
+	return retn;
+
+}
+
+
+/**
+ * Private helper method
+ *
+ * This function is a helper function for the ->run_monitor method.  It
+ * is responsible for configuring the security modeling namespace after
+ * it is created by the workload process.
+ *
+ * \param S		A pointer to the structure containing the state
+ *			information for the object running the workload.
+ *
+ * \param map_loader	A pointer to a function that will be called to
+ *			load a security map if one has been defined.
+ *
+ * \return		A boolean value is used to indicated whether or
+ *			not the setup of the namespace has succeeded.  A
+ *			false value indicates failure while a true
+ *			value indicates the namespace was successfully
+ *			created.
+ */
+
+static _Bool _configure_namespace(CO(TSEMworkload_State, S), \
+				  _Bool (*map_loader)(String))
+
+{
+	_Bool retn = false;
+
+	char cb,
+	     fname[PATH_MAX];
+
+	int rc;
+
+
+	/* Wait for release by workload. */
+	if ( Debug )
+		fprintf(Debug, "%d: Reading namespace id.\n", getpid());
+	if ( !S->control->id(S->control, &S->id) )
+		ERR(goto done);
+	if ( Debug )
+		fprintf(Debug, "%d: Container %lu started.\n", getpid(), \
+			S->id);
+
+	/* Open the event export file if needed. */
+	if ( S->type != TSEMcontrol_TYPE_INTERNAL ) {
+		memset(fname, '\0', sizeof(fname));
+		if ( snprintf(fname, sizeof(fname), TSEM_EVENT_FILE, \
+			      S->id) >= sizeof(fname) )
+			ERR(goto done);
+		if ( (S->fd = open(fname, O_RDONLY)) < 0 )
+			ERR(goto done);
+		if ( Debug )
+			fprintf(Debug, "Update file: %s\n", fname);
+	}
+
+	/* Load a model if one is specified and set enforcement status. */
+	if ( S->enforce ) {
+		if ( !S->control->enforce(S->control) )
+			ERR(goto done);
+	}
+	if ( S->map != NULL ) {
+		if ( !map_loader(S->map) )
+			ERR(goto done);
+	}
+
+	/* Release the workload. */
+	if ( Debug )
+		fprintf(Debug, "%d: Releasing workload %d.\n", getpid(), \
+			S->workload_pid);
+	if ( (rc = write(S->fdp[WRITE_SIDE], &cb, sizeof(cb))) == sizeof(cb) )
+		retn = true;
+	else {
+		kill(S->workload_pid, SIGKILL);
+		fputs("Child start failed.\n", stderr);
+	}
+
+
+ done:
+	close(S->fdp[WRITE_SIDE]);
+	close(S->fdp[READ_SIDE]);
+
+	return retn;
+
+}
+
+
+/**
+ * Internal private method.
+ *
+ * This method implements the execution of the workload in a security
+ * modeling namespace.
+ *
+ * \param this		A pointer to the object whose workload is
+ *			to be executed.
+ *
+ * \return		A boolean value is returned to indicate whether
+ *			or not the workload was successfully run.  A
+ *			false value indicates the execution of the
+ *			workload failed or if there was an error
+ *			encountered during the monitoring of the
+ *			workload.
+ */
+
+static _Bool _start_workload(CO(TSEMworkload_State, S))
+
+{
+	_Bool retn = false;
+
+	Process execute = NULL;
+
+
+	/* Child process - Workload. */
+	if ( Debug ) {
+		fprintf(Debug, "Workload process: %d\n", getpid());
+	}
+
+	if ( S->mode == CONTAINER_MODE ) {
+		if ( Debug ) {
+			fprintf(Debug, "%d: Workload container=%s, "	\
+				"bundle=%s\n", getpid(), S->container,	\
+				S->bundle->get(S->bundle));
+			fclose(Debug);
+		}
+
+		execlp("runc", "runc", "run", "-b", \
+		       S->bundle->get(S->bundle), S->container, NULL);
+		fputs("Workload execution failed.\n", stderr);
+		exit(1);
+	}
+
+	if ( S->mode == PROCESS_MODE ) {
+		if ( geteuid() != getuid() ) {
+			if ( Debug )
+				fprintf(Debug, "%d: Changing to real " \
+					"id: %u\n", getpid(), getuid());
+			if ( setuid(getuid()) != 0 ) {
+				fputs("Cannot change uid.\n", stderr);
+				exit(1);
+			}
+		}
+
+		if ( Debug ) {
+			fprintf(Debug, "%d: Executing workload shell.\n", \
+				getpid());
+			fclose(Debug);
+		}
+
+		execlp("bash", "bash", "-i", NULL);
+		fputs("Cartridge process execution failed.\n", stderr);
+		exit(1);
+	}
+
+	if ( S->mode == EXECUTE_MODE ) {
+		INIT(HurdLib, Process, execute, exit(1));
+		if ( geteuid() != getuid() ) {
+			if ( Debug )
+				fprintf(Debug, "Changing to real " \
+					"id: \%u\n",  getuid());
+			if ( setuid(getuid()) != 0 ) {
+				fputs("Cannot change uid.\n", stderr);
+				exit(1);
+			}
+		}
+
+		if ( Debug ) {
+			fprintf(Debug, "%d: Executing workload command.\n", \
+				getpid());
+			fclose(Debug);
+		}
+
+		execute->run_command_line(execute, S->argc, S->argv);
+		fputs("Command line execution failed.\n", stderr);
+		exit(1);
+	}
+
+	return retn;
+
+}
+
+
+/**
  * Private helper method.
  *
  * This method implements reading and processing of events until there are
@@ -709,9 +981,16 @@ static _Bool _process_events(CO(TSEMworkload, this), \
  *			to the object.  A NULL value will disable for
  *			polling for management commands.
  *
- * \parm event_handler	A pointer to a function that will be caused with
+ * \param map_load	A pointer to the function that will be invoked
+ *			to load a security map for the workload.
+ *
+ * \parm event_handler	A pointer to a function that will be called with
  *			the object that was used to read the security
  *			event.
+ *
+ * \param command_handler	A pointer to a function that will be
+ *				called with to handle management commands
+ *				for the workload.
  *
  * \return	A boolean value is used to indicate whether or not
  *		execution of the security monitor has succeeded.  A false
@@ -720,9 +999,10 @@ static _Bool _process_events(CO(TSEMworkload, this), \
  *		successfully configured.
  */
 
-static _Bool run_monitor(CO(TSEMworkload, this), CO(LocalDuct, mgmt),	\
-			 _Bool (*event_handler)(TSEMevent),		\
-			 _Bool (*command_handler)(LocalDuct, Buffer))
+static _Bool run_workload(CO(TSEMworkload, this), CO(LocalDuct, mgmt),	\
+			  _Bool (*map_loader)(String),			\
+			  _Bool (*event_handler)(TSEMevent),		\
+			  _Bool (*command_handler)(LocalDuct, Buffer))
 
 {
 	STATE(S);
@@ -730,10 +1010,8 @@ static _Bool run_monitor(CO(TSEMworkload, this), CO(LocalDuct, mgmt),	\
 	_Bool retn	= false,
 	      connected = false;
 
-	char out;
-
 	int rc,
-	    fdcnt = 1;
+	    fdcnt = 2;
 
 	unsigned int cycle = 0;
 
@@ -742,6 +1020,28 @@ static _Bool run_monitor(CO(TSEMworkload, this), CO(LocalDuct, mgmt),	\
 	Buffer cmdbufr = NULL;
 
 
+	/* Create pipe to communicate status with workload. */
+	if ( pipe(S->fdp) == -1 )
+		ERR(goto done);
+
+	/* Fork to run the workload. */
+	S->workload_pid = fork();
+	if ( S->workload_pid == -1 )
+		ERR(goto done);
+
+	/* Child process - create namespace and run workload. */
+	if ( S->workload_pid == 0 ) {
+		if ( !_create_namespace(S) )
+			_exit(1);
+		if ( !_start_workload(S) )
+			_exit(1);
+		return true;
+	}
+
+	/* Parent process - configure and monitor namespace. */
+	if ( !_configure_namespace(S, map_loader) )
+		ERR(goto done);
+
 	if ( Debug )
 		fprintf(Debug, "%d: Workload monitor.\n", getpid());
 
@@ -749,31 +1049,19 @@ static _Bool run_monitor(CO(TSEMworkload, this), CO(LocalDuct, mgmt),	\
 
 	memset(&poll_data, '\0', sizeof poll_data);
 	if ( S->fd != 0 ) {
-		poll_data[0].fd	    = S->fd;
+		poll_data[0].fd = S->fd;
 		poll_data[0].events = POLLIN;
-	}
+	} else
+		poll_data[0].fd = -1;
+
 	if ( mgmt != NULL ) {
 		if ( !mgmt->get_socket(mgmt, &poll_data[1].fd) )
 			ERR(goto done);
-		++fdcnt;
 		poll_data[1].events = POLLIN | POLLHUP;
-	}
+	} else
+		poll_data[1].fd = -1;
 
-	/* Dispatch loop. */
-	if ( Debug )
-		fprintf(Debug, "%d: Releasing workload %d.\n", getpid(), \
-			S->workload_pid);
-
-	rc = write(S->fdp[WRITE_SIDE], &out, sizeof(out));
-	close(S->fdp[WRITE_SIDE]);
-	close(S->fdp[READ_SIDE]);
-
-	if ( rc != sizeof(out) ) {
-		kill(S->workload_pid, SIGKILL);
-		fputs("Child start failed.\n", stderr);
-		goto done;
-	}
-
+	/* Workload event handling loop. */
 	if ( Debug ) {
 		fprintf(Debug, "%d: Calling monitor loop.\n", getpid());
 		fprintf(Debug, "%d: fdcnt=%d, monitor fd=%d, command fd=%d\n",\
@@ -923,136 +1211,6 @@ static _Bool run_monitor(CO(TSEMworkload, this), CO(LocalDuct, mgmt),	\
 
 
 /**
- * Private helper method
- *
- * This function is a helper function for the ->run_workload method.  It
- * is responsible for creating the security modeling namespace.  In the
- * case of an externally modeled or export namespace it captures the
- * security modeling namespace identifier value.
- *
- * \param S		A pointer to the structure containing the state
- *			information for the object running the workload.
- *
- * \return		A boolean value is used to indicated whether or
- *			not the setup of the namespace has succeeded.  A
- *			false value indicates failure while a true
- *			value indicates the namespace was successfully
- *			created.  In the event of a true value return
- *			and an external modeled or export domain the
- *			variable pointed to by the fdptr is updated
- *			with the file descriptor of the namespace
- *			export file.
- */
-
-static _Bool _setup_namespace(CO(TSEMworkload_State, S))
-
-{
-	_Bool retn = false;
-
-	char in,
-	     *model  = S->model == NULL ? NULL : S->model->get(S->model),
-	     *digest = S->digest == NULL ? NULL : S->digest->get(S->digest);
-
-
-	/* Create and configure a security model namespace. */
-	if ( !S->control->create_ns(S->control, S->type, model, digest, \
-				    S->ns, S->cache_size) )
-		ERR(goto done);
-	if ( !S->control->id(S->control, &S->id) )
-		ERR(goto done);
-	if ( S->enforce ) {
-		if ( !S->control->enforce(S->control) )
-			ERR(goto done);
-	}
-
-	/* Drop privileges after namespace setup. */
-	if ( Debug )
-		fprintf(Debug, "%d: Dropping CAP_MAC_ADMIN\n", getpid());
-	if ( cap_drop_bound(CAP_MAC_ADMIN) != 0 )
-		ERR(goto done);
-
-	/* Write the namespace identifier. */
-	if ( write(S->fdp[WRITE_SIDE], &S->id, sizeof(S->id)) != \
-	     sizeof(S->id) )
-		ERR(goto done);
-	if ( Debug )
-		fprintf(Debug, "%d: Sent namespace id: %lu\n", getpid(), \
-			S->id);
-
-	if ( read(S->fdp[READ_SIDE], &in, 1) != 1 )
-		ERR(goto done);
-	if ( Debug )
-		fprintf(Debug, "%d: Released by orchestrator.\n", getpid());
-
-	retn = true;
-
-
- done:
-	close(S->fdp[READ_SIDE]);
-	close(S->fdp[WRITE_SIDE]);
-	WHACK(S->control);
-
-	return retn;
-
-}
-
-
-/**
- * Private helper method
- *
- * This function is a helper function for the ->run_workload method.  It
- * is responsible for reading the namespace identifier from the
- * workload and opening the file that will receive events from the
- * namespace.
- *
- * \param S		A pointer to the structure containing the state
- *			information for the object running the workload.
- *
- * \return		A boolean value is used to indicated whether or
- *			not the namespace event file was opened.  A
- *			false value indicates failure while a true
- *			value indicates the namespace was successfully
- *			created.
- */
-
-static _Bool _open_event_file(CO(TSEMworkload_State, S))
-
-{
-	_Bool retn = false;
-
-	char fname[PATH_MAX];
-
-	int rc;
-
-
-	/* No event file if this is an internally modeled workload. */
-	if ( S->type == TSEMcontrol_TYPE_INTERNAL )
-		return true;
-
-	/* Read the namespace identifier from the workload process. */
-	rc = read(S->fdp[READ_SIDE], &S->id, sizeof(S->id));
-	if ( rc != sizeof(S->id) )
-		ERR(goto done);
-
-
-	/* Open the event export file. */
-	memset(fname, '\0', sizeof(fname));
-	if ( snprintf(fname, sizeof(fname), TSEM_EVENT_FILE, S->id) >= \
-	     sizeof(fname) )
-		ERR(goto done);
-	if ( Debug )
-		fprintf(Debug, "Update file: %s\n", fname);
-
-	if ( (S->fd = open(fname, O_RDONLY)) < 0 )
-		ERR(goto done);
-	retn = true;
-
- done:
-	return retn;
-}
-
-
-/**
  * Private helper function.
  *
  * This function is a helper function for the run_workload() function.
@@ -1094,128 +1252,6 @@ static _Bool _set_user(CO(char *, user))
 
  done:
 	return retn;
-}
-
-
-/**
- * External public method.
- *
- * This method implements running a workload process in a security
- * modeling namespace.  The function forks to create a process from
- * which the target workload will be executed.  The parent process
- * then reads the TSEM event file that was created for the security
- * modeling namespace and writes the events as they occur to the
- * event pipe that is connected to the security workload monitor.
- *
- * \param this		A pointer to the object whose workload is
- *			to be executed.
- *
- * \return		A boolean value is returned to indicate whether
- *			or not the workload was successfully run.  A
- *			false value indicates the execution of the
- *			workload failed or if there was an error
- *			encountered during the monitoring of the
- *			workload.
- */
-
-static _Bool run_workload(CO(TSEMworkload, this))
-
-{
-	STATE(S);
-
-	_Bool retn = false;
-
-	Process execute = NULL;
-
-
-	/* Create pipe to transfer namespace number .*/
-	if ( pipe(S->fdp) == -1 )
-		ERR(goto done);
-
-	/* Fork to run the workload. */
-	S->workload_pid = fork();
-	if ( S->workload_pid == -1 )
-		ERR(goto done);
-
-	/* Parent process - workload monitor. */
-	if ( S->workload_pid > 0 ) {
-		if ( !_open_event_file(S) )
-			ERR(goto done);
-		return true;
-	}
-
-	/* Child process - Workload. */
-	if ( Debug ) {
-		fprintf(Debug, "Workload process: %d\n", getpid());
-	}
-	if ( !_setup_namespace(S) )
-		_exit(1);
-
-	/* Drop the ability to modify the trust state. */
-
-	if ( S->mode == CONTAINER_MODE ) {
-		if ( Debug ) {
-			fprintf(Debug, "%d: Workload container=%s, "	\
-				"bundle=%s\n", getpid(), S->container,	\
-				S->bundle->get(S->bundle));
-			fclose(Debug);
-		}
-
-		execlp("runc", "runc", "run", "-b", \
-		       S->bundle->get(S->bundle), S->container, NULL);
-		fputs("Workload execution failed.\n", stderr);
-		exit(1);
-	}
-
-	if ( S->mode == PROCESS_MODE ) {
-		if ( geteuid() != getuid() ) {
-			if ( Debug )
-				fprintf(Debug, "%d: Changing to real " \
-					"id: %u\n", getpid(), getuid());
-			if ( setuid(getuid()) != 0 ) {
-				fputs("Cannot change uid.\n", stderr);
-				exit(1);
-			}
-		}
-
-		if ( Debug ) {
-			fprintf(Debug, "%d: Executing workload shell.\n", \
-				getpid());
-			fclose(Debug);
-		}
-
-		execlp("bash", "bash", "-i", NULL);
-		fputs("Cartridge process execution failed.\n", stderr);
-		exit(1);
-	}
-
-	if ( S->mode == EXECUTE_MODE ) {
-		INIT(HurdLib, Process, execute, exit(1));
-		if ( geteuid() != getuid() ) {
-			if ( Debug )
-				fprintf(Debug, "Changing to real " \
-					"id: \%u\n",  getuid());
-			if ( setuid(getuid()) != 0 ) {
-				fputs("Cannot change uid.\n", stderr);
-				exit(1);
-			}
-		}
-
-		if ( Debug ) {
-			fprintf(Debug, "%d: Executing workload command.\n", \
-				getpid());
-			fclose(Debug);
-		}
-
-		execute->run_command_line(execute, S->argc, S->argv);
-		fputs("Command line execution failed.\n", stderr);
-		exit(1);
-	}
-
-
- done:
-	return retn;
-
 }
 
 
@@ -1369,6 +1405,7 @@ static void whack(CO(TSEMworkload, this))
 
 	WHACK(S->model);
 	WHACK(S->digest);
+	WHACK(S->map);
 
 	WHACK(S->bundle);
 
@@ -1488,7 +1525,6 @@ extern TSEMworkload NAAAIM_TSEMworkload_Init(void)
 	this->set_container_mode = set_container_mode;
 	this->set_root_mode	 = set_root_mode;
 
-	this->run_monitor  = run_monitor;
 	this->run_workload = run_workload;
 
 	this->release	 = release;

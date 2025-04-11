@@ -25,14 +25,14 @@ typedef struct NAAAIM_TSEMworkload_State * TSEMworkload_State;
 struct NAAAIM_TSEMworkload
 {
 	/* External methods. */
-	_Bool (*configure_export)(const TSEMworkload, const char *,	   \
+	_Bool (*configure_export)(const TSEMworkload, const char *, \
 				  const char *, const char *, const _Bool);
-	_Bool (*configure_external)(const TSEMworkload, const char *,	   \
-				    const char *, const char *, const _Bool, \
-				    const _Bool);
-	_Bool (*configure_internal)(const TSEMworkload, const char *,	     \
-				    const char *, const char *, const _Bool, \
-				    const _Bool);
+	_Bool (*configure_external)(const TSEMworkload, const char *,	      \
+				    const char *, const char *, const char *, \
+				    const _Bool, const _Bool);
+	_Bool (*configure_internal)(const TSEMworkload, const char *,	      \
+				    const char *, const char *, const char *, \
+				    const _Bool, const _Bool);
 
 	void (*set_debug)(const TSEMworkload, FILE *);
 	void (*set_execute_mode)(const TSEMworkload, int argc, char *argv[]);
@@ -40,10 +40,10 @@ struct NAAAIM_TSEMworkload
 				    const char *);
 	_Bool (*set_root_mode)(const TSEMworkload, int *);
 
-	_Bool (*run_monitor)(const TSEMworkload,  const LocalDuct, \
-			     _Bool (*event_handler)(TSEMevent),	   \
-			     _Bool (*command_handler)(LocalDuct, Buffer));
-	_Bool (*run_workload)(const TSEMworkload);
+	_Bool (*run_workload)(const TSEMworkload,  const LocalDuct, \
+			      _Bool (*model_loader)(const String),  \
+			      _Bool (*event_handler)(TSEMevent),    \
+			      _Bool (*command_handler)(LocalDuct, Buffer));
 
 	_Bool (*release)(const TSEMworkload, pid_t, uint64_t);
 	_Bool (*discipline)(const TSEMworkload, pid_t, uint64_t);
