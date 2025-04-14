@@ -51,26 +51,24 @@
  * is running in one shot mode where the command to be processed is
  * specified by a command-line argument.
  */
-enum Oneshot_mode {
-	oneshot_none,
-	oneshot_state,
-	oneshot_trajectory,
-	oneshot_counts,
-	oneshot_forensics,
-	oneshot_points,
-	oneshot_events,
-	oneshot_map
+enum Output_mode {
+	output_none,
+	output_state,
+	output_trajectory,
+	output_forensics,
+	output_events,
+	output_model
 };
 
 /**
- * The following enumeration type specifies whether or not
- * the measurements are being managed internally or by an SGX enclave.
+ * The following enumeration type specifies whether security state
+ * coefficients or trajectors are to be displayed.
  */
- enum {
-	 show_mode,
-	 process_mode,
-	 cartridge_mode,
-} Mode = show_mode;
+ enum Output_type {
+	 trajectory_output,
+	 coefficient_output,
+	 count_output,
+};
 
 /**
  * The following variable is used to indicate whether or not output
@@ -78,6 +76,12 @@ enum Oneshot_mode {
  */
 static _Bool TTY_output = false;
 
+/**
+ * The following boolean variable is used to indicate whether or not
+ * the output of coefficients should have a 'state ' prefix added to
+ * each coefficient to allow it to be used directly in a model.
+ */
+static _Bool Prefix = false;
 
 /**
  * Private function.
@@ -413,6 +417,8 @@ static _Bool receive_coefficients(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 		cmdbufr->reset(cmdbufr);
 		if ( !mgmt->receive_Buffer(mgmt, cmdbufr) )
 			ERR(goto done);
+		if ( Prefix )
+			fputs("state ", stdout);
 		fprintf(stdout, "%s\n", cmdbufr->get(cmdbufr));
 		--cnt;
 	}
@@ -694,8 +700,11 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(char *, cmd))
  * \param mgmt		The socket object used to communicate with
  *			the cartridge management instance.
  *
- * \param mode		The enumeration type of the command that is to
- *			be run.
+ * \param type		The enumeration type describing the type of
+ *			output to be generated
+ *
+ * \param type		The enumeration type describing the mode of
+ *			output to be generated.
  *
  * \return		A boolean value is returned to indicate whether
  *			or not processing of the command succeeded.  A
@@ -704,50 +713,78 @@ static _Bool process_command(CO(LocalDuct, mgmt), CO(char *, cmd))
  *			processed.
  */
 
-static _Bool process_oneshot(CO(LocalDuct, mgmt), enum Oneshot_mode mode)
+static _Bool process_oneshot(CO(LocalDuct, mgmt), enum Output_mode type, \
+			     enum Output_type mode)
 
 {
-	_Bool retn = false;
+	_Bool submode = false,
+	      retn = false;
 
-	char *cmd = 0;
+	char *cmd = NULL;
+
+	int cmd_type = 0;
 
 
-	switch ( mode ) {
-		case oneshot_state:
-			cmd = Sancho_cmd_list[show_state - 1].syntax;
+	switch ( type ) {
+		case output_state:
+			cmd_type = show_state;
 			break;
 
-		case oneshot_trajectory:
-			cmd = Sancho_cmd_list[show_trajectory - 1].syntax;
+		case output_trajectory:
+			submode = true;
+			cmd_type = show_trajectory;
 			break;
 
-		case oneshot_forensics:
-			cmd = Sancho_cmd_list[show_forensics - 1].syntax;
+		case output_forensics:
+			submode = true;
+			cmd_type = show_forensics;
 			break;
 
-		case oneshot_points:
-			cmd = Sancho_cmd_list[show_coefficients - 1].syntax;
+		case output_events:
+			cmd_type = show_events;
 			break;
 
-		case oneshot_events:
-			cmd = Sancho_cmd_list[show_events - 1].syntax;
+		case output_model:
+			cmd_type = show_map;
 			break;
 
-		case oneshot_map:
-			cmd = Sancho_cmd_list[show_map - 1].syntax;
-			break;
-
-		case oneshot_counts:
-			cmd = Sancho_cmd_list[show_counts - 1].syntax;
-			break;
-
-		case oneshot_none:
+		case output_none:
 			break;
 	}
 
-	if ( cmd > 0 )
-		retn = process_command(mgmt, cmd);
+	/* Adjust for a sub-mode specification. */
+	if ( submode && (type == output_trajectory) ) {
+		switch ( mode ) {
+			case coefficient_output:
+				cmd_type = show_coefficients;
+				break;
+			case count_output:
+				cmd_type = show_counts;
+				break;
+			default:
+				break;
+		}
+	}
 
+	if ( submode && (type == output_forensics) ) {
+		switch ( mode ) {
+			case coefficient_output:
+				cmd_type = show_forensics_coefficients;
+				break;
+			case count_output:
+				cmd_type = show_forensics_counts;
+				break;
+			default:
+				break;
+		}
+	}
+
+
+	/* Select the command type and execute. */
+	if ( cmd_type > 0 ) {
+		cmd = Sancho_cmd_list[cmd_type - 1].syntax;
+		retn = process_command(mgmt, cmd);
+	}
 
 	return retn;
 }
@@ -769,7 +806,8 @@ extern int main(int argc, char *argv[])
 	int opt,
 	    retn = 1;
 
-	enum Oneshot_mode oneshot = oneshot_none;
+	enum Output_mode mode = output_none;
+	enum Output_type type = trajectory_output;
 
 	FILE *idfile = NULL;
 
@@ -781,28 +819,32 @@ extern int main(int argc, char *argv[])
 	File infile = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "CEFMPSTw:")) != EOF )
+	while ( (opt = getopt(argc, argv, "EFMSTcpsw:")) != EOF )
 		switch ( opt ) {
-			case 'C':
-				oneshot = oneshot_counts;
-				break;
 			case 'E':
-				oneshot = oneshot_events;
+				mode = output_events;
 				break;
 			case 'F':
-				oneshot = oneshot_forensics;
+				mode = output_forensics;
 				break;
 			case 'M':
-				oneshot = oneshot_map;
-				break;
-			case 'P':
-				oneshot = oneshot_points;
+				mode = output_model;
 				break;
 			case 'S':
-				oneshot = oneshot_state;
+				mode = output_state;
 				break;
 			case 'T':
-				oneshot = oneshot_trajectory;
+				mode = output_trajectory;
+				break;
+
+			case 'c':
+				type = count_output;
+				break;
+			case 'p':
+				Prefix = true;
+				break;
+			case 's':
+				type = coefficient_output;
 				break;
 
 			case 'w':
@@ -817,7 +859,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* Handle show mode. */
-	if ( oneshot == oneshot_none ) {
+	if ( mode == output_none ) {
 		show_domains(QUIXOTE_WORKLOAD_MGMT_DIR);
 		retn = 0;
 		goto done;
@@ -838,8 +880,8 @@ extern int main(int argc, char *argv[])
 
 
 	/* Handle command-line specified commands. */
-	if ( oneshot != oneshot_none ) {
-		retn = process_oneshot(mgmt, oneshot);
+	if ( mode != output_none ) {
+		retn = process_oneshot(mgmt, mode, type);
 		goto done;
 	}
 
