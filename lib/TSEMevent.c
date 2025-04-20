@@ -393,7 +393,8 @@ static enum TSEM_export_type extract_export(CO(TSEMevent, this))
 		goto done;
 
 	S->type = retn = cp->command;
-	if ( S->type == TSEM_EVENT_ASYNC_EVENT ) {
+	if ( (S->type == TSEM_EVENT_ASYNC_EVENT) || \
+	     (S->type == TSEM_EVENT_LOG) ) {
 		S->field->reset(S->field);
 		if ( !S->field->add(S->field, "event") )
 			goto done;
