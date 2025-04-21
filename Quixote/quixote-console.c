@@ -84,6 +84,15 @@ static _Bool TTY_output = false;
 static _Bool Prefix = false;
 
 /**
+ * The following boolean variable is used to indicate that an updated
+ * model is to be output.  An updated model includes the security state
+ * coefficients for any events that have been registered as being
+ * outside the current enforced model.
+ */
+static _Bool Update = false;
+
+
+/**
  * Private function.
  *
  * This function implements show mode for quixote.  This mode displays
@@ -487,6 +496,65 @@ static _Bool receive_TE_events(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 
 
 /**
+ * Private helper function.
+ *
+ * This function is a private helper function for the receive_map()
+ * function.  It is called if an updated security model has been
+ * requested that includes forensics points.
+ *
+ * \param mgmt		The socket object used to communicate with
+ *			the cartridge management instance.
+ *
+ * \param cmdbufr	The object used to process the remote command
+ *			response.
+ *
+ * \return		A boolean value is returned to indicate the
+ *			status of processing the list of forensics
+ *			coefficients.  A false value indicates an error
+ *			occurred while a true value indicates an error
+ *			was encountered.
+ */
+
+static _Bool _receive_update(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
+
+{
+	_Bool retn = false;
+
+	int cmdnum = show_forensics_coefficients;
+
+	unsigned int cnt;
+
+
+	cmdbufr->reset(cmdbufr);
+	cmdbufr->add(cmdbufr, (unsigned char *) &cmdnum, sizeof(cmdnum));
+	if ( !mgmt->send_Buffer(mgmt, cmdbufr) )
+		ERR(goto done);
+
+	/* Output the points. */
+	cmdbufr->reset(cmdbufr);
+	if ( !mgmt->receive_Buffer(mgmt, cmdbufr) )
+		ERR(goto done);
+	cnt = *(unsigned int *) cmdbufr->get(cmdbufr);
+
+	/* Output each point. */
+	fprintf(stdout, "# %u forensic updates\n", cnt);
+
+	while ( cnt ) {
+		cmdbufr->reset(cmdbufr);
+		if ( !mgmt->receive_Buffer(mgmt, cmdbufr) )
+			ERR(goto done);
+		fprintf(stdout, "state %s\n", cmdbufr->get(cmdbufr));
+		--cnt;
+	}
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
  * Private function.
  *
  * This function implements the receipt and output of a security state
@@ -538,8 +606,14 @@ static _Bool receive_map(CO(LocalDuct, mgmt), CO(Buffer, cmdbufr))
 		fprintf(stdout, "state %s\n", cmdbufr->get(cmdbufr));
 		--cnt;
 	}
-	fputs("seal\n", stdout);
 
+	/* Add forensic coefficients if an updated model is requested. */
+	if ( Update ) {
+		if ( !_receive_update(mgmt, cmdbufr) )
+			ERR(goto done);
+	}
+
+	fputs("seal\n", stdout);
 	fputs("end\n", stdout);
 	cmdbufr->reset(cmdbufr);
 	retn = true;
@@ -819,7 +893,7 @@ extern int main(int argc, char *argv[])
 	File infile = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "EFMSTcpsw:")) != EOF )
+	while ( (opt = getopt(argc, argv, "EFMSTcpsuw:")) != EOF )
 		switch ( opt ) {
 			case 'E':
 				mode = output_events;
@@ -845,6 +919,9 @@ extern int main(int argc, char *argv[])
 				break;
 			case 's':
 				type = coefficient_output;
+				break;
+			case 'u':
+				Update = true;
 				break;
 
 			case 'w':
