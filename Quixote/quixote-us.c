@@ -159,20 +159,6 @@ static _Bool Enforce = false;
 static char *TSEM_model = NULL;
 
 /**
- * The following variable holds booleans which describe signals
- * which were received.
- */
-struct {
-	_Bool sigint;
-	_Bool sigterm;
-	_Bool sighup;
-	_Bool sigquit;
-	_Bool stop;
-
-	_Bool sigchild;
-} Signals;
-
-/**
  * The following enumeration type specifies whether or not
  * the measurements are being managed internally or by an SGX enclave.
  */
