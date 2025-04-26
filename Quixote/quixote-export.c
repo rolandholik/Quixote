@@ -90,6 +90,12 @@ static pid_t Monitor_pid;
 static _Bool Current_Namespace = false;
 
 /**
+ * This boolean variable is set if a timestamp field is to be
+ * added to the event description.
+ */
+static _Bool Timestamp = false;
+
+/**
  * The name of the hash function to be used for the namespace.
  */
 static char *Digest = NULL;
@@ -142,6 +148,84 @@ static String Output_String = NULL;
 /**
  * Private function.
  *
+ * This function adds an ISO compatible timestamp to the export description.
+ *
+ * \param event		The object containing the event description.
+ *
+ * \param str		The object into which the updated event
+ *			description will be written.
+ *
+ * \return	A boolean value is returned to reflect the status of
+ *		the queueing.  A false value indicates an error was
+ *		encountered while a true value indicates the output
+ *		structure has a valid event description in it.
+ */
+
+static _Bool add_timestamp(CO(TSEMevent, event), CO(String, str))
+
+{
+	_Bool retn = false;
+
+	char *p,
+	     *type,
+	     tb[sizeof("9999-12-31T23:59:59")];
+
+	enum TSEM_export_type tp;
+
+	struct timespec now;
+
+
+	event->reset(event);
+	if ( (tp = event->extract_export(event)) == TSEM_EVENT_UNKNOWN )
+		ERR(goto done);
+
+	switch ( tp ) {
+		case TSEM_EVENT_EVENT:
+			type = "event";
+			break;
+		case TSEM_EVENT_ASYNC_EVENT:
+			type = "async_event";
+			break;
+		case TSEM_EVENT_LOG:
+			type = "forensic_event";
+			break;
+		case TSEM_EVENT_AGGREGATE:
+			type = "aggregate";
+			break;
+		default:
+			type = NULL;
+			break;
+	}
+
+	/* Re-create the export description. */
+	if ( !str->add_sprintf(str, "{\"export\": {\"type\": \"%s\", ", type) )
+		ERR(goto done);
+
+	/* Add the timestamp to the export description. */
+	clock_gettime(CLOCK_REALTIME, &now);
+	if ( strftime(tb, sizeof(tb), "%FT%T", gmtime(&now.tv_sec)) >= \
+	     sizeof(tb) )
+		ERR(goto done);
+	if ( !str->add_sprintf(str, "\"@timestamp\": \"%s.%lu\"}, ", tb, \
+			       now.tv_nsec) )
+		ERR(goto done);
+
+	/* Append the remainder of the event. */
+	if ( (p = strstr(event->get_event(event), "\"event\": {")) == NULL )
+		ERR(goto done);
+	if ( !str->add(str, p) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
  * This function is responsible for outputting a single event description.
  *
  * \param event	The object containing the object that contains the event
@@ -160,8 +244,14 @@ static _Bool output_event(CO(TSEMevent, event))
 
 
 	Output_String->reset(Output_String);
-	if ( !Output_String->add(Output_String, event->get_event(event)) )
-		ERR(goto done);
+	if ( Timestamp ) {
+		if ( !add_timestamp(event, Output_String) )
+			ERR(goto done);
+	} else {
+		if ( !Output_String->add(Output_String,
+					 event->get_event(event)) )
+			ERR(goto done);
+	}
 	if ( !Output_String->add(Output_String, "\n") )
 			ERR(goto done);
 
@@ -453,8 +543,15 @@ _Bool _queue_event(CO(TSEMevent, event))
 	str = GGET(Output, str);
 	str->reset(str);
 
-	if ( !str->add(str, event->get_event(event)) )
-		ERR(goto done);
+	if ( Timestamp ) {
+		fputs("Adding timestamp.\n", stderr);
+		if ( !add_timestamp(event, str) )
+			ERR(goto done);
+	} else {
+		if ( !str->add(str, event->get_event(event)) )
+			ERR(goto done);
+	}
+
 	if ( !str->add(str, "\n") )
 		ERR(goto done);
 
@@ -762,7 +859,7 @@ extern int main(int argc, char *argv[])
 	TSEMworkload workload = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "CPRSXfuM:b:d:h:n:o:p:q:s:t:w:")) \
+	while ( (opt = getopt(argc, argv, "CPRSXafuM:b:d:h:n:o:p:q:s:t:w:")) \
 		!= EOF )
 		switch ( opt ) {
 			case 'C':
@@ -781,6 +878,9 @@ extern int main(int argc, char *argv[])
 				Mode = execute_mode;
 				break;
 
+			case 'a':
+				Timestamp = true;
+				break;
 			case 'f':
 				follow = true;
 				break;
