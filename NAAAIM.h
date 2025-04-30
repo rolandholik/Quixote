@@ -111,3 +111,4 @@
 #define NAAAIM_TSEMevent_OBJID		71
 #define NAAAIM_MQTTduct_OBJID		72
 #define NAAAIM_TSEMworkload_OBJID	73
+#define NAAAIM_ESclient_OBJID		74
