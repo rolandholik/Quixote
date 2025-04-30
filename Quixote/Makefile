@@ -28,7 +28,8 @@ include ${SGXDIR}/Make.enclave
 SANCHODIR = ../Sancho
 SANCHOSGX = ${SANCHODIR}/SGX
 
-CSRC = quixote.c quixote-us.c quixote-console.c quixote-export.c test-sancho.c
+CSRC = quixote.c quixote-us.c quixote-console.c quixote-export.c \
+	quixote-inject.c test-sancho.c
 
 ifeq ($(findstring SGX,${BUILD_SANCHOS}),SGX)
 CSRC := ${CSRC} quixote-sgx.c quixote-sgx-u.c
@@ -40,7 +41,7 @@ ifeq ($(findstring Nordic, ${BUILD_SANCHOS}),Nordic)
 CSRC := ${CSRC} quixote-mcu.c
 endif
 
-TOOLS = quixote quixote-us quixote-export quixote-console \
+TOOLS = quixote quixote-us quixote-export quixote-console quixote-inject \
 	test-sancho test-thread test-domain-creation
 
 ifeq ($(findstring SGX,${BUILD_SANCHOS}),SGX)
@@ -105,6 +106,9 @@ SEDELIB	     = -L ${SGXDIR} -lSRDEruntime
 
 MOSQUITTO_LIB = -L ../Support/mosquitto/lib -l mosquitto -lssl \
 	${BUILD_LIBCRYPTO}
+
+CURL_LIBS = ${shell pkg-config --libs libcurl} -lssl -lcrypto -lz
+CURL_INC  = ${shell pkg-config --cflags libcurl}
 
 # libcap library
 LIBCAP = -L ../support/libcap -lcap
@@ -175,6 +179,12 @@ quixote-export: quixote-export.o ${LIBDEPS} ${MODELDEPS}
 
 quixote-console: quixote-console.o ${LIBDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
+
+quixote-inject: quixote-inject.o ${LIBDEPS}
+	${CC} ${LDFLAGS} -o $@ $< ${LIBS} ${CURL_LIBS};
+
+quixote-inject.o: quixote-inject.c
+	${CC} ${CFLAGS} ${CURL_INC} -c $< -o $@;
 
 test-sancho: test-sancho.o ${LIBDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
