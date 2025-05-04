@@ -17,7 +17,7 @@
 #define QUIXOTE_WORKLOAD_MGMT_DIR "/var/lib/Quixote/mgmt"
 
 /* Location of the root export file. */
-#define TSEM_ROOT_EXPORT "/sys/kernel/security/tsem/external_tma/0"
+#define TSEM_EXPORT_FILE "/sys/kernel/security/tsem/export"
 
 /* Defines for which side of the event pipe to access. */
 #define READ_SIDE  0
@@ -25,9 +25,6 @@
 
 /* The size of the buffer to be used for reading TSEM events. */
 #define TSEM_READ_BUFFER 1536
-
-/* The printf specifier for the file exporting events for a namespace. */
-#define TSEM_EVENT_FILE "/sys/kernel/security/tsem/external_tma/%lu"
 
 
 /* Include files. */
@@ -643,7 +640,7 @@ static _Bool set_root_mode(CO(TSEMworkload, this), int *fd)
 	STATE(S);
 
 
-	if ( (S->fd = open(TSEM_ROOT_EXPORT, O_RDONLY)) < 0 )
+	if ( (S->fd = open(TSEM_EXPORT_FILE, O_RDONLY)) < 0 )
 		ERR(return false);
 
 	*fd  = S->fd;
@@ -849,8 +846,6 @@ static _Bool _configure_namespace(CO(TSEMworkload_State, S), \
 {
 	_Bool retn = false;
 
-	char fname[PATH_MAX];
-
 
 	/* Wait for release by workload. */
 	if ( Debug )
@@ -863,14 +858,8 @@ static _Bool _configure_namespace(CO(TSEMworkload_State, S), \
 
 	/* Open the event export file if needed. */
 	if ( S->type != TSEMcontrol_TYPE_INTERNAL ) {
-		memset(fname, '\0', sizeof(fname));
-		if ( snprintf(fname, sizeof(fname), TSEM_EVENT_FILE, \
-			      S->id) >= sizeof(fname) )
+		if ( (S->fd = open(TSEM_EXPORT_FILE, O_RDONLY)) < 0 )
 			ERR(goto done);
-		if ( (S->fd = open(fname, O_RDONLY)) < 0 )
-			ERR(goto done);
-		if ( Debug )
-			fprintf(Debug, "Update file: %s\n", fname);
 	}
 
 	/* Load a model if one is specified and set enforcement status. */
