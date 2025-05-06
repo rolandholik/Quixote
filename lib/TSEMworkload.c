@@ -29,6 +29,7 @@
 
 /* Include files. */
 #include <stdio.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -165,29 +166,10 @@ struct NAAAIM_TSEMworkload_State
 static void _init_state(CO(TSEMworkload_State, S))
 
 {
-	S->libid = NAAAIM_LIBID;
-	S->objid = NAAAIM_TSEMworkload_OBJID;
+	INIT_STATE(S, NAAAIM, TSEMworkload);
 
-	S->poisoned = false;
-
-	S->workload_pid = 0;
-
-	S->fd = 0;
-	S->id = 0;
-	S->type = 0;
-	S->ns = TSEMcontrol_INIT_NS;
-	S->cache_size = 0;
-	S->name = NULL;
-	S->model = NULL;
-	S->digest = NULL;
-	S->mgmt = NULL;
-	S->control = NULL;
-	S->map = NULL;
-
+	S->ns	= TSEMcontrol_INIT_NS;
 	S->mode = PROCESS_MODE;
-	S->argc = 0;
-	S->argv = NULL;
-	S->bundle = NULL;
 
 	return;
 }
