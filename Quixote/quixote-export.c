@@ -4,23 +4,24 @@
  * stacks in an independent security namespace domain with export of
  * the security state events to userspace.  The primary purpose
  * of this orchestrator is to provide a mechanism for driving machine
- * learning baed security models.
+ * learning based security models.
  *
  * As with the other userspace orchestrator the security events
- * are exported through the following pseudo-file:
+ * are exported through the following control plane file:
  *
- * /sys/kernel/security/tsem/ExternalTMA/update-NNNNNNNNNN
+ * /sys/kernel/security/tsem/export
  *
- * Where NNNNNNNNNN is the id number of the security event modeling
- * namespace.
+ * Export can be directed to a file or to an MQTT broker.
+ *
+ * In addition to running workloads in subordinate modeling namespaces,
+ * this utility also provides support for exporting security events
+ * from the root modeling namespace when the kernel is run in
+ * root_export_only mode.
  */
 
 /**************************************************************************
  * Copyright (c) 2023, Enjellic Systems Development, LLC. All rights reserved.
  **************************************************************************/
-
-#define TSEM_ROOT_EXPORT "/sys/kernel/security/tsem/external_tma/0"
-#define _GNU_SOURCE
 
 
 /* Include files. */
@@ -625,55 +626,6 @@ static _Bool _output_events(void)
 /**
  * Private helper function.
  *
- * This function is a helper function for the export_root function.  This
- * function reads and outputs all of the oustanding events that are
- * available.
- *
- * \param event		The event processing structure that will be used
- *			to read the event stream.
- *
- * \param fd		The file descriptor of the export file from which
- *			the event descriptions are to be read.
- *
- * \param output	The object that is used to hold the event
- *			entries.
- *
- * \return	A boolean value is returned to reflect the status of
- *		the exports.  A false value indicates an error was
- *		encountered while a true value indicates the currently
- *		available events have been exported.
- */
-
-static _Bool _read_events(CO(TSEMevent, event), const int fd)
-
-{
-	_Bool retn	 = false,
-	      have_event = true;
-
-
-	/* Output events until the end of the event list is met. */
-	while ( have_event ) {
-		if ( !event->read_export(event, fd, &have_event) )
-			ERR(goto done);
-		if ( !have_event )
-			return true;
-		if ( !_queue_event(event) )
-			ERR(goto done);
-		if ( Queued == Output->size(Output) ) {
-			if ( !_output_events() )
-				ERR(goto done);
-		}
-	}
-
-
- done:
-	return retn;
-}
-
-
-/**
- * Private helper function.
- *
  * This function is a helper function for the export_root function.  It
  * is called by the TSEMworkload->monitor method for each event that
  * is processed.
@@ -759,8 +711,6 @@ static _Bool export_root(CO(TSEMworkload, workload), const _Bool follow, \
 {
 	_Bool retn = false;
 
-	int fd;
-
 	unsigned int lp;
 
 	long int queue_length;
@@ -799,29 +749,8 @@ static _Bool export_root(CO(TSEMworkload, workload), const _Bool follow, \
 			ERR(goto done);
 	}
 
-	/* Initialize the workload to manage root exports. */
-	INIT(NAAAIM, TSEMevent, event, ERR(goto done));
-
-	if ( !workload->set_root_mode(workload, &fd) )
-		ERR(goto done);
-
-	/* Output entries that have been queued. */
-	if ( !_read_events(event, fd) )
-		ERR(goto done);
-
-	if ( !_output_events() )
-		ERR(goto done);
-
-	if ( !follow ) {
-		retn = true;
-		goto done;
-	}
-
 	/* Output events as they are generated.. */
-	if ( Debug )
-		fprintf(Debug, "%d: Running root event loop.\n", getpid());
-
-	if ( !workload->run_workload(workload, NULL, _process_event, NULL) )
+	if ( !workload->run_root_export(workload, _process_event, follow) )
 		ERR(goto done);
 	retn = true;
 

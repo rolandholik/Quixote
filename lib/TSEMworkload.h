@@ -39,12 +39,13 @@ struct NAAAIM_TSEMworkload
 	void (*set_debug)(const TSEMworkload, FILE *);
 	void (*set_execute_mode)(const TSEMworkload, int argc, char *argv[]);
 	_Bool (*set_container_mode)(const TSEMworkload, const char *);
-	_Bool (*set_root_mode)(const TSEMworkload, int *);
 
 	_Bool (*run_workload)(const TSEMworkload,		    \
 			      _Bool (*model_loader)(const String),  \
 			      _Bool (*event_handler)(TSEMevent),    \
 			      _Bool (*command_handler)(LocalDuct, Buffer));
+	_Bool (*run_root_export)(const TSEMworkload, \
+				 _Bool (*event_handler)(TSEMevent), _Bool);
 
 	_Bool (*release)(const TSEMworkload, pid_t, uint64_t);
 	_Bool (*discipline)(const TSEMworkload, pid_t, uint64_t);

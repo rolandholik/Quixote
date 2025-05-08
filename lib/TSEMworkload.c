@@ -23,10 +23,6 @@
 #define READ_SIDE  0
 #define WRITE_SIDE 1
 
-/* The size of the buffer to be used for reading TSEM events. */
-#define TSEM_READ_BUFFER 1536
-
-
 /* Include files. */
 #include <stdio.h>
 #include <stddef.h>
@@ -594,39 +590,6 @@ static _Bool set_container_mode(CO(TSEMworkload, this), CO(char *, magazine))
 
  done:
 	return retn;
-}
-
-
-/**
- * External public method.
- *
- * This method implementations configuring the workload object to handle
- * exports from the root modeling namespace.
- *
- * \param this		A pointer to the object whose workload type is
- *			being set.
- *
- * \param fdp		A pointer to a variable that will be loaded with
- *			the file descriptior of the root export file.
- *
- * \return	A boolean value is used to indicate whether or not
- *		configuration of the mode had succeeded.  A false
- *		value indicates that configuration failed while a true
- *		value indicates the object execution mode was successfully
- *		configured.
- */
-
-static _Bool set_root_mode(CO(TSEMworkload, this), int *fd)
-
-{
-	STATE(S);
-
-
-	if ( (S->fd = open(TSEM_EXPORT_FILE, O_RDONLY)) < 0 )
-		ERR(return false);
-
-	*fd  = S->fd;
-	return true;
 }
 
 
@@ -1318,6 +1281,105 @@ static _Bool run_workload(CO(TSEMworkload, this),			\
 
 
 /**
+ * External public method.
+ *
+ * This method implements the functionality needed to export security
+ * events from the root modeling namespace.
+ *
+ * \param this		A pointer to the object representing the
+ *			workload that will be exporting the root security
+ *			events.
+ *
+ * \param follow	A pointer to a boolean flag indicating whether or
+ *			not the export of events should be continued
+ *			after the set of queued events are exported.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		export of the root security events had completed
+ *		successively.  A false value indicates that an error
+ *		had been encountered while a true value indicates that
+ *		the export was successful.
+ */
+
+static _Bool run_root_export(CO(TSEMworkload, this), \
+			     _Bool (*event_handler)(TSEMevent), _Bool follow)
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+	int rc;
+
+	unsigned int cycle = 0;
+
+	struct pollfd poll_data[1];
+
+
+	if ( (S->fd = open(TSEM_EXPORT_FILE, O_RDONLY)) < 0 )
+		ERR(return false);
+
+	/* Flush the outstanding event queue and return if not following. */
+	if ( !_process_events(this, event_handler) )
+		ERR(goto done);
+	if ( !follow )
+		return true;
+
+	/* Continuously poll and output events. */
+	poll_data[0].fd	    = S->fd;
+	poll_data[0].events = POLLIN;
+
+	if ( Debug )
+		fputs("Calling root export loop.\n", Debug);
+
+	while ( true ) {
+		if ( Debug )
+			fprintf(Debug, "\nExport cycle: %d\n", ++cycle);
+
+		rc = poll(poll_data, 1, -1);
+		if ( Debug )
+			fprintf(Debug, "Poll retn=%d, Data poll=%0x\n", rc, \
+				poll_data[0].revents);
+
+		if ( rc < 0 ) {
+			if ( Signals.stop ) {
+				if ( Debug )
+					fprintf(Debug, "Export terminated.\n");
+				retn = true;
+				Signals.stop = false;
+				goto done;
+			}
+
+			fputs("Poll error.\n", stderr);
+			goto done;
+		}
+
+		if ( poll_data[0].revents & POLLHUP ) {
+			if ( Signals.stop ) {
+				retn = true;
+				Signals.stop = false;
+				goto done;
+			}
+		}
+
+		if ( poll_data[0].revents & POLLIN ) {
+			if ( !_process_events(this, event_handler) )
+				goto done;
+			if ( Signals.sigchild ) {
+				Signals.sigchild = false;
+				retn = true;
+				goto done;
+			}
+		}
+	}
+
+
+ done:
+	return retn;
+}
+
+
+/**
  * Private helper function.
  *
  * This function is a helper function for the run_workload() function.
@@ -1633,9 +1695,9 @@ extern TSEMworkload NAAAIM_TSEMworkload_Init(void)
 	this->set_debug		 = set_debug;
 	this->set_execute_mode	 = set_execute_mode;
 	this->set_container_mode = set_container_mode;
-	this->set_root_mode	 = set_root_mode;
 
-	this->run_workload = run_workload;
+	this->run_workload    = run_workload;
+	this->run_root_export = run_root_export;
 
 	this->release	 = release;
 	this->discipline = discipline;
