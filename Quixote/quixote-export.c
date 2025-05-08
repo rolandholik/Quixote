@@ -117,6 +117,10 @@ static char *TSEM_model = NULL;
  */
 static size_t Queued = 0;
 
+/**
+ * The object that holds the UUID based boot identifier.
+ */
+static String Boot_ID = NULL;
 
 /**
  * The object used to hold events being exported from the root modeling
@@ -124,14 +128,12 @@ static size_t Queued = 0;
  */
 static Gaggle Output = NULL;
 
-
 /**
  * The objects used to write the output.
  */
 static File Output_File	    = NULL;
 static MQTTduct MQTT	    = NULL;
 static String Output_String = NULL;
-
 
 /**
  * The following enumeration type specifies whether or not
@@ -147,9 +149,51 @@ static String Output_String = NULL;
 
 
 /**
+ * Private helper function.
+ *
+ * This function is a helper function for the update_event() function that
+ * adds a timestamp to the export description.
+ *
+ * \param str	A pointer to the object containing the export description
+ *		that is being updated.
+ *
+ * \return	A boolean value is used to indicate if the addition of
+ *		the timestamp was successfull.  A false value indicates
+ *		that it failed while a true value indicates the object
+ *		passed to the function has been updated with the timestamp.
+ */
+
+static _Bool _add_timestamp(CO(String, str))
+
+{
+	_Bool retn = false;
+
+	char tb[sizeof("9999-12-31T23:59:59")];
+
+	struct timespec now;
+
+
+	clock_gettime(CLOCK_REALTIME, &now);
+	if ( strftime(tb, sizeof(tb), "%FT%T", gmtime(&now.tv_sec)) \
+	     >= sizeof(tb) )
+		ERR(goto done);
+
+	if ( !str->add_sprintf(str, "\"@timestamp\": \"%s.%lu\", ", tb, \
+			       now.tv_nsec) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
  * Private function.
  *
- * This function adds an ISO compatible timestamp to the export description.
+ * This function updates the export description to include the boot
+ * identifier, and if requested, an event timestamp.
  *
  * \param event		The object containing the event description.
  *
@@ -157,23 +201,21 @@ static String Output_String = NULL;
  *			description will be written.
  *
  * \return	A boolean value is returned to reflect the status of
- *		the queueing.  A false value indicates an error was
- *		encountered while a true value indicates the output
- *		structure has a valid event description in it.
+ *		the update of the export description.  A false value
+ *		indicates an error was encountered while a true value
+ *		indicates the output structure has a valid event
+ *		description in it.
  */
 
-static _Bool add_timestamp(CO(TSEMevent, event), CO(String, str))
+static _Bool update_event(CO(TSEMevent, event), CO(String, str))
 
 {
 	_Bool retn = false;
 
 	char *p,
-	     *type,
-	     tb[sizeof("9999-12-31T23:59:59")];
+	     *type;
 
 	enum TSEM_export_type tp;
-
-	struct timespec now;
 
 
 	event->reset(event);
@@ -198,18 +240,21 @@ static _Bool add_timestamp(CO(TSEMevent, event), CO(String, str))
 			break;
 	}
 
-	/* Re-create the export description. */
-	if ( !str->add_sprintf(str, "{\"export\": {\"type\": \"%s\", ", type) )
+	/* Re-create the export description with a boot identifier. */
+	if ( !str->add_sprintf(str, "{\"export\": {\"boot_id\": \"%s\", ", \
+			       Boot_ID->get(Boot_ID)) )
 		ERR(goto done);
 
-	/* Add the timestamp to the export description. */
-	clock_gettime(CLOCK_REALTIME, &now);
-	if ( strftime(tb, sizeof(tb), "%FT%T", gmtime(&now.tv_sec)) >= \
-	     sizeof(tb) )
+	/* Add the timestamp export description if requested. */
+	if ( Timestamp ) {
+		if ( !_add_timestamp(str) )
+			ERR(goto done);
+	}
+
+	/* Add the type. */
+	if ( !str->add_sprintf(str, "\"type\": \"%s\"}, ", type) )
 		ERR(goto done);
-	if ( !str->add_sprintf(str, "\"@timestamp\": \"%s.%lu\"}, ", tb, \
-			       now.tv_nsec) )
-		ERR(goto done);
+
 
 	/* Append the remainder of the event. */
 	if ( (p = strstr(event->get_event(event), "\"event\": {")) == NULL )
@@ -245,14 +290,8 @@ static _Bool output_event(CO(TSEMevent, event))
 
 
 	Output_String->reset(Output_String);
-	if ( Timestamp ) {
-		if ( !add_timestamp(event, Output_String) )
+	if ( !update_event(event, Output_String) )
 			ERR(goto done);
-	} else {
-		if ( !Output_String->add(Output_String,
-					 event->get_event(event)) )
-			ERR(goto done);
-	}
 	if ( !Output_String->add(Output_String, "\n") )
 			ERR(goto done);
 
@@ -544,14 +583,8 @@ _Bool _queue_event(CO(TSEMevent, event))
 	str = GGET(Output, str);
 	str->reset(str);
 
-	if ( Timestamp ) {
-		fputs("Adding timestamp.\n", stderr);
-		if ( !add_timestamp(event, str) )
-			ERR(goto done);
-	} else {
-		if ( !str->add(str, event->get_event(event)) )
-			ERR(goto done);
-	}
+	if ( !update_event(event, str) )
+		ERR(goto done);
 
 	if ( !str->add(str, "\n") )
 		ERR(goto done);
@@ -762,6 +795,55 @@ static _Bool export_root(CO(TSEMworkload, workload), const _Bool follow, \
 	return retn;
 }
 
+/**
+ * Private helper function.
+ *
+ * This is a private helper function for the main() function that
+ * reads the system boot identifier from the following file:
+ *
+ * /proc/sys/kernel/random/boot_id
+ *
+ * This UUID will be added to each exported record in order to allow
+ * namespaces to be differentiated between boots of the operating
+ * system.  Within a given OS boot the security context identifier
+ * will differentiate separate namespaces.
+ *
+ * This function loads the UUID into the statically scoped Boot_ID
+ * String object.
+ *
+ * \return	A boolean value is returned to reflect the status of
+ *		loading the boot identifier.  A false value indicates
+ *		the read of the identifier failed while a true value
+ *		indicates the Boot_ID object contains the current
+ *		boot identifier.
+ */
+
+static _Bool _read_boot_identifier(void)
+
+{
+	_Bool retn = false;
+
+	File boot_file = NULL;
+
+
+	INIT(HurdLib, String, Boot_ID, ERR(goto done));
+
+	INIT(HurdLib, File, boot_file, ERR(goto done));
+	if ( !boot_file->open_ro(boot_file, \
+				 "/proc/sys/kernel/random/boot_id") )
+		ERR(goto done);
+
+	if ( !boot_file->read_String(boot_file, Boot_ID) )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	WHACK(boot_file);
+
+	return retn;
+}
+
 
 /*
  * Program entry point begins here.
@@ -884,6 +966,10 @@ extern int main(int argc, char *argv[])
 		}
 	}
 
+	/* Get the boot identifier. */
+	if ( !_read_boot_identifier() )
+		ERR(goto done);
+
 	/* Initialize the TSEM workload manager object. */
 	INIT(NAAAIM, TSEMworkload, workload, ERR(goto done));
 	INIT(HurdLib, String, Output_String, ERR(goto done));
@@ -941,6 +1027,7 @@ extern int main(int argc, char *argv[])
 
 
  done:
+	WHACK(Boot_ID);
 	WHACK(Output_String);
 	WHACK(MQTT);
 	WHACK(Output_File);
