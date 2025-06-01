@@ -20,13 +20,13 @@ SANCHODIR = ../Sancho/SGX
 
 CSRC = COE.c Cell.c SecurityEvent.c SecurityPoint.c TSEM.c EventModel.c \
 	EventParser.c compute-aggregate.c generate-pseudonym.c		\
-	generate-states.c test-parser.c
+	generate-states.c generate-model.c test-parser.c
 
-TOOLS = test-COE test-cell test-event generate-states sha-tool	   \
-	compute-measurement test-TSEM compute-aggregate	sign-model \
+TOOLS = test-COE test-cell test-event generate-states generate-model sha-tool \
+	compute-measurement test-TSEM compute-aggregate	sign-model	      \
 	generate-pseudonym test-parser json2quixote
 
-INSTALLBIN  = generate-states generate-pseudonym sign-model
+INSTALLBIN  = generate-states generate-pseudonym generate-model sign-model
 
 CDEBUG = -g -O2 -fomit-frame-pointer -march=core2
 CFLAGS = -Wall ${CDEBUG}
@@ -96,6 +96,10 @@ test-TSEM: test-TSEM.o TSEM.o SecurityPoint.o SecurityEvent.o COE.o Cell.o \
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO};
 
 generate-states: generate-states.o SecurityEvent.o EventParser.o COE.o Cell.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO};
+
+generate-model: generate-model.o SecurityEvent.o TSEM.o COE.o Cell.o TSEM.o \
+	EventModel.o SecurityPoint.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO};
 
 compute-measurement: compute-measurement.o COE.o Cell.o EventParser.o
