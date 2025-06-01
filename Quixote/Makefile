@@ -180,8 +180,8 @@ quixote-export: quixote-export.o ${LIBDEPS} ${MODELDEPS}
 quixote-console: quixote-console.o ${LIBDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
 
-quixote-inject: quixote-inject.o ${LIBDEPS}
-	${CC} ${LDFLAGS} -o $@ $< ${LIBS} ${CURL_LIBS};
+quixote-inject: quixote-inject.o ${LIBDEPS} ${MODELDEPS}
+	${CC} ${LDFLAGS} -o $@ $< ${MODELDEPS} ${LIBS} ${CURL_LIBS};
 
 quixote-inject.o: quixote-inject.c
 	${CC} ${CFLAGS} ${CURL_INC} -c $< -o $@;
