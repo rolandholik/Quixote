@@ -133,7 +133,6 @@ extern int main(int argc, char *argv[])
  done:
 	WHACK(bufr);
 	WHACK(descn);
-	WHACK(event);
 	WHACK(trajectory);
 	WHACK(model);
 
