@@ -17,6 +17,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <errno.h>
+#include <ctype.h>
 #include <sys/types.h>
 
 #include <Origin.h>
@@ -89,6 +90,36 @@ static void _init_state(CO(TSEMparser_State, S))
 
 
 /**
+ * Internal private helper function.
+ *
+ * This function consumes whitespace and returns a pointer to the first
+ * character after the whitespace.
+ *
+ * \param ptr	A pointer to a location in a null-terminated string
+ *		buffer that is the starting position from where the
+ *		whitespace is to be bypassed.
+ *
+ * \return	A pointer to the character position that is first
+ *		non-whitespace character.  If the end of the string is
+ *		encountered a null value is returned.
+ */
+
+static inline char *_gobble_whitespace(char *ptr)
+
+{
+	while ( true ) {
+		if ( *ptr == '\0' )
+			return NULL;
+		if ( !isspace(*ptr) )
+			return ptr;
+		++ptr;
+	}
+
+	return ptr;
+}
+
+
+/**
  * External public method.
  *
  * This method extracts a JSON encoded field definition from an event
@@ -115,7 +146,8 @@ static _Bool extract_field(CO(TSEMparser, this), CO(String, event), \
 
 	_Bool retn = false;
 
-	char *start,
+	char *p,
+	     *start,
 	     *end,
 	     in[2];
 
@@ -136,14 +168,20 @@ static _Bool extract_field(CO(TSEMparser, this), CO(String, event), \
 
 	/* Create the field specifier we will look for. */
 	S->field->reset(S->field);
-	if ( !S->field->add_sprintf(S->field, "\"%s\": {", field) )
+	if ( !S->field->add_sprintf(S->field, "\"%s\":", field) )
 		ERR(goto done);
 
 	/* Locate the start and end of the field specifier. */
 	if ( (start = strstr(start, S->field->get(S->field))) == NULL )
 		ERR(goto done);
-	start += S->field->size(S->field) - 1;
 
+	p = start + S->field->size(S->field);
+	if ( (p = _gobble_whitespace(p)) == NULL )
+		ERR(goto done);
+	if ( *p != '{' )
+		ERR(goto done);
+
+	start = p;
 	end = start + 1;
 	while ( (*end != '\0') && (cnt > 0) ) {
 		if ( *end == '{' )
@@ -286,7 +324,7 @@ static char * _find_key(CO(TSEMparser_State, S), CO(char *, key))
 
 	/* Create the key descriptor. */
 	S->key_value->reset(S->key_value);
-	if ( !S->key_value->add_sprintf(S->key_value, "\"%s\": ", key) )
+	if ( !S->key_value->add_sprintf(S->key_value, "\"%s\":", key) )
 		return NULL;
 
 	/* Verify that the key is found and terminate it appropriately. */
@@ -296,6 +334,7 @@ static char * _find_key(CO(TSEMparser_State, S), CO(char *, key))
 		p = strstr(fp, S->key_value->get(S->key_value));
 		if ( p == NULL )
 			return NULL;
+
 		if ( _find_level(S->field->get(S->field), p) == 0 )
 			not_found = false;
 		else
@@ -303,10 +342,14 @@ static char * _find_key(CO(TSEMparser_State, S), CO(char *, key))
 	}
 
 	type = p + S->key_value->size(S->key_value);
-	if ( *type == '\0' )
+	type = _gobble_whitespace(type);
+	if ( type == NULL )
 		return NULL;
-	if ( (*type != '"') && (*type != '{') )
+
+	if ( (*type != '"') && (*type != '{') ) {
+		fprintf(stdout, "%s: Unknown type: `%s`\n", __func__, type);
 		return NULL;
+	}
 
 	add[0] = *type;
 	add[1] = '\0';
@@ -350,7 +393,10 @@ static _Bool _get_key(CO(TSEMparser_State, S), CO(char *, key))
 	if ( (start = _find_key(S, key)) == NULL )
 		ERR(goto done);
 	start += S->key_value->size(S->key_value);
-	end    = start;
+	start = _gobble_whitespace(start);
+	if ( (*start == '"') || (*start == '{') )
+		++start;
+	end = start;
 
 	while ( !found ) {
 		if ( (end = strchr(end, '"')) == NULL )
