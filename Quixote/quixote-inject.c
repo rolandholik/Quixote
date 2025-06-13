@@ -326,7 +326,7 @@ int main(int argc, char *argv[])
 
 	/* Initialize the endpoint. */
 	INIT(NAAAIM, ESclient, es, ERR(goto done));
-	if ( !es->init(es, host, index, user, NULL) ) {
+	if ( !es->init(es, host, index, user, NULL, NULL) ) {
 		fputs("Error initializing endpoint connection.\n", stderr);
 		goto done;
 	}

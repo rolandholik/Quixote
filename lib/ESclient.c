@@ -67,6 +67,9 @@ struct NAAAIM_ESclient_State
 
 	/* The list of headers used for a request. */
 	struct curl_slist *hdrs;
+
+	/* Object used to accumulate output. */
+	Buffer output;
 };
 
 
@@ -160,14 +163,27 @@ static _Bool _set_password(CO(char *, pwd), CO(String, auth))
 /*
  * Private helper function.
  *
- * This function is a null callback routine that supresses any output
- * from the injection request.
+ * This function is the callback routine for the command that is executed.
+ * If an output object has been set the output that is generated is
+ * added to the output object.
  */
 
-static size_t _null_cb(void *data, size_t size, size_t nmemb, void *clientp)
+static size_t _output_cb(void *data, size_t size, size_t nmemb, void *output)
 
 {
-	return size * nmemb;
+	unsigned char *p = data;
+
+	size_t retn = size * nmemb;
+
+	Buffer bufr = output;
+
+
+	if ( bufr == NULL )
+		return retn;
+
+	if ( !bufr->add(bufr, p, size) )
+		return 0;
+	return retn;
 }
 
 
@@ -193,6 +209,14 @@ static size_t _null_cb(void *data, size_t size, size_t nmemb, void *clientp)
  *			to obtain the password from an environment
  *			variable or a file.
  *
+ * \param bufr		The Buffer object that will be used to hold the
+ *			output of commands that are executed.  A NULL
+ *			value will result in command output being
+ *			suppressed.  The supplied object will be under
+ *			the control of the caller and will not be
+ *			destroyed by the destructor for the this
+ *			object.
+ *
  * \return	A boolean value is used to indicate whether or not the
  *		initialization succeeded.  A false value indicates the
  *		initialized failed and the object cannot be used.  A
@@ -202,7 +226,7 @@ static size_t _null_cb(void *data, size_t size, size_t nmemb, void *clientp)
  */
 
 static _Bool init(CO(ESclient, this), CO(char *, host), CO(char *, index), \
-		  CO(char *, user), CO(char *, pwd))
+		  CO(char *, user), CO(char *, pwd), CO(Buffer, bufr))
 
 {
 	STATE(S);
@@ -273,10 +297,13 @@ static _Bool init(CO(ESclient, this), CO(char *, host), CO(char *, index), \
 	     CURLE_OK )
 		ERR(goto done);
 
-	/* Set a null writeback to suppress output. */
-	if ( curl_easy_setopt(S->ctxt, CURLOPT_WRITEFUNCTION, _null_cb) != \
+	/* Setup the callback function and object. */
+	if ( curl_easy_setopt(S->ctxt, CURLOPT_WRITEFUNCTION, _output_cb) != \
 	     CURLE_OK)
 		ERR(goto done);
+	if ( curl_easy_setopt(S->ctxt, CURLOPT_WRITEDATA, bufr) != CURLE_OK )
+		ERR(goto done);
+
 	retn = true;
 
 
