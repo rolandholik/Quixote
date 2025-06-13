@@ -31,6 +31,11 @@ MOSQUITTO_FILE    = mosquitto-${MOSQUITTO_VERSION}.tar.gz
 MOSQUITTO_URL     = https://mosquitto.org/files/source/${MOSQUITTO_FILE}
 MOSQUITTO_TAR     = Build/${MOSQUITTO_FILE}
 
+# Definitions for building cJSON.
+CJSON_VERSION = 1.7.18
+CJSON_FILE    = v${CJSON_VERSION}.tar.gz
+CJSON_URL     = https://github.com/DaveGamble/cJSON/archive/refs/tags/v1.7.18.tar.gz
+CJSON_TAR     = Build/${CJSON_FILE}
 
 # Definitions for the mbedtls source package.
 MBEDTLS_VERSION = 2.28.8
@@ -50,7 +55,7 @@ NORDIC_URL  = ${BUILD_NORDIC_URL}/${NORDIC_FILE}
 #
 .PHONY: all
 
-all: Build libcap.stamp mosquitto.stamp mbedtls.stamp # nordic.stamp
+all: Build libcap.stamp mosquitto.stamp cjson.stamp mbedtls.stamp # nordic.stamp
 
 
 #
@@ -86,6 +91,23 @@ mosquitto: ${MOSQUITTO_TAR}
 
 ${MOSQUITTO_TAR}:
 	wget -O $@ ${MOSQUITTO_URL};
+
+
+#
+# cJSON build.
+#
+cjson.stamp: cJSON/libcjson.a
+	touch $@;
+
+cJSON/libcjson.a: cJSON
+	make -C cJSON CC=${CC} static;
+
+cJSON: ${CJSON_TAR}
+	tar xf $<;
+	mv cJSON-${CJSON_VERSION} cJSON;
+
+${CJSON_TAR}:
+	wget -O $@ ${CJSON_URL};
 
 
 #
@@ -137,12 +159,14 @@ install-bin:
 clean:
 	[ -d libcap ] && make -C libcap clean || true;
 	[ -d mosquitto ] && make -C mosquitto clean || true;
+	[ -d cJSON ] && make -C cJSON clean || true;
 
 distclean: clean
 	[ -d libcap ] && rm -rf libcap || true;
 	[ -d mosquitto ] && rm -rf mosquitto || true;
 	[ -d mbedtls ] && rm -rf mbedtls || true;
 	[ -d nRF5_SDK ] && rm -rf nRF5_SDK || true;
+	[ -d cJSON ] && rm -rf CJSON || true;
 	rm -f *.stamp;
 
 purge: distclean
