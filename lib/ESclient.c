@@ -68,6 +68,15 @@ struct NAAAIM_ESclient_State
 	/* The list of headers used for a request. */
 	struct curl_slist *hdrs;
 
+	/* The object containing the target endpoint for the commands. */
+	String endpoint;
+
+	/* The object containing the index name. */
+	String index;
+
+	/* The object that will be used to build a command string. */
+	String command;
+
 	/* Object used to accumulate output. */
 	Buffer output;
 };
@@ -84,8 +93,6 @@ struct NAAAIM_ESclient_State
  */
 
 static void _init_state(CO(ESclient_State, S))
-
-
 
 {
 	INIT_STATE(S, NAAAIM, ESclient);
@@ -199,7 +206,9 @@ static size_t _output_cb(void *data, size_t size, size_t nmemb, void *output)
  *			containing the name of the host to connect to.
  *
  * \param index		The name of the index that will be updated using
- *			this object.
+ *			this object.  A null value should be passed as
+ *			the index name for commands that do not reference
+ *			a particular index.
  *
  * \param user		The name of the user that will be used to
  *			authenticate the connection.
@@ -233,8 +242,6 @@ static _Bool init(CO(ESclient, this), CO(char *, host), CO(char *, index), \
 
 	_Bool retn = false;
 
-	String authinfo = NULL;
-
 
 	/* Check object state. */
 	if ( S->poisoned )
@@ -244,27 +251,29 @@ static _Bool init(CO(ESclient, this), CO(char *, host), CO(char *, index), \
 	if ( (S->ctxt = curl_easy_init()) == NULL )
 		ERR(goto done);
 
-	/* Set the endpoint name. */
-	INIT(HurdLib, String, authinfo, ERR(goto done));
+	/* Initialize object used to construct commands. */
+	INIT(HurdLib, String, S->command, ERR(goto done));
 
-	if ( !authinfo->add_sprintf(authinfo, "https://%s:9200/%s/_doc", \
-				host, index) )
+	/* Save the index name for future reference. */
+	if ( index != NULL ) {
+		INIT(HurdLib, String, S->index, ERR(goto done));
+		if ( !S->index->add(S->index, index) )
+			ERR(goto done);
+	}
+
+	/* Set the authentication information. */
+	INIT(HurdLib, String, S->endpoint, ERR(goto done));
+	if ( !S->endpoint->add_sprintf(S->endpoint, "%s:", user) )
 		ERR(goto done);
-
-	if ( curl_easy_setopt(S->ctxt, CURLOPT_URL, \
-			      authinfo->get(authinfo)) != CURLE_OK )
+	if ( !_set_password(pwd, S->endpoint) )
 		ERR(goto done);
-
-	/* Set the authentication information .*/
-	authinfo->reset(authinfo);
-	if ( !authinfo->add_sprintf(authinfo, "%s:", user) )
-		ERR(goto done);
-
-	if ( !_set_password(pwd, authinfo) )
-		ERR(goto done);
-
 	if ( curl_easy_setopt(S->ctxt, CURLOPT_USERPWD, \
-			       authinfo->get(authinfo)) != CURLE_OK )
+			       S->endpoint->get(S->endpoint)) != CURLE_OK )
+		ERR(goto done);
+
+	/* Set the endpoint name. */
+	S->endpoint->reset(S->endpoint);
+	if ( !S->endpoint->add_sprintf(S->endpoint, "https://%s:9200", host) )
 		ERR(goto done);
 
 	/* Set the boilerplate definitions. */
@@ -308,8 +317,6 @@ static _Bool init(CO(ESclient, this), CO(char *, host), CO(char *, index), \
 
 
  done:
-	WHACK(authinfo);
-
 	if ( !retn )
 		S->poisoned = true;
 	return retn;
@@ -348,11 +355,20 @@ static _Bool inject(CO(ESclient, this), CO(String, str))
 	if ( S->ctxt == NULL )
 		ERR(goto done);
 
+	/* Create the command. */
+	S->command->reset(S->command);
+	if ( !S->command->add_sprintf(S->command, "%s/%s/_doc", \
+				     S->endpoint->get(S->endpoint), \
+				     S->index->get(S->index)) )
+		ERR(goto done);
+	if ( curl_easy_setopt(S->ctxt, CURLOPT_URL, \
+			      S->command->get(S->command)) != CURLE_OK )
+		ERR(goto done);
+
 	/* Set the size of the update and the payload. */
 	if ( curl_easy_setopt(S->ctxt, CURLOPT_POSTFIELDSIZE_LARGE, \
 			      str->size(str)) != CURLE_OK )
 		ERR(goto done);
-
 	if ( curl_easy_setopt(S->ctxt, CURLOPT_POSTFIELDS, str->get(str)) \
 	     != CURLE_OK)
 		ERR(goto done);
@@ -386,6 +402,10 @@ static void whack(CO(ESclient, this))
 
 	curl_easy_cleanup(S->ctxt);
 	curl_slist_free_all(S->hdrs);
+
+	S->endpoint->whack(S->endpoint);
+	S->index->whack(S->index);
+	S->command->whack(S->command);
 
 	S->root->whack(S->root, this, S);
 	return;
