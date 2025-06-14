@@ -20,13 +20,14 @@ SANCHODIR = ../Sancho/SGX
 
 CSRC = COE.c Cell.c SecurityEvent.c SecurityPoint.c TSEM.c EventModel.c \
 	EventParser.c compute-aggregate.c generate-pseudonym.c		\
-	generate-states.c generate-model.c test-parser.c
+	generate-states.c generate-model.c qidx-util.c test-parser.c
 
 TOOLS = test-COE test-cell test-event generate-states generate-model sha-tool \
 	compute-measurement test-TSEM compute-aggregate	sign-model	      \
-	generate-pseudonym test-parser json2quixote
+	generate-pseudonym test-parser json2quixote qidx-util
 
-INSTALLBIN  = generate-states generate-pseudonym generate-model sign-model
+INSTALLBIN  = generate-states generate-pseudonym generate-model sign-model \
+	qidx-util
 
 CDEBUG = -g -O2 -fomit-frame-pointer -march=core2
 CFLAGS = -Wall ${CDEBUG}
@@ -65,6 +66,8 @@ RDKLIB	    = -L ../SRDE -lSRDEruntime ${BUILD_ELFLIB}
 
 NAAAIM_LIBRARY = ../lib/libNAAAIM.a
 NAAAIMLIB      = -L ../lib -lNAAAIM
+
+CURL_LIB = ${shell pkg-config --libs libcurl} -lssl -lcrypto -lz
 
 LIBS = ${NAAAIMLIB} ${HURDLIB}
 
@@ -113,6 +116,9 @@ sha-tool: sha-tool.o
 
 sign-model: sign-model.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO};
+
+qidx-util: qidx-util.o
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${CURL_LIB};
 
 generate-pseudonym: generate-pseudonym.o Cell.o EventParser.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO};
