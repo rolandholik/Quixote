@@ -188,7 +188,7 @@ static size_t _output_cb(void *data, size_t size, size_t nmemb, void *output)
 	if ( bufr == NULL )
 		return retn;
 
-	if ( !bufr->add(bufr, p, size) )
+	if ( !bufr->add(bufr, p, retn) )
 		return 0;
 	return retn;
 }
@@ -326,6 +326,61 @@ static _Bool init(CO(ESclient, this), CO(char *, host), CO(char *, index), \
 /**
  * External public method.
  *
+ * This method generates a list of the indexes that are available on
+ * the initialized endpoint.
+ *
+ * \param this	The object representing the endpoint that will be
+ *		queried.
+ *
+ *
+ * \return	A boolean value is used to indicate whether or not the
+ *		the index list was generated.  A false value indicates
+ *		an error was encountered.  A true value indicates that
+ *		the output object that was defined at endpoint
+ *		initialization time has been populated with an index
+ *		list.
+ */
+
+static _Bool list(CO(ESclient, this))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Check object state. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( S->ctxt == NULL )
+		ERR(goto done);
+
+	/* Create the command. */
+	S->command->reset(S->command);
+	if ( !S->command->add_sprintf(S->command, "%s/_cat/indices?v",
+				      S->endpoint->get(S->endpoint)) )
+		ERR(goto done);
+	if ( curl_easy_setopt(S->ctxt, CURLOPT_URL, \
+			      S->command->get(S->command)) != CURLE_OK )
+		ERR(goto done);
+	if ( curl_easy_setopt(S->ctxt, CURLOPT_CUSTOMREQUEST, "GET") != \
+	     CURLE_OK )
+		ERR(goto done);
+
+	/* Request generation of the list. */
+	if ( curl_easy_perform(S->ctxt) != CURLE_OK )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method injects a document into the endpoint configured as the
  * destination endpoint for the object.
  *
@@ -335,7 +390,7 @@ static _Bool init(CO(ESclient, this), CO(char *, host), CO(char *, index), \
  *			be injected into the index.
  *
  * \return	A boolean value is used to indicate whether or not the
- *		injectino of the value succeeded.  A false value indicates
+ *		injection of the value succeeded.  A false value indicates
  *		the injection failed and the object cannot be used until
  *		it is reset.  A true value indicates the value was
  *		successfully loaded into the endpoint.
@@ -403,9 +458,9 @@ static void whack(CO(ESclient, this))
 	curl_easy_cleanup(S->ctxt);
 	curl_slist_free_all(S->hdrs);
 
-	S->endpoint->whack(S->endpoint);
-	S->index->whack(S->index);
-	S->command->whack(S->command);
+	WHACK(S->endpoint);
+	WHACK(S->index);
+	WHACK(S->command);
 
 	S->root->whack(S->root, this, S);
 	return;
@@ -448,7 +503,9 @@ extern ESclient NAAAIM_ESclient_Init(void)
 
 	/* Method initialization. */
 	this->init   = init;
+
 	this->inject = inject;
+	this->list   = list;
 
 	this->whack = whack;
 

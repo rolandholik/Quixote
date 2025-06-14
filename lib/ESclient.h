@@ -27,7 +27,9 @@ struct NAAAIM_ESclient
 	/* External methods. */
 	_Bool (*init)(const ESclient, const char *, const char *, \
 		      const char *, const char *, const Buffer);
+
 	_Bool (*inject)(const ESclient, const String);
+	_Bool (*list)(const ESclient);
 
 	void (*whack)(const ESclient);
 
