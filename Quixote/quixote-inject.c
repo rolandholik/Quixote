@@ -198,7 +198,7 @@ static _Bool model_event(CO(String, str))
 	if ( !Model->update(Model, event, &updated, &violation, &sealed) )
 		ERR(goto done);
 
-	if ( !updated )
+	if ( !updated && !violation )
 		str->reset(str);
 	else {
 		if ( (p = strchr(save->get(save), '}')) == NULL )
