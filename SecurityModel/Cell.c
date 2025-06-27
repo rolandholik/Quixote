@@ -19,7 +19,9 @@
 
 #define UNIX_PATH_MAX 108
 
-#define TMPFS_MAGIC 0x01021994
+#define TMPFS_MAGIC		0x01021994
+#define SYSFS_MAGIC		0x62656572
+#define CGROUP2_SUPER_MAGIC	0x63677270
 
 
 /* Include files. */
@@ -69,6 +71,13 @@ const char zero_message[NAAAIM_IDSIZE] = {
 	0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55
 };
 
+
+/** Array containing filesystem magic numbers that are to be substituted. */
+const uint32_t substituted_fs_types[] = {
+	TMPFS_MAGIC,
+	SYSFS_MAGIC,
+	CGROUP2_SUPER_MAGIC
+};
 
 /* Definition for an inode. */
 struct inode {
@@ -1337,6 +1346,38 @@ static _Bool _add_temp_path(CO(Buffer, bufr), CO(struct path *, pp))
 
 
 /**
+ * Internal private helper function..
+ *
+ * This function is a helper function for the _measure_file method.  It
+ * takes the magic number of the filesystem and checks it against a list
+ * of filesystem types whose UUID is to be substituted with a known
+ * value.
+ *
+ * \param magic	The magic number of the filesystem type to be checked.
+ *
+ * \return	A boolean value is used to indicate whether or not
+ *		a substitution should be made.  A false value indicates
+ *		that a substitution is not needed with a true value
+ *		indicating this is a filesystem that should have its
+ *		UUID value substituted.
+ */
+
+static _Bool __substitute_uuid(uint32_t magic)
+
+{
+	unsigned int lp;
+
+
+	for (lp= 0; lp < sizeof(substituted_fs_types)/sizeof(uint32_t); ++lp) {
+		if ( substituted_fs_types[lp] == magic )
+			return true;
+	}
+
+	return false;
+}
+
+
+/**
  * Internal private method.
  *
  * This method implements computing of the measurement of a cell that
@@ -1374,7 +1415,7 @@ static _Bool _measure_file(CO(Cell_State, S))
 	bufr->add(bufr, (void *) &i->s_magic, sizeof(i->s_magic));
 	bufr->add(bufr, (void *) &i->s_id, sizeof(i->s_id));
 
-	if ( i->s_magic == TMPFS_MAGIC ) {
+	if ( __substitute_uuid(i->s_magic) ) {
 		memset(null_uuid, '\0', sizeof(null_uuid));
 		bufr->add(bufr, null_uuid, sizeof(null_uuid));
 	} else
