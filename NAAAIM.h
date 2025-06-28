@@ -112,3 +112,4 @@
 #define NAAAIM_MQTTduct_OBJID		72
 #define NAAAIM_TSEMworkload_OBJID	73
 #define NAAAIM_ESclient_OBJID		74
+#define NAAAIM_JSONparser_OBJID		75

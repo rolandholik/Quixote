@@ -22,18 +22,19 @@ INSTINCLUDE = ../NAAAIM.h AES256_cbc.h Base64.h Curve25519.h Duct.h	 \
 	SHA256.h  SHA256_hmac.h SmartCard.h SoftwareStatus.h		 \
 	X509cert.h Prompt.h AES128_cmac.h TTYduct.h XENduct.h		 \
 	TSEMcontrol.h TSEMevent.h TSEMparser.h MQTTduct.h TSEMworkload.h \
-	ESclient.h
+	ESclient.h JSONparser.h
 
 CSRC = Duct.c OTEDKS.c Curve25519.c IPC.c SoftwareStatus.c Ivy.c IDmgr.c     \
 	RSAkey.c LocalDuct.c HTTP.c Base64.c Duct_mgr.c SHA256.c	     \
 	SHA256_hmac.c RandomBuffer.c AES256_cbc.c IDtoken.c X509cert.c	     \
 	Prompt.c AES128_cmac.c TTYduct.c XENduct.c TSEMcontrol.c TSEMevent.c \
-	TSEMparser.c MQTTduct.c TSEMworkload.c ESclient.c
+	TSEMparser.c MQTTduct.c TSEMworkload.c ESclient.c JSONparser.c
 
 TESTS = Duct_test Curve25519_test IPC_test RSAkey_test			\
 	LocalDuct_test X509cert_test Prompt_test AES128_cmac_test	\
-	TTYduct_test MQTTduct_test test-parser #SmartCard_test
+	TTYduct_test MQTTduct_test JSONparser_test test-parser #SmartCard_test
 
+CJSON_LIB     = -L ${TOPDIR}/Support/cJSON -l cjson
 MOSQUITTO_LIB = -L ${TOPDIR}/Support/mosquitto/lib -l mosquitto -lssl
 
 LIBNAME = NAAAIM
@@ -46,6 +47,8 @@ CDEBUG = -g ${DMALLOC}
 
 CFLAGS	  = -Wall -fpic ${CDEBUG}
 XENCFLAGS = ${shell pkg-config --cflags xenstore}
+
+CJSONFLAGS = -I ../Support/cJSON
 
 LDFLAGS = -g -L ../HurdLib 
 
@@ -129,6 +132,12 @@ SmartCard.o: SmartCard.c SmartCard.h
 
 XENduct.o: XENduct.c
 	${CC} ${CFLAGS} ${XENCFLAGS} -c $< -o $@;
+
+JSONparser.o: JSONparser.c
+	${CC} ${CFLAGS} ${CJSONFLAGS} -c $< -o $@;
+
+JSONparser_test: JSONparser_test.o JSONparser.o
+	${CC} ${LDFLAGS} -o $@ $^ -L../HurdLib -lHurdLib ${CJSON_LIB};
 
 install-dev:
 	[ -d ${INSTPATH}/include ] || mkdir -p ${INSTPATH}/include;
