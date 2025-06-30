@@ -444,6 +444,137 @@ static _Bool inject(CO(ESclient, this), CO(String, str))
 /**
  * External public method.
  *
+ * This method initiates the dumping of an index using the scroll API.
+ *
+ * \param this		The object that is being dumped.
+ *
+ * \param str		A pointer to the object containing the search
+ *			criteria that is to be used for the dump.
+ *
+ * \return	A boolean value is used to indicate whether or not the
+ *		initiation of the search succeeded.  A false value indicates
+ *		that the initiation failed.  A true value indicates that
+ *		the search was initiated and the output buffer contains
+ *		the results of the first query.
+ */
+
+static _Bool scroll(CO(ESclient, this), CO(String, str))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Check object state. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( S->ctxt == NULL )
+		ERR(goto done);
+
+	/* Create the command. */
+	S->command->reset(S->command);
+	if ( !S->command->add_sprintf(S->command,			\
+				      "%s/%s/_search\?scroll=30s",	\
+				      S->endpoint->get(S->endpoint),	\
+				      S->index->get(S->index)) )
+		ERR(goto done);
+
+	if ( curl_easy_setopt(S->ctxt, CURLOPT_URL, \
+			      S->command->get(S->command)) != CURLE_OK )
+		ERR(goto done);
+	if ( curl_easy_setopt(S->ctxt, CURLOPT_CUSTOMREQUEST, "GET") != \
+	     CURLE_OK )
+		ERR(goto done);
+
+	/* Set the search criteria. */
+	if ( curl_easy_setopt(S->ctxt, CURLOPT_POSTFIELDSIZE_LARGE, \
+			      str->size(str)) != CURLE_OK )
+		ERR(goto done);
+	if ( curl_easy_setopt(S->ctxt, CURLOPT_POSTFIELDS, str->get(str)) \
+	     != CURLE_OK)
+		ERR(goto done);
+
+	/* Request generation of the list. */
+	if ( curl_easy_perform(S->ctxt) != CURLE_OK )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
+ * This method requests the next window of scroll data.
+ *
+ * \param this		The object that is being scrolled.
+ *
+ * \param str		A pointer to the object containing the scroll
+ *			command to be issued.
+ *
+ * \return	A boolean value is used to indicate whether or not the
+ *		scroll succeeded.  A false value indicates that the
+ *		scroll failed while a true value indicates that the
+ *		Buffer object associated with this connection has
+ *		valid data.
+ */
+
+static _Bool next(CO(ESclient, this), CO(String, str))
+
+{
+	STATE(S);
+
+	_Bool retn = false;
+
+
+	/* Check object state. */
+	if ( S->poisoned )
+		ERR(goto done);
+	if ( S->ctxt == NULL )
+		ERR(goto done);
+
+	/* Create the command. */
+
+	S->command->reset(S->command);
+	if ( !S->command->add_sprintf(S->command,			\
+				      "%s/_search/scroll",		\
+				      S->endpoint->get(S->endpoint)) )
+		ERR(goto done);
+
+	if ( curl_easy_setopt(S->ctxt, CURLOPT_URL, \
+			      S->command->get(S->command)) != CURLE_OK )
+		ERR(goto done);
+	if ( curl_easy_setopt(S->ctxt, CURLOPT_CUSTOMREQUEST, "GET") != \
+	     CURLE_OK )
+		ERR(goto done);
+
+	/* Set the search criteria. */
+
+	if ( curl_easy_setopt(S->ctxt, CURLOPT_POSTFIELDSIZE_LARGE, \
+			      str->size(str)) != CURLE_OK )
+		ERR(goto done);
+	if ( curl_easy_setopt(S->ctxt, CURLOPT_POSTFIELDS, str->get(str)) \
+	     != CURLE_OK)
+		ERR(goto done);
+
+	/* Request generation of the list. */
+	if ( curl_easy_perform(S->ctxt) != CURLE_OK )
+		ERR(goto done);
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * External public method.
+ *
  * This method implements a destructor for a ESclient object.
  *
  * \param this	A pointer to the object which is to be destroyed.
@@ -506,6 +637,8 @@ extern ESclient NAAAIM_ESclient_Init(void)
 
 	this->inject = inject;
 	this->list   = list;
+	this->scroll = scroll;
+	this->next   = next;
 
 	this->whack = whack;
 

@@ -30,6 +30,8 @@ struct NAAAIM_ESclient
 
 	_Bool (*inject)(const ESclient, const String);
 	_Bool (*list)(const ESclient);
+	_Bool (*scroll)(const ESclient, const String);
+	_Bool (*next)(const ESclient, const String);
 
 	void (*whack)(const ESclient);
 
