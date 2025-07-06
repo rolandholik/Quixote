@@ -398,6 +398,12 @@ static _Bool _get_key(CO(TSEMparser_State, S), CO(char *, key))
 		++start;
 	end = start;
 
+	if ( (*end == '}') || (*end == '"') ) {
+		retn = true;
+		S->key_value->reset(S->key_value);
+		goto done;
+	}
+
 	while ( !found ) {
 		if ( (end = strchr(end, '"')) == NULL )
 			ERR(goto done);
