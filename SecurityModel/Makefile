@@ -69,6 +69,8 @@ NAAAIMLIB      = -L ../lib -lNAAAIM
 
 CURL_LIB = ${shell pkg-config --libs libcurl} -lssl -lcrypto -lz
 
+CJSON_LIB = -L ${TOPDIR}/Support/cJSON -l cjson
+
 LIBS = ${NAAAIMLIB} ${HURDLIB}
 
 CFLAGS := ${CFLAGS} -I.. -I../lib -I../HurdLib -I ${SANCHODIR} -I ../SRDE
@@ -118,7 +120,7 @@ sign-model: sign-model.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO};
 
 qidx-util: qidx-util.o
-	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${CURL_LIB};
+	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${CURL_LIB} ${CJSON_LIB};
 
 generate-pseudonym: generate-pseudonym.o Cell.o EventParser.o
 	${CC} ${LDFLAGS} -o $@ $^ ${LIBS} ${BUILD_LIBCRYPTO};
