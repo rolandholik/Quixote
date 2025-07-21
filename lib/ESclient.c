@@ -234,13 +234,16 @@ static size_t _output_cb(void *data, size_t size, size_t nmemb, void *output)
  *		instance.
  */
 
-static _Bool init(CO(ESclient, this), CO(char *, host), CO(char *, index), \
-		  CO(char *, user), CO(char *, pwd), CO(Buffer, bufr))
+static _Bool init(CO(ESclient, this), CO(char *, host), CO(char *, port), \
+		  CO(char *, index), CO(char *, user), CO(char *, pwd),	  \
+		  CO(Buffer, bufr))
 
 {
 	STATE(S);
 
 	_Bool retn = false;
+
+	const char *pn = port == NULL ? "9200" : port;
 
 
 	/* Check object state. */
@@ -273,7 +276,8 @@ static _Bool init(CO(ESclient, this), CO(char *, host), CO(char *, index), \
 
 	/* Set the endpoint name. */
 	S->endpoint->reset(S->endpoint);
-	if ( !S->endpoint->add_sprintf(S->endpoint, "https://%s:9200", host) )
+	if ( !S->endpoint->add_sprintf(S->endpoint, "https://%s:%s", host, \
+				       pn) )
 		ERR(goto done);
 
 	/* Set the boilerplate definitions. */
