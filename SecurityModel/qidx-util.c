@@ -253,6 +253,7 @@ int main(int argc, char *argv[])
 
 {
 	char *host  = NULL,
+	     *port  = NULL,
 	     *index = NULL,
 	     *pwd   = NULL,
 	     *user  = NULL;
@@ -272,7 +273,7 @@ int main(int argc, char *argv[])
 
 
 	/* Parse and validate arguments. */
-	while ( (opt = getopt(argc, argv, "DLh:i:p:u:")) != EOF )
+	while ( (opt = getopt(argc, argv, "DLh:i:p:u:P:")) != EOF )
 		switch ( opt ) {
 			case 'D':
 				mode = dump_mode;
@@ -288,10 +289,14 @@ int main(int argc, char *argv[])
 				index = optarg;
 				break;
 			case 'p':
-				pwd = optarg;
+				port = optarg;
 				break;
 			case 'u':
 				user = optarg;
+				break;
+
+			case 'P':
+				pwd = optarg;
 				break;
 		}
 
@@ -314,15 +319,22 @@ int main(int argc, char *argv[])
 		goto done;
 	}
 
+	if ( index == NULL ) {
+		fputs("No endpoint index specified.\n", stderr);
+		return 1;
+	}
+
 	if ( pwd == NULL )
 		pwd = getenv("QUIXOTE_IDX_PWD");
+
+	port = getenv("QUIXOTE_IDX_PORT");
 
 
 	/* Initialize the index manipulation objects. */
 	INIT(HurdLib, Buffer, bufr, ERR(goto done));
 
 	INIT(NAAAIM, ESclient, client, ERR(goto done));
-	if ( !client->init(client, host, index, user, pwd, bufr) )
+	if ( !client->init(client, host, port, index, user, pwd, bufr) )
 		ERR(goto done);
 
 	switch ( mode ) {

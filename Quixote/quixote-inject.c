@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 
@@ -258,8 +259,10 @@ int main(int argc, char *argv[])
 	      verbose  = false;
 
 	char *host  = NULL,
+	     *port  = NULL,
 	     *index = NULL,
 	     *user  = NULL,
+	     *pwd   = NULL,
 	     *model = NULL;
 
 	int opt,
@@ -273,7 +276,7 @@ int main(int argc, char *argv[])
 
 
 	/* Parse and validate arguments. */
-	while ( (opt = getopt(argc, argv, "Mvnh:i:m:u:")) != EOF )
+	while ( (opt = getopt(argc, argv, "Mvnh:i:m:p:u:P:")) != EOF )
 		switch ( opt ) {
 			case 'M':
 				modeling = true;
@@ -295,25 +298,44 @@ int main(int argc, char *argv[])
 			case 'm':
 				model = optarg;
 				break;
+			case 'p':
+				port = optarg;
+				break;
 			case 'u':
 				user = optarg;
+				break;
+
+			case 'P':
+				pwd = optarg;
 				break;
 		}
 
 
 	/* Validate required inputs. */
+	if ( host == NULL )
+		host = getenv("QUIXOTE_IDX_HOST");
 	if ( host == NULL ) {
 		fputs("No endpoint host specified.\n", stderr);
 		return 1;
 	}
-	if ( index == NULL ) {
-		fputs("No endpoint index specified.\n", stderr);
-		return 1;
-	}
+
+	if ( user == NULL )
+		user = getenv("QUIXOTE_IDX_USER");
 	if ( user == NULL ) {
 		fputs("No user name specified.\n", stderr);
 		return 1;
 	}
+
+	if ( index == NULL ) {
+		fputs("No endpoint index specified.\n", stderr);
+		return 1;
+	}
+
+	if ( pwd == NULL )
+		pwd = getenv("QUIXOTE_IDX_PWD");
+
+	port = getenv("QUIXOTE_IDX_PORT");
+
 
 	/* Open the input file. */
 	INIT(HurdLib, String, str, ERR(goto done));
@@ -326,7 +348,7 @@ int main(int argc, char *argv[])
 
 	/* Initialize the endpoint. */
 	INIT(NAAAIM, ESclient, es, ERR(goto done));
-	if ( !es->init(es, host, index, user, NULL, NULL) ) {
+	if ( !es->init(es, host, port, index, user, pwd, NULL) ) {
 		fputs("Error initializing endpoint connection.\n", stderr);
 		goto done;
 	}
