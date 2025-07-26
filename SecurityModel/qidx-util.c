@@ -319,7 +319,7 @@ int main(int argc, char *argv[])
 		goto done;
 	}
 
-	if ( index == NULL ) {
+	if ( (mode != list_mode) && (index == NULL) ) {
 		fputs("No endpoint index specified.\n", stderr);
 		return 1;
 	}
@@ -327,7 +327,8 @@ int main(int argc, char *argv[])
 	if ( pwd == NULL )
 		pwd = getenv("QUIXOTE_IDX_PWD");
 
-	port = getenv("QUIXOTE_IDX_PORT");
+	if ( port == NULL )
+		port = getenv("QUIXOTE_IDX_PORT");
 
 
 	/* Initialize the index manipulation objects. */
