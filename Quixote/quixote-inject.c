@@ -334,7 +334,8 @@ int main(int argc, char *argv[])
 	if ( pwd == NULL )
 		pwd = getenv("QUIXOTE_IDX_PWD");
 
-	port = getenv("QUIXOTE_IDX_PORT");
+	if ( port == NULL )
+		port = getenv("QUIXOTE_IDX_PORT");
 
 
 	/* Open the input file. */
