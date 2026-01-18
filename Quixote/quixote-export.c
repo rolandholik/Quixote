@@ -11,7 +11,8 @@
  *
  * /sys/kernel/security/tsem/export
  *
- * Export can be directed to a file or to an MQTT broker.
+ * Export can be directed to a file, an MQTT broker or directly into
+ * a document indexing engine.
  *
  * In addition to running workloads in subordinate modeling namespaces,
  * this utility also provides support for exporting security events
@@ -62,6 +63,7 @@
 #include "TTYduct.h"
 #include "LocalDuct.h"
 #include "MQTTduct.h"
+#include "ESclient.h"
 #include "SHA256.h"
 
 #include "SecurityPoint.h"
@@ -133,6 +135,7 @@ static Gaggle Output = NULL;
  */
 static File Output_File	    = NULL;
 static MQTTduct MQTT	    = NULL;
+static ESclient IDX	    = NULL;
 static String Output_String = NULL;
 
 /**
@@ -297,6 +300,11 @@ static _Bool output_event(CO(TSEMevent, event))
 
 	if ( MQTT != NULL ) {
 		if ( !MQTT->send_String(MQTT, Output_String) )
+			ERR(goto done);
+	}
+
+	if ( IDX != NULL ) {
+		if ( !IDX->inject(IDX, Output_String) )
 			ERR(goto done);
 	}
 
@@ -550,6 +558,107 @@ static _Bool run_broker_workload(CO(TSEMworkload, workload),		\
 
 	if ( !workload->run_workload(workload, NULL, output_event, NULL) )
 		ERR(goto done);
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/** Private function.
+ *
+ * This function is responsible for opening a connection to an index
+ * engine endpoint.
+ *
+ * \param endpoint	A null-terminated buffer containing the hostname
+ *			of the broker.
+ *
+ * \param port		A null-terminated buffer containing the ASCII
+ *			representation of the numeric port value that
+ *			is to be used for the connection.
+ *
+ * \param user		A null-terminated buffer containing the name of
+ *			the user to be used for authenticating to the
+ *			broker.
+ *
+ * \param pwd		A pointer to a null-terminated buffer containing
+ *			the password to be used to authenticate to
+ *			the indexing engine.
+ *
+ * \param index		A pointer to a null-terminated buffer containing
+ *			the name of the index that the security event
+ *			descriptions are to be written to.
+ *
+ * \return	A boolean value is used to indicate whether or establishing
+ *		of the connection succeeded.  A false value indicates a
+ *		failure while a true value indicates the connection has
+ *		been established and is operational.
+ */
+
+static _Bool _open_endpoint(CO(char *, endpoint), CO(char *, port),	\
+			    CO(char *, user), CO(char *, pwd),		\
+			    CO(char *, index))
+
+{
+	_Bool retn = false;
+
+
+	INIT(NAAAIM, ESclient, IDX, ERR(goto done));
+	if ( !IDX->init(IDX, endpoint, port, index, user, pwd, NULL) )
+		ERR(goto done);
+
+	retn = true;
+
+
+ done:
+	return retn;
+}
+
+
+/**
+ * Private function.
+ *
+ * This function is responsible for launching a workload in an
+ * independent security modeling namespace that has the events exported
+ * by that namespace to a document indexing engine.  The functionality of
+ * this function is identical to the run_broker_workload() function with the
+ * exception that this function initializes the index client in the
+ * context of the monitor process.
+ *
+ * \param workload	The object controlling the workload that is to
+ *			be executed.
+ *
+ * \param endpoint	A null-terminated character buffer containing
+ *			the name of the host running the indexing
+ *			engine.
+ *
+ * \param argv		A pointer to the array of strings describing
+ *			the command-line arguements.  This variable and
+ *			the argc value are used if the export utility
+ *			has been running in execute mode.
+ *
+ * \return	A boolean value is returned to reflect the status of
+ *		the launch.  A false value indicates an error was
+ *		encountered while a true value indicates the cartridge
+ *		was successfully launched.
+ */
+
+static _Bool run_index_workload(CO(TSEMworkload, workload),		\
+				CO(char *, endpoint), CO(char *, port), \
+				CO(char *, user), CO(char *, pwd),	\
+				CO(char *, index))
+
+{
+	_Bool retn = false;
+
+
+	if ( !_open_endpoint(endpoint, port, user, pwd, index) )
+		ERR(goto done);
+
+	if ( !workload->run_workload(workload, NULL, output_event, NULL) )
+		ERR(goto done);
+	fputs("Exited index workload.\n", stderr);
 	retn = true;
 
 
@@ -856,6 +965,7 @@ extern int main(int argc, char *argv[])
 
 	char *debug	    = NULL,
 	     *broker	    = NULL,
+	     *endpoint	    = NULL,
 	     *topic	    = NULL,
 	     *port	    = NULL,
 	     *name	    = NULL,
@@ -870,7 +980,8 @@ extern int main(int argc, char *argv[])
 	TSEMworkload workload = NULL;
 
 
-	while ( (opt = getopt(argc, argv, "CPRSXafuM:b:d:h:n:o:p:q:s:t:w:")) \
+	while ( (opt = getopt(argc, argv,
+			      "CPRSXafuM:b:d:e:h:n:o:p:q:s:t:w:")) \
 		!= EOF )
 		switch ( opt ) {
 			case 'C':
@@ -909,6 +1020,9 @@ extern int main(int argc, char *argv[])
 			case 'd':
 				debug = optarg;
 				break;
+			case 'e':
+				endpoint = optarg;
+				break;
 			case 'h':
 				Digest = optarg;
 				break;
@@ -934,7 +1048,7 @@ extern int main(int argc, char *argv[])
 
 
 	/* We need an output file. */
-	if ( (outfile == NULL) && (broker == NULL) ) {
+	if ( (outfile == NULL) && (broker == NULL) && (endpoint == NULL) ) {
 		fputs("No output method specified.\n", stderr);
 		goto done;
 	}
@@ -1016,12 +1130,24 @@ extern int main(int argc, char *argv[])
 		if ( !run_broker_workload(workload, broker, port, tsem_user, \
 					  topic) )
 			ERR(goto done);
-
-	} else {
+	} else if ( endpoint != NULL ) {
+		if ( topic == NULL ) {
+			fputs("No index specified.\n", stderr);
+			goto done;
+		}
+		if ( Debug )
+			fprintf(Debug, "Index output: host=%s, index=%s\n", \
+				endpoint, topic);
+		if ( !run_index_workload(workload, endpoint, port, tsem_user, \
+					 NULL, topic) )
+			ERR(goto done);
+	} else if ( outfile != NULL ) {
 		/* Run a file based workload. */
 		if ( !run_workload(workload, outfile) )
 			ERR(goto done);
 	}
+	fputs("Exited workload.\n", stderr);
+
 
 	waitpid(Monitor_pid, NULL, 0);
 
@@ -1030,6 +1156,7 @@ extern int main(int argc, char *argv[])
 	WHACK(Boot_ID);
 	WHACK(Output_String);
 	WHACK(MQTT);
+	WHACK(IDX);
 	WHACK(Output_File);
 
 	WHACK(workload);

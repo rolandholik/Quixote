@@ -175,7 +175,8 @@ quixote-xen.o: quixote-xen.c
 	${CC} ${CFLAGS} ${XENCFLAGS} -c $< -o $@;
 
 quixote-export: quixote-export.o ${LIBDEPS} ${MODELDEPS}
-	${CC} ${LDFLAGS} -o $@ $< ${MODELDEPS} ${LIBS} ${MOSQUITTO_LIB};
+	${CC} ${LDFLAGS} -o $@ $< ${MODELDEPS} ${LIBS} ${CURL_LIBS} \
+		${MOSQUITTO_LIB};
 
 quixote-console: quixote-console.o ${LIBDEPS}
 	${CC} ${LDFLAGS} -o $@ $< ${LIBS};
