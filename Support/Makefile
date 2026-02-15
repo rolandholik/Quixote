@@ -166,7 +166,7 @@ distclean: clean
 	[ -d mosquitto ] && rm -rf mosquitto || true;
 	[ -d mbedtls ] && rm -rf mbedtls || true;
 	[ -d nRF5_SDK ] && rm -rf nRF5_SDK || true;
-	[ -d cJSON ] && rm -rf CJSON || true;
+	[ -d cJSON ] && rm -rf cJSON || true;
 	rm -f *.stamp;
 
 purge: distclean
